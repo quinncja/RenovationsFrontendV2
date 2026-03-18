@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Synchronously apply stored theme before first paint to prevent flash -->
+    <script>
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === '"light"' || t === 'light') {
+          document.documentElement.style.colorScheme = 'light';
+        }
+      } catch (e) {}
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900&display=swap")
+    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>93E Dashboard</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
