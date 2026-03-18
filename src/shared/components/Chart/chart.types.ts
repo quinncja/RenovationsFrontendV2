@@ -2,7 +2,7 @@
 
 export interface LinePoint {
   x: string | number
-  y: number
+  y: number | null
 }
 
 export interface LineSeries {

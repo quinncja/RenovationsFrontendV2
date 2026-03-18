@@ -13,7 +13,7 @@ const ALL_MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 function buildMonthSeries(points: MonthlySpendingPoint[]) {
   return ALL_MONTHS.map((m) => {
     const found = points.find((p) => p.month === m)
-    return { x: shortMonth(m), y: found?.spending ?? 0 }
+    return { x: shortMonth(m), y: found?.spending ?? null }
   })
 }
 
