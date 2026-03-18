@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react"
-import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
 import { ChevronRight, ChevronDown, ChevronUp, ChevronsUpDown, Search } from "lucide-react"
 import Page from "../../shared/components/Page"
@@ -89,14 +88,6 @@ function getJobStatusClass(status: number): string {
   return JOB_STATUS_CLASS[status] ?? "closed"
 }
 
-function costTypeClass(type: string | null | undefined): string {
-  const t = (type ?? "").toLowerCase()
-  if (t.includes("mat")) return "jc-ct-material"
-  if (t.includes("lab")) return "jc-ct-labor"
-  if (t.includes("sub")) return "jc-ct-sub"
-  if (t.includes("equip")) return "jc-ct-equip"
-  return "jc-ct-other"
-}
 
 function projectedMargin(revisedContract: number, revisedEstimate: number): number | null {
   if (revisedContract <= 0 || revisedEstimate <= 0) return null
@@ -163,7 +154,6 @@ function SummaryRow({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Jobcost() {
-  const navigate = useNavigate()
   const [year, setYear] = useState(new Date().getFullYear())
   const [jobs, setJobs] = useState<JobRow[]>([])
   const [isLoading, setIsLoading] = useState(false)

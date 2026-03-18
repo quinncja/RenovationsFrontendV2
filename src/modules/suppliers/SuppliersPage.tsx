@@ -89,7 +89,7 @@ function SuppliersContent({ year, setYear }: { year: number | null; setYear: (y:
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.map((item, i) => (
+                  {sorted.map((item) => (
                     <tr
                       key={item.id}
                       className="spend-rank-table-row"
