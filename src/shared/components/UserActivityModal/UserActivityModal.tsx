@@ -176,7 +176,7 @@ export function UserActivityModal({ user, isAdmin, onClose, onRoleChange }: User
                     <span className="usr-activity-stat-value usr-activity-stat-value--month">
                       {isLoading ? "—" : (activity?.thisMonth ?? 0).toLocaleString()}
                     </span>
-                    <span className="usr-activity-stat-label">This Month</span>
+                    <span className="usr-activity-stat-label">Last 30 Days</span>
                   </div>
                 </div>
 
