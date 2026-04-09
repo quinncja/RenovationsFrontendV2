@@ -440,10 +440,10 @@ export default function Jobcost() {
           </div>
           <div className="jc-list-header-right">
             <div className="jc-financial-col">
-              <SortHeader label="Revised Contract" sortKey="revisedContract" active={sortKey === "revisedContract"} dir={sortDir} onSort={handleSort} />
+              <SortHeader label="Contract" sortKey="revisedContract" active={sortKey === "revisedContract"} dir={sortDir} onSort={handleSort} />
             </div>
             <div className="jc-financial-col">
-              <SortHeader label="Revised Estimate" sortKey="revisedEstimate" active={sortKey === "revisedEstimate"} dir={sortDir} onSort={handleSort} />
+              <SortHeader label="Estimate" sortKey="revisedEstimate" active={sortKey === "revisedEstimate"} dir={sortDir} onSort={handleSort} />
             </div>
             <div className="jc-financial-col">
               <SortHeader label="Profit" sortKey="profit" active={sortKey === "profit"} dir={sortDir} onSort={handleSort} />
@@ -452,7 +452,9 @@ export default function Jobcost() {
               <SortHeader label="Margin" sortKey="margin" active={sortKey === "margin"} dir={sortDir} onSort={handleSort} />
             </div>
           </div>
-          <div className="jc-header-btn-spacer" />
+          <button className="jc-view-project-btn" style={{ visibility: 'hidden' }} aria-hidden tabIndex={-1}>
+            <span className="jc-view-btn-text">View Project</span> <ExternalLink size={13} />
+          </button>
         </div>
       )}
 
@@ -532,7 +534,7 @@ export default function Jobcost() {
                   onClick={(e) => { e.stopPropagation(); navigate(`/jobcosting/${job.recnum}`) }}
                   title="View project details"
                 >
-                  View Project <ExternalLink size={13} />
+                  <span className="jc-view-btn-text">View Project</span> <ExternalLink size={13} />
                 </button>
               </div>
 
