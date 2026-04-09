@@ -7,6 +7,10 @@ import { formatMoneyFull, formatDate } from "../../utils/format"
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface JobSummary {
+  recnum?: number
+  jobName?: string
+  status?: number
+  clientName?: string | null
   originalContract: number
   changeOrderTotal: number
   revisedContract: number
@@ -185,7 +189,7 @@ export function JobDetailPanel({ detail, expandedGroups, onToggleGroup }: JobDet
         <div className="jc-summary-panel">
           <p className="jc-summary-section-label">Cost Summary</p>
           <SummaryRow label="Revised Estimate" value={formatMoneyFull(s?.revisedEstimate ?? 0)} />
-          <SummaryRow label="Actual to Date" value={formatMoneyFull(s?.actualToDate ?? 0)} />
+          <SummaryRow label="Spending to Date" value={formatMoneyFull(s?.actualToDate ?? 0)} />
           <SummaryRow
             label="Projected Profit"
             value={formatMoneyFull(projProfit)}

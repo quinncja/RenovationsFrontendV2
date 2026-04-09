@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import { ResponsiveLine } from "@nivo/line"
 import { ResponsivePie } from "@nivo/pie"
 import { ResponsiveBar } from "@nivo/bar"
+import { ResponsiveRadialBar } from "@nivo/radial-bar"
 import type { ChartConfig, LineSeries } from "./chart.types"
 import { formatMoney, formatMoneyFull } from "../../utils/format"
 import { useDarkMode } from "../../hooks/useDarkMode"
@@ -203,12 +204,67 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
   )
 }
 
+// ─── Radial bar chart ────────────────────────────────────────────────────────
+
+function RadialBarChart({ config }: { config: Extract<ChartConfig, { type: "radial-bar" }> }) {
+  const { data, colors = CHART_COLORS, valueFormat: valueFmt } = config
+
+  const dark = useDarkMode()
+  const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
+  const fmt = valueFmt ?? formatMoneyFull
+  const trackColor = dark ? "rgba(148,163,184,0.08)" : "rgba(25,55,90,0.06)"
+
+  return (
+    <ResponsiveRadialBar
+      data={data}
+      theme={nivoTheme}
+      colors={colors}
+      margin={{ top: 28, right: 120, bottom: 28, left: 28 }}
+      padding={0.3}
+      cornerRadius={3}
+      innerRadius={0.25}
+      enableTracks
+      tracksColor={trackColor}
+      enableRadialGrid={false}
+      enableCircularGrid
+      radialAxisStart={null}
+      circularAxisOuter={{ tickSize: 0, tickPadding: 8 }}
+      enableLabels={false}
+      animate
+      motionConfig={{ tension: 120, friction: 14 }}
+      legends={[
+        {
+          anchor: "right",
+          direction: "column",
+          justify: false,
+          translateX: 100,
+          translateY: 0,
+          itemsSpacing: 4,
+          itemWidth: 90,
+          itemHeight: 18,
+          itemDirection: "left-to-right",
+          symbolSize: 8,
+          symbolShape: "circle",
+        },
+      ]}
+      tooltip={({ bar }) => (
+        <div className="chart-tooltip">
+          <span className="chart-tooltip-dot" style={{ background: bar.color }} />
+          <span>{bar.groupId} — {bar.category}</span>
+          <strong>{fmt(bar.value)}</strong>
+        </div>
+      )}
+    />
+  )
+}
+
 // ─── Line chart ───────────────────────────────────────────────────────────────
 
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
   const { series, yFormat, enableArea = true, legend = false, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip } = config
 
   const dark = useDarkMode()
+  const isMobile = window.innerWidth <= 768
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
   const yTicks = everyOtherYTicks(series)
   const hasSeriesColors = series.some((s) => s.color)
@@ -223,7 +279,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       data={series}
       theme={nivoTheme}
       colors={hasSeriesColors ? (serie: { color?: string }) => serie.color ?? CHART_COLORS[0] : CHART_COLORS}
-      margin={{ top: marginTop, right: 24, bottom: 40, left: 68 }}
+      margin={{ top: marginTop, right: isMobile ? 12 : 24, bottom: 48, left: isMobile ? 48 : 68 }}
       xScale={{ type: "point" }}
       yScale={{ type: "linear", min: yMin, max: "auto", stacked: false }}
       curve={curve}
@@ -247,7 +303,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       }}
       axisBottom={{
         tickSize: 0,
-        tickPadding: 12,
+        tickPadding: 18,
         tickValues: axisBottomTickValues,
         format: axisBottomFormat,
       }}
@@ -339,7 +395,10 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
 
   return (
     <div className="pie-with-list">
-      <div className={`pie-with-list-chart pie-with-list-chart--${chartSize}`}>
+      <div
+        className={`pie-with-list-chart pie-with-list-chart--${chartSize}`}
+        onClick={onItemClick ? (e) => e.stopPropagation() : undefined}
+      >
         <ResponsivePie
           data={pieData}
           theme={nivoTheme}
@@ -358,13 +417,18 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
               ? ["arcs", "arcLabels", "arcLinkLabels", "legends", CenterLayer]
               : ["arcs", "arcLabels", "arcLinkLabels", "legends"]
           }
-          tooltip={({ datum }) => (
-            <div className="chart-tooltip">
-              <span className="chart-tooltip-dot" style={{ background: datum.color }} />
-              <span>{datum.label}</span>
-              <strong>{valueFormat(datum.value as number)}</strong>
-            </div>
-          )}
+          onClick={onItemClick ? (datum) => onItemClick(String(datum.id)) : undefined}
+          tooltip={({ datum }) => {
+            const pct = total > 0 ? ((datum.value as number) / total) * 100 : 0
+            return (
+              <div className="chart-tooltip">
+                <span className="chart-tooltip-dot" style={{ background: datum.color }} />
+                <span>{datum.label}</span>
+                <strong>{valueFormat(datum.value as number)}</strong>
+                <span className="chart-tooltip-pct">({pct.toFixed(1)}%)</span>
+              </div>
+            )
+          }}
         />
       </div>
 
@@ -406,6 +470,12 @@ export function Chart({ config }: { config: ChartConfig }) {
       return (
         <div className="chart-container">
           <BarChart config={config} />
+        </div>
+      )
+    case "radial-bar":
+      return (
+        <div className="chart-container">
+          <RadialBarChart config={config} />
         </div>
       )
     case "line":

@@ -4,9 +4,13 @@ import Page from "../../shared/components/Page"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
+import { PeriodSelector, periodToParams, type Period } from "../../shared/components/PeriodSelector/PeriodSelector"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { formatMoneyFull, formatDate } from "../../shared/utils/format"
+import useIsMobile from "../../shared/hooks/useIsMobile"
+import { MobileFilterSheet, activeFilterCount, type FilterGroup } from "../../shared/components/MobileFilterSheet/MobileFilterSheet"
+import { MobileFilterButton } from "../../shared/components/MobileFilterSheet/MobileFilterButton"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,11 +73,15 @@ function FilterButton({
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Invoices() {
+  const isMobile = useIsMobile()
   const [year, setYear] = useState(new Date().getFullYear())
+  const [period, setPeriod] = useState<Period>("annual")
   const [invoices, setInvoices] = useState<InvoiceRow[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [disconnected, setDisconnected] = useState(false)
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [selectedInvoice, setSelectedInvoice] = useState<{ id: string; module: "clients" | "suppliers" } | null>(null)
   const [sortCol, setSortCol] = useState<SortCol>("invoiceDate")
@@ -83,12 +91,17 @@ export default function Invoices() {
     let cancelled = false
     setIsLoading(true)
     setInvoices([])
-    fetchPageData({ module: "invoices", queries: ["allInvoices"], params: { year } })
-      .then((data) => { if (!cancelled) setInvoices((data.allInvoices as InvoiceRow[]) ?? []) })
+    fetchPageData({ module: "invoices", queries: ["allInvoices"], params: { year, ...periodToParams(period) } })
+      .then((data) => {
+        if (cancelled) return
+        const allNull = Object.values(data).every((v) => v === null)
+        setDisconnected(allNull)
+        setInvoices((data.allInvoices as InvoiceRow[]) ?? [])
+      })
       .catch(() => { if (!cancelled) setInvoices([]) })
       .finally(() => { if (!cancelled) setIsLoading(false) })
     return () => { cancelled = true }
-  }, [year])
+  }, [year, period])
 
   const filtered = invoices.filter((inv) => {
     if (typeFilter !== "all" && inv.type !== typeFilter) return false
@@ -138,46 +151,97 @@ export default function Invoices() {
     })
   }
 
+  const invFilterGroups: FilterGroup[] = [
+    {
+      key: "type",
+      label: "Type",
+      options: [
+        { value: "all", label: "All" },
+        { value: "AR", label: "AR – Receivable", colorClass: "inv-filter-ar" },
+        { value: "AP", label: "AP – Payable", colorClass: "inv-filter-ap" },
+      ],
+    },
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "all", label: "All" },
+        { value: "1", label: "Open", colorClass: "inv-filter-open" },
+        { value: "2", label: "Review", colorClass: "inv-filter-review" },
+        { value: "3", label: "Dispute", colorClass: "inv-filter-dispute" },
+        { value: "4", label: "Paid", colorClass: "inv-filter-paid" },
+        { value: "5", label: "Void", colorClass: "inv-filter-void" },
+      ],
+    },
+  ]
+
+  const invFilterDefaults = { type: "all", status: "all" }
+  const invFilterValues = { type: typeFilter, status: statusFilter }
+  const invActiveCount = activeFilterCount(invFilterValues, invFilterDefaults)
+
   return (
-    <Page title="Invoices">
+    <Page title="Invoices" actions={<><PeriodSelector value={period} onChange={setPeriod} /><YearSelector value={year} onChange={setYear} /></>}>
       <MotionList className="inv-page-stack">
 
         {/* ── 1. Filters + Metrics card ── */}
         <MotionItem>
           <div className="card inv-filter-metrics-card">
-            <div className="inv-filter-row">
-              <div className="jc-filter-group">
-                <span className="jc-filter-label">Type</span>
-                <div className="jc-filter-buttons">
-                  <FilterButton active={typeFilter === "all"} onClick={() => setTypeFilter("all")}>All</FilterButton>
-                  <FilterButton active={typeFilter === "AR"}  onClick={() => setTypeFilter("AR")}  colorClass="inv-filter-ar">AR</FilterButton>
-                  <FilterButton active={typeFilter === "AP"}  onClick={() => setTypeFilter("AP")}  colorClass="inv-filter-ap">AP</FilterButton>
+            {isMobile ? (
+              <div className="inv-filter-row">
+                <div className="jc-search-wrapper" style={{ flex: 1 }}>
+                  <Search size={13} className="jc-search-icon" />
+                  <input
+                    className="jc-search"
+                    placeholder="Search..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <MobileFilterButton count={invActiveCount} onClick={() => setFilterSheetOpen(true)} />
+              </div>
+            ) : (
+              <div className="inv-filter-row">
+                <div className="jc-filter-group">
+                  <span className="jc-filter-label">Type</span>
+                  <div className="jc-filter-buttons">
+                    <FilterButton active={typeFilter === "all"} onClick={() => setTypeFilter("all")}>All</FilterButton>
+                    <FilterButton active={typeFilter === "AR"}  onClick={() => setTypeFilter("AR")}  colorClass="inv-filter-ar">AR</FilterButton>
+                    <FilterButton active={typeFilter === "AP"}  onClick={() => setTypeFilter("AP")}  colorClass="inv-filter-ap">AP</FilterButton>
+                  </div>
+                </div>
+
+                <div className="jc-filter-group">
+                  <span className="jc-filter-label">Status</span>
+                  <div className="jc-filter-buttons">
+                    <FilterButton active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>All</FilterButton>
+                    <FilterButton active={statusFilter === "1"}   onClick={() => setStatusFilter("1")}>Open</FilterButton>
+                    <FilterButton active={statusFilter === "2"}   onClick={() => setStatusFilter("2")} colorClass="inv-filter-review">Review</FilterButton>
+                    <FilterButton active={statusFilter === "3"}   onClick={() => setStatusFilter("3")} colorClass="inv-filter-dispute">Dispute</FilterButton>
+                    <FilterButton active={statusFilter === "4"}   onClick={() => setStatusFilter("4")} colorClass="inv-filter-paid">Paid</FilterButton>
+                    <FilterButton active={statusFilter === "5"}   onClick={() => setStatusFilter("5")} colorClass="inv-filter-void">Void</FilterButton>
+                  </div>
+                </div>
+
+                <div className="jc-search-wrapper inv-search-grow">
+                  <Search size={13} className="jc-search-icon" />
+                  <input
+                    className="jc-search"
+                    placeholder="Search invoice #, entity, or description..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
                 </div>
               </div>
+            )}
 
-              <div className="jc-filter-group">
-                <span className="jc-filter-label">Status</span>
-                <div className="jc-filter-buttons">
-                  <FilterButton active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>All</FilterButton>
-                  <FilterButton active={statusFilter === "1"}   onClick={() => setStatusFilter("1")}>Open</FilterButton>
-                  <FilterButton active={statusFilter === "2"}   onClick={() => setStatusFilter("2")} colorClass="inv-filter-review">Review</FilterButton>
-                  <FilterButton active={statusFilter === "3"}   onClick={() => setStatusFilter("3")} colorClass="inv-filter-dispute">Dispute</FilterButton>
-                  <FilterButton active={statusFilter === "4"}   onClick={() => setStatusFilter("4")} colorClass="inv-filter-paid">Paid</FilterButton>
-                <FilterButton active={statusFilter === "5"}   onClick={() => setStatusFilter("5")} colorClass="inv-filter-void">Void</FilterButton>
-                </div>
-              </div>
-
-              <div className="jc-search-wrapper inv-search-grow">
-                <Search size={13} className="jc-search-icon" />
-                <input
-                  className="jc-search"
-                  placeholder="Search invoice #, entity, or description..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              <YearSelector value={year} onChange={setYear} />
-            </div>
+            <MobileFilterSheet
+              open={filterSheetOpen}
+              onClose={() => setFilterSheetOpen(false)}
+              groups={invFilterGroups}
+              values={invFilterValues}
+              defaults={invFilterDefaults}
+              onChange={(v) => { setTypeFilter(v.type as TypeFilter); setStatusFilter(v.status as StatusFilter) }}
+            />
 
             {isLoading && (
               <div className="inv-metrics-skeleton" />
@@ -210,6 +274,7 @@ export default function Invoices() {
             title="Invoices"
             loading={isLoading}
             noData={!isLoading && invoices.length === 0}
+            disconnected={disconnected}
             className="inv-table-widget"
           >
             {filtered.length === 0 && invoices.length > 0 && (

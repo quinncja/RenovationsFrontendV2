@@ -1,13 +1,13 @@
 import { StatWidget } from "../../../shared/components/StatWidget/StatWidget"
-import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
+import { useWidgetData, usePeriodLabel } from "../../../shared/context/PageContext"
 
 export function YearRevenueWidget() {
-  const year = usePageYear()
+  const label = usePeriodLabel()
   const { data, isLoading } = useWidgetData<{ yearRevenue: number | null }>(["yearRevenue"])
 
   return (
     <StatWidget
-      title={`${year} Revenue`}
+      title={`${label} Revenue`}
       value={data?.yearRevenue ?? null}
       loading={isLoading}
     />

@@ -1,0 +1,49 @@
+import fetchWithRetry from "../utils/fetchWithRetry"
+import { auth } from "../../core/auth/firebase"
+import type { DashboardLayout } from "../../modules/dashboard/types/dashboardLayout"
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api"
+
+export async function fetchDashboardLayout(): Promise<DashboardLayout | null> {
+  return fetchWithRetry(async () => {
+    const token = await auth.currentUser?.getIdToken()
+
+    const response = await fetch(`${API_BASE_URL}/user/dashboard-layout`, {
+      method: "GET",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    })
+
+    if (response.status === 404) return null
+
+    if (!response.ok) {
+      const error = new Error(`HTTP ${response.status}`) as Error & { status: number }
+      error.status = response.status
+      throw error
+    }
+
+    return response.json()
+  })
+}
+
+export async function saveDashboardLayout(layout: DashboardLayout): Promise<void> {
+  return fetchWithRetry(async () => {
+    const token = await auth.currentUser?.getIdToken()
+
+    const response = await fetch(`${API_BASE_URL}/user/dashboard-layout`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(layout),
+    })
+
+    if (!response.ok) {
+      const error = new Error(`HTTP ${response.status}`) as Error & { status: number }
+      error.status = response.status
+      throw error
+    }
+  })
+}

@@ -1,11 +1,13 @@
 import { useState, type ReactNode } from "react"
-import { ChevronRight, ChevronDown, ChartNoAxesColumn } from "lucide-react"
+import { ChevronRight, ChevronDown, ChartNoAxesColumn, DatabaseZap } from "lucide-react"
+import { usePageDisconnected } from "../../context/PageContext"
 
 interface WidgetProps {
   title?: string
   description?: string
   loading?: boolean
   noData?: boolean
+  disconnected?: boolean
   expandable?: boolean
   onExpand?: () => void
   collapsible?: boolean
@@ -19,6 +21,7 @@ export function Widget({
   description,
   loading,
   noData,
+  disconnected,
   expandable,
   onExpand,
   collapsible,
@@ -27,9 +30,16 @@ export function Widget({
   children,
 }: WidgetProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
+  const pageDisconnected = usePageDisconnected()
+  const isDisconnected = disconnected || pageDisconnected
 
   const body = loading ? (
     <div className="widget-skeleton" />
+  ) : isDisconnected ? (
+    <div className="widget-no-data widget-disconnected">
+      <DatabaseZap size={24} className="widget-no-data-icon" />
+      <span className="body-text">Data source offline</span>
+    </div>
   ) : noData ? (
     <div className="widget-no-data">
       <ChartNoAxesColumn size={24} className="widget-no-data-icon" />

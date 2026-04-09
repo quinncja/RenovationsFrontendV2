@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react"
-import { Wifi, WifiOff } from "lucide-react"
+import { Wifi, WifiOff, X } from "lucide-react"
 import { auth } from "../../core/auth/firebase"
 import { useAuth } from "../../core/auth/AuthProvider"
 import Page from "../../shared/components/Page"
@@ -25,13 +25,17 @@ function avatarInitials(name: string): string {
 function UserCard({
   user,
   isAdmin,
+  isExecutive,
   onAssignRole,
+  onReject,
   assigning,
   onClick,
 }: {
   user: UserRecord
   isAdmin: boolean
+  isExecutive?: boolean
   onAssignRole?: (uid: string, role: string) => void
+  onReject?: (uid: string) => void
   assigning: boolean
   onClick: () => void
 }) {
@@ -50,6 +54,15 @@ function UserCard({
       </div>
       {isAdmin && user.role === "waiting" && onAssignRole && (
         <div className="usr-assign-row">
+          {isExecutive && (
+            <button
+              className="usr-assign-btn usr-assign-executive"
+              disabled={assigning}
+              onClick={(e) => { e.stopPropagation(); onAssignRole(user.uid, "executive") }}
+            >
+              Executive
+            </button>
+          )}
           <button
             className="usr-assign-btn usr-assign-admin"
             disabled={assigning}
@@ -64,6 +77,16 @@ function UserCard({
           >
             Manager
           </button>
+          {onReject && (
+            <button
+              className="usr-assign-btn usr-assign-reject"
+              disabled={assigning}
+              onClick={(e) => { e.stopPropagation(); onReject(user.uid) }}
+              title="Reject user"
+            >
+              <X size={14} strokeWidth={3} />
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -94,7 +117,9 @@ function Column({
 
 export default function Users() {
   const { user, claims } = useAuth()
-  const isAdmin = claims["role"] === "admin"
+  const userRole = claims["role"] as string | undefined
+  const isExecutive = userRole === "executive"
+  const isAdmin = userRole === "admin" || isExecutive
 
   const [users, setUsers] = useState<UserRecord[]>([])
   const [connected, setConnected] = useState(false)
@@ -146,6 +171,24 @@ export default function Users() {
     }
   }, [user])
 
+  async function handleRejectUser(uid: string) {
+    if (assigning) return
+    setAssigning(uid)
+    // Optimistically remove from the list
+    setUsers((prev) => prev.filter((u) => u.uid !== uid))
+    try {
+      const token = await auth.currentUser?.getIdToken()
+      await fetch(`${API_BASE_URL}/users/${uid}`, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      })
+    } finally {
+      setAssigning(null)
+    }
+  }
+
   async function handleAssignRole(uid: string, role: string) {
     if (assigning) return
     setAssigning(uid)
@@ -164,9 +207,10 @@ export default function Users() {
     }
   }
 
+  const executives = isExecutive ? users.filter((u) => u.role === "executive") : []
   const admins = users.filter((u) => u.role === "admin")
   const managers = users.filter((u) => u.role === "manager")
-  const waiting = users.filter((u) => u.role === "waiting" || !["admin", "manager"].includes(u.role))
+  const waiting = users.filter((u) => u.role === "waiting" || !["executive", "admin", "manager"].includes(u.role))
 
   return (
     <>
@@ -183,6 +227,18 @@ export default function Users() {
     >
       <MotionList><MotionItem>
       <div className="usr-board">
+        {isExecutive && (
+          <Column title="Executives" badge={executives.length}>
+            {executives.length === 0 ? (
+              <p className="usr-empty">No executives</p>
+            ) : (
+              executives.map((u) => (
+                <UserCard key={u.uid} user={u} isAdmin={isAdmin} assigning={assigning === u.uid} onClick={() => setSelectedUser(u)} />
+              ))
+            )}
+          </Column>
+        )}
+
         <Column title="Admins" badge={admins.length}>
           {admins.length === 0 ? (
             <p className="usr-empty">No admins</p>
@@ -212,7 +268,9 @@ export default function Users() {
                 key={u.uid}
                 user={u}
                 isAdmin={isAdmin}
+                isExecutive={isExecutive}
                 onAssignRole={handleAssignRole}
+                onReject={handleRejectUser}
                 assigning={assigning === u.uid}
                 onClick={() => setSelectedUser(u)}
               />
@@ -226,6 +284,7 @@ export default function Users() {
     <UserActivityModal
       user={selectedUser}
       isAdmin={isAdmin}
+      isExecutive={isExecutive}
       onClose={() => setSelectedUser(null)}
       onRoleChange={handleAssignRole}
     />

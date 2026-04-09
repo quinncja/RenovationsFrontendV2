@@ -24,6 +24,14 @@ export const PAGE_QUERIES = {
     "jobCostGroups",
     "jobCostTransactions",
   ],
+  jobCostDetailPage: [
+    "jobCostSummary",
+    "jobCostGroups",
+    "jobCostTransactions",
+    "jobCostMonthlyCosts",
+    "jobCostInvoices",
+    "jobCostVendorSpend",
+  ],
   users: [
     "allUsers",
   ],

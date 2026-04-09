@@ -46,6 +46,17 @@ export async function fetchPageData(
       throw error
     }
 
-    return response.json()
+    const result: PageDataResponse = await response.json()
+
+    // Strip server-side query errors ({ __error: "..." }) → null
+    // so consumers safely fall through to empty/no-data states.
+    for (const key of Object.keys(result)) {
+      const val = result[key]
+      if (val && typeof val === "object" && "__error" in (val as Record<string, unknown>)) {
+        result[key] = null
+      }
+    }
+
+    return result
   })
 }

@@ -22,10 +22,22 @@ export function formatDate(raw: unknown): string {
     if (s.length === 8) return `${s.slice(4, 6)}/${s.slice(6, 8)}/${s.slice(0, 4)}`
     return s
   }
-  if (typeof raw === "string" || raw instanceof Date) {
-    const d = new Date(raw as string)
+  if (typeof raw === "string") {
+    // ISO date-only strings (e.g. "2026-03-31" or "2026-03-31T00:00:00.000Z") are parsed
+    // as UTC midnight by `new Date()`, which shifts them back a day in US timezones.
+    // Extract the date parts directly to avoid the UTC offset.
+    const isoMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (isoMatch) {
+      return `${isoMatch[2]}/${isoMatch[3]}/${isoMatch[1]}`
+    }
+    const d = new Date(raw)
     if (!isNaN(d.getTime())) {
       return d.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })
+    }
+  }
+  if (raw instanceof Date) {
+    if (!isNaN(raw.getTime())) {
+      return raw.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" })
     }
   }
   return String(raw)

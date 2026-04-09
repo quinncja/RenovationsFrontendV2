@@ -1,11 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import App from "../../App.tsx"
-import RequireAuth from "./RequireAuth.tsx"
+import RequireAuth, { RequireRole } from "./RequireAuth.tsx"
 import LoginPage from "../auth/pages/LoginPage.tsx"
 import LogoutPage from "../auth/pages/LogoutPage.tsx"
 import SignoutPage from "../auth/pages/SignoutPage.tsx"
 import Dashboard from "../../modules/dashboard/Dashboard.tsx"
 import Jobcost from "../../modules/jobcost/Jobcost.tsx"
+import JobcostDetailPage from "../../modules/jobcost/JobcostDetailPage.tsx"
 import Users from "../../modules/users/users.tsx"
 import ClientsPage from "../../modules/clients/ClientsPage.tsx"
 import ClientDetailPage from "../../modules/clients/ClientDetailPage.tsx"
@@ -29,20 +30,26 @@ export default function Router() {
         {/* App shell — includes navbar */}
         <Route element={<App />}>
           <Route element={<RequireAuth />}>
-            <Route path="/dashboard" element={<Dashboard />} />
+            {/* Executive only */}
+            <Route path="/dashboard" element={<RequireRole allowed={["executive"]}><Dashboard /></RequireRole>} />
+
+            {/* All roles */}
             <Route path="/jobcosting" element={<Jobcost />} />
-            <Route path="/users" element={<Users />} />
+            <Route path="/jobcosting/:recnum" element={<JobcostDetailPage />} />
 
-            <Route path="/clients" element={<ClientsPage />} />
-            <Route path="/clients/:id" element={<ClientDetailPage />} />
+            {/* Executive + Admin */}
+            <Route path="/users" element={<RequireRole allowed={["executive", "admin"]}><Users /></RequireRole>} />
 
-            <Route path="/suppliers" element={<SuppliersPage />} />
-            <Route path="/suppliers/:id" element={<SupplierDetailPage />} />
+            <Route path="/clients" element={<RequireRole allowed={["executive", "admin"]}><ClientsPage /></RequireRole>} />
+            <Route path="/clients/:id" element={<RequireRole allowed={["executive", "admin"]}><ClientDetailPage /></RequireRole>} />
 
-            <Route path="/subcontractors" element={<SubcontractorsPage />} />
-            <Route path="/subcontractors/:id" element={<SubcontractorDetailPage />} />
+            <Route path="/suppliers" element={<RequireRole allowed={["executive", "admin"]}><SuppliersPage /></RequireRole>} />
+            <Route path="/suppliers/:id" element={<RequireRole allowed={["executive", "admin"]}><SupplierDetailPage /></RequireRole>} />
 
-            <Route path="/invoices" element={<Invoices />} />
+            <Route path="/subcontractors" element={<RequireRole allowed={["executive", "admin"]}><SubcontractorsPage /></RequireRole>} />
+            <Route path="/subcontractors/:id" element={<RequireRole allowed={["executive", "admin"]}><SubcontractorDetailPage /></RequireRole>} />
+
+            <Route path="/invoices" element={<RequireRole allowed={["executive", "admin"]}><Invoices /></RequireRole>} />
           </Route>
         </Route>
       </Routes>

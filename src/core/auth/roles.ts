@@ -35,13 +35,17 @@ const companiesGroup: NavGroup = {
 }
 
 export const roles = {
-  admin: {
-    appRole: "admin" as const,
+  executive: {
+    appRole: "executive" as const,
     nav: [navItems.home, navItems.jobcost, navItems.invoices, companiesGroup, navItems.users] as (NavItem | NavGroup)[],
   },
+  admin: {
+    appRole: "admin" as const,
+    nav: [navItems.jobcost, navItems.invoices, companiesGroup, navItems.users] as (NavItem | NavGroup)[],
+  },
   manager: {
-    appRole: "project manager" as const,
-    nav: [navItems.home, navItems.company, navItems.jobcost, navItems.invoices, companiesGroup] as (NavItem | NavGroup)[],
+    appRole: "manager" as const,
+    nav: [navItems.jobcost] as (NavItem | NavGroup)[],
   },
 }
 

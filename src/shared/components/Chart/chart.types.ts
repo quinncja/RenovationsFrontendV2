@@ -25,6 +25,11 @@ export interface BarDataPoint {
   value: number
 }
 
+export interface RadialBarSeries {
+  id: string
+  data: { x: string; y: number }[]
+}
+
 export type ChartConfig =
   | {
       type: "bar"
@@ -33,6 +38,14 @@ export type ChartConfig =
       color?: string
       /** Y-axis label formatter */
       yFormat?: (v: number) => string
+    }
+  | {
+      type: "radial-bar"
+      data: RadialBarSeries[]
+      /** Override the default color palette */
+      colors?: string[]
+      /** Value formatter for tooltips/labels */
+      valueFormat?: (v: number) => string
     }
   | {
       type: "line"

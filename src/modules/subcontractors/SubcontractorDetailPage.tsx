@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, useNavigate } from "react-router-dom"
 import { ChevronDown } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
@@ -9,9 +9,11 @@ import { StatWidget } from "../../shared/components/StatWidget/StatWidget"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { Chart } from "../../shared/components/Chart/Chart"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
+import { PeriodSelector, periodToParams, type Period } from "../../shared/components/PeriodSelector/PeriodSelector"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { projectedMargin, marginClass, formatMargin } from "../../shared/components/JobDetailPanel/JobDetailPanel"
 import { formatMoneyFull, formatDate } from "../../shared/utils/format"
+import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import type { BarDataPoint } from "../../shared/components/Chart/chart.types"
 
 const JOB_STATUS_LABEL: Record<number, string> = { 1: "Bid", 2: "Refused", 3: "Contract", 4: "Current", 5: "Complete", 6: "Closed" }
@@ -29,7 +31,9 @@ interface SubcontractorJob {
   revisedContract: number; revisedEstimate: number
 }
 
-function SubcontractorDetailContent({ year, setYear }: { year: number; setYear: (y: number) => void }) {
+function SubcontractorDetailContent({ year, setYear, period, setPeriod }: { year: number; setYear: (y: number) => void; period: Period; setPeriod: (p: Period) => void }) {
+  const navigate = useNavigate()
+  const [hideCurrentMargin] = useLocalStorage("hideCurrentMargin", false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
   const [jobsOpen, setJobsOpen] = useState(false)
   const [invOpen, setInvOpen] = useState(false)
@@ -49,15 +53,16 @@ function SubcontractorDetailContent({ year, setYear }: { year: number; setYear: 
   const totalOutstanding = recentInvoices.reduce((s, i) => s + (i.amountRemaining ?? 0), 0)
 
   const totalContract = jobs.reduce((s, j) => s + (j.revisedContract ?? 0), 0)
-  const totalProfit = jobs.reduce((s, j) => s + ((j.revisedContract ?? 0) - (j.revisedEstimate ?? 0)), 0)
-  const margins = jobs.map(j => projectedMargin(j.revisedContract ?? 0, j.revisedEstimate ?? 0)).filter((m): m is number => m !== null)
+  const nonCurrentJobs = hideCurrentMargin ? jobs.filter(j => j.status !== 4) : jobs
+  const totalProfit = nonCurrentJobs.reduce((s, j) => s + ((j.revisedContract ?? 0) - (j.revisedEstimate ?? 0)), 0)
+  const margins = nonCurrentJobs.map(j => projectedMargin(j.revisedContract ?? 0, j.revisedEstimate ?? 0)).filter((m): m is number => m !== null)
   const avgMargin = margins.length > 0 ? margins.reduce((s, m) => s + m, 0) / margins.length : null
 
   return (
     <>
       <Page
         title={summary?.label ?? "Subcontractor"}
-        actions={<YearSelector value={year} onChange={setYear} />}
+        actions={<><PeriodSelector value={period} onChange={setPeriod} /><YearSelector value={year} onChange={setYear} /></>}
       >
         <MotionList className="widget-grid widget-grid-2">
           <MotionItem>
@@ -105,12 +110,12 @@ function SubcontractorDetailContent({ year, setYear }: { year: number; setYear: 
                     <div className="inv-metric-divider" />
                     <div className="inv-metric">
                       <span className={`inv-metric-value ${totalProfit >= 0 ? "jc-margin-high" : "jc-margin-critical"}`}>{formatMoneyFull(totalProfit)}</span>
-                      <span className="inv-metric-label">Proj. Profit</span>
+                      <span className="inv-metric-label">{hideCurrentMargin ? "Total Profit (Closed)" : "Total Profit"}</span>
                     </div>
                     <div className="inv-metric-divider" />
                     <div className="inv-metric">
                       <span className={`inv-metric-value ${marginClass(avgMargin)}`}>{formatMargin(avgMargin)}</span>
-                      <span className="inv-metric-label">Avg. Margin</span>
+                      <span className="inv-metric-label">{hideCurrentMargin ? "Avg. Margin (Closed)" : "Avg. Margin"}</span>
                     </div>
                   </div>
                   </div>
@@ -138,7 +143,14 @@ function SubcontractorDetailContent({ year, setYear }: { year: number; setYear: 
                           const pct = projectedMargin(job.revisedContract ?? 0, job.revisedEstimate ?? 0)
                           const profit = (job.revisedContract ?? 0) - (job.revisedEstimate ?? 0)
                           return (
-                            <tr key={job.recnum} className="spend-rank-table-row-plain">
+                            <tr
+                              key={job.recnum}
+                              className="spend-rank-table-row"
+                              onClick={() => navigate(`/jobcosting/${job.recnum}`)}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => e.key === "Enter" && navigate(`/jobcosting/${job.recnum}`)}
+                            >
                               <td className="spend-rank-table-num subheadline text-secondary">{job.recnum}</td>
                               <td className="spend-rank-table-name body-text">{job.jobName}</td>
                               <td className="spend-rank-table-name">
@@ -148,8 +160,8 @@ function SubcontractorDetailContent({ year, setYear }: { year: number; setYear: 
                               </td>
                               <td className="spend-rank-table-value body-text">{formatMoneyFull(job.revisedContract ?? 0)}</td>
                               <td className="spend-rank-table-value body-text">{formatMoneyFull(job.revisedEstimate ?? 0)}</td>
-                              <td className={`spend-rank-table-value body-text ${profit >= 0 ? "jc-margin-high" : "jc-margin-critical"}`}>{formatMoneyFull(profit)}</td>
-                              <td className={`spend-rank-table-value body-text ${marginClass(pct)}`}>{formatMargin(pct)}</td>
+                              <td className={`spend-rank-table-value body-text ${hideCurrentMargin && job.status === 4 ? "" : (profit >= 0 ? "jc-margin-high" : "jc-margin-critical")}`}>{hideCurrentMargin && job.status === 4 ? "—" : formatMoneyFull(profit)}</td>
+                              <td className={`spend-rank-table-value body-text ${hideCurrentMargin && job.status === 4 ? "" : marginClass(pct)}`}>{hideCurrentMargin && job.status === 4 ? "—" : formatMargin(pct)}</td>
                             </tr>
                           )
                         })}
@@ -256,6 +268,7 @@ function SubcontractorDetailContent({ year, setYear }: { year: number; setYear: 
 export default function SubcontractorDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [year, setYear] = useState(new Date().getFullYear())
+  const [period, setPeriod] = useState<Period>("annual")
   const numericId = id ? parseInt(id, 10) : null
 
   if (numericId === null || isNaN(numericId)) {
@@ -266,9 +279,9 @@ export default function SubcontractorDetailPage() {
     <PageDataProvider
       module="subcontractors"
       queries={PAGE_QUERIES.subcontractorDetail}
-      params={{ year, id: numericId }}
+      params={{ year, id: numericId, ...periodToParams(period) }}
     >
-      <SubcontractorDetailContent year={year} setYear={setYear} />
+      <SubcontractorDetailContent year={year} setYear={setYear} period={period} setPeriod={setPeriod} />
     </PageDataProvider>
   )
 }

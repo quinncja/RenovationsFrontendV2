@@ -27,6 +27,7 @@ interface ActivityData {
 interface UserActivityModalProps {
   user: UserRecord | null
   isAdmin: boolean
+  isExecutive?: boolean
   onClose: () => void
   onRoleChange: (uid: string, role: string) => Promise<void>
 }
@@ -40,20 +41,22 @@ function avatarInitials(name: string): string {
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  admin:   "Admin",
-  manager: "Manager",
-  waiting: "Waiting Room",
+  executive: "Executive",
+  admin:     "Admin",
+  manager:   "Manager",
+  waiting:   "Waiting Room",
 }
 
 const ROLE_CLASS: Record<string, string> = {
-  admin:   "usr-role-badge--admin",
-  manager: "usr-role-badge--manager",
-  waiting: "usr-role-badge--waiting",
+  executive: "usr-role-badge--executive",
+  admin:     "usr-role-badge--admin",
+  manager:   "usr-role-badge--manager",
+  waiting:   "usr-role-badge--waiting",
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function UserActivityModal({ user, isAdmin, onClose, onRoleChange }: UserActivityModalProps) {
+export function UserActivityModal({ user, isAdmin, isExecutive = false, onClose, onRoleChange }: UserActivityModalProps) {
   const [activity, setActivity]     = useState<ActivityData | null>(null)
   const [isLoading, setIsLoading]   = useState(false)
   const [changingRole, setChangingRole] = useState(false)
@@ -97,8 +100,11 @@ export function UserActivityModal({ user, isAdmin, onClose, onRoleChange }: User
     }
   }
 
+  const isTargetExecutive = currentRole === "executive"
   const isTargetAdmin = currentRole === "admin"
-  const canChangeRole = isAdmin && !isTargetAdmin
+  const canChangeRole = isExecutive
+    ? !isTargetExecutive
+    : isAdmin && !isTargetAdmin && !isTargetExecutive
 
   const series: LineSeries[] = activity
     ? [{
@@ -207,25 +213,38 @@ export function UserActivityModal({ user, isAdmin, onClose, onRoleChange }: User
                   <div className="usr-activity-role-section">
                     <p className="invoice-modal-section-label">Role Management</p>
 
-                    {isTargetAdmin ? (
+                    {!canChangeRole ? (
                       <div className="usr-activity-admin-lock">
                         <ShieldCheck size={14} className="usr-activity-admin-lock-icon" />
-                        <span>Admin roles cannot be modified by another admin.</span>
+                        <span>
+                          {isTargetExecutive
+                            ? "Executive roles cannot be modified."
+                            : "Admin roles cannot be modified by another admin."}
+                        </span>
                       </div>
                     ) : (
                       <div className="usr-activity-role-row">
                         <span className="usr-activity-role-hint">Change role to:</span>
-                        <div className="usr-assign-row" style={{ width: "14rem" }}>
+                        <div className="usr-assign-row" style={{ width: isExecutive ? "20rem" : "14rem" }}>
+                          {isExecutive && (
+                            <button
+                              className={`usr-assign-btn usr-assign-executive${currentRole === "executive" ? " usr-assign-btn--active" : ""}`}
+                              disabled={changingRole || currentRole === "executive"}
+                              onClick={() => handleRoleChange("executive")}
+                            >
+                              Executive
+                            </button>
+                          )}
                           <button
                             className={`usr-assign-btn usr-assign-admin${currentRole === "admin" ? " usr-assign-btn--active" : ""}`}
-                            disabled={changingRole || !canChangeRole || currentRole === "admin"}
+                            disabled={changingRole || currentRole === "admin"}
                             onClick={() => handleRoleChange("admin")}
                           >
                             Admin
                           </button>
                           <button
                             className={`usr-assign-btn usr-assign-manager${currentRole === "manager" ? " usr-assign-btn--active" : ""}`}
-                            disabled={changingRole || !canChangeRole || currentRole === "manager"}
+                            disabled={changingRole || currentRole === "manager"}
                             onClick={() => handleRoleChange("manager")}
                           >
                             Manager

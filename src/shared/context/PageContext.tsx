@@ -20,6 +20,7 @@ interface PageContextValue {
   data: PageDataResponse
   isLoading: boolean
   error: Error | null
+  disconnected: boolean
   params: PageParams
   refetch: () => void
 }
@@ -37,6 +38,13 @@ export function usePageData(): PageContextValue {
 interface WidgetDataResult<T = unknown> {
   data: T | null
   isLoading: boolean
+  disconnected: boolean
+}
+
+/** Returns true if the data source is offline. Safe to call outside PageDataProvider. */
+export function usePageDisconnected(): boolean {
+  const context = useContext(PageContext)
+  return context?.disconnected ?? false
 }
 
 export function usePageYear(): number {
@@ -44,17 +52,35 @@ export function usePageYear(): number {
   return typeof params.year === "number" ? params.year : new Date().getFullYear()
 }
 
+/** Returns a display label for the current period, e.g. "2026", "Q1 2026", or "All Time". */
+export function usePeriodLabel(): string {
+  const { params } = usePageData()
+  const year = typeof params.year === "number" ? params.year : null
+  if (year === null) return "All Time"
+  const sm = typeof params.startMonth === "number" ? params.startMonth : null
+  if (sm === 1) return `Q1 ${year}`
+  if (sm === 4) return `Q2 ${year}`
+  if (sm === 7) return `Q3 ${year}`
+  if (sm === 10) return `Q4 ${year}`
+  return String(year)
+}
+
 export function useWidgetData<T extends Record<string, unknown>>(
   queryNames: string[]
 ): WidgetDataResult<T> {
   const { data, isLoading } = usePageData()
 
+  // If all requested queries returned null, the data source is likely offline
+  let allNull = !isLoading && queryNames.length > 0
+
   const widgetData = queryNames.reduce((acc, name) => {
-    acc[name] = data[name] ?? null
+    const value = data[name] ?? null
+    if (value !== null) allNull = false
+    acc[name] = value
     return acc
   }, {} as Record<string, unknown>) as T
 
-  return { data: widgetData, isLoading }
+  return { data: widgetData, isLoading, disconnected: allNull }
 }
 
 interface PageDataProviderProps {
@@ -117,15 +143,21 @@ export function PageDataProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [module, queriesKey, paramsKey, fetchKey])
 
+  // Data source is offline if we finished loading and every query result is null
+  const disconnected = !isLoading && queries.length > 0 &&
+    Object.keys(data).length > 0 &&
+    Object.values(data).every((v) => v === null)
+
   const value = useMemo<PageContextValue>(
     () => ({
       data,
       isLoading,
       error,
+      disconnected,
       params,
       refetch,
     }),
-    [data, isLoading, error, params, refetch]
+    [data, isLoading, error, disconnected, params, refetch]
   )
 
   return <PageContext.Provider value={value}>{children}</PageContext.Provider>

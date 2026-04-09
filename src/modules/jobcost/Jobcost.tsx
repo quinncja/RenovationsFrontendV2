@@ -1,11 +1,17 @@
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import { motion } from "framer-motion"
-import { ChevronRight, ChevronDown, ChevronUp, ChevronsUpDown, Search } from "lucide-react"
+import { ChevronRight, ChevronDown, ChevronUp, ChevronsUpDown, Search, DatabaseZap, ExternalLink } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
+import { PeriodSelector, periodToParams, type Period } from "../../shared/components/PeriodSelector/PeriodSelector"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { formatMoneyFull, formatDate } from "../../shared/utils/format"
+import useIsMobile from "../../shared/hooks/useIsMobile"
+import useLocalStorage from "../../shared/hooks/useLocalStorage"
+import { MobileFilterSheet, activeFilterCount, type FilterGroup } from "../../shared/components/MobileFilterSheet/MobileFilterSheet"
+import { MobileFilterButton } from "../../shared/components/MobileFilterSheet/MobileFilterButton"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -123,6 +129,7 @@ function FilterButton({
 }
 
 type SortKey = "jobName" | "clientName" | "revisedContract" | "revisedEstimate" | "profit" | "margin"
+type CostSortKey = "costGroup" | "budget" | "actual" | "variance"
 type SortDir = "asc" | "desc"
 
 function SortHeader({
@@ -154,16 +161,24 @@ function SummaryRow({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function Jobcost() {
-  const [year, setYear] = useState(new Date().getFullYear())
+  const navigate = useNavigate()
+  const isMobile = useIsMobile()
+  const [hideCurrentMargin] = useLocalStorage("hideCurrentMargin", false)
+  const [year, setYear] = useState<number | null>(new Date().getFullYear())
+  const [period, setPeriod] = useState<Period>("annual")
   const [jobs, setJobs] = useState<JobRow[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [disconnected, setDisconnected] = useState(false)
   const [statusFilter, setStatusFilter] = useState("any")
   const [marginFilter, setMarginFilter] = useState("all")
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("revisedContract")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [costSortKey, setCostSortKey] = useState<CostSortKey>("costGroup")
+  const [costSortDir, setCostSortDir] = useState<SortDir>("asc")
   const [jobDetails, setJobDetails] = useState<Record<number, JobDetail>>({})
   const [loadingDetailId, setLoadingDetailId] = useState<number | null>(null)
 
@@ -172,19 +187,24 @@ export default function Jobcost() {
     setIsLoading(true)
     setJobs([])
     setExpandedId(null)
-    fetchPageData({ module: "jobcost", queries: ["jobCostList"], params: { year } })
-      .then((data) => { if (!cancelled) setJobs((data.jobCostList as JobRow[]) ?? []) })
+    fetchPageData({ module: "jobcost", queries: ["jobCostList"], params: { year, ...(year !== null ? periodToParams(period) : {}) } })
+      .then((data) => {
+        if (cancelled) return
+        const allNull = Object.values(data).every((v) => v === null)
+        setDisconnected(allNull)
+        setJobs((data.jobCostList as JobRow[]) ?? [])
+      })
       .catch(() => { if (!cancelled) setJobs([]) })
       .finally(() => { if (!cancelled) setIsLoading(false) })
     return () => { cancelled = true }
-  }, [year])
+  }, [year, period])
 
   function loadDetail(recnum: number) {
     setLoadingDetailId(recnum)
     fetchPageData({
       module: "jobcost",
       queries: ["jobCostSummary", "jobCostChangeOrders", "jobCostGroups", "jobCostTransactions"],
-      params: { year, recnum },
+      params: { year, recnum, ...(year !== null ? periodToParams(period) : {}) },
     })
       .then((data) => {
         setJobDetails((prev) => ({
@@ -242,6 +262,15 @@ export default function Jobcost() {
     }
   }
 
+  function handleCostSort(key: CostSortKey) {
+    if (costSortKey === key) {
+      setCostSortDir((d) => (d === "asc" ? "desc" : "asc"))
+    } else {
+      setCostSortKey(key)
+      setCostSortDir(key === "costGroup" ? "asc" : "desc")
+    }
+  }
+
   const sortedJobs = [...filteredJobs].sort((a, b) => {
     let av: number | string
     let bv: number | string
@@ -250,61 +279,113 @@ export default function Jobcost() {
       case "clientName":       av = a.clientName ?? "";                              bv = b.clientName ?? "";                              break
       case "revisedContract":  av = a.revisedContract;                               bv = b.revisedContract;                               break
       case "revisedEstimate":  av = a.revisedEstimate;                               bv = b.revisedEstimate;                               break
-      case "profit":           av = a.revisedContract - a.revisedEstimate;           bv = b.revisedContract - b.revisedEstimate;           break
-      case "margin":           av = projectedMargin(a.revisedContract, a.revisedEstimate) ?? -Infinity;
-                               bv = projectedMargin(b.revisedContract, b.revisedEstimate) ?? -Infinity; break
+      case "profit":           av = (hideCurrentMargin && a.status === 4) ? -Infinity : (a.revisedContract - a.revisedEstimate);
+                               bv = (hideCurrentMargin && b.status === 4) ? -Infinity : (b.revisedContract - b.revisedEstimate); break
+      case "margin":           av = (hideCurrentMargin && a.status === 4) ? -Infinity : (projectedMargin(a.revisedContract, a.revisedEstimate) ?? -Infinity);
+                               bv = (hideCurrentMargin && b.status === 4) ? -Infinity : (projectedMargin(b.revisedContract, b.revisedEstimate) ?? -Infinity); break
     }
     if (av < bv) return sortDir === "asc" ? -1 : 1
     if (av > bv) return sortDir === "asc" ? 1 : -1
     return 0
   })
 
+  const jcFilterGroups: FilterGroup[] = [
+    {
+      key: "status",
+      label: "Status",
+      options: [
+        { value: "any", label: "Any" },
+        { value: "4", label: "Current", colorClass: "jc-filter-current" },
+        { value: "5", label: "Complete", colorClass: "jc-filter-complete" },
+        { value: "6", label: "Closed", colorClass: "jc-filter-closed" },
+      ],
+    },
+    {
+      key: "margin",
+      label: "Margin",
+      options: [
+        { value: "all", label: "All" },
+        { value: "high", label: "High >30%", colorClass: "jc-filter-high" },
+        { value: "target", label: "Target 20–30%", colorClass: "jc-filter-target" },
+        { value: "critical", label: "Critical <20%", colorClass: "jc-filter-critical" },
+      ],
+    },
+  ]
+
+  const jcFilterDefaults = { status: "any", margin: "all" }
+  const jcFilterValues = { status: statusFilter, margin: marginFilter }
+  const jcActiveCount = activeFilterCount(jcFilterValues, jcFilterDefaults)
+
   return (
-    <Page title="Projects">
+    <Page title="Projects" actions={<><PeriodSelector value={period} onChange={setPeriod} disabled={year === null} /><YearSelector allowAllTime value={year} onChange={setYear} /></>}>
       <MotionList className="inv-page-stack">
 
       {/* ── Filter bar + metrics card ── */}
       <MotionItem>
       <div className="card inv-filter-metrics-card" style={{ marginBottom: "2rem" }}>
-        <div className="jc-filter-bar">
-          <div className="jc-filter-group">
-            <span className="jc-filter-label">Status</span>
-            <div className="jc-filter-buttons">
-              <FilterButton active={statusFilter === "any"} onClick={() => setStatusFilter("any")}>Any</FilterButton>
-              <FilterButton active={statusFilter === "4"} onClick={() => setStatusFilter("4")} colorClass="jc-filter-current">Current</FilterButton>
-              <FilterButton active={statusFilter === "5"} onClick={() => setStatusFilter("5")} colorClass="jc-filter-complete">Complete</FilterButton>
-              <FilterButton active={statusFilter === "6"} onClick={() => setStatusFilter("6")} colorClass="jc-filter-closed">Closed</FilterButton>
+        {isMobile ? (
+          <div className="jc-filter-bar">
+            <div className="jc-search-wrapper" style={{ flex: 1 }}>
+              <Search size={13} className="jc-search-icon" />
+              <input
+                className="jc-search"
+                placeholder="Search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <MobileFilterButton count={jcActiveCount} onClick={() => setFilterSheetOpen(true)} />
+          </div>
+        ) : (
+          <div className="jc-filter-bar">
+            <div className="jc-filter-group">
+              <span className="jc-filter-label">Status</span>
+              <div className="jc-filter-buttons">
+                <FilterButton active={statusFilter === "any"} onClick={() => setStatusFilter("any")}>Any</FilterButton>
+                <FilterButton active={statusFilter === "4"} onClick={() => setStatusFilter("4")} colorClass="jc-filter-current">Current</FilterButton>
+                <FilterButton active={statusFilter === "5"} onClick={() => setStatusFilter("5")} colorClass="jc-filter-complete">Complete</FilterButton>
+                <FilterButton active={statusFilter === "6"} onClick={() => setStatusFilter("6")} colorClass="jc-filter-closed">Closed</FilterButton>
+              </div>
+            </div>
+
+            <div className="jc-filter-group">
+              <span className="jc-filter-label">Margin</span>
+              <div className="jc-filter-buttons">
+                <FilterButton active={marginFilter === "all"}      onClick={() => setMarginFilter("all")}>All</FilterButton>
+                <FilterButton active={marginFilter === "high"}     colorClass="jc-filter-high"     onClick={() => setMarginFilter("high")}>High &gt;30%</FilterButton>
+                <FilterButton active={marginFilter === "target"}   colorClass="jc-filter-target"   onClick={() => setMarginFilter("target")}>Target 20–30%</FilterButton>
+                <FilterButton active={marginFilter === "critical"} colorClass="jc-filter-critical" onClick={() => setMarginFilter("critical")}>Critical &lt;20%</FilterButton>
+              </div>
+            </div>
+
+            <div className="jc-search-wrapper">
+              <Search size={13} className="jc-search-icon" />
+              <input
+                className="jc-search"
+                placeholder="Search projects or clients..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
             </div>
           </div>
+        )}
 
-          <div className="jc-filter-group">
-            <span className="jc-filter-label">Margin</span>
-            <div className="jc-filter-buttons">
-              <FilterButton active={marginFilter === "all"}      onClick={() => setMarginFilter("all")}>All</FilterButton>
-              <FilterButton active={marginFilter === "high"}     colorClass="jc-filter-high"     onClick={() => setMarginFilter("high")}>High &gt;30%</FilterButton>
-              <FilterButton active={marginFilter === "target"}   colorClass="jc-filter-target"   onClick={() => setMarginFilter("target")}>Target 20–30%</FilterButton>
-              <FilterButton active={marginFilter === "critical"} colorClass="jc-filter-critical" onClick={() => setMarginFilter("critical")}>Critical &lt;20%</FilterButton>
-            </div>
-          </div>
-
-          <div className="jc-search-wrapper">
-            <Search size={13} className="jc-search-icon" />
-            <input
-              className="jc-search"
-              placeholder="Search projects or clients..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <YearSelector value={year} onChange={setYear} />
-        </div>
+        <MobileFilterSheet
+          open={filterSheetOpen}
+          onClose={() => setFilterSheetOpen(false)}
+          groups={jcFilterGroups}
+          values={jcFilterValues}
+          defaults={jcFilterDefaults}
+          onChange={(v) => { setStatusFilter(v.status); setMarginFilter(v.margin) }}
+        />
 
         {isLoading && <div className="inv-metrics-skeleton" />}
 
         {!isLoading && jobs.length > 0 && (() => {
           const totalContract = filteredJobs.reduce((s, j) => s + j.revisedContract, 0)
-          const totalProfit   = filteredJobs.reduce((s, j) => s + (j.revisedContract - j.revisedEstimate), 0)
-          const margins       = filteredJobs.map(j => projectedMargin(j.revisedContract, j.revisedEstimate)).filter((m): m is number => m !== null)
+          const nonCurrentJobs = hideCurrentMargin ? filteredJobs.filter(j => j.status !== 4) : filteredJobs
+          const totalProfit   = nonCurrentJobs.reduce((s, j) => s + (j.revisedContract - j.revisedEstimate), 0)
+          const margins       = nonCurrentJobs.map(j => projectedMargin(j.revisedContract, j.revisedEstimate)).filter((m): m is number => m !== null)
           const avgMargin     = margins.length > 0 ? margins.reduce((s, m) => s + m, 0) / margins.length : null
           return (
             <div className="inv-metrics-row">
@@ -320,12 +401,12 @@ export default function Jobcost() {
               <div className="inv-metric-divider" />
               <div className="inv-metric">
                 <span className={`inv-metric-value ${totalProfit >= 0 ? "jc-margin-high" : "jc-margin-critical"}`}>{formatMoneyFull(totalProfit)}</span>
-                <span className="inv-metric-label">Proj. Profit</span>
+                <span className="inv-metric-label">{hideCurrentMargin ? "Total Profit (Closed)" : "Total Profit"}</span>
               </div>
               <div className="inv-metric-divider" />
               <div className="inv-metric">
                 <span className={`inv-metric-value ${marginClass(avgMargin)}`}>{formatMargin(avgMargin)}</span>
-                <span className="inv-metric-label">Avg. Margin</span>
+                <span className="inv-metric-label">{hideCurrentMargin ? "Avg. Margin (Closed)" : "Avg. Margin"}</span>
               </div>
             </div>
           )
@@ -337,9 +418,16 @@ export default function Jobcost() {
       {/* ── Loading / empty ── */}
       {isLoading && <div className="widget-skeleton" style={{ height: "5rem" }} />}
 
-      {!isLoading && filteredJobs.length === 0 && (
+      {!isLoading && disconnected && (
+        <div className="widget-no-data widget-disconnected" style={{ marginTop: "2.5rem" }}>
+          <DatabaseZap size={24} className="widget-no-data-icon" />
+          <span className="body-text">Data source offline</span>
+        </div>
+      )}
+
+      {!isLoading && !disconnected && filteredJobs.length === 0 && (
         <p className="body-text text-secondary" style={{ marginTop: "2.5rem", textAlign: "center" }}>
-          No jobs found for {year}.
+          No jobs found{year ? ` for ${year}` : ""}.
         </p>
       )}
 
@@ -358,12 +446,13 @@ export default function Jobcost() {
               <SortHeader label="Revised Estimate" sortKey="revisedEstimate" active={sortKey === "revisedEstimate"} dir={sortDir} onSort={handleSort} />
             </div>
             <div className="jc-financial-col">
-              <SortHeader label="Proj. Profit" sortKey="profit" active={sortKey === "profit"} dir={sortDir} onSort={handleSort} />
+              <SortHeader label="Profit" sortKey="profit" active={sortKey === "profit"} dir={sortDir} onSort={handleSort} />
             </div>
             <div className="jc-financial-col">
-              <SortHeader label="Proj. Margin" sortKey="margin" active={sortKey === "margin"} dir={sortDir} onSort={handleSort} />
+              <SortHeader label="Margin" sortKey="margin" active={sortKey === "margin"} dir={sortDir} onSort={handleSort} />
             </div>
           </div>
+          <div className="jc-header-btn-spacer" />
         </div>
       )}
 
@@ -400,7 +489,13 @@ export default function Jobcost() {
                   <div className="jc-job-meta">
                     <div className="jc-job-title-row">
                       <span className="jc-recnum-badge">#{job.recnum}</span>
-                      <span className="jc-job-name">{job.jobName}</span>
+                      <span
+                        className="jc-job-name jc-job-name-link"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/jobcosting/${job.recnum}`) }}
+                        role="link"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); navigate(`/jobcosting/${job.recnum}`) } }}
+                      >{job.jobName}</span>
                       <span className={`jc-status-badge jc-badge-${getJobStatusClass(job.status)}`}>{getJobStatusLabel(job.status)}</span>
                     </div>
                     {job.clientName && (
@@ -419,18 +514,26 @@ export default function Jobcost() {
                     <div className="jc-financial-value">{formatMoneyFull(job.revisedEstimate)}</div>
                   </div>
                   <div className="jc-financial-col">
-                    <div className="jc-financial-label">Proj. Profit</div>
-                    <div className={`jc-financial-value ${profit >= 0 ? "jc-margin-high" : "jc-margin-critical"}`}>
-                      {formatMoneyFull(profit)}
+                    <div className="jc-financial-label">{job.status === 4 ? "Projected Profit" : "Profit"}</div>
+                    <div className={`jc-financial-value ${hideCurrentMargin && job.status === 4 ? "" : (profit >= 0 ? "jc-margin-high" : "jc-margin-critical")}`}>
+                      {hideCurrentMargin && job.status === 4 ? "—" : formatMoneyFull(profit)}
                     </div>
                   </div>
                   <div className="jc-financial-col">
-                    <div className="jc-financial-label">Proj. Margin</div>
-                    <div className={`jc-financial-value ${marginClass(pct)}`} style={{ fontSize: "1.0625rem" }}>
-                      {formatMargin(pct)}
+                    <div className="jc-financial-label">{job.status === 4 ? "Projected Margin" : "Margin"}</div>
+                    <div className={`jc-financial-value ${hideCurrentMargin && job.status === 4 ? "" : marginClass(pct)}`} style={{ fontSize: "1.0625rem" }}>
+                      {hideCurrentMargin && job.status === 4 ? "—" : formatMargin(pct)}
                     </div>
                   </div>
                 </div>
+
+                <button
+                  className="jc-view-project-btn"
+                  onClick={(e) => { e.stopPropagation(); navigate(`/jobcosting/${job.recnum}`) }}
+                  title="View project details"
+                >
+                  View Project <ExternalLink size={13} />
+                </button>
               </div>
 
               {/* ── Expanded detail ── */}
@@ -490,18 +593,22 @@ export default function Jobcost() {
                           <div className="jc-summary-panel">
                             <p className="jc-summary-section-label">Cost Summary</p>
                             <SummaryRow label="Revised Estimate" value={formatMoneyFull(s?.revisedEstimate ?? 0)} />
-                            <SummaryRow label="Actual to Date"   value={formatMoneyFull(s?.actualToDate ?? 0)} />
-                            <SummaryRow
-                              label="Projected Profit"
-                              value={formatMoneyFull(projProfit)}
-                              valueClass={projProfit >= 0 ? "jc-margin-high" : "jc-margin-critical"}
-                            />
-                            <SummaryRow
-                              label="Projected Margin"
-                              value={formatMargin(projPct)}
-                              valueClass={marginClass(projPct)}
-                              total
-                            />
+                            <SummaryRow label="Spending to Date"   value={formatMoneyFull(s?.actualToDate ?? 0)} />
+                            {!(hideCurrentMargin && job.status === 4) && (
+                              <>
+                                <SummaryRow
+                                  label={job.status === 4 ? "Projected Profit" : "Profit"}
+                                  value={formatMoneyFull(projProfit)}
+                                  valueClass={projProfit >= 0 ? "jc-margin-high" : "jc-margin-critical"}
+                                />
+                                <SummaryRow
+                                  label={job.status === 4 ? "Projected Margin" : "Margin"}
+                                  value={formatMargin(projPct)}
+                                  valueClass={marginClass(projPct)}
+                                  total
+                                />
+                              </>
+                            )}
                           </div>
                         </div>
 
@@ -513,14 +620,42 @@ export default function Jobcost() {
                           <table className="jc-cost-table">
                             <thead>
                               <tr>
-                                <th className="jc-cost-th jc-cost-code-col">Category</th>
-                                <th className="jc-cost-th jc-cost-num-col">Budget</th>
-                                <th className="jc-cost-th jc-cost-num-col">Actual</th>
-                                <th className="jc-cost-th jc-cost-num-col">Variance</th>
+                                <th className="jc-cost-th jc-cost-code-col">
+                                  <button className={`jc-sort-btn${costSortKey === "costGroup" ? " active" : ""}`} onClick={() => handleCostSort("costGroup")}>
+                                    Category{costSortKey === "costGroup" ? (costSortDir === "asc" ? <ChevronUp size={11} /> : <ChevronDown size={11} />) : <ChevronsUpDown size={11} />}
+                                  </button>
+                                </th>
+                                <th className="jc-cost-th jc-cost-num-col">
+                                  <button className={`jc-sort-btn${costSortKey === "budget" ? " active" : ""}`} onClick={() => handleCostSort("budget")}>
+                                    Budget{costSortKey === "budget" ? (costSortDir === "asc" ? <ChevronUp size={11} /> : <ChevronDown size={11} />) : <ChevronsUpDown size={11} />}
+                                  </button>
+                                </th>
+                                <th className="jc-cost-th jc-cost-num-col">
+                                  <button className={`jc-sort-btn${costSortKey === "actual" ? " active" : ""}`} onClick={() => handleCostSort("actual")}>
+                                    Actual{costSortKey === "actual" ? (costSortDir === "asc" ? <ChevronUp size={11} /> : <ChevronDown size={11} />) : <ChevronsUpDown size={11} />}
+                                  </button>
+                                </th>
+                                <th className="jc-cost-th jc-cost-num-col">
+                                  <button className={`jc-sort-btn${costSortKey === "variance" ? " active" : ""}`} onClick={() => handleCostSort("variance")}>
+                                    Variance{costSortKey === "variance" ? (costSortDir === "asc" ? <ChevronUp size={11} /> : <ChevronDown size={11} />) : <ChevronsUpDown size={11} />}
+                                  </button>
+                                </th>
                               </tr>
                             </thead>
                             <tbody>
-                              {detail.costGroups.flatMap((group) => {
+                              {[...detail.costGroups].sort((a, b) => {
+                                let av: number | string
+                                let bv: number | string
+                                switch (costSortKey) {
+                                  case "costGroup": av = a.costGroup; bv = b.costGroup; break
+                                  case "budget":    av = a.budget;    bv = b.budget;    break
+                                  case "actual":    av = a.actual;    bv = b.actual;    break
+                                  case "variance":  av = a.variance;  bv = b.variance;  break
+                                }
+                                if (av < bv) return costSortDir === "asc" ? -1 : 1
+                                if (av > bv) return costSortDir === "asc" ? 1 : -1
+                                return 0
+                              }).flatMap((group) => {
                                 const isGroupExpanded = expandedGroups.has(group.costGroup)
                                 const groupTxns = detail.transactions.filter(
                                   (t) => t.costGroup === group.costGroup

@@ -7,7 +7,9 @@ import { PAGE_QUERIES } from "../../shared/config/pageQueries"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
+import { PeriodSelector, periodToParams, type Period } from "../../shared/components/PeriodSelector/PeriodSelector"
 import { formatMoneyFull } from "../../shared/utils/format"
+import useIsMobile from "../../shared/hooks/useIsMobile"
 
 interface SpendItem { id: string; label: string; value: number; jobCount: number }
 type SortKey = "label" | "value" | "jobCount"
@@ -29,7 +31,8 @@ function SortTh({ col, label, align = "left", sortKey, sortDir, onSort }: {
   )
 }
 
-function SubcontractorsContent({ year, setYear }: { year: number | null; setYear: (y: number | null) => void }) {
+function SubcontractorsContent({ year, setYear, period, setPeriod }: { year: number | null; setYear: (y: number | null) => void; period: Period; setPeriod: (p: Period) => void }) {
+  const isMobile = useIsMobile()
   const navigate = useNavigate()
   const { data, isLoading } = useWidgetData(["allSubcontractorsBySpend"])
   const items = (data?.["allSubcontractorsBySpend"] as SpendItem[] | null) ?? []
@@ -55,7 +58,7 @@ function SubcontractorsContent({ year, setYear }: { year: number | null; setYear
   }, [items, search, sortKey, sortDir])
 
   return (
-    <Page title="Subcontractors">
+    <Page title="Subcontractors" actions={<><PeriodSelector value={period} onChange={setPeriod} disabled={year === null} /><YearSelector allowAllTime value={year} onChange={setYear} /></>}>
       <MotionList className="inv-page-stack">
         <MotionItem>
           <Widget loading={isLoading} noData={!isLoading && items.length === 0} className="co-widget">
@@ -70,7 +73,6 @@ function SubcontractorsContent({ year, setYear }: { year: number | null; setYear
                   onChange={e => setSearch(e.target.value)}
                 />
               </div>
-              <YearSelector allowAllTime value={year} onChange={setYear} />
               <span className="co-count subheadline text-secondary">
                 {sorted.length} {sorted.length === 1 ? "subcontractor" : "subcontractors"}
               </span>
@@ -116,9 +118,10 @@ function SubcontractorsContent({ year, setYear }: { year: number | null; setYear
 
 export default function SubcontractorsPage() {
   const [year, setYear] = useState<number | null>(null)
+  const [period, setPeriod] = useState<Period>("annual")
   return (
-    <PageDataProvider module="subcontractors" queries={PAGE_QUERIES.subcontractors} params={{ year }}>
-      <SubcontractorsContent year={year} setYear={setYear} />
+    <PageDataProvider module="subcontractors" queries={PAGE_QUERIES.subcontractors} params={{ year, ...(year !== null ? periodToParams(period) : {}) }}>
+      <SubcontractorsContent year={year} setYear={setYear} period={period} setPeriod={setPeriod} />
     </PageDataProvider>
   )
 }

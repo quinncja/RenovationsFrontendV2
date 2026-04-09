@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate, useLocation } from "react-router-dom"
-import { Sun, Moon, ChevronsRight, ChevronsLeft, ChevronDown } from "lucide-react"
+import { Settings, ChevronsRight, ChevronsLeft, ChevronDown } from "lucide-react"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import useNavItems from "../auth/hooks/useNavItems"
 import { isNavGroup, type NavItem, type NavGroup } from "../auth/roles"
+import { SettingsModal } from "../../shared/components/SettingsModal/SettingsModal"
 import Logo from "./Logo"
 import LogoText from "./LogoText"
 
@@ -78,6 +79,7 @@ function Navbar() {
   const [theme, setTheme] = useLocalStorage<"light" | "dark">("theme", "dark")
   const navItems = useNavItems()
   const [tooltip, setTooltip] = useState<TooltipState>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const [openGroup, setOpenGroup] = useState<string | null>(() => {
     const active = navItems.find(
@@ -165,10 +167,10 @@ function Navbar() {
         <div className="navbar-bottom">
           <button
             className="button bottom-nav-button"
-            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode (⌘/)`}
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            title="Settings"
+            onClick={() => setSettingsOpen(true)}
           >
-            {theme === "light" ? <Sun size={17} /> : <Moon size={17} />}
+            <Settings size={17} />
           </button>
           <button
             className="button bottom-nav-button"
@@ -186,6 +188,13 @@ function Navbar() {
         </div>,
         document.body
       )}
+
+      <SettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        theme={theme}
+        onThemeChange={setTheme}
+      />
     </>
   )
 }
