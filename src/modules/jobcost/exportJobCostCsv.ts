@@ -148,11 +148,6 @@ function styled(v: string | number | null, s?: StyledCell["s"]): StyledCell {
   return { v, s }
 }
 
-function kvRow(label: string, value: string | StyledCell): SheetRow {
-  const val: StyledCell = typeof value === "string" ? styled(value, valueStyle) : value
-  return [styled(label, labelStyle), val]
-}
-
 function kvMoney(label: string, v: number): SheetRow {
   return [styled(label, labelStyle), { v, s: valueMoney, t: "n" }]
 }
@@ -172,7 +167,7 @@ function emptyRow(): SheetRow {
   return []
 }
 
-function varianceColor(variance: number): StyledCell["s"] {
+function varianceColor(variance: number) {
   const color = variance < 0 ? RED : variance > 0 ? GREEN : BLACK
   return { font: { sz: 12, color: { rgb: color } } }
 }
@@ -268,9 +263,9 @@ export function buildJobCostXlsx(
     styled("Total", totalLabelStyle),
     { v: totalBudget, s: totalMoneyStyle, t: "n" },
     { v: totalActual, s: totalMoneyStyle, t: "n" },
-    { v: totalVariance, s: { ...totalMoneyStyle, font: { ...totalMoneyStyle.font, color: totalVarColor.font?.color } }, t: "n" },
+    { v: totalVariance, s: { ...totalMoneyStyle, font: { ...totalMoneyStyle!.font, color: totalVarColor.font.color } }, t: "n" },
     totalVariancePct !== null
-      ? { v: totalVariancePct / 100, s: { ...totalPctStyle, font: { ...totalPctStyle.font, color: totalVarColor.font?.color } }, t: "n" }
+      ? { v: totalVariancePct / 100, s: { ...totalPctStyle, font: { ...totalPctStyle!.font, color: totalVarColor.font.color } }, t: "n" }
       : styled("—", totalLabelStyle),
     totalUsedPct !== null
       ? { v: totalUsedPct / 100, s: totalPctStyle, t: "n" }

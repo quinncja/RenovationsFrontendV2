@@ -73,7 +73,7 @@ export function WidgetPlaceholder({ id, colSpan, isSelected, isMultiDragging, en
 }
 
 /** Overlay shown while dragging — no interactivity needed */
-export function WidgetPlaceholderOverlay({ id, colSpan }: { id: WidgetId; colSpan: 1 | 2 }) {
+export function WidgetPlaceholderOverlay({ id }: { id: WidgetId; colSpan: 1 | 2 }) {
   const entry = WIDGET_REGISTRY[id]
 
   return (

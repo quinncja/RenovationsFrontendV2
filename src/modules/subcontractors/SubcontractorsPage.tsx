@@ -9,7 +9,7 @@ import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { PeriodSelector, periodToParams, type Period } from "../../shared/components/PeriodSelector/PeriodSelector"
 import { formatMoneyFull } from "../../shared/utils/format"
-import useIsMobile from "../../shared/hooks/useIsMobile"
+
 
 interface SpendItem { id: string; label: string; value: number; jobCount: number }
 type SortKey = "label" | "value" | "jobCount"
@@ -32,7 +32,6 @@ function SortTh({ col, label, align = "left", sortKey, sortDir, onSort }: {
 }
 
 function SubcontractorsContent({ year, setYear, period, setPeriod }: { year: number | null; setYear: (y: number | null) => void; period: Period; setPeriod: (p: Period) => void }) {
-  const isMobile = useIsMobile()
   const navigate = useNavigate()
   const { data, isLoading } = useWidgetData(["allSubcontractorsBySpend"])
   const items = (data?.["allSubcontractorsBySpend"] as SpendItem[] | null) ?? []
