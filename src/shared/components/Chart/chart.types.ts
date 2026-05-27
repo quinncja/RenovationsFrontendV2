@@ -33,9 +33,19 @@ export interface RadialBarSeries {
 export type ChartConfig =
   | {
       type: "bar"
-      data: BarDataPoint[]
-      /** Bar fill color (defaults to primary chart color) */
+      /**
+       * Simple bars use `BarDataPoint[]` ({ label, value }). For multi-series /
+       * stacked bars, pass raw rows plus `keys` + `indexBy`.
+       */
+      data: BarDataPoint[] | Record<string, unknown>[]
+      /** Numeric fields to stack. Omit for simple { label, value } data. */
+      keys?: string[]
+      /** Category-axis field when `keys` is provided (default "label"). */
+      indexBy?: string
+      /** Bar fill color for single-series bars (defaults to primary chart color) */
       color?: string
+      /** Color palette for stacked keys (defaults to the chart palette) */
+      colors?: string[]
       /** Y-axis label formatter */
       yFormat?: (v: number) => string
     }

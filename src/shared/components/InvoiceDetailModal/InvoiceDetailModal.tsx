@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom"
 import { X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { fetchPageData } from "../../api/pageApi"
-import type { ModuleName } from "../../api/pageApi"
 import { formatMoneyFull, formatDate } from "../../utils/format"
 
 // ─── Status labels & classes ──────────────────────────────────────────────────
@@ -137,28 +136,24 @@ export function InvoiceDetailModal({ invoiceId, module, onClose }: InvoiceDetail
     setDetail(null)
     setError(null)
 
+    // All invoice-detail queries live on the dashboard/home-data endpoint.
+    // Subcontractors are AP vendors, so they reuse the supplier (AP) queries.
     const queries =
       module === "clients"
         ? ["clientInvoiceDetail"]
-        : module === "suppliers"
-          ? ["supplierInvoiceDetail", "supplierInvoiceLines"]
-          : ["subcontractorInvoiceDetail", "subcontractorInvoiceLines"]
+        : ["supplierInvoiceDetail", "supplierInvoiceLines"]
 
-    fetchPageData({ module: module as ModuleName, queries, params: { invoiceRecnum: recnum } })
+    fetchPageData({ module: "invoices", queries, params: { invoiceRecnum: recnum } })
       .then((data) => {
         if (cancelled) return
         if (module === "clients") {
           const header = data.clientInvoiceDetail as ClientInvoiceDetail | null
           if (!header) { setError("Invoice not found."); setIsLoading(false); return }
           setDetail({ module: "clients", header })
-        } else if (module === "suppliers") {
+        } else {
           const header = data.supplierInvoiceDetail as APInvoiceDetail | null
           if (!header) { setError("Invoice not found."); setIsLoading(false); return }
-          setDetail({ module: "suppliers", header, lines: (data.supplierInvoiceLines as InvoiceLine[]) ?? [] })
-        } else {
-          const header = data.subcontractorInvoiceDetail as APInvoiceDetail | null
-          if (!header) { setError("Invoice not found."); setIsLoading(false); return }
-          setDetail({ module: "subcontractors", header, lines: (data.subcontractorInvoiceLines as InvoiceLine[]) ?? [] })
+          setDetail({ module, header, lines: (data.supplierInvoiceLines as InvoiceLine[]) ?? [] })
         }
         setIsLoading(false)
       })
@@ -252,10 +247,10 @@ function ClientInvoiceBody({ header: h }: { header: ClientInvoiceDetail }) {
       {h.jobNum && (
         <section
           className="invoice-modal-section invoice-modal-section-link"
-          onClick={() => navigate(`/jobcosting/${h.jobNum}`)}
+          onClick={() => navigate(`/jobcost/${h.jobNum}`)}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => e.key === "Enter" && navigate(`/jobcosting/${h.jobNum}`)}
+          onKeyDown={(e) => e.key === "Enter" && navigate(`/jobcost/${h.jobNum}`)}
         >
           <p className="invoice-modal-section-label">Job</p>
           <div className="invoice-modal-info">

@@ -14,12 +14,22 @@ const AuthContext = createContext<AuthContextValue>({
   loading: true,
 })
 
+const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true'
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [claims, setClaims] = useState<Record<string, unknown>>({})
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!DEV_BYPASS)
 
   useEffect(() => {
+    if (DEV_BYPASS) {
+      // Fake user object with just enough shape to satisfy consumers
+      setUser({ displayName: 'Dev User', email: 'dev@renovationsdelivered.com', uid: 'dev-local' } as unknown as User)
+      setClaims({ role: 'executive' })
+      setLoading(false)
+      return
+    }
+
     return onIdTokenChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const result = await firebaseUser.getIdTokenResult()

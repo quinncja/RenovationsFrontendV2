@@ -1,13 +1,21 @@
 import { DatabaseZap } from "lucide-react"
-import { formatMoneyFull } from "../../utils/format"
+import { formatMoneyFull, formatPercent, formatNumber } from "../../utils/format"
 import { usePageDisconnected } from "../../context/PageContext"
+
+type FormatPreset = "money" | "percent" | "number"
+
+const FORMATTERS: Record<FormatPreset, (v: number) => string> = {
+  money: formatMoneyFull,
+  percent: formatPercent,
+  number: formatNumber,
+}
 
 interface StatWidgetProps {
   title: string
-  value: number | null
+  value: number | null | undefined
   loading?: boolean
   disconnected?: boolean
-  format?: (v: number) => string
+  format?: ((v: number) => string) | FormatPreset
 }
 
 export function StatWidget({
@@ -15,10 +23,11 @@ export function StatWidget({
   value,
   loading,
   disconnected,
-  format = formatMoneyFull,
+  format = "money",
 }: StatWidgetProps) {
   const pageDisconnected = usePageDisconnected()
   const isDisconnected = disconnected || pageDisconnected
+  const formatFn = typeof format === "function" ? format : FORMATTERS[format]
 
   return (
     <div className="stat-widget card">
@@ -30,10 +39,10 @@ export function StatWidget({
           <DatabaseZap size={14} />
           Offline
         </span>
-      ) : value === null ? (
+      ) : value == null ? (
         <span className="body-text text-secondary">—</span>
       ) : (
-        <span className="stat-widget-value title1 emphasized">{format(value)}</span>
+        <span className="stat-widget-value title1 emphasized">{formatFn(value)}</span>
       )}
     </div>
   )

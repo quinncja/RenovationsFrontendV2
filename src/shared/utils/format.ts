@@ -51,3 +51,13 @@ export function formatMoneyFull(value: number): string {
     maximumFractionDigits: 0,
   }).format(value)
 }
+
+// Accepts either a ratio (0.18 → "18.0%") or a whole percentage (18 → "18.0%").
+export function formatPercent(value: number): string {
+  const pct = Math.abs(value) <= 1 ? value * 100 : value
+  return `${pct.toFixed(1)}%`
+}
+
+export function formatNumber(value: number): string {
+  return new Intl.NumberFormat("en-US").format(value)
+}

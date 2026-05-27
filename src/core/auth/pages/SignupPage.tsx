@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { createUserWithEmailAndPassword } from "firebase/auth"
 import { auth } from "../firebase"
+import { DOMAIN_ERROR, isAllowedEmail } from "../domain"
 import Logo from "../../components/Logo"
 
 export default function SignupPage() {
@@ -15,6 +16,11 @@ export default function SignupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
+
+    if (!isAllowedEmail(email)) {
+      setError(DOMAIN_ERROR)
+      return
+    }
 
     if (password !== confirm) {
       setError("Passwords do not match.")
@@ -38,7 +44,7 @@ export default function SignupPage() {
         <div className="auth-card-header">
           <Logo size={48} />
           <h1 className="title1">Create an account</h1>
-          <p className="body-text">Get started with 93E</p>
+          <p className="body-text">Get started with Renovations Delivered</p>
         </div>
         <form onSubmit={handleSubmit} style={{ width: "80%", display: "flex", flexDirection: "column", gap: "1rem" }}>
           <input

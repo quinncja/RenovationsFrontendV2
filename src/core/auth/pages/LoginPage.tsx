@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { signInWithEmailAndPassword, SAMLAuthProvider, GoogleAuthProvider, signInWithPopup } from "firebase/auth"
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth"
 import { auth } from "../firebase"
 import { useAuth } from "../AuthProvider"
+import { ALLOWED_EMAIL_DOMAIN, DOMAIN_ERROR, isAllowedEmail } from "../domain"
 import Logo from "../../components/Logo"
-import SolarPanelBackground from "../components/SolarPanelBackground"
-
-const SAML_PROVIDER_ID = import.meta.env.VITE_FIREBASE_SAML_PROVIDER_ID as string | undefined
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -25,6 +23,10 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
+    if (!isAllowedEmail(email)) {
+      setError(DOMAIN_ERROR)
+      return
+    }
     setLoading(true)
     try {
       await signInWithEmailAndPassword(auth, email, password)
@@ -41,12 +43,12 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const provider = new GoogleAuthProvider()
-      provider.setCustomParameters({ hd: "93energy.com" })
+      // Hint Google to the company Workspace; still verified below since `hd` isn't enforced.
+      provider.setCustomParameters({ hd: ALLOWED_EMAIL_DOMAIN })
       const result = await signInWithPopup(auth, provider)
-      // Double-check domain server-side isn't possible here, but verify the email
-      if (!result.user.email?.endsWith("@93energy.com")) {
-        await result.user.delete()
-        setError("Only @93energy.com accounts are allowed.")
+      if (!isAllowedEmail(result.user.email)) {
+        await signOut(auth)
+        setError(DOMAIN_ERROR)
         return
       }
       navigate("/dashboard")
@@ -57,29 +59,14 @@ export default function LoginPage() {
     }
   }
 
-  async function handleSSOLogin() {
-    if (!SAML_PROVIDER_ID) return
-    setError("")
-    setLoading(true)
-    try {
-      const provider = new SAMLAuthProvider(SAML_PROVIDER_ID)
-      await signInWithPopup(auth, provider)
-      navigate("/dashboard")
-    } catch (err: unknown) {
-      setError((err as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="login-page">
-      <SolarPanelBackground />
+      <div className="login-background" />
       <div className="auth-card">
         <div className="auth-card-header">
-          <Logo size={48} color="white" />
+          <Logo size={48} />
           <h1 className="title1">Welcome back</h1>
-          <p className="body-text">Sign in to your account</p>
+          <p className="body-text">Sign in to Renovations Delivered</p>
         </div>
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-field">
@@ -107,7 +94,7 @@ export default function LoginPage() {
           </div>
           {error && <p className="auth-error">{error}</p>}
           <button type="submit" className="button auth-submit" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
         <div className="auth-divider">
@@ -122,11 +109,6 @@ export default function LoginPage() {
           </svg>
           Continue with Google
         </button>
-        {SAML_PROVIDER_ID && (
-          <button className="button auth-sso" onClick={handleSSOLogin} disabled={loading}>
-            Continue with SSO
-          </button>
-        )}
       </div>
     </div>
   )

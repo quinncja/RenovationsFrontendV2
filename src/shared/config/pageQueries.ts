@@ -1,72 +1,102 @@
 export const PAGE_QUERIES = {
+  // Dashboard — admin/executive
   adminDashboard: [
-    "yearRevenue",
-    "allTimeRevenue",
     "annualRevenueTrend",
-    "grossRevenueByMonth",
-    "grossRevenueByMonthPrevYear",
-    "netRevenueByMonth",
-    "netRevenueByMonthPrevYear",
-    "spendingByMonth",
-    "spendingByMonthPrevYear",
-    "topClientsByRevenue",
-    "topMaterialSuppliersBySpend",
-    "topSubcontractorsBySpend",
-    "totalMaterialSpend",
-    "totalSubcontractorSpend",
+    "cumulativeRevenueGrowth",
+    "monthlyRevenueComparison",
+    "marginPerformance",
+    "annualDirectExpenses",
+    "phaseCompletion",
+    "clientInsights",
+    "projectInsights",
+    "subcontractorInsights",
+    "vendorInsights",
+    "employeePerformance",
+    "agingSummary",
+    "loc",
+    "dataValidation",
+    "openMonthFinances",
+    "overHeadExpenses",
+    "projectsMissingContracts",
+    "currentPeriodProjects",
   ],
-  jobCost: [
-    "jobCostList",
+
+  // Dashboard — PM view
+  employeeDashboard: [
+    "employeePerformanceBreakdown",
+    "watchlist",
+    "projectsMissingContracts",
+    "projectCount",
   ],
-  jobCostDetail: [
-    "jobCostSummary",
-    "jobCostChangeOrders",
-    "jobCostGroups",
-    "jobCostTransactions",
+
+  // Dashboard drill-down queries
+  open: {
+    phaseCompletion: ["phaseCompletionOpen"],
+    dataValidation: ["dataValidation", "dataValidationOpen"],
+    agingSummary: ["loc", "agingSummary", "agingSummaryOpen"],
+    clientInsights: ["clientInsights", "clientInsightsPrevYear"],
+    projectInsights: ["projectInsights", "projectInsightsPrevYear"],
+    subcontractorInsights: ["subcontractorInsights", "subcontractorInsightsPrevYear"],
+    vendorInsights: ["vendorInsights", "vendorInsightsPrevYear"],
+    employeePerformance: ["employeePerformanceBreakdown"],
+  },
+
+  // Business Summary
+  businessSummary: [
+    "annualDirectExpenses",
+    "annualRevenueTrend",
+    "marginPerformance",
+    "openMonthFinances",
+    "phaseCompletion",
+    "employeePerformance",
+    "overHeadExpenses",
+    "currentPeriodProjects",
   ],
-  jobCostDetailPage: [
-    "jobCostSummary",
-    "jobCostGroups",
-    "jobCostTransactions",
-    "jobCostMonthlyCosts",
-    "jobCostInvoices",
-    "jobCostVendorSpend",
-  ],
-  users: [
-    "allUsers",
-  ],
-  clients: [
-    "allClientsByRevenue",
-  ],
+
+  // Job Costing
+  projectJobcost: ["getPhases", "getBudgetByRecnum", "getAllCostItems", "getChangeOrdersByRecnum"],
+
+  // Projects
+  projects: ["homeProjectList"],
+
+  // Cash Flow
+  cashflow: ["cashflow"],
+
+  // Org Chart (Monday.com)
+  orgChart: ["orgChart"],
+
+  // Revenue Map
+  revenueMap: ["revenueMap"],
+
+  // Invoices
+  invoices: ["allInvoices"],
+
+  // Directory — Clients
+  clients: ["allClientsByRevenue"],
   clientDetail: [
     "clientSummary",
     "clientRevenueByYear",
     "clientRecentInvoices",
     "clientJobs",
   ],
-  suppliers: [
-    "allMaterialSuppliersBySpend",
+
+  // Directory — Vendors
+  vendors: ["allVendorsBySpend"],
+  vendorDetail: [
+    "vendorSummary",
+    "vendorSpendByYear",
+    "vendorRecentInvoices",
+    "vendorJobs",
   ],
-  supplierDetail: [
-    "supplierSummary",
-    "supplierSpendByYear",
-    "supplierRecentInvoices",
-    "supplierJobs",
-  ],
-  subcontractors: [
-    "allSubcontractorsBySpend",
-  ],
+
+  // Directory — Subcontractors
+  subcontractors: ["allSubcontractorsBySpend"],
   subcontractorDetail: [
     "subcontractorSummary",
     "subcontractorSpendByYear",
     "subcontractorRecentInvoices",
     "subcontractorJobs",
   ],
-  invoices: [
-    "allInvoices",
-  ],
 } as const
 
 export type PageQueryKey = keyof typeof PAGE_QUERIES
-export type QueryName<K extends PageQueryKey> = (typeof PAGE_QUERIES)[K][number]
-export type AllQueryNames = (typeof PAGE_QUERIES)[PageQueryKey][number]

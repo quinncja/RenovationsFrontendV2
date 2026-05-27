@@ -10,8 +10,8 @@ import { useDarkMode } from "../../hooks/useDarkMode"
 // ─── Theme ───────────────────────────────────────────────────────────────────
 
 function buildNivoTheme(dark: boolean) {
-  const subtext = dark ? "#94a3b8" : "#6b7a8d"
-  const grid = dark ? "rgba(148,163,184,0.12)" : "rgba(25,55,90,0.10)"
+  const subtext = dark ? "#9a8e82" : "#6b7a8d"
+  const grid = dark ? "rgba(200,180,160,0.12)" : "rgba(25,55,90,0.10)"
   return {
     background: "transparent",
     text: { fill: subtext, fontSize: 11, fontFamily: "Figtree, -apple-system, sans-serif" },
@@ -28,13 +28,13 @@ function buildNivoTheme(dark: boolean) {
 }
 
 const CHART_COLORS = [
-  "#1f78c5",
+  "#c27c3e",
   "#22c55e",
-  "#f59e0b",
+  "#3b82f6",
   "#ef4444",
   "#8b5cf6",
   "#06b6d4",
-  "#f97316",
+  "#f59e0b",
   "#ec4899",
   "#14b8a6",
   "#84cc16",
@@ -164,21 +164,31 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth }: {
 // ─── Bar chart ────────────────────────────────────────────────────────────────
 
 function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> }) {
-  const { data, color = CHART_COLORS[0], yFormat } = config
+  const { data, keys, indexBy, color = CHART_COLORS[0], colors, yFormat } = config
 
   const dark = useDarkMode()
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
 
-  const barData = data.map((d) => ({ label: d.label, value: d.value }))
+  // Stacked/multi-series mode when explicit keys are provided; otherwise treat
+  // the data as simple { label, value } points.
+  const stacked = Array.isArray(keys) && keys.length > 0
+  const barKeys = stacked ? keys! : ["value"]
+  const barIndexBy = stacked ? (indexBy ?? "label") : "label"
+  const barColors = colors ?? (stacked ? CHART_COLORS : [color])
+  const barData = (
+    stacked
+      ? (data as Record<string, unknown>[])
+      : (data as { label: string; value: number }[]).map((d) => ({ label: d.label, value: d.value }))
+  ) as Record<string, string | number>[]
 
   return (
     <ResponsiveBar
       data={barData}
-      keys={["value"]}
-      indexBy="label"
+      keys={barKeys}
+      indexBy={barIndexBy}
       theme={nivoTheme}
-      colors={[color]}
-      margin={{ top: 20, right: 24, bottom: 40, left: 68 }}
+      colors={barColors}
+      margin={{ top: 20, right: 24, bottom: stacked ? 56 : 40, left: 68 }}
       padding={0.35}
       borderRadius={3}
       axisLeft={{
@@ -194,9 +204,26 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
       enableLabel={false}
       animate
       motionConfig={{ tension: 120, friction: 14 }}
-      tooltip={({ value, indexValue }) => (
+      legends={
+        stacked
+          ? [
+              {
+                dataFrom: "keys",
+                anchor: "bottom",
+                direction: "row",
+                translateY: 52,
+                itemsSpacing: 12,
+                itemWidth: 80,
+                itemHeight: 16,
+                symbolSize: 10,
+                symbolShape: "circle",
+              },
+            ]
+          : []
+      }
+      tooltip={({ id, value, indexValue }) => (
         <div className="chart-tooltip">
-          <span>{String(indexValue)}</span>
+          <span>{stacked ? `${String(indexValue)} · ${String(id)}` : String(indexValue)}</span>
           <strong>{formatMoneyFull(value as number)}</strong>
         </div>
       )}

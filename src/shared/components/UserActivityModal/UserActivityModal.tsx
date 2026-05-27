@@ -2,11 +2,9 @@ import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
 import { X, ShieldCheck } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { auth } from "../../../core/auth/firebase"
+import { getUserActivity } from "../../api/mutationApi"
 import { Chart } from "../Chart/Chart"
 import type { LineSeries } from "../Chart/chart.types"
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "/api"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -43,14 +41,14 @@ function avatarInitials(name: string): string {
 const ROLE_LABEL: Record<string, string> = {
   executive: "Executive",
   admin:     "Admin",
-  manager:   "Manager",
+  pm:        "PM",
   waiting:   "Waiting Room",
 }
 
 const ROLE_CLASS: Record<string, string> = {
   executive: "usr-role-badge--executive",
   admin:     "usr-role-badge--admin",
-  manager:   "usr-role-badge--manager",
+  pm:        "usr-role-badge--manager",
   waiting:   "usr-role-badge--waiting",
 }
 
@@ -75,15 +73,8 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, onClose,
 
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
 
-    auth.currentUser?.getIdToken()
-      .then((token) =>
-        fetch(
-          `${API_BASE_URL}/users/${user.uid}/activity?timezone=${encodeURIComponent(timezone)}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        )
-      )
-      .then((r) => r.json())
-      .then((data: ActivityData) => { if (!cancelled) { setActivity(data); setIsLoading(false) } })
+    getUserActivity(user.uid, timezone)
+      .then((data) => { if (!cancelled) { setActivity(data as ActivityData); setIsLoading(false) } })
       .catch(() => { if (!cancelled) setIsLoading(false) })
 
     return () => { cancelled = true }
@@ -243,11 +234,11 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, onClose,
                             Admin
                           </button>
                           <button
-                            className={`usr-assign-btn usr-assign-manager${currentRole === "manager" ? " usr-assign-btn--active" : ""}`}
-                            disabled={changingRole || currentRole === "manager"}
-                            onClick={() => handleRoleChange("manager")}
+                            className={`usr-assign-btn usr-assign-manager${currentRole === "pm" ? " usr-assign-btn--active" : ""}`}
+                            disabled={changingRole || currentRole === "pm"}
+                            onClick={() => handleRoleChange("pm")}
                           >
-                            Manager
+                            PM
                           </button>
                         </div>
                       </div>

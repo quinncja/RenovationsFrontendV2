@@ -1,5 +1,21 @@
 import type { LucideIcon } from "lucide-react"
-import { Home, Building, Users, Building2, FileText, Briefcase, Users2, Truck, HardHat } from "lucide-react"
+import {
+  Home,
+  Building,
+  Users,
+  Building2,
+  FileText,
+  Briefcase,
+  Users2,
+  Truck,
+  HardHat,
+  ClipboardList,
+  DollarSign,
+  Map,
+  Network,
+  BarChart3,
+  MessageSquare,
+} from "lucide-react"
 
 export interface NavItem {
   label: string
@@ -19,33 +35,66 @@ export function isNavGroup(item: NavItem | NavGroup): item is NavGroup {
 
 const navItems = {
   home: { label: "Home", path: "/dashboard", icon: Home },
-  jobcost: { label: "Projects", path: "/jobcosting", icon: Building },
+  businessSummary: { label: "Company", path: "/company", icon: Building2 },
+  jobcost: { label: "Job Costing", path: "/jobcost", icon: Building },
+  changeOrders: { label: "Change Orders", path: "/change-orders", icon: ClipboardList },
   invoices: { label: "Invoices", path: "/invoices", icon: FileText },
   users: { label: "Users", path: "/users", icon: Users },
-  company: { label: "Company", path: "/company-summary", icon: Building2 },
   clients: { label: "Clients", path: "/clients", icon: Users2 },
-  suppliers: { label: "Vendors", path: "/suppliers", icon: Truck },
+  vendors: { label: "Vendors", path: "/vendors", icon: Truck },
   subcontractors: { label: "Subcontractors", path: "/subcontractors", icon: HardHat },
+  projects: { label: "Projects", path: "/projects", icon: Briefcase },
+  cashFlow: { label: "Cash Flow", path: "/cash-flow", icon: DollarSign },
+  revenueMap: { label: "Revenue Map", path: "/revenue-map", icon: Map },
+  orgChart: { label: "Org Chart", path: "/org-chart", icon: Network },
+  feedback: { label: "Feedback", path: "/feedback", icon: MessageSquare },
 } as const satisfies Record<string, NavItem>
 
-const companiesGroup: NavGroup = {
+const directoryGroup: NavGroup = {
   label: "Directory",
   icon: Briefcase,
-  items: [navItems.clients, navItems.suppliers, navItems.subcontractors],
+  items: [navItems.clients, navItems.vendors, navItems.subcontractors, navItems.projects],
+}
+
+const chartsGroup: NavGroup = {
+  label: "Charts",
+  icon: BarChart3,
+  items: [navItems.orgChart, navItems.cashFlow, navItems.revenueMap],
 }
 
 export const roles = {
   executive: {
     appRole: "executive" as const,
-    nav: [navItems.home, navItems.jobcost, navItems.invoices, companiesGroup, navItems.users] as (NavItem | NavGroup)[],
+    nav: [
+      navItems.home,
+      navItems.businessSummary,
+      navItems.jobcost,
+      navItems.changeOrders,
+      navItems.invoices,
+      directoryGroup,
+      chartsGroup,
+      navItems.users,
+    ] as (NavItem | NavGroup)[],
   },
   admin: {
     appRole: "admin" as const,
-    nav: [navItems.jobcost, navItems.invoices, companiesGroup, navItems.users] as (NavItem | NavGroup)[],
+    nav: [
+      navItems.home,
+      navItems.businessSummary,
+      navItems.jobcost,
+      navItems.changeOrders,
+      navItems.invoices,
+      directoryGroup,
+      chartsGroup,
+      navItems.users,
+    ] as (NavItem | NavGroup)[],
   },
-  manager: {
-    appRole: "manager" as const,
-    nav: [navItems.jobcost] as (NavItem | NavGroup)[],
+  pm: {
+    appRole: "pm" as const,
+    nav: [
+      navItems.home,
+      navItems.jobcost,
+    ] as (NavItem | NavGroup)[],
   },
 }
 

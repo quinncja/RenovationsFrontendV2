@@ -2,7 +2,8 @@ import fetchWithRetry from "../utils/fetchWithRetry"
 import { auth } from "../../core/auth/firebase"
 import type { DashboardLayout } from "../../modules/dashboard/types/dashboardLayout"
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "/api"
+// Trim any trailing slash so the leading-slash paths below don't produce "//".
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "")
 
 export async function fetchDashboardLayout(): Promise<DashboardLayout | null> {
   return fetchWithRetry(async () => {
@@ -11,6 +12,7 @@ export async function fetchDashboardLayout(): Promise<DashboardLayout | null> {
     const response = await fetch(`${API_BASE_URL}/user/dashboard-layout`, {
       method: "GET",
       headers: {
+        "ngrok-skip-browser-warning": "true",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     })
@@ -35,6 +37,7 @@ export async function saveDashboardLayout(layout: DashboardLayout): Promise<void
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(layout),

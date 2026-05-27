@@ -1,7 +1,8 @@
 import fetchWithRetry from "../utils/fetchWithRetry"
 import { auth } from "../../core/auth/firebase"
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "/api"
+// Trim any trailing slash so leading-slash paths below don't produce "//".
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "")
 
 async function authedFetch(path: string, method: "GET" | "POST" = "GET") {
   return fetchWithRetry(async () => {
@@ -11,6 +12,7 @@ async function authedFetch(path: string, method: "GET" | "POST" = "GET") {
       method,
       headers: {
         "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     })
