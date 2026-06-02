@@ -1,0 +1,12 @@
+{
+  // Cloudflare Worker (static assets) config for the RD frontend.
+  // SPA fallback: serve index.html for unmatched client-side routes (e.g. /dashboard
+  // on refresh) instead of a 404. Replaces the "/* /index.html 200" _redirects rule,
+  // which the static-assets engine rejects as a self-referential loop.
+  "name": "renovations-delivered-frontend",
+  "compatibility_date": "2026-06-02",
+  "assets": {
+    "directory": "./dist/",
+    "not_found_handling": "single-page-application"
+  }
+}
