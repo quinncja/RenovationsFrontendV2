@@ -76,7 +76,7 @@ function Navbar() {
   const navigate = useNavigate()
   const location = useLocation()
   const [isOpen, setIsOpen] = useLocalStorage("navbarOpen", true)
-  const [theme, setTheme] = useLocalStorage<"light" | "dark">("theme", "dark")
+  const [theme, setTheme] = useLocalStorage<"light" | "dark">("theme", "light")
   const navItems = useNavItems()
   const [tooltip, setTooltip] = useState<TooltipState>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)

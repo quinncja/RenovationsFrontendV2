@@ -49,7 +49,7 @@ function LineOfCreditCard({
   const remaining = ready ? limit - drawn : 0
 
   return (
-    <div className="stat-widget card">
+    <div className="stat-widget card loc-card">
       <span className="stat-widget-title subheadline">{brandTitle("Line of Credit")}</span>
       {loading ? (
         <div className="stat-widget-skeleton" />

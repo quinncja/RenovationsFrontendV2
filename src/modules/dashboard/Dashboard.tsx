@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
@@ -14,6 +14,7 @@ import { SectionPager } from "./components/SectionPager"
 import { SectionEditor } from "./components/SectionEditor"
 import { EditModeToggle } from "./components/EditModeToggle"
 import { EditModeToolbar } from "./components/EditModeToolbar"
+import { WelcomeWalkthrough, GearHintPopover } from "./components/WelcomeWalkthrough"
 
 export default function Dashboard() {
   const { claims } = useAuth()
@@ -42,7 +43,27 @@ export default function Dashboard() {
 // ─── Admin Dashboard (customizable two-column layout) ────────────────
 
 function AdminDashboard({ year, onYearChange }: { year: number; onYearChange: (y: number) => void }) {
-  const { isEditing, isLoading } = useDashboardLayout()
+  const { isEditing, isLoading, hasChosenLayout } = useDashboardLayout()
+
+  // Dev-only: `?welcome` forces the walkthrough so it can be previewed even when
+  // a layout is already saved server-side. Never active in production builds; in
+  // preview, picking a layout is non-destructive (see WelcomeWalkthrough).
+  const [forceWelcome, setForceWelcome] = useState(
+    () => import.meta.env.DEV && new URLSearchParams(window.location.search).has("welcome")
+  )
+  // Step two of the walkthrough: point out the gear once they've chosen.
+  const [gearHint, setGearHint] = useState(false)
+  // Fade the dashboard in the first time it reveals after a welcome selection.
+  const [cameFromWelcome, setCameFromWelcome] = useState(false)
+
+  // New user who hasn't picked a layout (or dev preview) → walkthrough, not grid.
+  const showWelcome = !isEditing && (forceWelcome || (!isLoading && !hasChosenLayout))
+
+  function handleChosen() {
+    setForceWelcome(false)
+    setGearHint(true)
+    setCameFromWelcome(true)
+  }
 
   return (
     <Page
@@ -51,23 +72,28 @@ function AdminDashboard({ year, onYearChange }: { year: number; onYearChange: (y
       actions={
         isEditing ? (
           <EditModeToolbar />
-        ) : (
+        ) : showWelcome ? undefined : (
           <>
             <YearSelector value={year} onChange={onYearChange} />
-            <EditModeToggle />
+            <EditModeToggle highlight={gearHint} onActivate={() => setGearHint(false)} />
           </>
         )
       }
     >
-      {isLoading ? (
+      {isEditing ? (
+        <SectionEditor />
+      ) : showWelcome ? (
+        <WelcomeWalkthrough preview={forceWelcome} onChosen={handleChosen} />
+      ) : isLoading ? (
         <div className="widget-grid widget-grid-2">
           <div className="widget card"><div className="widget-skeleton" /></div>
           <div className="widget card"><div className="widget-skeleton" /></div>
         </div>
-      ) : isEditing ? (
-        <SectionEditor />
       ) : (
-        <SectionPager />
+        <>
+          <SectionPager enterAnimation={cameFromWelcome} />
+          {gearHint && <GearHintPopover onDismiss={() => setGearHint(false)} />}
+        </>
       )}
     </Page>
   )

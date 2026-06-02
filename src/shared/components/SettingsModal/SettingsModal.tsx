@@ -16,7 +16,6 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
   const { claims } = useAuth()
   const isAdmin = claims["role"] === "executive"
 
-  const [hideCurrentMargin, setHideCurrentMargin] = useLocalStorage("hideCurrentMargin", false)
   const [marginColorsEnabled, setMarginColorsEnabled] = useLocalStorage("marginColorsEnabled", true)
   const [sqlConnected, setSqlConnected] = useState<boolean | null>(null)
   const [sqlLoading, setSqlLoading] = useState(false)
@@ -94,19 +93,6 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
               </div>
 
               <div className="settings-section">
-                <div className="settings-row">
-                  <div className="settings-row-info">
-                    <span className="settings-row-label">Current Project Financials</span>
-                    <span className="settings-row-description">Show profit and margin for in-progress projects</span>
-                  </div>
-                  <button
-                    className={`settings-sql-toggle ${hideCurrentMargin ? "settings-sql-disconnected" : "settings-sql-connected"}`}
-                    onClick={() => setHideCurrentMargin(!hideCurrentMargin)}
-                  >
-                    {hideCurrentMargin ? "Hidden" : "Visible"}
-                  </button>
-                </div>
-
                 <div className="settings-row">
                   <div className="settings-row-info">
                     <span className="settings-row-label">Margin Colors</span>

@@ -17,7 +17,7 @@ export default function MobileMenuDrawer({ open, onClose }: MobileMenuDrawerProp
   const location = useLocation()
   const navItems = useNavItems()
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [theme, setTheme] = useLocalStorage<"light" | "dark">("theme", "dark")
+  const [theme, setTheme] = useLocalStorage<"light" | "dark">("theme", "light")
 
   // Lock body scroll when drawer is open
   useEffect(() => {

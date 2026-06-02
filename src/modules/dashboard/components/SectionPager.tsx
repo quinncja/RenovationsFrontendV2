@@ -49,7 +49,7 @@ function renderSectionWidgets(widgets: WidgetLayoutItem[]): ReactNode[] {
  * taller than the screen scrolls internally, then chains to the next. Dots on
  * the right indicate / jump to sections; the native scrollbar sits at the edge.
  */
-export function SectionPager() {
+export function SectionPager({ enterAnimation = false }: { enterAnimation?: boolean }) {
   const { layout, activeSectionIndex, setActiveSectionIndex } = useDashboardLayout()
   const sections = layout.sections
 
@@ -136,7 +136,10 @@ export function SectionPager() {
 
   return (
     <>
-      <div className="section-pager" ref={scrollRef}>
+      <div
+        className={`section-pager${enterAnimation ? " section-pager-enter" : ""}`}
+        ref={scrollRef}
+      >
         {sections.map((section, i) => (
           <section
             key={section.id}

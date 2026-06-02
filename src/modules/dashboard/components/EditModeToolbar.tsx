@@ -33,7 +33,7 @@ function TemplatePicker() {
               className="template-picker-option"
               role="menuitem"
               onClick={() => {
-                applyTemplate(t.sectionOrder)
+                applyTemplate(t)
                 setOpen(false)
               }}
             >

@@ -1,21 +1,41 @@
-import type { DashboardLayout, SectionId } from "../types/dashboardLayout"
+import type { DashboardLayout, SectionId, WidgetLayoutItem } from "../types/dashboardLayout"
 import { DEFAULT_DASHBOARD_LAYOUT } from "./defaultLayout"
 
 // Named starting layouts the user can reset their home page to. Each template
-// is just a section ordering — the widgets within each section reset to their
-// default composition.
+// is a section ordering plus, optionally, per-section widget composition
+// overrides. Sections without an override reset to their default composition.
 
 export interface LayoutTemplate {
   id: string
   name: string
+  /** Short one-liner shown in the "Reset view" dropdown and welcome cards. */
   description: string
   sectionOrder: SectionId[]
+  /**
+   * Per-section widget composition overrides. A section listed here replaces
+   * the default widget set/sizes for that section; omitted sections fall back
+   * to DEFAULT_DASHBOARD_LAYOUT's composition.
+   */
+  sectionWidgets?: Partial<Record<SectionId, WidgetLayoutItem[]>>
 }
 
 export const LAYOUT_TEMPLATES: LayoutTemplate[] = [
   {
     id: "operations",
     name: "Operations",
+    description: "Growth & performance first",
+    sectionOrder: [
+      "businessDevelopment",
+      "businessPerformance",
+      "businessRelations",
+      "businessFinancials",
+      "financialTrends",
+      "reports",
+    ],
+  },
+  {
+    id: "procurement",
+    name: "Procurement",
     description: "Reports & relations first",
     sectionOrder: [
       "reports",
@@ -25,6 +45,14 @@ export const LAYOUT_TEMPLATES: LayoutTemplate[] = [
       "businessDevelopment",
       "financialTrends",
     ],
+    // Procurement leads Business Relations with suppliers rather than clients.
+    sectionWidgets: {
+      businessRelations: [
+        { id: "vendorInsights", colSpan: 2 },
+        { id: "clientInsights", colSpan: 1 },
+        { id: "subcontractorInsights", colSpan: 1 },
+      ],
+    },
   },
   {
     id: "financial",
@@ -39,31 +67,19 @@ export const LAYOUT_TEMPLATES: LayoutTemplate[] = [
       "reports",
     ],
   },
-  {
-    id: "owner",
-    name: "Owner",
-    description: "Growth & performance first",
-    sectionOrder: [
-      "businessDevelopment",
-      "businessPerformance",
-      "businessRelations",
-      "businessFinancials",
-      "financialTrends",
-      "reports",
-    ],
-  },
 ]
 
 /**
  * Build a full layout for a template: the default widget composition with the
- * sections reordered per the template. Any sections the template omits are
- * appended in their default order so nothing is ever lost.
+ * sections reordered per the template, and any per-section widget overrides
+ * applied. Sections the template omits are appended in their default order so
+ * nothing is ever lost.
  */
-export function buildTemplateLayout(sectionOrder: SectionId[]): DashboardLayout {
+export function buildTemplateLayout(template: LayoutTemplate): DashboardLayout {
   const bySection = new Map(DEFAULT_DASHBOARD_LAYOUT.sections.map((s) => [s.id, s]))
   const ordered: SectionId[] = []
   const seen = new Set<SectionId>()
-  for (const id of [...sectionOrder, ...DEFAULT_DASHBOARD_LAYOUT.sections.map((s) => s.id)]) {
+  for (const id of [...template.sectionOrder, ...DEFAULT_DASHBOARD_LAYOUT.sections.map((s) => s.id)]) {
     if (bySection.has(id) && !seen.has(id)) {
       seen.add(id)
       ordered.push(id)
@@ -72,6 +88,10 @@ export function buildTemplateLayout(sectionOrder: SectionId[]): DashboardLayout 
   return {
     version: 2,
     columns: 2,
-    sections: ordered.map((id) => structuredClone(bySection.get(id)!)),
+    sections: ordered.map((id) => {
+      const override = template.sectionWidgets?.[id]
+      if (override) return { id, widgets: structuredClone(override) }
+      return structuredClone(bySection.get(id)!)
+    }),
   }
 }

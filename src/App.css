@@ -1,5 +1,5 @@
 :root{
-  color-scheme: dark;
+  color-scheme: light;
 
   /* Colors — Warm Charcoal + Copper */
   --primary-color: #c27c3e;
@@ -1737,6 +1737,17 @@ body{
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
 }
+/* Pin the Overdrawn pill to the card's top-right corner (the "available to
+   draw" pill stays inline below the value). */
+.loc-card {
+  position: relative;
+}
+.loc-card .loc-pill--over {
+  position: absolute;
+  top: 0.85rem;
+  right: 1.25rem;
+  margin-top: 0;
+}
 @media (max-width: 640px) {
   .banking-pair {
     flex-direction: column;
@@ -1764,8 +1775,8 @@ body{
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 .overdue-stat-clickable:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--primary-color) 10%, var(--hover-bg));
-  border-color: color-mix(in srgb, var(--primary-color) 40%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-color) 5%, var(--hover-bg));
+  border-color: color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
 }
 .overdue-stat-clickable:disabled {
   cursor: default;
@@ -4767,6 +4778,150 @@ body{
   color: var(--primary-text);
 }
 
+/* Gear button pulse — draws the eye during the welcome "edit anytime" hint. */
+.btn-icon-attention {
+  color: var(--primary-color);
+  animation: gearPulse 3s ease-in-out infinite;
+}
+@keyframes gearPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(from var(--primary-color) r g b / 0.28); }
+  60% { box-shadow: 0 0 0 5px rgb(from var(--primary-color) r g b / 0); }
+}
+
+/* ─── New-user welcome walkthrough ───────────────────────────────────── */
+.welcome-walkthrough {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: clamp(0.5rem, 4vh, 2.5rem) 0 4rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.25rem;
+  animation: welcomeFade 0.4s ease both;
+}
+@keyframes welcomeFade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.welcome-intro {
+  text-align: center;
+  max-width: 560px;
+}
+.welcome-title { margin: 0 0 0.625rem; }
+.welcome-subtitle { color: var(--secondary-text); margin: 0; }
+
+.welcome-cards {
+  width: 100%;
+  max-width: 720px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.25rem;
+}
+
+.welcome-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--button-shadow);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.welcome-card:hover {
+  border-color: var(--primary-color);
+  box-shadow: light-dark(0 12px 28px rgba(0, 0, 0, 0.12), 0 12px 28px rgba(0, 0, 0, 0.45));
+}
+.welcome-card:focus-visible {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 22%, transparent);
+}
+
+.welcome-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+  color: var(--primary-color);
+  margin-bottom: 0.125rem;
+}
+.welcome-card-name {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--primary-text);
+}
+.welcome-card-desc {
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+}
+
+/* Step two: gear hint popover, anchored under the top-right gear. */
+.gear-hint {
+  position: absolute;
+  top: 3.75rem;
+  right: 2.5rem;
+  z-index: 30;
+  width: 270px;
+  padding: 0.95rem 1rem 1rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: light-dark(0 14px 36px rgba(0, 0, 0, 0.18), 0 14px 36px rgba(0, 0, 0, 0.55));
+  animation: gearHintIn 0.28s ease both;
+}
+@keyframes gearHintIn {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+.gear-hint-arrow {
+  position: absolute;
+  top: -7px;
+  /* Popover right edge aligns with the gear's right edge (both 2.5rem); the gear
+     is 2.25rem wide, so center the arrow ~18px in to sit under the gear. */
+  right: 11.5px;
+  width: 13px;
+  height: 13px;
+  background: var(--card-color);
+  border-left: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
+  transform: rotate(45deg);
+}
+.gear-hint-body {
+  margin: 0 0 0.875rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--secondary-text);
+}
+.gear-hint-dismiss {
+  width: 100%;
+  border-radius: 8px;
+  padding: 0.45rem 0.875rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  background: var(--primary-color);
+  color: #fff;
+  transition: background 0.15s ease;
+}
+.gear-hint-dismiss:hover { background: var(--primary-color-hover); }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-icon-attention { animation: none; }
+  .welcome-walkthrough,
+  .gear-hint,
+  .section-pager-enter { animation: none; }
+}
+
 /* Widget placeholder — base */
 .widget-placeholder {
   display: flex;
@@ -5203,6 +5358,15 @@ svg.placeholder-illustration {
 .section-pager::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+/* One-shot fade-in when the dashboard reveals after a welcome selection. */
+.section-pager-enter {
+  animation: pagerFadeIn 0.6s ease both;
+}
+@keyframes pagerFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Each section is a snap target. Content-sized (so the next peeks in below).
@@ -5979,8 +6143,10 @@ svg.placeholder-illustration {
     min-width: 0;
   }
 
-  /* ── 1. Hide edit layout button on mobile ── */
+  /* ── 1. Hide edit layout button on mobile (editing is desktop-only) ── */
   .btn-icon { display: none; }
+  /* The gear hint points at that now-hidden gear — drop it on mobile too. */
+  .gear-hint { display: none; }
 
   /* ── 2. Pie chart: hide percentage, let name take more space ── */
   .spend-list-percent { display: none; }

@@ -2,12 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- Synchronously apply stored theme before first paint to prevent flash -->
+    <!-- Synchronously apply stored theme before first paint to prevent flash.
+         Defaults to light; only an explicit stored "dark" choice flips it. -->
     <script>
       try {
         var t = localStorage.getItem('theme');
-        if (t === '"light"' || t === 'light') {
-          document.documentElement.style.colorScheme = 'light';
+        if (t === '"dark"' || t === 'dark') {
+          document.documentElement.style.colorScheme = 'dark';
         }
       } catch (e) {}
     </script>

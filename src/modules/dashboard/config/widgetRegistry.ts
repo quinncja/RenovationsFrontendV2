@@ -113,7 +113,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
     component: EmployeePerformanceWidget,
     label: "Employee Performance",
     visualType: "table",
-    defaultColSpan: 2,
+    defaultColSpan: 1,
   },
   // ── Financial Trends ─────────────────────────────────────────────────
   monthlyRevenueComparison: {
@@ -166,7 +166,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
     component: ClientInsightsWidget,
     label: "Top Clients by Revenue",
     visualType: "pie",
-    defaultColSpan: 1,
+    defaultColSpan: 2,
   },
   subcontractorInsights: {
     id: "subcontractorInsights",

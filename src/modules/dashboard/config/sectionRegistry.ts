@@ -85,14 +85,14 @@ export const WIDGET_DEFAULT_ORDER: WidgetId[] = [
   "employeePerformance",
   // Financial Trends
   "monthlyRevenueComparison",
+  "monthlyDirectExpense",
   "monthlyOverhead",
   "monthlyNetProfit",
-  "monthlyDirectExpense",
   // Business Financials
   "banking",
   "billings",
   // Business Relations
   "clientInsights",
-  "subcontractorInsights",
   "vendorInsights",
+  "subcontractorInsights",
 ]

@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react"
 import type { DashboardLayout, SectionId, WidgetId, WidgetLayoutItem } from "../types/dashboardLayout"
 import { DEFAULT_DASHBOARD_LAYOUT } from "../config/defaultLayout"
-import { buildTemplateLayout } from "../config/layoutTemplates"
+import { buildTemplateLayout, type LayoutTemplate } from "../config/layoutTemplates"
 import { reconcileLayout } from "../config/reconcileLayout"
 import { fetchDashboardLayout, saveDashboardLayout } from "../../../shared/api/layoutApi"
 import { useAuth } from "../../../core/auth/AuthProvider"
@@ -12,6 +12,10 @@ interface DashboardLayoutContextValue {
   isEditing: boolean
   isDirty: boolean
   isLoading: boolean
+  /** False until the user has picked/saved a layout — drives the welcome walkthrough. */
+  hasChosenLayout: boolean
+  /** Commit a template as the user's live layout (new-user welcome selection). */
+  chooseTemplate: (template: LayoutTemplate) => void
 
   // Home-page pager position (which section is shown), persisted per user.
   activeSectionIndex: number
@@ -24,8 +28,8 @@ interface DashboardLayoutContextValue {
   enterEditMode: () => void
   exitEditMode: () => void
   saveLayout: () => Promise<void>
-  /** Reset the in-edit layout to a named template's section order (default widgets). */
-  applyTemplate: (sectionOrder: SectionId[]) => void
+  /** Reset the in-edit layout to a named template (section order + widget defaults). */
+  applyTemplate: (template: LayoutTemplate) => void
 
   // Section-level (edit mode)
   moveSection: (activeId: SectionId, overId: SectionId) => void
@@ -98,6 +102,9 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
   const [editLayout, setEditLayout] = useState<DashboardLayout | null>(null)
   // Only show loading if we have no cached layout and need to fetch
   const [isLoading, setIsLoading] = useState(!cachedLayout && !!userId)
+  // A cached layout means the user has chosen before; otherwise the fetch below
+  // resolves it (server layout → chosen; 404 → new user → welcome walkthrough).
+  const [hasChosenLayout, setHasChosenLayout] = useState<boolean>(cachedLayout != null)
 
   // Home-page pager position. Persisted per user; clamped to the section count.
   const [activeSectionIndex, setActiveSectionIndexState] = useState<number>(() => loadSectionIndex(userId))
@@ -131,7 +138,10 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
           const reconciled = reconcileLayout(serverLayout)
           setLayout(reconciled)
           saveToLocalStorage(userId, reconciled)
+          setHasChosenLayout(true)
         }
+        // A null (404) response with no cache leaves hasChosenLayout false → the
+        // new-user welcome walkthrough shows once loading settles.
       })
       .catch(() => {
         // API failed — keep localStorage/default layout
@@ -220,13 +230,31 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
   }, [editLayout, userId, setSelectedSection])
 
   const applyTemplate = useCallback(
-    (sectionOrder: SectionId[]) => {
-      const layout = buildTemplateLayout(sectionOrder)
+    (template: LayoutTemplate) => {
+      const layout = buildTemplateLayout(template)
       setEditLayout(layout)
       setSelectedSection(layout.sections[0]?.id ?? null)
       setSelected(new Set())
     },
     [setSelectedSection]
+  )
+
+  // New-user welcome selection: commit a template straight to the live layout
+  // (not edit mode) and persist it. State updates apply immediately; the save
+  // runs in the background so the dashboard reveals without waiting on the API.
+  const chooseTemplate = useCallback(
+    (template: LayoutTemplate) => {
+      const next = buildTemplateLayout(template)
+      setLayout(next)
+      setHasChosenLayout(true)
+      if (userId) {
+        saveToLocalStorage(userId, next)
+        void saveDashboardLayout(next).catch(() => {
+          // Save failed — layout is still applied locally for this session.
+        })
+      }
+    },
+    [userId]
   )
 
   // ── Section-level mutation ─────────────────────────────────────────
@@ -489,6 +517,8 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
         isEditing,
         isDirty,
         isLoading,
+        hasChosenLayout,
+        chooseTemplate,
         activeSectionIndex,
         setActiveSectionIndex,
         selectedSectionId,

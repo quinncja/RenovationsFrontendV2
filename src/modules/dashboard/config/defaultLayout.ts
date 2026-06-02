@@ -7,9 +7,9 @@ import { WIDGET_REGISTRY } from "./widgetRegistry"
 //   • Reports             — Reconciliation, Data Quality, Missing Contracts
 //   • Business Development — Current Year, All-Time, Annual Revenue Trend
 //   • Business Performance — Period & Year Summary, Margin, Employee Performance
-//   • Financial Trends     — Gross Revenue, Overhead, Net Profit, Direct Expense (by month)
+//   • Financial Trends     — Gross Revenue, Direct Expense, Overhead, Net Profit (by month)
 //   • Business Financials  — Overdue, Upcoming Billings
-//   • Business Relations   — Top Clients, Subcontractors, Material Suppliers
+//   • Business Relations   — Top Clients, Material Suppliers, Subcontractors
 function buildDefaultLayout(): DashboardLayout {
   const sections: SectionLayout[] = SECTION_ORDER.map((sectionId) => {
     const widgets = WIDGET_DEFAULT_ORDER.filter(
