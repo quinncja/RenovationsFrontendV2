@@ -133,7 +133,7 @@ function Navbar() {
   return (
     <>
       <div className={`navbar ${isOpen ? "navbar-open" : ""}`}>
-        <div className="logo-wrapper" onClick={() => navigate("/dashboard")}>
+        <div className="logo-wrapper" onClick={() => navigate("/dashboard", { state: { resetHome: true } })}>
           <div className="logo-icon">
             <Logo size={32} />
           </div>
@@ -156,7 +156,11 @@ function Navbar() {
               <button
                 key={item.path}
                 className={`button nav-button${location.pathname === item.path || location.pathname.startsWith(`${item.path}/`) ? " nav-button-active" : ""}`}
-                onClick={() => { navigate(item.path); setOpenGroup(null) }}
+                onClick={() => {
+                  // Home button → reset the section pager to the top; other routes navigate as-is.
+                  navigate(item.path, item.path === "/dashboard" ? { state: { resetHome: true } } : {})
+                  setOpenGroup(null)
+                }}
                 {...tipProps(item.label)}
               >
                 <item.icon size={20} />

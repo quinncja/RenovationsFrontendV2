@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from "react"
+import { useLocation, useNavigate } from "react-router-dom"
 import { useDashboardLayout } from "../context/DashboardLayoutContext"
 import { SECTION_REGISTRY } from "../config/sectionRegistry"
 import { WIDGET_REGISTRY } from "../config/widgetRegistry"
@@ -51,6 +52,8 @@ function renderSectionWidgets(widgets: WidgetLayoutItem[]): ReactNode[] {
  */
 export function SectionPager({ enterAnimation = false }: { enterAnimation?: boolean }) {
   const { layout, activeSectionIndex, setActiveSectionIndex } = useDashboardLayout()
+  const location = useLocation()
+  const navigate = useNavigate()
   const sections = layout.sections
 
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -104,11 +107,27 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
   useLayoutEffect(() => {
     if (didInit.current) return
     didInit.current = true
-    if (active > 0) panelRefs.current[active]?.scrollIntoView({ block: "start" })
+    // A navbar Home/logo navigation arrives with `state.resetHome` → start at the
+    // top; otherwise (back/forward, refresh) restore the persisted section.
+    const resetHome = (location.state as { resetHome?: boolean } | null)?.resetHome
+    if (!resetHome && active > 0) panelRefs.current[active]?.scrollIntoView({ block: "start" })
     applyFades()
     // Only run once on mount; `active` is the persisted starting point.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Reset to the top when navigated here via the navbar Home button or logo
+  // (which set `state.resetHome`). Plain back/forward carry no such state, so they
+  // keep the restored section. Runs on mount and on same-route re-clicks.
+  useEffect(() => {
+    const resetHome = (location.state as { resetHome?: boolean } | null)?.resetHome
+    if (!resetHome) return
+    scrollRef.current?.scrollTo({ top: 0, behavior: scrollBehavior() })
+    setActiveSectionIndex(0)
+    // Consume the flag so returning to this history entry later won't force the top.
+    navigate(location.pathname, { replace: true, state: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key])
 
   useEffect(() => {
     const root = scrollRef.current
