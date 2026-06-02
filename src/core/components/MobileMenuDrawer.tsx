@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, Settings } from "lucide-react"
 import useNavItems from "../auth/hooks/useNavItems"
-import { isNavGroup } from "../auth/roles"
+import { isNavGroup, isNavDivider } from "../auth/roles"
 import { SettingsModal } from "../../shared/components/SettingsModal/SettingsModal"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 
@@ -59,7 +59,10 @@ export default function MobileMenuDrawer({ open, onClose }: MobileMenuDrawerProp
               </div>
 
               <div className="mobile-menu-items">
-                {navItems.map((item) => {
+                {navItems.map((item, i) => {
+                  if (isNavDivider(item)) {
+                    return <div key={`divider-${i}`} className="mobile-menu-divider" role="separator" />
+                  }
                   if (isNavGroup(item)) {
                     return (
                       <div key={item.label} className="mobile-menu-group">

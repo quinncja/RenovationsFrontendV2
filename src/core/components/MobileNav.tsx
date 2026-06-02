@@ -2,7 +2,7 @@ import { useState, useMemo } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { Home, Building, Menu, type LucideIcon } from "lucide-react"
 import useNavItems from "../auth/hooks/useNavItems"
-import { isNavGroup } from "../auth/roles"
+import { isNavGroup, isNavDivider } from "../auth/roles"
 import MobileMenuDrawer from "./MobileMenuDrawer"
 
 const PINNED_PATHS = ["/dashboard", "/jobcosting"]
@@ -19,6 +19,7 @@ export default function MobileNav() {
     if (PINNED_PATHS.some((p) => path.startsWith(p))) return Menu
 
     for (const item of navItems) {
+      if (isNavDivider(item)) continue
       if (isNavGroup(item)) {
         for (const child of item.items) {
           if (path.startsWith(child.path)) return child.icon

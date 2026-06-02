@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 
 interface PageProps {
   title: string
-  subtitle?: string
+  subtitle?: ReactNode
   actions?: ReactNode
   stickyHeader?: boolean
   children?: ReactNode

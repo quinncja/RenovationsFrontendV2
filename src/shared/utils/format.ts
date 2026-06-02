@@ -61,3 +61,10 @@ export function formatPercent(value: number): string {
 export function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value)
 }
+
+// Color for a margin percentage (0–100 scale): green at/above 20%, red below.
+export function marginTextColor(pct: number): string {
+  if (pct >= 20) return "#22c55e" // green
+  if (pct >= 15) return "#eab308" // yellow
+  return "#ef4444" // red
+}

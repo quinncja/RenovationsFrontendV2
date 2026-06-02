@@ -17,6 +17,7 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
   const isAdmin = claims["role"] === "executive"
 
   const [hideCurrentMargin, setHideCurrentMargin] = useLocalStorage("hideCurrentMargin", false)
+  const [marginColorsEnabled, setMarginColorsEnabled] = useLocalStorage("marginColorsEnabled", true)
   const [sqlConnected, setSqlConnected] = useState<boolean | null>(null)
   const [sqlLoading, setSqlLoading] = useState(false)
 
@@ -103,6 +104,19 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                     onClick={() => setHideCurrentMargin(!hideCurrentMargin)}
                   >
                     {hideCurrentMargin ? "Hidden" : "Visible"}
+                  </button>
+                </div>
+
+                <div className="settings-row">
+                  <div className="settings-row-info">
+                    <span className="settings-row-label">Margin Colors</span>
+                    <span className="settings-row-description">Color margin values green / amber / red by health</span>
+                  </div>
+                  <button
+                    className={`settings-sql-toggle ${marginColorsEnabled ? "settings-sql-connected" : "settings-sql-disconnected"}`}
+                    onClick={() => setMarginColorsEnabled(!marginColorsEnabled)}
+                  >
+                    {marginColorsEnabled ? "On" : "Off"}
                   </button>
                 </div>
               </div>

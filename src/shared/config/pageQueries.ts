@@ -4,6 +4,9 @@ export const PAGE_QUERIES = {
     "annualRevenueTrend",
     "cumulativeRevenueGrowth",
     "monthlyRevenueComparison",
+    "monthlyDirectExpenseComparison",
+    "monthlyOverheadComparison",
+    "monthlyNetProfitComparison",
     "marginPerformance",
     "annualDirectExpenses",
     "phaseCompletion",
@@ -13,8 +16,10 @@ export const PAGE_QUERIES = {
     "vendorInsights",
     "employeePerformance",
     "agingSummary",
+    "agingSummaryOpen",
     "loc",
     "dataValidation",
+    "dataValidationOpen",
     "openMonthFinances",
     "overHeadExpenses",
     "projectsMissingContracts",
@@ -28,6 +33,21 @@ export const PAGE_QUERIES = {
     "projectsMissingContracts",
     "projectCount",
   ],
+
+  // Dashboard "View" breakdown pages — each pulls its corresponding
+  // monthly chart query plus the line-item drill-down for the table.
+  dashboardBreakdownRevenue: ["monthlyRevenueComparison", "openMonthFinances", "revenueLineItems"],
+  dashboardBreakdownDirectExpense: ["monthlyDirectExpenseComparison", "openMonthFinances", "directExpenseLineItems"],
+  dashboardBreakdownOverhead: ["monthlyOverheadComparison", "openMonthFinances", "overheadLineItems"],
+
+  // Upcoming Billings breakdown — the per-invoice open AR/AP rows behind the chart.
+  dashboardUpcomingBillings: ["agingSummaryOpen"],
+
+  // Employee performance detail page. `openMonthFinances` is included so the
+  // Period summary half can detect which month is the actually-open one
+  // (period dropdown's "Open" sentinel) — the per-employee numbers come
+  // from the breakdown's monthly[] rows, not from openMonthFinances itself.
+  employeeDetail: ["employeePerformanceBreakdown", "openMonthFinances"],
 
   // Dashboard drill-down queries
   open: {
@@ -70,6 +90,11 @@ export const PAGE_QUERIES = {
 
   // Invoices
   invoices: ["allInvoices"],
+
+  // Directory — Employees (uses the same query that powers the home page
+  // Employee Performance widget; this page shows the full list rather
+  // than just the top N).
+  employees: ["employeePerformance"],
 
   // Directory — Clients
   clients: ["allClientsByRevenue"],

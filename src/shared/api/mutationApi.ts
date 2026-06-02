@@ -4,14 +4,12 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/"
 const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true'
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  // ngrok-skip-browser-warning: skip ngrok-free's HTML interstitial so we always get JSON.
   if (DEV_BYPASS) {
-    return { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" }
+    return { "Content-Type": "application/json" }
   }
   const token = await auth.currentUser?.getIdToken()
   return {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
 }
@@ -64,6 +62,8 @@ export interface ChangeOrderData {
   subs: number
   wtpm: number
   lineItems: ChangeOrderLineItem[]
+  /** One row per non-zero cost type per line item — what the backend inserts. */
+  rowObjects: ChangeOrderRowObject[]
   jobString: string
   recnum: string
   user: string
@@ -77,6 +77,15 @@ export interface ChangeOrderLineItem {
   subs: number
   wtpm: number
   total: number
+}
+
+export type ChangeOrderCostType = "material" | "labor" | "subs" | "wtpm"
+
+export interface ChangeOrderRowObject {
+  desc: string
+  unit: string
+  type: ChangeOrderCostType
+  price: number
 }
 
 export function createChangeOrder(data: ChangeOrderData) {

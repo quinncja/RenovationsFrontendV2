@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { fetchPageData } from "../../api/pageApi"
 import { formatMoneyFull, formatDate } from "../../utils/format"
+import useMarginColorsEnabled from "../../hooks/useMarginColorsEnabled"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -142,6 +143,7 @@ interface JobDetailPanelProps {
 
 export function JobDetailPanel({ detail, expandedGroups, onToggleGroup }: JobDetailPanelProps) {
   const navigate = useNavigate()
+  const marginColorsOn = useMarginColorsEnabled()
   const s = detail.summary
   const projProfit = s ? (s.revisedContract ?? 0) - (s.revisedEstimate ?? 0) : 0
   const projPct = s ? projectedMargin(s.revisedContract ?? 0, s.revisedEstimate ?? 0) : null
@@ -198,7 +200,7 @@ export function JobDetailPanel({ detail, expandedGroups, onToggleGroup }: JobDet
           <SummaryRow
             label="Projected Margin"
             value={formatMargin(projPct)}
-            valueClass={marginClass(projPct)}
+            valueClass={marginColorsOn ? marginClass(projPct) : undefined}
             total
           />
         </div>

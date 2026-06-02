@@ -1,5 +1,9 @@
 import XLSX from "xlsx-js-style"
-import type { ChangeOrderLineItem } from "../../../shared/api/mutationApi"
+import type {
+  ChangeOrderLineItem,
+  ChangeOrderRowObject,
+  ChangeOrderCostType,
+} from "../../../shared/api/mutationApi"
 
 interface ParsedChangeOrder {
   name: string
@@ -9,7 +13,25 @@ interface ParsedChangeOrder {
   subs: number
   wtpm: number
   lineItems: ChangeOrderLineItem[]
+  rowObjects: ChangeOrderRowObject[]
 }
+
+// The change-order template stamps this UUID into cell QS5 so we can reject
+// files that aren't actually exported from it.
+const EXCEL_UUID = "d25beb3e-821d-4b92-8c1f-3ba23a00cd73"
+
+// Fixed column layout of the change-order template (zero-based).
+const COL = { desc: 0, unit: 9, labor: 13, material: 14, subs: 15, wtpm: 16 }
+// Summary rows (zero-based): category totals on row 7, grand total on row 8.
+const SUMMARY_ROW = 6
+const TOTAL_ROW = 7
+const TOTAL_COL = 20
+// Line items begin on row 14 (zero-based 13).
+const LINE_ITEMS_START = 13
+
+const num = (v: unknown): number => Number(v) || 0
+const isBlankRow = (row: unknown[]): boolean =>
+  !row || row.every((c) => c === undefined || c === null || c === "")
 
 export async function parseChangeOrderExcel(file: File): Promise<ParsedChangeOrder> {
   const buffer = await file.arrayBuffer()
@@ -18,72 +40,68 @@ export async function parseChangeOrderExcel(file: File): Promise<ParsedChangeOrd
 
   if (!sheet) throw new Error("No worksheet found in Excel file")
 
+  // Validate this is a real change-order template.
+  const uuid = (sheet["QS5"] as { v?: unknown } | undefined)?.v
+  if (uuid !== EXCEL_UUID) {
+    throw new Error("This file isn't a recognized change order template.")
+  }
+
   const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1 })
 
-  if (rows.length < 3) throw new Error("Excel file must have at least 3 rows")
+  // Category totals from the summary rows.
+  const summary = (rows[SUMMARY_ROW] ?? []) as unknown[]
+  const totalRow = (rows[TOTAL_ROW] ?? []) as unknown[]
+  const labor = num(summary[COL.labor])
+  const material = num(summary[COL.material])
+  const subs = num(summary[COL.subs])
+  const wtpm = num(summary[COL.wtpm])
+  let total = num(totalRow[TOTAL_COL])
 
-  // Parse header — name is usually in cell A1 or B1
-  const name = String(rows[0]?.[0] ?? rows[0]?.[1] ?? "Unnamed Change Order")
-
-  // Find the category row (Material, Labor, Subs, WTPM)
-  let material = 0, labor = 0, subs = 0, wtpm = 0, total = 0
+  // Line items — stop at the first fully-blank row. rowObjects flatten each
+  // line item into one row per non-zero cost type (what the backend inserts).
   const lineItems: ChangeOrderLineItem[] = []
-
-  // Look for a summary row with category totals
-  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+  const rowObjects: ChangeOrderRowObject[] = []
+  for (let i = LINE_ITEMS_START; i < rows.length; i++) {
     const row = rows[i]
-    if (!row) continue
-    const firstCell = String(row[0] ?? "").toLowerCase()
-    if (firstCell.includes("total") || firstCell.includes("amount")) {
-      total = Number(row[1]) || 0
-    }
-    if (firstCell.includes("material")) material = Number(row[1]) || 0
-    if (firstCell.includes("labor")) labor = Number(row[1]) || 0
-    if (firstCell.includes("sub")) subs = Number(row[1]) || 0
-    if (firstCell.includes("wtpm") || firstCell.includes("equipment")) wtpm = Number(row[1]) || 0
-  }
+    if (isBlankRow(row)) break
 
-  // Parse line items — look for rows with description and amounts
-  // Typically starts after header rows
-  let headerRow = -1
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]
-    if (!row) continue
-    const cells = row.map(c => String(c ?? "").toLowerCase())
-    if (cells.some(c => c.includes("description") || c.includes("desc"))) {
-      headerRow = i
-      break
-    }
-  }
+    const desc = String(row[COL.desc] ?? "")
+    const unit = String(row[COL.unit] ?? "")
+    if (!desc || !unit) continue
 
-  if (headerRow >= 0) {
-    for (let i = headerRow + 1; i < rows.length; i++) {
-      const row = rows[i]
-      if (!row || !row[0]) continue
-      const desc = String(row[0] ?? "")
-      if (!desc || desc.toLowerCase() === "total") continue
+    const liLabor = num(row[COL.labor])
+    const liMaterial = num(row[COL.material])
+    const liSubs = num(row[COL.subs])
+    const liWtpm = num(row[COL.wtpm])
 
-      const item: ChangeOrderLineItem = {
-        desc,
-        unit: String(row[1] ?? ""),
-        material: Number(row[2]) || 0,
-        labor: Number(row[3]) || 0,
-        subs: Number(row[4]) || 0,
-        wtpm: Number(row[5]) || 0,
-        total: Number(row[6]) || 0,
-      }
-      lineItems.push(item)
+    lineItems.push({
+      desc,
+      unit,
+      labor: liLabor,
+      material: liMaterial,
+      subs: liSubs,
+      wtpm: liWtpm,
+      total: liLabor + liMaterial + liSubs + liWtpm,
+    })
+
+    const byType: [ChangeOrderCostType, number][] = [
+      ["labor", liLabor],
+      ["material", liMaterial],
+      ["subs", liSubs],
+      ["wtpm", liWtpm],
+    ]
+    for (const [type, price] of byType) {
+      if (price !== 0) rowObjects.push({ desc, unit, type, price })
     }
   }
 
-  // If no total found, sum from line items
+  // Fall back to summing line items if the template totals are missing.
   if (total === 0 && lineItems.length > 0) {
     total = lineItems.reduce((sum, li) => sum + li.total, 0)
   }
-  if (material === 0) material = lineItems.reduce((sum, li) => sum + li.material, 0)
-  if (labor === 0) labor = lineItems.reduce((sum, li) => sum + li.labor, 0)
-  if (subs === 0) subs = lineItems.reduce((sum, li) => sum + li.subs, 0)
-  if (wtpm === 0) wtpm = lineItems.reduce((sum, li) => sum + li.wtpm, 0)
 
-  return { name, total, material, labor, subs, wtpm, lineItems }
+  // The change-order name is the file name without its extension.
+  const name = file.name.replace(/\.(xlsx|xls)$/i, "")
+
+  return { name, total, material, labor, subs, wtpm, lineItems, rowObjects }
 }

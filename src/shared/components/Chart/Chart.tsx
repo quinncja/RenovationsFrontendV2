@@ -1,8 +1,9 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { ResponsiveLine } from "@nivo/line"
 import { ResponsivePie } from "@nivo/pie"
 import { ResponsiveBar } from "@nivo/bar"
 import { ResponsiveRadialBar } from "@nivo/radial-bar"
+import { useTooltip } from "@nivo/tooltip"
 import type { ChartConfig, LineSeries } from "./chart.types"
 import { formatMoney, formatMoneyFull } from "../../utils/format"
 import { useDarkMode } from "../../hooks/useDarkMode"
@@ -117,23 +118,26 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth }: {
     return { id: s.id, value: point != null ? (point.data.y as number | null) : null }
   })
 
+  // Convention for 2-series comparison charts: the FIRST series is the current
+  // period (nivo paints series[0] on top), the SECOND is the prior period.
+  const currentRow = rowsBySerie[0]
+  const prevRow = rowsBySerie[1]
   let growth: number | null = null
-  if (rowsBySerie.length === 2) {
-    const prev = rowsBySerie[0].value
-    const curr = rowsBySerie[1].value
-    if (prev != null && prev !== 0 && curr != null) {
-      growth = ((curr - prev) / Math.abs(prev)) * 100
-    }
+  if (rowsBySerie.length === 2 && currentRow.value != null && prevRow.value != null && prevRow.value !== 0) {
+    growth = ((currentRow.value - prevRow.value) / Math.abs(prevRow.value)) * 100
   }
   const growthColor = growth != null
     ? growth >= 0 ? "#22c55e" : "#ef4444"
     : undefined
 
+  // Display chronologically (prior first, current last) regardless of paint order.
+  const orderedRows = rowsBySerie.length === 2 ? [prevRow, currentRow] : rowsBySerie
+
   return (
     <div className="chart-line-tooltip">
       <div className="chart-line-tooltip-header">{xLabel}</div>
-      {rowsBySerie.map((row, i) => {
-        const isCurrent = i === rowsBySerie.length - 1
+      {orderedRows.map((row) => {
+        const isCurrent = row.id === currentRow.id
         return (
           <div key={row.id} className="chart-line-tooltip-row">
             <span className="chart-line-tooltip-label">{row.id}</span>
@@ -164,22 +168,249 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth }: {
 // ─── Bar chart ────────────────────────────────────────────────────────────────
 
 function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> }) {
-  const { data, keys, indexBy, color = CHART_COLORS[0], colors, yFormat } = config
+  const { data, keys, indexBy, color = CHART_COLORS[0], colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, onBarClick } = config
 
   const dark = useDarkMode()
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
 
   // Stacked/multi-series mode when explicit keys are provided; otherwise treat
   // the data as simple { label, value } points.
+  // Guard against non-array data (unexpected backend shapes) so a bad payload
+  // renders an empty chart instead of crashing the page (nivo calls data.map).
+  const rows = Array.isArray(data) ? (data as Record<string, unknown>[]) : []
   const stacked = Array.isArray(keys) && keys.length > 0
   const barKeys = stacked ? keys! : ["value"]
   const barIndexBy = stacked ? (indexBy ?? "label") : "label"
-  const barColors = colors ?? (stacked ? CHART_COLORS : [color])
+  // Per-bar coloring (simple bars only) takes precedence over the palette.
+  const barColors =
+    colorBy && !stacked
+      ? (d: { data: Record<string, unknown> }) => colorBy(Number(d.data.value))
+      : colors ?? (stacked ? CHART_COLORS : [color])
   const barData = (
     stacked
-      ? (data as Record<string, unknown>[])
-      : (data as { label: string; value: number }[]).map((d) => ({ label: d.label, value: d.value }))
+      ? rows
+      : rows.map((d) => ({ label: d.label, value: d.value }))
   ) as Record<string, string | number>[]
+  const tooltipFormat = yFormat ?? formatMoneyFull
+
+  const zeroLineColor = dark ? "rgba(220,205,185,0.45)" : "rgba(25,55,90,0.40)"
+  // Faint column highlight painted behind the hovered category's bars.
+  const sliceHighlight = dark ? "rgba(255,255,255,0.07)" : "rgba(15,23,42,0.06)"
+  // Y-axis markers (zero-line + any caller-supplied horizontal lines) go
+  // through nivo's built-in `markers` prop. X-axis markers go to a custom
+  // layer below — nivo's built-in bar markers anchor at the band's *start*
+  // edge (left side of the bar) rather than the center, so the line lands
+  // off-center on the open-month bar. The custom layer reads each bar's
+  // computed `x + width/2` for a true center; visual style (color, dash,
+  // label position above the plot area) matches the line-chart markers so
+  // both chart types render the "Open" cue identically.
+  const xMarkers = useMemo(
+    () => (configMarkers ?? []).filter((m) => m.axis === "x"),
+    [configMarkers]
+  )
+  const nivoMarkers = useMemo(() => {
+    const list: NonNullable<typeof configMarkers> = []
+    if (emphasizeZero) {
+      list.push({
+        axis: "y",
+        value: 0,
+        lineStyle: { stroke: zeroLineColor, strokeWidth: 1.5 },
+      })
+    }
+    for (const m of configMarkers ?? []) {
+      if (m.axis !== "x") list.push(m)
+    }
+    return list.length > 0 ? list : undefined
+  }, [emphasizeZero, configMarkers, zeroLineColor])
+
+  const marginTop = 20
+
+  // Custom layer: vertical line through the band CENTER. The label sits
+  // in the chart's bottom margin (alongside the month tick labels) so
+  // the Open text and the "May" tick read on the same baseline — putting
+  // it in the top margin like the line charts looked asymmetric since
+  // the bar's category axis lives at the bottom. The line spans only the
+  // plot area (y=0 → y=height), not into the bottom margin, so it stops
+  // cleanly at the x-axis.
+  type BandBar = { data: { indexValue: string | number }; x: number; width: number }
+  // nivo passes `height` as the FULL canvas height; the plot area is
+  // `innerHeight`. The layer's <g> is already translated by margin.top, so
+  // we measure against innerHeight — using `height` would push the line past
+  // the x-axis and shove the label below the SVG (clipped, so it vanishes).
+  const BarXMarkersLayer = ({ bars, innerHeight }: { bars: readonly BandBar[]; innerHeight: number }) => {
+    if (xMarkers.length === 0) return null
+    // Sits ~6px below the plot's bottom edge — same vertical band as the
+    // bar chart's axisBottom tickPadding (12), so the Open label is
+    // visually adjacent to the month label.
+    const labelY = innerHeight + 18
+    return (
+      <g pointerEvents="none">
+        {xMarkers.map((m, i) => {
+          const bar = bars.find((b) => String(b.data.indexValue) === String(m.value))
+          if (!bar) return null
+          const cx = bar.x + bar.width / 2
+          const stroke = m.lineStyle?.stroke ?? "currentColor"
+          const strokeWidth = m.lineStyle?.strokeWidth ?? 1
+          const strokeOpacity = m.lineStyle?.strokeOpacity ?? 1
+          const strokeDasharray = m.lineStyle?.strokeDasharray
+          // Vertical "Open"-style label sits centered above the line, which then
+          // starts below it; horizontal labels keep the full-height line + bottom text.
+          const vertical = m.legend != null && m.legendOrientation === "vertical"
+          const labelBottom = 30
+          const lineTop = vertical ? labelBottom + 10 : 0
+          return (
+            <g key={i}>
+              <line
+                x1={cx}
+                x2={cx}
+                y1={lineTop}
+                y2={innerHeight}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+                strokeOpacity={strokeOpacity}
+                strokeDasharray={strokeDasharray}
+              />
+              {m.legend &&
+                (vertical ? (
+                  // Vertical label reading bottom→top, centered on the line, with
+                  // the line starting below it — matches the line charts' "Open" cue.
+                  <text
+                    transform={`translate(${cx}, ${labelBottom}) rotate(-90)`}
+                    textAnchor="start"
+                    dominantBaseline="central"
+                    fill={m.textStyle?.fill ?? stroke}
+                    fontSize={m.textStyle?.fontSize ?? 10}
+                    fontWeight={m.textStyle?.fontWeight ?? 600}
+                  >
+                    {m.legend}
+                  </text>
+                ) : (
+                  <text
+                    x={cx}
+                    y={labelY}
+                    textAnchor="middle"
+                    fill={m.textStyle?.fill ?? stroke}
+                    fontSize={m.textStyle?.fontSize ?? 10}
+                    fontWeight={m.textStyle?.fontWeight ?? 600}
+                  >
+                    {m.legend}
+                  </text>
+                ))}
+            </g>
+          )
+        })}
+      </g>
+    )
+  }
+
+  // Slice tooltip: one combined card per category showing every key's value
+  // plus their signed difference, mirroring the line chart's slice tooltip.
+  // Values render as magnitudes (matching an absolute-valued axis); the
+  // difference keeps its sign and is colored good/bad.
+  const stackedPalette = Array.isArray(colors) ? colors : CHART_COLORS
+  const groupTooltipOn = Boolean(groupTooltip) && stacked
+  const GroupTooltip = ({ indexValue, row }: { indexValue: string; row: Record<string, unknown> }) => {
+    const diff = barKeys.reduce((sum, k) => sum + (Number(row[k]) || 0), 0)
+    const diffColor = diff >= 0 ? "#22c55e" : "#ef4444"
+    return (
+      <div className="chart-line-tooltip">
+        <div className="chart-line-tooltip-header">{indexValue}</div>
+        {barKeys.map((k, i) => (
+          <div key={k} className="chart-line-tooltip-row">
+            <span className="chart-line-tooltip-label" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <span className="chart-tooltip-dot" style={{ background: stackedPalette[i % stackedPalette.length] }} />
+              {k}
+            </span>
+            <span className="chart-line-tooltip-value">{formatMoneyFull(Math.abs(Number(row[k]) || 0))}</span>
+          </div>
+        ))}
+        <div className="chart-line-tooltip-divider" />
+        <div className="chart-line-tooltip-growth-row">
+          <span className="chart-line-tooltip-growth-label">{tooltipTotalLabel ?? "Net"}</span>
+          <span className="chart-line-tooltip-growth-value" style={{ color: diffColor }}>
+            {diff > 0 ? "+" : ""}{formatMoneyFull(diff)}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  type SliceBar = { data: { indexValue: string | number; data: Record<string, unknown> }; x: number; width: number }
+  const BarSliceLayer = ({
+    bars,
+    innerHeight,
+    yScale,
+  }: {
+    bars: readonly SliceBar[]
+    innerHeight: number
+    // nivo's value scale; for this y-axis it's callable with a number.
+    yScale: unknown
+  }) => {
+    const valueToY = yScale as (v: number) => number
+    const { showTooltipFromEvent, hideTooltip } = useTooltip()
+    const [hovered, setHovered] = useState<string | null>(null)
+    if (!groupTooltipOn && !onBarClick) return null
+    // Collapse the per-key bars into one transparent full-height band per
+    // category. Each band shares its segments' x/width (stacked), and carries
+    // the original data row so the tooltip can read every key at once. The same
+    // band intercepts clicks, so the whole column is a click target.
+    const bands = new Map<string, { x: number; width: number; row: Record<string, unknown> }>()
+    for (const b of bars) {
+      const key = String(b.data.indexValue)
+      if (!bands.has(key)) bands.set(key, { x: b.x, width: b.width, row: b.data.data })
+    }
+    const hoveredBand = hovered != null ? bands.get(hovered) : undefined
+    return (
+      <g>
+        {hoveredBand && (
+          <rect
+            x={hoveredBand.x - 3}
+            y={0}
+            width={hoveredBand.width + 6}
+            height={innerHeight}
+            rx={6}
+            fill={sliceHighlight}
+            pointerEvents="none"
+          />
+        )}
+        {[...bands.entries()].map(([key, band]) => (
+          <rect
+            key={key}
+            x={band.x}
+            y={0}
+            width={band.width}
+            height={innerHeight}
+            fill="transparent"
+            pointerEvents="all"
+            style={onBarClick ? { cursor: "pointer" } : undefined}
+            onMouseEnter={(e) => {
+              setHovered(key)
+              if (groupTooltipOn) showTooltipFromEvent(<GroupTooltip indexValue={key} row={band.row} />, e)
+            }}
+            onMouseMove={groupTooltipOn ? (e) => showTooltipFromEvent(<GroupTooltip indexValue={key} row={band.row} />, e) : undefined}
+            onMouseLeave={() => {
+              setHovered(null)
+              if (groupTooltipOn) hideTooltip()
+            }}
+            onClick={
+              onBarClick
+                ? (e) => {
+                    // For a two-key diverging chart, report which key was clicked
+                    // from the cursor's side of the zero line (key 0 above, 1 below).
+                    let segKey: string | undefined
+                    if (barKeys.length === 2) {
+                      const top = (e.currentTarget as SVGRectElement).getBoundingClientRect().top
+                      segKey = e.clientY - top < valueToY(0) ? barKeys[0] : barKeys[1]
+                    }
+                    onBarClick(key, segKey)
+                  }
+                : undefined
+            }
+          />
+        ))}
+      </g>
+    )
+  }
 
   return (
     <ResponsiveBar
@@ -188,24 +419,37 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
       indexBy={barIndexBy}
       theme={nivoTheme}
       colors={barColors}
-      margin={{ top: 20, right: 24, bottom: stacked ? 56 : 40, left: 68 }}
+      margin={{ top: marginTop, right: 24, bottom: stacked && !hideLegend ? 56 : 40, left: 68 }}
       padding={0.35}
       borderRadius={3}
+      valueScale={
+        scaleType === "symlog"
+          ? { type: "symlog", constant: scaleConstant, min: minValue, max: maxValue }
+          : { type: "linear", min: minValue, max: maxValue }
+      }
       axisLeft={{
         tickSize: 0,
         tickPadding: 10,
+        tickValues: axisLeftTickValues,
         format: yFormat ?? ((v) => formatMoney(v as number)),
       }}
       axisBottom={{
         tickSize: 0,
         tickPadding: 12,
       }}
+      gridYValues={axisLeftTickValues}
+      markers={nivoMarkers}
+      // Keep interactivity on: nivo only mounts its <Tooltip> renderer when
+      // isInteractive is true, so the slice tooltip needs it. The slice layer's
+      // bands sit topmost (last) and intercept hovers, so the bars beneath
+      // never fire their own per-segment tooltip — no double tooltip.
+      layers={["grid", "axes", "bars", "markers", "legends", "annotations", BarXMarkersLayer, BarSliceLayer]}
       enableGridX={false}
       enableLabel={false}
       animate
       motionConfig={{ tension: 120, friction: 14 }}
       legends={
-        stacked
+        stacked && !hideLegend
           ? [
               {
                 dataFrom: "keys",
@@ -224,7 +468,7 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
       tooltip={({ id, value, indexValue }) => (
         <div className="chart-tooltip">
           <span>{stacked ? `${String(indexValue)} · ${String(id)}` : String(indexValue)}</span>
-          <strong>{formatMoneyFull(value as number)}</strong>
+          <strong>{tooltipFormat(value as number)}</strong>
         </div>
       )}
     />
@@ -287,8 +531,73 @@ function RadialBarChart({ config }: { config: Extract<ChartConfig, { type: "radi
 
 // ─── Line chart ───────────────────────────────────────────────────────────────
 
+// Custom nivo line layer: renders a static dot + animated pulse ring at a
+// single data point identified by series id + x value. Placed above the
+// default points layer so it sits on top of the standard small dot. Bails
+// out silently if the target point isn't in the rendered data.
+interface PulsePointConfig { seriesId: string; xValue: string | number; color?: string }
+type NivoComputedSeries = {
+  id: string | number
+  color?: string
+  data: readonly { position: { x: number; y: number }; data: { x: string | number; y: number | null } }[]
+}
+function buildPulseLayer(pulse: PulsePointConfig | undefined) {
+  if (!pulse) return null
+  return ({ series }: { series: readonly NivoComputedSeries[] }) => {
+    const s = series.find((ser) => String(ser.id) === String(pulse.seriesId))
+    if (!s) return null
+    const pt = s.data.find((d) => String(d.data.x) === String(pulse.xValue))
+    if (!pt || pt.data.y == null) return null
+    const color = pulse.color ?? s.color ?? CHART_COLORS[0]
+    // Verbatim port of the old frontend's pointSymbol pulse: 4 circles
+    // wrapped in a <g> translated to the point. Inner circles use the
+    // default cx=0/cy=0 so the pulseCore transform: scale() animates
+    // around the circle's own center (without the wrapping translate
+    // the scale would happen around the SVG origin and the dot would
+    // slide as it pulsed). `size/2 = 3` matches the old code's default
+    // nivo point size of 6.
+    const SIZE = 6
+    const BORDER_WIDTH = 2
+    return (
+      <g transform={`translate(${pt.position.x}, ${pt.position.y})`} pointerEvents="none">
+        <circle
+          className="pulse-ring-outer"
+          r={8}
+          fill="none"
+          stroke={color}
+          strokeWidth={1}
+          strokeOpacity={0.25}
+          style={{
+            animation: "pulseOuter 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+          }}
+        />
+        <circle
+          className="pulse-ring-inner"
+          r={6}
+          fill={color}
+          fillOpacity={0.08}
+          style={{
+            animation: "pulseInner 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite",
+          }}
+        />
+        <circle
+          r={SIZE / 2}
+          fill="#ffffff"
+          style={{ animation: "pulseCore 2.5s ease-in-out infinite" }}
+        />
+        <circle
+          r={SIZE / 2}
+          fill="none"
+          stroke={color}
+          strokeWidth={BORDER_WIDTH}
+        />
+      </g>
+    )
+  }
+}
+
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
-  const { series, yFormat, enableArea = true, legend = false, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip } = config
+  const { series, yFormat, enableArea = true, legend = false, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, markers, pulsePoint, highlightedX, onPointClick } = config
 
   const dark = useDarkMode()
   const isMobile = window.innerWidth <= 768
@@ -296,6 +605,19 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
   const yTicks = everyOtherYTicks(series)
   const hasSeriesColors = series.some((s) => s.color)
   const marginTop = legend ? 40 : 20
+  // "Muted" mode: when the caller is highlighting a specific x value, all
+  // series fade to gray and the single matching point paints in its
+  // own series color. Communicates "this is what you clicked" without
+  // dropping the rest of the line off the chart.
+  const muted = highlightedX != null && highlightedX !== ""
+  const MUTED_COLOR = "#94a3b8"
+  const seriesColorById = useMemo(() => {
+    const map = new Map<string, string>()
+    series.forEach((s, i) => {
+      map.set(String(s.id), s.color ?? CHART_COLORS[i % CHART_COLORS.length])
+    })
+    return map
+  }, [series])
 
   const allY = series.flatMap((s) => s.data.map((p) => p.y)).filter((v): v is number => typeof v === "number")
   const minY = allY.length > 0 ? Math.min(...allY) : 0
@@ -305,7 +627,13 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
     <ResponsiveLine
       data={series}
       theme={nivoTheme}
-      colors={hasSeriesColors ? (serie: { color?: string }) => serie.color ?? CHART_COLORS[0] : CHART_COLORS}
+      colors={
+        muted
+          ? () => MUTED_COLOR
+          : hasSeriesColors
+            ? (serie: { color?: string }) => serie.color ?? CHART_COLORS[0]
+            : CHART_COLORS
+      }
       margin={{ top: marginTop, right: isMobile ? 12 : 24, bottom: 48, left: isMobile ? 48 : 68 }}
       xScale={{ type: "point" }}
       yScale={{ type: "linear", min: yMin, max: "auto", stacked: false }}
@@ -316,9 +644,39 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       areaOpacity={0.12}
       enablePoints
       pointSize={6}
-      pointColor="#ffffff"
+      pointColor={
+        muted
+          ? ((ctx: { point: { data: { x: unknown }; seriesId: string } }) =>
+              String(ctx.point.data.x) === highlightedX
+                ? (seriesColorById.get(String(ctx.point.seriesId)) ?? CHART_COLORS[0])
+                : "#ffffff") as never
+          : "#ffffff"
+      }
       pointBorderWidth={2}
-      pointBorderColor={{ from: "seriesColor" }}
+      pointBorderColor={
+        muted
+          ? ((point: { data: { x: unknown }; seriesId: string }) =>
+              String(point.data.x) === highlightedX
+                ? (seriesColorById.get(String(point.seriesId)) ?? CHART_COLORS[0])
+                : MUTED_COLOR) as never
+          : { from: "seriesColor" }
+      }
+      onClick={
+        onPointClick
+          ? ((target: unknown) => {
+              // With slices enabled, nivo invokes onClick with the slice
+              // object (carries `points`); without slices it's a point
+              // directly. Handle both shapes so the click works regardless
+              // of nivo internals.
+              const t = target as {
+                data?: { x?: unknown }
+                points?: { data: { x: unknown } }[]
+              }
+              const x = t.data?.x ?? t.points?.[0]?.data?.x
+              if (x != null) onPointClick(String(x))
+            }) as never
+          : undefined
+      }
       enableSlices="x"
       tooltip={() => null}
       sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} />}
@@ -337,6 +695,22 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       gridYValues={yTicks ?? 5}
       enableGridX={false}
       enableCrosshair
+      markers={markers}
+      // Layers: default nivo order with the optional pulse layer appended
+      // last so the pulsing dot paints on top of the standard points.
+      layers={[
+        "grid",
+        "markers",
+        "axes",
+        "areas",
+        "crosshair",
+        "lines",
+        "points",
+        "slices",
+        "mesh",
+        "legends",
+        ...(pulsePoint ? [buildPulseLayer(pulsePoint)!] : []),
+      ]}
       crosshairType="x"
       lineWidth={2}
       legends={

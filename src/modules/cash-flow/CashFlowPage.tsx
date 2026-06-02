@@ -1,5 +1,6 @@
 import { useMemo } from "react"
 import Page from "../../shared/components/Page"
+import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
@@ -11,6 +12,7 @@ import { formatMoneyFull } from "../../shared/utils/format"
 
 interface SankeyNode {
   id: string
+  name?: string
   color?: string
 }
 
@@ -65,14 +67,18 @@ function CashFlowContent({ year, onYearChange }: { year: number; onYearChange: (
 
   return (
     <Page title="Cash Flow" actions={<YearSelector value={year} onChange={onYearChange} />}>
+      <MotionList className="inv-page-stack">
+        <MotionItem>
       <Widget title={`${year} Cash Flow`} loading={isLoading} noData={!sankeyData}>
         {sankeyData && (
           <div style={{ height: "85vh" }}>
             <ResponsiveSankey
               data={sankeyData}
-              margin={{ top: 20, right: 160, bottom: 20, left: 20 }}
-              align="justify"
+              margin={{ top: 20, right: 180, bottom: 20, left: 150 }}
+              align="center"
+              sort="input"
               colors={node => (node as unknown as { color: string }).color || "#6b7280"}
+              label={node => (node as unknown as { name?: string }).name ?? node.id}
               nodeOpacity={1}
               nodeThickness={18}
               nodeInnerPadding={3}
@@ -109,6 +115,8 @@ function CashFlowContent({ year, onYearChange }: { year: number; onYearChange: (
           </div>
         )}
       </Widget>
+        </MotionItem>
+      </MotionList>
     </Page>
   )
 }

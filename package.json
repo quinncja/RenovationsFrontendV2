@@ -29,8 +29,8 @@
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
     "react-simple-maps": "^3.0.0",
-    "topojson-client": "^3.1.0",
     "sonner": "^1.7.0",
+    "topojson-client": "^3.1.0",
     "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {

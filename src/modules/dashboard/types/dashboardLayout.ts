@@ -1,21 +1,74 @@
 // Shape of a user's customizable dashboard layout, persisted via layoutApi.ts
 // (GET/PUT /user/dashboard-layout). The backend stores this verbatim as a
 // schemaless document, so the frontend owns this contract.
+//
+// v2: widgets are grouped into named sections. The home page renders one
+// section at a time; widgets are reorderable within a section but never leave
+// it. The grid inside a section is still a fixed two-column layout — each
+// widget spans one column (half width) or both (full width). A half-width
+// widget may carry an `offset` to push it into the right column.
+//
+// Section titles are NOT stored here — they live in SECTION_REGISTRY so a
+// future rename ships without a migration and doesn't pollute the dirty check.
 
-export interface DashboardWidgetLayout {
-  /** Stable widget identifier (matches the widget key rendered on the dashboard). */
-  id: string
-  /** Display order within the grid (ascending). */
-  order: number
-  /** Whether the user has hidden this widget. */
-  hidden?: boolean
-  /** Optional grid column span (1 = full-width single column). */
-  colSpan?: number
+export type WidgetId =
+  | "annualRevenue"
+  | "cumulativeRevenueGrowth"
+  | "currentYearRevenue"
+  | "allTimeRevenue"
+  | "monthlyRevenueComparison"
+  | "monthlyDirectExpense"
+  | "monthlyOverhead"
+  | "monthlyNetProfit"
+  | "margin"
+  | "periodAndYearSummary"
+  | "employeePerformance"
+  | "clientInsights"
+  | "subcontractorInsights"
+  | "vendorInsights"
+  // Split out of the old monolithic ReportsWidget:
+  | "reconciliation"
+  | "dataQuality"
+  | "missingContracts"
+  // ADVIA cash in bank + line of credit, one widget (two cards).
+  | "banking"
+  // Overdue AR/AP + Upcoming Billings forecast, as one full-width unit (Overdue
+  // 1/3, chart 2/3). Rendered as two cards but a single widget in the editor.
+  | "billings"
+
+export type SectionId =
+  | "reports"
+  | "businessDevelopment"
+  | "businessPerformance"
+  | "financialTrends"
+  | "businessFinancials"
+  | "businessRelations"
+
+export interface WidgetLayoutItem {
+  id: WidgetId
+  colSpan: 1 | 2
+  /** Columns to skip before this widget (0 = default, 1 = push to right column). Only meaningful for colSpan: 1. */
+  offset?: number
+}
+
+export interface SectionLayout {
+  id: SectionId
+  widgets: WidgetLayoutItem[]
 }
 
 export interface DashboardLayout {
-  /** Schema version, bumped when the layout shape changes. */
-  version: number
-  /** Per-widget placement, in render order. */
-  widgets: DashboardWidgetLayout[]
+  version: 2
+  columns: 2
+  sections: SectionLayout[]
+}
+
+// ─── Legacy v1 shape (flat widget list) ──────────────────────────────────
+// Retained only so reconcileLayout can migrate previously-saved documents.
+// `widgets[].id` is a plain string because v1 used widget ids that no longer
+// exist in the WidgetId union (e.g. "reports").
+
+export interface DashboardLayoutV1 {
+  version: 1
+  columns: 2
+  widgets: Array<{ id: string; colSpan: 1 | 2; offset?: number }>
 }

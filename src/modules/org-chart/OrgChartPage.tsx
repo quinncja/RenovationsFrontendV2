@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Page from "../../shared/components/Page"
-import { Widget } from "../../shared/components/Widget/Widget"
+import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { fetchPageData } from "../../shared/api/pageApi"
-import { ChevronDown, ChevronRight, List, BarChart3 } from "lucide-react"
+import { ChevronDown } from "lucide-react"
 
 interface OrgItem {
   name: string
@@ -24,10 +24,29 @@ interface Employee {
   categories: Record<string, { color: string }>
 }
 
-type ViewMode = "list" | "bar"
+// Canonical group order (Monday boards may omit some).
+const ALL_GROUPS = ["Daily", "Weekly/Bi-Weekly", "Monthly", "Annually", "Special Projects"]
+
+const AVATAR_COLORS = ["#c27c3e", "#2563eb", "#22c55e", "#eab308", "#8b5cf6", "#06b6d4", "#ec4899", "#f97316"]
+const FALLBACK_CATEGORY_COLORS = [
+  "#f97316", "#2563eb", "#22c55e", "#eab308", "#8b5cf6",
+  "#06b6d4", "#ec4899", "#14b8a6", "#f59e0b", "#ef4444",
+]
+
+function initials(name: string): string {
+  if (!name) return "?"
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0][0]?.toUpperCase() ?? "?"
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+function hashIndex(str: string, mod: number): number {
+  let h = 0
+  for (let i = 0; i < str.length; i++) h = (h + str.charCodeAt(i)) % mod
+  return h
+}
 
 export default function OrgChartPage() {
-  const [viewMode, setViewMode] = useState<ViewMode>("list")
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
@@ -46,89 +65,105 @@ export default function OrgChartPage() {
       .catch(() => setLoading(false))
   }, [])
 
+  // Consistent category → color map across all employees.
+  const colorMap = useMemo(() => {
+    const cats = [...new Set(employees.flatMap(e => Object.keys(e.categories || {})))].filter(Boolean)
+    const map: Record<string, string> = {}
+    let fallback = 0
+    cats.forEach(cat => {
+      const fromApi = employees.find(e => e.categories?.[cat]?.color)?.categories[cat].color
+      map[cat] = fromApi || FALLBACK_CATEGORY_COLORS[fallback++ % FALLBACK_CATEGORY_COLORS.length]
+    })
+    return map
+  }, [employees])
+
   function toggleGroup(key: string) {
     setExpandedGroups(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
   function toggleAll(expand: boolean) {
-    const newState: Record<string, boolean> = {}
-    employees.forEach(emp => emp.groups.forEach(g => {
-      newState[`${emp.name}-${g.title}`] = expand
-    }))
-    setExpandedGroups(newState)
+    const next: Record<string, boolean> = {}
+    employees.forEach(emp => emp.groups.forEach(g => { next[`${emp.boardId}-${g.title}`] = expand }))
+    setExpandedGroups(next)
   }
 
   return (
     <Page
       title="Org Chart"
+      subtitle="Visualize employee responsibilities"
       actions={
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <div className="toggle-group">
-            <button className={`button toggle-button ${viewMode === "list" ? "active" : ""}`} onClick={() => setViewMode("list")}>
-              <List size={14} /> List
-            </button>
-            <button className={`button toggle-button ${viewMode === "bar" ? "active" : ""}`} onClick={() => setViewMode("bar")}>
-              <BarChart3 size={14} /> Bar
-            </button>
-          </div>
-          <button className="button" onClick={() => toggleAll(true)}>Expand All</button>
-          <button className="button" onClick={() => toggleAll(false)}>Collapse All</button>
+        <div className="toggle-group">
+          <button className="button toggle-button" onClick={() => toggleAll(true)}>Expand all</button>
+          <button className="button toggle-button" onClick={() => toggleAll(false)}>Collapse all</button>
         </div>
       }
     >
-      <Widget loading={loading} noData={!loading && employees.length === 0}>
-        {viewMode === "list" ? (
-          <div className="org-chart-list">
-            {employees.map(emp => (
-              <div key={emp.name} className="org-card">
-                <h3 className="title3">{emp.name}</h3>
-                {emp.groups.map(group => {
-                  const key = `${emp.name}-${group.title}`
-                  const expanded = expandedGroups[key]
-                  return (
-                    <div key={group.title} className="org-group">
-                      <button className="button org-group-header" onClick={() => toggleGroup(key)}>
-                        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        <span>{group.title}</span>
-                        <span className="org-time-badge">{group.totalTimeBurden}h</span>
-                      </button>
-                      {expanded && (
-                        <div className="org-group-items">
-                          {group.items.map(item => (
-                            <div key={item.id} className="org-item">
-                              <span
-                                className="org-category-dot"
-                                style={{ background: emp.categories?.[item.category]?.color || "#6b7280" }}
-                              />
-                              <span>{item.name}</span>
-                              {item.timeBurden > 0 && <span className="org-time">{item.timeBurden}h</span>}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="org-chart-bar">
-            {employees.map(emp => {
-              const totalHours = emp.groups.reduce((sum, g) => sum + g.totalTimeBurden, 0)
-              return (
-                <div key={emp.name} className="org-bar-row">
-                  <span className="org-bar-label">{emp.name}</span>
-                  <div className="org-bar-track">
-                    <div className="org-bar-fill" style={{ width: `${Math.min((totalHours / 40) * 100, 100)}%` }} />
+      {loading ? (
+        <div className="card widget-skeleton" style={{ height: 320 }} />
+      ) : employees.length === 0 ? (
+        <div className="table-empty">No process boards found.</div>
+      ) : (
+        <MotionList className="org-grid">
+          {employees.map(emp => {
+            return (
+              <MotionItem key={emp.boardId} className="card org-emp-card">
+                <div className="org-emp-head">
+                  <span className="org-avatar" style={{ background: AVATAR_COLORS[hashIndex(emp.name, AVATAR_COLORS.length)] }}>
+                    {initials(emp.name)}
+                  </span>
+                  <div className="org-emp-meta">
+                    <span className="org-emp-name">{emp.name}</span>
                   </div>
-                  <span className="org-bar-value">{totalHours}h</span>
                 </div>
-              )
-            })}
-          </div>
-        )}
-      </Widget>
+
+                <div className="org-groups">
+                  {ALL_GROUPS.map(title => {
+                    const group = emp.groups.find(g => g.title === title) ?? { title, items: [], totalTimeBurden: 0 }
+                    const key = `${emp.boardId}-${title}`
+                    const expanded = !!expandedGroups[key]
+                    const hasItems = group.items.length > 0
+                    return (
+                      <div key={title} className={`org-group${expanded ? " org-group-open" : ""}`}>
+                        <button
+                          className="org-group-header"
+                          onClick={() => hasItems && toggleGroup(key)}
+                          disabled={!hasItems}
+                        >
+                          <ChevronDown size={14} className="org-group-chevron" />
+                          <span className="org-group-title">{title}</span>
+                          <span className="org-group-count">{group.items.length}</span>
+                          <span className="org-group-hours">{group.totalTimeBurden.toFixed(1)}h</span>
+                        </button>
+                        {expanded && hasItems && (
+                          <div className="org-group-items">
+                            {group.items.map(item => (
+                              <div key={item.id} className="org-item">
+                                <span className="org-item-name">{item.name}</span>
+                                {item.category && (
+                                  <span
+                                    className="org-cat-pill"
+                                    style={{
+                                      color: colorMap[item.category] ?? "var(--secondary-text)",
+                                      background: `color-mix(in srgb, ${colorMap[item.category] ?? "#888"} 15%, transparent)`,
+                                    }}
+                                  >
+                                    {item.category}
+                                  </span>
+                                )}
+                                <span className="org-item-hours">{item.timeBurden ? `${item.timeBurden}h` : "—"}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </MotionItem>
+            )
+          })}
+        </MotionList>
+      )}
     </Page>
   )
 }

@@ -12,7 +12,6 @@ export async function fetchDashboardLayout(): Promise<DashboardLayout | null> {
     const response = await fetch(`${API_BASE_URL}/user/dashboard-layout`, {
       method: "GET",
       headers: {
-        "ngrok-skip-browser-warning": "true",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     })
@@ -37,7 +36,6 @@ export async function saveDashboardLayout(layout: DashboardLayout): Promise<void
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       body: JSON.stringify(layout),

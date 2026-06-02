@@ -37,3 +37,24 @@ export const SUBCONTRACTOR_COLORS_10 = [
   "#7c2d12", "#c2410c", "#ea580c", "#f97316", "#fb923c",
   "#fdba74", "#fed7aa", "#ffedd5", "#fbbf24", "#fde68a",
 ]
+
+/** HSL ramp used by the dashboard "Top N" donut widgets. Slices go darkest
+ *  (highest value) → lightest, with the hue drifting slightly so adjacent
+ *  slices stay distinguishable. */
+export function colorRamp(hue: number, drift: number, count: number): string[] {
+  const n = Math.max(count, 1)
+  return Array.from({ length: n }, (_, i) => {
+    const t = n === 1 ? 0 : i / (n - 1)
+    const light = Math.round(54 + t * 32) // 54% → 86%
+    const sat = Math.round(85 - t * 22)   // 85% → 63%
+    const h = Math.round(hue + t * drift)
+    return `hsl(${h}, ${sat}%, ${light}%)`
+  })
+}
+
+/** Per-family hue + drift used by the dashboard insight widgets. */
+export const RAMP_SCHEMES = {
+  orange: { hue: 28, drift: 16 },
+  red:    { hue: 2,  drift: -14 },
+  purple: { hue: 278, drift: 18 },
+} as const

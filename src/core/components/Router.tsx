@@ -24,7 +24,10 @@ const VendorsPage = lazy(() => import("../../modules/directory/vendors/VendorsPa
 const VendorDetailPage = lazy(() => import("../../modules/directory/vendors/VendorDetailPage.tsx"))
 const SubcontractorsPage = lazy(() => import("../../modules/directory/subcontractors/SubcontractorsPage.tsx"))
 const SubcontractorDetailPage = lazy(() => import("../../modules/directory/subcontractors/SubcontractorDetailPage.tsx"))
-const ProjectsPage = lazy(() => import("../../modules/directory/projects/ProjectsPage.tsx"))
+const EmployeeDetailPage = lazy(() => import("../../modules/dashboard/EmployeeDetailPage.tsx"))
+const EmployeesPage = lazy(() => import("../../modules/directory/employees/EmployeesPage.tsx"))
+const MonthlyBreakdownPage = lazy(() => import("../../modules/dashboard/MonthlyBreakdownPage.tsx"))
+const UpcomingBillingsPage = lazy(() => import("../../modules/dashboard/UpcomingBillingsPage.tsx"))
 const Invoices = lazy(() => import("../../modules/invoices/Invoices.tsx"))
 const Users = lazy(() => import("../../modules/users/Users.tsx"))
 const FeedbackPage = lazy(() => import("../../modules/feedback/FeedbackPage.tsx"))
@@ -48,10 +51,14 @@ export default function Router() {
           <Route element={<RequireAuth />}>
             {/* Dashboard — admin/executive see full, PM sees limited */}
             <Route path="/dashboard" element={<SuspenseWrapper><Dashboard /></SuspenseWrapper>} />
+            <Route path="/dashboard/breakdown/:category" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><MonthlyBreakdownPage /></SuspenseWrapper></RequireRole>} />
+            <Route path="/dashboard/upcoming-billings" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><UpcomingBillingsPage /></SuspenseWrapper></RequireRole>} />
+            <Route path="/employees" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><EmployeesPage /></SuspenseWrapper></RequireRole>} />
+            <Route path="/employees/:employeeNum" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><EmployeeDetailPage /></SuspenseWrapper></RequireRole>} />
 
-            {/* Business Summary — admin/executive only */}
+            {/* Company — shown in nav for managers (PMs); see roles.ts */}
             <Route path="/company" element={
-              <RequireRole allowed={["executive", "admin"]}>
+              <RequireRole allowed={["executive", "admin", "manager"]}>
                 <SuspenseWrapper><BusinessSummary /></SuspenseWrapper>
               </RequireRole>
             } />
@@ -86,7 +93,6 @@ export default function Router() {
             <Route path="/vendors/:id" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><VendorDetailPage /></SuspenseWrapper></RequireRole>} />
             <Route path="/subcontractors" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><SubcontractorsPage /></SuspenseWrapper></RequireRole>} />
             <Route path="/subcontractors/:id" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><SubcontractorDetailPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/projects" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><ProjectsPage /></SuspenseWrapper></RequireRole>} />
 
             {/* Charts — admin/executive */}
             <Route path="/cash-flow" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><CashFlow /></SuspenseWrapper></RequireRole>} />

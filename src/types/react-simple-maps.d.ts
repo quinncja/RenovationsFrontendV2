@@ -16,6 +16,7 @@ declare module "react-simple-maps" {
     width?: number
     height?: number
     className?: string
+    style?: CSSProperties
     children?: ReactNode
   }
   export const ComposableMap: (props: ComposableMapProps) => JSX.Element

@@ -1,30 +1,90 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { useAuth } from "../AuthProvider"
 import { auth } from "../firebase"
 
-// Roles live in the Firebase ID token (custom claims). When an admin assigns a
-// role, the user picks it up by refreshing their token — so we just poll a
-// forced refresh; AuthProvider's onIdTokenChanged then re-renders and RequireAuth
-// admits them automatically. No backend coordination needed.
-const POLL_MS = 8000
+// Trim trailing slash so `${API_BASE_URL}/users/...` never produces "//".
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "")
 
 export default function WaitingRoom() {
-  const [checking, setChecking] = useState(false)
+  const { user } = useAuth()
+  const [status, setStatus] = useState<"connecting" | "waiting" | "admitted" | "rejected">("connecting")
+  const esRef = useRef<EventSource | null>(null)
 
-  async function refreshToken() {
-    try {
-      setChecking(true)
-      await auth.currentUser?.getIdToken(true)
-    } finally {
-      setChecking(false)
-    }
-  }
+  // Announce this user's presence so admins see them in the waiting room.
+  // Small delay to ensure Firebase has propagated the new user.
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken()
+        if (!token) return
+        await fetch(`${API_BASE_URL}/users/announce`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+      } catch {
+        // non-critical
+      }
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
-    const id = setInterval(() => {
-      auth.currentUser?.getIdToken(true).catch(() => {})
-    }, POLL_MS)
-    return () => clearInterval(id)
-  }, [])
+    let closed = false
+    let es: EventSource | null = null
+
+    async function connect() {
+      const token = await auth.currentUser?.getIdToken()
+      if (!token || closed) return
+
+      es = new EventSource(`${API_BASE_URL}/users/sse?token=${encodeURIComponent(token)}`)
+      esRef.current = es
+
+      es.onopen = () => setStatus("waiting")
+
+      es.onmessage = async (event) => {
+        try {
+          const msg = JSON.parse(event.data) as { type: string; role?: string }
+          if (msg.type === "roleAssigned") {
+            setStatus("admitted")
+            es?.close()
+            esRef.current = null
+            // Force-refresh the ID token so AuthProvider picks up new claims
+            await auth.currentUser?.getIdToken(true)
+          } else if (msg.type === "rejected") {
+            setStatus("rejected")
+            es?.close()
+            esRef.current = null
+            await auth.signOut()
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      es.onerror = () => {
+        setStatus("waiting")
+        es?.close()
+        esRef.current = null
+        if (!closed) setTimeout(connect, 5000)
+      }
+    }
+
+    connect()
+
+    return () => {
+      closed = true
+      es?.close()
+      esRef.current = null
+    }
+  }, [user])
+
+  async function handleRefresh() {
+    if (user) {
+      await user.getIdToken(true)
+    }
+  }
 
   return (
     <div className="waiting-room">
@@ -35,20 +95,19 @@ export default function WaitingRoom() {
           Your account is pending approval. You'll be let in automatically once an admin assigns your role.
         </p>
         <div className="waiting-room-status">
-          <span className="wr-dot wr-dot--waiting" />
+          {status === "connecting" && <span className="wr-dot wr-dot--connecting" />}
+          {status === "waiting" && <span className="wr-dot wr-dot--waiting" />}
+          {status === "admitted" && <span className="wr-dot wr-dot--admitted" />}
+          {status === "rejected" && <span className="wr-dot wr-dot--rejected" />}
           <span className="waiting-room-status-label">
-            {checking ? "Checking…" : "Waiting for approval"}
+            {status === "connecting" && "Connecting…"}
+            {status === "waiting" && "Waiting for approval"}
+            {status === "admitted" && "Access granted — loading…"}
+            {status === "rejected" && "Access denied"}
           </span>
         </div>
-        <button className="waiting-room-refresh-btn" onClick={refreshToken} disabled={checking}>
-          Check again
-        </button>
-        <button
-          className="waiting-room-refresh-btn"
-          style={{ marginTop: "0.5rem" }}
-          onClick={() => auth.signOut()}
-        >
-          Sign out
+        <button className="waiting-room-refresh-btn" onClick={handleRefresh}>
+          Refresh manually
         </button>
       </div>
     </div>

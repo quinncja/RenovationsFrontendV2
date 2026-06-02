@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react"
 import Page from "../../shared/components/Page"
+import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
@@ -8,6 +9,7 @@ import { StatWidget } from "../../shared/components/StatWidget/StatWidget"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps"
 import { useDarkMode } from "../../shared/hooks/useDarkMode"
+import { formatMoneyFull } from "../../shared/utils/format"
 
 const GEO_URL = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
 
@@ -48,6 +50,7 @@ function RevenueMapContent({ year, onYearChange }: { year: number | null; onYear
   const dark = useDarkMode()
   const [viewMode, setViewMode] = useState<ViewMode>("revenue")
   const [selectedState, setSelectedState] = useState<string | null>(null)
+  const [tip, setTip] = useState<{ content: string; x: number; y: number } | null>(null)
   const { data, isLoading } = useWidgetData<{ revenueMap: StateData[] | null }>(["revenueMap"])
 
   const stateMap = useMemo(() => {
@@ -72,8 +75,9 @@ function RevenueMapContent({ year, onYearChange }: { year: number | null; onYear
     if (!stateData) return dark ? "#2a2725" : "#e5e7eb"
 
     if (viewMode === "margin") {
-      if (stateData.margin >= 0.20) return "#22c55e"
-      if (stateData.margin >= 0.17) return "#eab308"
+      // Backend returns margin as a percentage (e.g. 18.4), not a fraction.
+      if (stateData.margin >= 20) return "#22c55e"
+      if (stateData.margin >= 15) return "#eab308"
       return "#ef4444"
     }
 
@@ -83,6 +87,14 @@ function RevenueMapContent({ year, onYearChange }: { year: number | null; onYear
     const g = Math.round(124 + (224 - 124) * (1 - intensity))
     const b = Math.round(62 + (216 - 62) * (1 - intensity))
     return `rgb(${r}, ${g}, ${b})`
+  }
+
+  function tipText(abbr: string): string {
+    const d = stateMap.get(abbr)
+    if (!d) return `${abbr} · No data`
+    return viewMode === "revenue"
+      ? `${abbr} · ${formatMoneyFull(d.revenue)}`
+      : `${abbr} · ${d.margin.toFixed(1)}% margin`
   }
 
   const selectedData = selectedState ? stateMap.get(selectedState) : null
@@ -110,10 +122,13 @@ function RevenueMapContent({ year, onYearChange }: { year: number | null; onYear
         </div>
       }
     >
-      <div style={{ display: "flex", gap: "1.5rem" }}>
+      <MotionList className="inv-page-stack">
+        <MotionItem>
+      <div style={{ display: "flex", gap: "1.5rem", alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
         <Widget title={`${year ?? "All-Time"} ${viewMode === "revenue" ? "Revenue" : "Margin"} by State`} loading={isLoading} noData={stateMap.size === 0}>
-          <div style={{ height: "70vh" }}>
-            <ComposableMap projection="geoAlbersUsa">
+          <div style={{ height: "70vh", width: "100%" }}>
+            <ComposableMap projection="geoAlbersUsa" style={{ width: "100%", height: "100%" }}>
               <ZoomableGroup>
                 <Geographies geography={GEO_URL}>
                   {({ geographies }) =>
@@ -127,11 +142,14 @@ function RevenueMapContent({ year, onYearChange }: { year: number | null; onYear
                           stroke={dark ? "#1a1714" : "#fff"}
                           strokeWidth={0.5}
                           style={{
-                            hover: { fill: "#c27c3e", outline: "none" },
-                            pressed: { fill: "#a86a34", outline: "none" },
+                            hover: { fill: dark ? "#9a948c" : "#cbd5e1", outline: "none", cursor: "pointer" },
+                            pressed: { fill: dark ? "#7c766e" : "#94a3b8", outline: "none" },
                             default: { outline: "none" },
                           }}
                           onClick={() => abbr && setSelectedState(abbr)}
+                          onMouseEnter={(e) => abbr && setTip({ content: tipText(abbr), x: e.clientX, y: e.clientY })}
+                          onMouseMove={(e) => setTip((t) => (t ? { ...t, x: e.clientX, y: e.clientY } : t))}
+                          onMouseLeave={() => setTip(null)}
                         />
                       )
                     })
@@ -141,6 +159,7 @@ function RevenueMapContent({ year, onYearChange }: { year: number | null; onYear
             </ComposableMap>
           </div>
         </Widget>
+        </div>
 
         {selectedData && (
           <div style={{ minWidth: 240 }}>
@@ -153,6 +172,14 @@ function RevenueMapContent({ year, onYearChange }: { year: number | null; onYear
           </div>
         )}
       </div>
+        </MotionItem>
+      </MotionList>
+
+      {tip && (
+        <div className="map-tooltip" style={{ left: tip.x + 14, top: tip.y + 14 }}>
+          {tip.content}
+        </div>
+      )}
     </Page>
   )
 }

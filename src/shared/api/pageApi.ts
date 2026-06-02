@@ -42,7 +42,10 @@ const MODULE_ENDPOINTS: Record<ModuleName, string> = {
   dashboard: "home-data",
   businessSummary: "home-data",
   jobcost: "jobcost",
-  jobcostDetail: "jobcost-data",
+  // The /jobcost endpoint (loadJobcost) serves the createQueryMap queries
+  // (getPhases, getBudgetByRecnum, getAllCostItems, …) keyed by `recnum`.
+  // /jobcost-data is a different, fixed-shape endpoint that ignores `queries`.
+  jobcostDetail: "jobcost",
   jobcostItems: "jobcost-items",
   cashflow: "home-data",
   revenueMap: "home-data",
@@ -59,14 +62,12 @@ const MODULE_ENDPOINTS: Record<ModuleName, string> = {
 const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true'
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  // ngrok-skip-browser-warning: skip ngrok-free's HTML interstitial so we always get JSON.
   if (DEV_BYPASS) {
-    return { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" }
+    return { "Content-Type": "application/json" }
   }
   const token = await auth.currentUser?.getIdToken()
   return {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
 }

@@ -12,7 +12,6 @@ async function authedFetch(path: string, method: "GET" | "POST" = "GET") {
       method,
       headers: {
         "Content-Type": "application/json",
-        "ngrok-skip-browser-warning": "true",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     })

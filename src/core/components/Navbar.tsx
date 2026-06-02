@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom"
 import { Settings, ChevronsRight, ChevronsLeft, ChevronDown } from "lucide-react"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import useNavItems from "../auth/hooks/useNavItems"
-import { isNavGroup, type NavItem, type NavGroup } from "../auth/roles"
+import { isNavGroup, isNavDivider, type NavItem, type NavGroup } from "../auth/roles"
 import { SettingsModal } from "../../shared/components/SettingsModal/SettingsModal"
 import Logo from "./Logo"
 import LogoText from "./LogoText"
@@ -140,8 +140,10 @@ function Navbar() {
           {isOpen && <LogoText />}
         </div>
         <div className="navbar-top">
-          {navItems.map((item) =>
-            isNavGroup(item) ? (
+          {navItems.map((item, i) =>
+            isNavDivider(item) ? (
+              <div key={`divider-${i}`} className="nav-divider" role="separator" />
+            ) : isNavGroup(item) ? (
               <NavGroupItem
                 key={item.label}
                 group={item}
@@ -153,7 +155,7 @@ function Navbar() {
             ) : (
               <button
                 key={item.path}
-                className={`button nav-button${location.pathname === item.path ? " nav-button-active" : ""}`}
+                className={`button nav-button${location.pathname === item.path || location.pathname.startsWith(`${item.path}/`) ? " nav-button-active" : ""}`}
                 onClick={() => { navigate(item.path); setOpenGroup(null) }}
                 {...tipProps(item.label)}
               >

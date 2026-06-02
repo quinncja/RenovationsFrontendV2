@@ -100,6 +100,11 @@ body{
   height: 100vh;
   overflow: hidden;
   background-color: var(--background-color);
+  /* Subtle ambient copper glow (same as the login page), behind all content */
+  background-image: radial-gradient(ellipse at 30% 40%, rgba(194, 124, 62, 0.15) 0%, transparent 60%),
+                    radial-gradient(ellipse at 70% 60%, rgba(168, 106, 52, 0.08) 0%, transparent 50%);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
   font-family: var(--font-family);
   padding: 0px;
   margin: 0;
@@ -396,6 +401,32 @@ body{
   padding-top: .25rem;
 }
 
+/* Sidebar section separator between nav tiers. */
+.nav-divider {
+  align-self: center;
+  width: calc(var(--navbar-closed-width) - 1.5rem);
+  height: 1px;
+  margin: 0.5rem 0;
+  background: var(--border-color);
+  /* Match the navbar's own width transition so the divider widens in lockstep
+     when the sidebar expands, instead of staying pinned at closed-width. */
+  transition: width .3s ease-in-out;
+}
+
+/* Open state divider: 5rem on an 11rem navbar (~45%). Wider than the
+   closed 2.5rem so it visibly responds to the expand, but inset enough
+   on each side that it doesn't read as a full horizontal rule. */
+.navbar-open .nav-divider {
+  width: calc(var(--navbar-open-width) - 6rem);
+}
+
+/* Divider inside the mobile menu drawer. */
+.mobile-menu-divider {
+  height: 1px;
+  margin: 0.5rem 0.75rem;
+  background: var(--border-color);
+}
+
 .navbar-bottom{
   margin-top: auto;
   display: flex;
@@ -525,6 +556,7 @@ body{
   align-items: center;
   overflow: hidden;
   padding-left: 2px;
+  margin-left: -2px;
 }
 
 .logo-icon{
@@ -543,20 +575,21 @@ body{
   margin-left: -6px;
 }
 
-.logo-text-name {
-  font-size: 0.9375rem;
+.logo-text-name,
+.logo-text-tagline {
+  font-size: 0.8125rem;
   font-weight: 700;
-  color: var(--primary-text);
   line-height: 1;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.logo-text-name {
+  color: var(--primary-text);
 }
 
 .logo-text-tagline {
-  font-size: 0.6rem;
-  font-weight: 500;
   color: var(--secondary-text);
-  letter-spacing: 0.1em;
-  line-height: 1;
 }
 
 .logo-wrapper:hover{
@@ -654,7 +687,7 @@ body{
   font-size: 0.875rem;
   font-weight: 500;
   padding: 0.4rem 2rem 0.4rem 0.75rem;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7a8d' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23d8d2cc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.6rem center;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -677,6 +710,31 @@ body{
   border: 1.5px solid var(--border-color);
   border-radius: 999px;
   overflow: hidden;
+}
+
+/* Opt-in modifier: distributes the buttons evenly across the pill. Use on
+   2-option toggles where the two labels have different intrinsic widths
+   (e.g. "Current Year" / "All Time") so neither side dominates. The
+   shared PeriodSelector (Annual / Q1–Q4) doesn't add this class — its
+   varied label widths read fine left-to-right. */
+.period-selector--equal {
+  width: max-content;
+}
+/* Equal width is enforced by a per-button `min-width` floor wide enough to
+   fit the longer "Current Year" label. With `width: max-content` on the
+   pill and `flex: 1` on each button, both buttons settle at exactly the
+   floor — the parent becomes 2× floor, and flex has no remaining space to
+   distribute. If a future label exceeds the floor it'll push that side
+   wider and break parity; bump `min-width` if that happens. */
+.period-selector--equal .period-selector-btn {
+  flex: 1;
+  /* Tightest min-width that comfortably fits "Current Year" at the
+     button's 0.8rem font + 0.65rem h-padding. Anything smaller risks
+     the longer label clipping or pushing past the floor (which would
+     break equality). */
+  min-width: 6.25rem;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .period-selector-btn {
@@ -721,10 +779,13 @@ body{
   gap: 1rem;
 }
 
+/* Standalone section headers (not within a widget) get a little top padding so
+   the heading text doesn't sit flush against the element above. */
 .section-header {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  padding-top: 10px;
 }
 
 .section-header h2 {
@@ -908,6 +969,232 @@ body{
   min-height: 0;
 }
 
+/* Home dashboard: taller cards for more chart room. Scoped so other pages keep
+   the default height; .stat-widget (year / all-time revenue) isn't a .widget so
+   the small number-only cards stay compact. */
+.dashboard-home-grid .widget {
+  min-height: 330px;
+}
+
+/* Current Period Summary: subtle orange-tinted parent; the inner stat tiles keep
+   the default gray card color (they're separate .card elements). It's a short
+   stat block, so override the tall dashboard card height to fit its content. */
+.dashboard-home-grid .current-period-widget {
+  min-height: 0;
+}
+
+.current-period-widget {
+  background: color-mix(in srgb, var(--primary-color) 8%, var(--card-color));
+  border-color: color-mix(in srgb, var(--primary-color) 25%, var(--border-color));
+}
+
+/* ─── Period ↔ Year Summary (paired snapshot) ──────────────────────────
+   The Period Summary and Year Summary widgets share the same data shape
+   (Margin / Income / COGS / Gross Profit) and are visually bridged into a
+   single snapshot unit. Both reuse .current-period-widget for the tinted
+   parent; the rules below add the header-actions slot, the inline status
+   tone for the description, the period <select> sizing, and the seam-only
+   bridge between the two slots. */
+
+.widget-header:has(.widget-header-actions) {
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
+}
+
+.widget-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+/* The month <select> reuses .year-selector for visual parity. Options are
+   the 3-letter short month form (Jan/Feb/.../Dec); the "Open" sentinel
+   was removed in favor of always showing the actual month name. `5ch`
+   keeps the control compact without cropping. */
+.period-select {
+  min-width: 5ch;
+}
+
+/* Small "reset to default" chip that appears to the left of the period /
+   year selectors when the user has navigated away from the current open
+   period or current year. Secondary style: brand-orange border, no fill;
+   icon-only with a tooltip via aria-label. */
+.reset-to-default-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border: 1.5px solid var(--primary-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--primary-color);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.reset-to-default-btn:hover {
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+}
+
+.reset-to-default-btn:active {
+  background: color-mix(in srgb, var(--primary-color) 16%, transparent);
+}
+
+/* Body headline shared by both widgets. The label is the focal point — month
+   + year for Period Summary, just the year for Year Summary. Tabular numerics
+   keep the year glyphs vertically aligned between the two stacked cards.
+   Trailing the label, Period Summary shows a status chip (colored dot + soft
+   tinted pill) and Year Summary shows a thin vertical-rule caption, so the
+   unit reads at a glance even before the stats below resolve. */
+.snapshot-headline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.snapshot-headline-label {
+  font-size: 1.625rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status chip — pill with a colored dot. The dot wears a soft same-color halo
+   (currentColor at low alpha) so the chip reads alive without shouting. */
+.snapshot-headline-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.6rem 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.68rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.snapshot-headline-status::before {
+  content: "";
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.snapshot-headline-status--open {
+  color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+  border-color: color-mix(in srgb, var(--primary-color) 22%, transparent);
+}
+
+.snapshot-headline-status--closed {
+  color: var(--secondary-text);
+  background: color-mix(in srgb, var(--secondary-text) 7%, transparent);
+  border-color: color-mix(in srgb, var(--secondary-text) 18%, transparent);
+}
+
+.snapshot-headline-status--future {
+  color: var(--secondary-text);
+  background: transparent;
+  border-color: var(--border-color);
+  opacity: 0.85;
+}
+
+/* Year Summary's caption ("Year to date" / "Full year"). No background — a thin
+   vertical hairline separates it from the year label, lighter and more deliberate
+   than the old middle-dot. */
+.snapshot-headline-meta {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  padding-left: 0.7rem;
+  color: var(--secondary-text);
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.snapshot-headline-meta::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 0.75rem;
+  background: var(--border-color);
+}
+
+/* ── Visual bridge: any `.summary-snapshot-pair` wrapper holds two stacked
+   `.widget` cards (Period Summary + Year Summary) and fuses them into one
+   snapshot unit. The seam is a single clean hairline, inset slightly from
+   each card edge so it doesn't kiss the vertical borders. The line lives
+   inside the year card's bounds so it follows that card's stacking context
+   (no hover z-index drama reaching across the seam). `isolation: isolate`
+   is belt-and-suspenders for the same reason. Used on the dashboard's
+   periodAndYearSummary slot AND on the EmployeeDetailPage's employee
+   summary pair. */
+
+.summary-snapshot-pair {
+  isolation: isolate;
+  /* The fused pair should read as one elevated card, matching `.card`'s
+     shadow + radius. Inner widgets still set `box-shadow: none` on their
+     own surfaces so two shadows don't paint across the seam — the wrapper
+     owns the single unified shadow at the pair's outer outline. */
+  border-radius: 12px;
+  box-shadow: var(--button-shadow);
+}
+
+/* Opt the slot that holds a stacked-pair out of the global
+   `.widget-grid > *:has(:hover) → z-index: 1` lift. Otherwise hovering
+   either inner card raises the slot above its neighbors, and the card's
+   drop shadow paints across the seam — reading as the dividing line
+   darkening on hover. The two-`:has` chain (one for the pair child, one
+   for hover) is more specific than the global lift, so it wins. */
+.widget-grid > *:has(> .summary-snapshot-pair):has(:hover) {
+  z-index: 0;
+}
+
+.summary-snapshot-pair > .widget:first-child {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom: 0;
+  box-shadow: none;
+}
+
+.summary-snapshot-pair > .widget + .widget {
+  position: relative;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-top: 0;
+  /* `0 1px 4px` blurs ~3px ABOVE the box too (blur − offset). That upward bleed
+     paints a dark band on top of the period card right at the seam — the dark
+     line above ours in the screenshot. Drop the shadow on the merged unit; the
+     tinted background + border still give the pair definition. */
+  box-shadow: none;
+}
+
+.summary-snapshot-pair > .widget + .widget::before {
+  content: "";
+  position: absolute;
+  left: 2.5rem;
+  right: 2.5rem;
+  top: 0;
+  height: 1px;
+  background: var(--border-color);
+  pointer-events: none;
+}
+
 /* ─── Widget ─────────────────────────────────────────────────────────── */
 
 .widget {
@@ -1028,6 +1315,36 @@ body{
 .det-section {
   padding: 0;
   overflow: hidden;
+  /* `position: relative` is no longer required for an accent stripe
+     pseudo-element (removed), but kept here in case future variants
+     anchor any absolutely-positioned children. */
+  position: relative;
+}
+
+/* Left group: icon badge + title sit together so the existing
+   `justify-content: space-between` on `.det-section-header` keeps the
+   Show/Hide action on the right. */
+.det-section-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+/* Square rounded badge. Background is the accent at low alpha (color-mix),
+   icon color is the accent at full strength. Inherits the badge color
+   from the section's `--det-section-accent` var so passing `accentColor`
+   to the component is the only knob needed. */
+.det-section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 7px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--det-section-accent, var(--secondary-text)) 14%, transparent);
+  color: var(--det-section-accent, var(--secondary-text));
 }
 
 /* Clickable toggle zone wraps header row + metrics */
@@ -1119,18 +1436,23 @@ body{
   color: var(--primary-text);
 }
 
+
 .stat-widget-skeleton {
-  height: 1.75rem;
+  /* Match `.title1` line-height (1.625rem) so the skeleton occupies the same
+     box as the loaded `.stat-widget-value`. Was 1.75rem, which made the
+     loading state ~2px taller than loaded and caused a tiny layout shift
+     when StatWidgets resolved. */
+  height: 1.625rem;
   width: 60%;
   border-radius: 6px;
   background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--primary-text) 8%, var(--card-color)) 20%,
-    color-mix(in srgb, var(--primary-text) 3%, var(--card-color)) 50%,
-    color-mix(in srgb, var(--primary-text) 8%, var(--card-color)) 80%
+    115deg,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 20%,
+    color-mix(in srgb, var(--primary-text) 2%, var(--card-color)) 50%,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 80%
   );
   background-size: 900px 100%;
-  animation: shimmer 2.2s linear infinite;
+  animation: shimmer 3.2s linear infinite;
 }
 
 /* No data state */
@@ -1155,18 +1477,39 @@ body{
   100% { background-position: 900px 0; }
 }
 
+/* "Open month" pulse on the line chart — verbatim port of old RD's
+   LineGraph pulse symbol. Three keyframes (pulseOuter / pulseInner /
+   pulseCore) all running on a 2.5s cycle. pulseCore uses
+   `transform: scale(1) → scale(1.06)`, which only positions correctly
+   when the animated circle is at its parent group's local origin (0,0)
+   — that's why Chart.tsx's pulse layer wraps the four circles in a
+   `<g transform="translate(cx, cy)">` and uses cx=0/cy=0 (default) on
+   the inner circles, matching the old pointSymbol structure exactly. */
+@keyframes pulseOuter {
+  0%, 100% { r: 6.5px; stroke-opacity: 0.35; }
+  50%      { r: 11px;  stroke-opacity: 0.05; }
+}
+@keyframes pulseInner {
+  0%, 100% { r: 4px; fill-opacity: 0.10; }
+  50%      { r: 7px; fill-opacity: 0.35; }
+}
+@keyframes pulseCore {
+  0%, 100% { transform: scale(1);    }
+  50%      { transform: scale(1.06); }
+}
+
 .widget-skeleton {
   flex: 1;
   min-height: 200px;
   border-radius: 8px;
   background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--primary-text) 8%, var(--card-color)) 20%,
-    color-mix(in srgb, var(--primary-text) 3%, var(--card-color)) 50%,
-    color-mix(in srgb, var(--primary-text) 8%, var(--card-color)) 80%
+    115deg,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 20%,
+    color-mix(in srgb, var(--primary-text) 2%, var(--card-color)) 50%,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 80%
   );
   background-size: 900px 100%;
-  animation: shimmer 2.2s linear infinite;
+  animation: shimmer 3.2s linear infinite;
 }
 
 /* ─── Chart container ────────────────────────────────────────────────── */
@@ -1183,6 +1526,271 @@ body{
 }
 .chart-container > div {
   width: 100% !important;
+}
+
+/* ── Upcoming Billings breakdown page ── */
+
+/* Right-aligned numeric columns (shared by the overdue modal + the tree). */
+.data-table th.num,
+.data-table td.num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+/* Totals footer (overdue modal). */
+.billings-invoice-table tfoot td {
+  border-top: 1px solid var(--border-color);
+  border-bottom: none;
+  font-weight: 600;
+  color: var(--secondary-text);
+  padding-top: 0.75rem;
+}
+
+/* Week → AR/AP → invoices folder tree. Every level lives in the same table so
+   the money columns line up; fixed layout pins those column widths. border-box
+   keeps cell padding inside those widths so nothing overflows the card. */
+.billings-tree,
+.billings-tree th,
+.billings-tree td,
+.billings-leaf-table th,
+.billings-leaf-table td {
+  box-sizing: border-box;
+}
+.billings-tree {
+  table-layout: fixed;
+}
+.billings-tree th:nth-child(1),
+.billings-tree td:nth-child(1) { width: 46%; }
+.billings-tree th:nth-child(2),
+.billings-tree td:nth-child(2),
+.billings-tree th:nth-child(3),
+.billings-tree td:nth-child(3),
+.billings-tree th:nth-child(4),
+.billings-tree td:nth-child(4) { width: 18%; }
+
+/* Week row — the top-level folder. */
+.billings-week-row > td {
+  background: color-mix(in srgb, var(--primary-text) 3%, transparent);
+}
+.billings-week-row:not(.is-empty) {
+  cursor: pointer;
+}
+.billings-week-row:not(.is-empty):hover > td {
+  background: var(--hover-bg);
+}
+.billings-week-row.is-empty {
+  opacity: 0.5;
+}
+.billings-week-name {
+  font-weight: 600;
+}
+/* Flex lives on an inner span, not the <td>, so the cell still fills its full
+   fixed-layout column (a flex <td> only paints behind its content → white gap). */
+.billings-folder-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+.billings-count {
+  font-weight: 400;
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+}
+
+/* AR / AP folder row — second level. Spans the full table width; its total sits
+   in the matching week column (AR under "AR in", AP under "AP out"). */
+.billings-side-row > td {
+  background: color-mix(in srgb, var(--primary-text) 1.5%, transparent);
+}
+.billings-side-row:not(.is-empty) {
+  cursor: pointer;
+}
+.billings-side-row:not(.is-empty):hover > td {
+  background: var(--hover-bg);
+}
+.billings-side-row.is-empty {
+  opacity: 0.45;
+}
+.billings-tree td.billings-side-name {
+  padding-left: 3.25rem; /* indent one step under the week folder */
+}
+
+/* Leaf invoice table — the third level. It sits in a rounded, bordered panel,
+   inset and indented under its AR/AP folder so it reads as a distinct layer. */
+.billings-subrow > td {
+  padding: 0.35rem 0.75rem 0.8rem 3.25rem;
+  background: color-mix(in srgb, var(--primary-text) 1.5%, transparent);
+}
+.billings-leaf-wrap {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden; /* clip the collapsed-border table to the rounded corners */
+  background: var(--card-color);
+}
+.billings-leaf-table {
+  table-layout: fixed;
+  width: 100%;
+  margin: 0;
+}
+.billings-leaf-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.billings-leaf-table th:first-child,
+.billings-leaf-table td:first-child {
+  padding-left: 1rem;
+}
+.billings-leaf-table th:last-child,
+.billings-leaf-table td:last-child {
+  padding-right: 1rem;
+}
+.billings-leaf-table th:nth-child(1),
+.billings-leaf-table td:nth-child(1) { width: 30%; }
+.billings-leaf-table th:nth-child(2),
+.billings-leaf-table td:nth-child(2) { width: 15%; }
+.billings-leaf-table th:nth-child(3),
+.billings-leaf-table td:nth-child(3) { width: 28%; }
+.billings-leaf-table th:nth-child(4),
+.billings-leaf-table td:nth-child(4) { width: 13%; }
+.billings-leaf-table th:nth-child(5),
+.billings-leaf-table td:nth-child(5) { width: 14%; }
+
+/* The Overdue card stacks two AR/AP position cards; the Upcoming card holds the
+   weekly forecast chart. */
+.billings-positions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+}
+.billings-positions .overdue-stat {
+  flex: 1;
+  justify-content: center;
+}
+
+/* Billings unit: one widget rendering two cards — Overdue (1/3) beside the
+   Upcoming Billings forecast chart (2/3). */
+.billings-pair {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+.billings-pair > .widget {
+  min-width: 0;
+  min-height: 340px;
+}
+.billings-overdue-card {
+  flex: 1; /* 1/3 of the row */
+}
+.billings-chart-card {
+  flex: 2; /* 2/3 of the row */
+  /* Clip the chart tooltip: a near-edge tooltip could briefly extend past the
+     widget and push the whole section into horizontal overflow (a flickering
+     scrollbar). Only the chart card — the Overdue card's hover must not clip. */
+  overflow: hidden;
+}
+@media (max-width: 640px) {
+  .billings-pair {
+    flex-direction: column;
+  }
+}
+
+/* ── Banking widget: Cash in Bank + Line of Credit ──────────────────────
+   Two cards that reuse the home StatWidget look (.stat-widget card). */
+.banking-pair {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+.banking-pair > .stat-widget {
+  flex: 1;
+  min-width: 0;
+}
+/* "ADVIA" reads as a bold brand lead-in on the stat title. */
+.advia-brand {
+  font-weight: var(--font-weight-bold);
+  color: var(--secondary-text);
+}
+
+/* Line of Credit: drawn / available fraction — the denominator is dimmed so the
+   drawn figure leads, then a status pill below. */
+.loc-fraction-denom {
+  color: var(--secondary-text);
+  font-weight: var(--font-weight-regular);
+}
+.loc-pill {
+  align-self: flex-start;
+  margin-top: 0.125rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+}
+.loc-pill--ok {
+  background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+  color: var(--primary-color);
+}
+.loc-pill--over {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+@media (max-width: 640px) {
+  .banking-pair {
+    flex-direction: column;
+  }
+}
+
+/* AR/AP position stat blocks. Rendered as <button>s (click to open the invoice
+   list modal), so reset the button chrome. */
+.overdue-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+  background: var(--hover-bg);
+  border: 1px solid var(--border-color);
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+}
+/* Subtle brand-orange hover (no lift). */
+.overdue-stat-clickable {
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.overdue-stat-clickable:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary-color) 10%, var(--hover-bg));
+  border-color: color-mix(in srgb, var(--primary-color) 40%, var(--border-color));
+}
+.overdue-stat-clickable:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+.overdue-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--secondary-text);
+}
+.overdue-amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.overdue-ar .overdue-amount {
+  color: #22c55e;
+}
+.overdue-ap .overdue-amount {
+  color: #ef4444;
+}
+.overdue-count {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
 }
 
 .chart-tooltip {
@@ -1303,8 +1911,8 @@ body{
    min() caps at the desired size but allows proportional shrinking.   */
 .pie-with-list-chart     { aspect-ratio: 1; flex-shrink: 0; width: min(180px, 44%); }
 .pie-with-list-chart--sm { aspect-ratio: 1; flex-shrink: 0; width: min(200px, 44%); }
-.pie-with-list-chart--md { aspect-ratio: 1; flex-shrink: 0; width: min(240px, 42%); }
-.pie-with-list-chart--lg { aspect-ratio: 1; flex-shrink: 0; width: min(320px, 40%); }
+.pie-with-list-chart--md { aspect-ratio: 1; flex-shrink: 0; width: min(240px, 44%); }
+.pie-with-list-chart--lg { aspect-ratio: 1; flex-shrink: 0; width: min(330px, 42%); }
 
 /* Column layout when the widget itself is too narrow to fit chart + list side-by-side */
 @container (max-width: 460px) {
@@ -1330,7 +1938,7 @@ body{
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0;
   min-width: 0;
 }
 
@@ -1505,6 +2113,106 @@ body{
   white-space: nowrap;
 }
 
+/* ─── Treemap Modal ─────────────────────────────────────────────────────────── */
+/* Wider variant of `.modal` for the treemap. Tighter top padding so the
+   header reads as a single visual block: title row + Metric chip row
+   share the same card surface and a hairline underline separates the
+   header from the treemap canvas below. */
+
+.treemap-modal {
+  min-width: 0;
+  max-width: min(1100px, 95vw);
+  width: min(1100px, 95vw);
+  padding: 1.25rem 1.5rem 1.5rem;
+  gap: 0;
+}
+
+.treemap-modal-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.treemap-modal-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.treemap-modal-title {
+  letter-spacing: -0.01em;
+  color: var(--primary-text);
+}
+
+/* The metric chip row sits flush-left under the title — no extra card
+   surface around it (those were inside `.det-section-metrics`), so it
+   reads as part of the header rather than a separate card. */
+.treemap-modal-metrics .inv-metrics-row {
+  padding: 0;
+  background: none;
+  border: none;
+}
+
+.treemap-canvas {
+  flex: 1;
+  min-height: 60vh;
+  height: 60vh;
+  width: 100%;
+  /* `overflow: hidden` is belt to the `animate={false}` suspenders —
+     guarantees that if any child SVG ever overshoots its measured size
+     during a render, it can't push the modal into showing scrollbars. */
+  overflow: hidden;
+}
+
+.treemap-empty {
+  flex: 1;
+  min-height: 12rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Custom tooltip — solid card surface, soft shadow, brand-accent value. */
+.treemap-tooltip {
+  padding: 0.65rem 0.85rem;
+  gap: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 11rem;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
+.treemap-tooltip-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.treemap-tooltip-swatch {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.treemap-tooltip-name {
+  color: var(--primary-text);
+}
+
+.treemap-tooltip-value {
+  color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.treemap-tooltip-pct {
+  letter-spacing: 0.02em;
+}
+
 /* ─── Invoice Detail Modal ──────────────────────────────────────────────────── */
 
 .invoice-modal {
@@ -1560,7 +2268,7 @@ body{
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
-.invoice-status-badge--open    { background: color-mix(in srgb, var(--primary-color) 12%, transparent); color: var(--primary-color); }
+.invoice-status-badge--open    { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
 .invoice-status-badge--review  { background: rgba(245, 158, 11, 0.12); color: #d97706; }
 .invoice-status-badge--dispute { background: rgba(239, 68, 68, 0.12);  color: #dc2626; }
 .invoice-status-badge--paid    { background: rgba(22, 163, 74, 0.12);  color: #16a34a; }
@@ -1717,6 +2425,14 @@ body{
 
 .spend-rank-table td {
   padding: 0.625rem 0.75rem;
+}
+
+/* Airier row padding for tables that host avatar chips (currently the
+   Employees directory page). Matches `.data-table-airy td`'s 1rem top/bot
+   so the 2rem avatar gets the same breathing room it has in the home-page
+   Employee Performance widget. */
+.spend-rank-table.spend-rank-table--airy td {
+  padding: 1rem 0.875rem;
 }
 
 .spend-rank-table-row-plain {
@@ -1913,26 +2629,6 @@ body{
   display: flex;
   justify-content: center;
 }
-
-.jc-sort-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.6875rem;
-  font-weight: var(--font-weight-medium);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--secondary-text);
-  padding: 0.25rem 0;
-  transition: color 120ms;
-}
-
-.jc-sort-btn:hover { color: var(--primary-text); }
-.jc-sort-btn.active { color: var(--primary-color); }
 
 @media (max-width: 720px) {
   .jc-list-header { display: none; }
@@ -2321,6 +3017,157 @@ body{
 .jc-variance-over  { color: #dc2626; }
 .jc-variance-under { color: #16a34a; }
 
+/* Cost Breakdown uses the standard spend-rank-table look. Inside the Job
+   Costing list it lives in a `.co-widget`, where the change-orders column-gap
+   rule would otherwise bleed onto it — neutralize that so it keeps standard
+   spacing in both the list and the detail page. */
+.co-widget .spend-rank-table.jc-cost-breakdown > thead > tr > th,
+.co-widget .spend-rank-table.jc-cost-breakdown > tbody > tr > td {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+.co-widget .spend-rank-table.jc-cost-breakdown .jc-txn-container-row > td {
+  padding: 0;
+}
+.co-widget .spend-rank-table.jc-cost-breakdown .jc-txn-table th,
+.co-widget .spend-rank-table.jc-cost-breakdown .jc-txn-table td {
+  padding-left: 1.125rem;
+  padding-right: 1.125rem;
+}
+/* Total row matches the group rows' horizontal padding so the right-aligned
+   numbers line up (in both the list and the detail page). */
+.jc-cost-breakdown .jc-total-row td {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+/* Invisible chevron keeps the Total label aligned with the group names. */
+.jc-group-chevron-spacer { visibility: hidden; }
+
+/* ── Job Costing list: expandable inline detail rows ── */
+/* Narrow chevron column. The shared `.co-widget .spend-rank-table` gap rule
+   (defined for the change-orders table) also lands on this table, so the
+   overrides below need matching specificity to win. */
+.co-widget .spend-rank-table tr > th.jc-expand-th,
+.co-widget .spend-rank-table tr > td.jc-expand-chevron-cell {
+  width: 1.75rem;
+  padding-left: 0.625rem;
+  padding-right: 0;
+  text-align: center;
+  color: var(--secondary-text);
+}
+.jc-expand-chevron { transition: transform 150ms ease; vertical-align: middle; }
+.jc-expand-chevron.open { transform: rotate(90deg); }
+.jc-view-th { width: 1px; }
+.jc-view-cell { text-align: right; white-space: nowrap; }
+.jc-view-btn { font-size: 0.8125rem; padding: 0.3rem 0.7rem; }
+
+/* Open job — the project row is unchanged besides a faint orange tint
+   (matching the Period / Year summary widget) and no divider above its
+   detail panel, so the row + panel read as one block. */
+.spend-rank-table-row.jc-row-open {
+  background: color-mix(in srgb, var(--primary-color) 8%, var(--card-color));
+  /* Subtle gray divider between the project header and the open contents. */
+  border-bottom: 1px solid var(--border-color);
+}
+/* Detail panel row: same tint, full width (overriding the shared gap rule). */
+.co-widget .spend-rank-table tr.jc-expand-row > td {
+  padding: 0;
+  background: color-mix(in srgb, var(--primary-color) 8%, var(--card-color));
+}
+/* 1px outline around the whole open section (row + panel), matching the
+   Period / Year summary widget border. Drawn with OUTSET box-shadows
+   (top across the row; left/right down the row's end cells + the panel;
+   bottom on the panel) so it works with the table's border-collapse. */
+.spend-rank-table-row.jc-row-open > td {
+  box-shadow: 0 -1px 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color));
+}
+.spend-rank-table-row.jc-row-open > td:first-child {
+  box-shadow:
+    0 -1px 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color)),
+    -1px 0 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color));
+}
+.spend-rank-table-row.jc-row-open > td:last-child {
+  box-shadow:
+    0 -1px 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color)),
+    1px 0 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color));
+}
+.co-widget .spend-rank-table tr.jc-expand-row > td {
+  box-shadow:
+    -1px 0 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color)),
+    1px 0 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color)),
+    0 1px 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color));
+}
+
+.jc-expand-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  /* Inherit the row tint so the whole open block reads as one color. */
+  background: transparent;
+}
+
+/* Summary cards + breakdown reuse the bordered-card look. */
+.jc-summary-card,
+.jc-expand-breakdown {
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+.jc-expand-breakdown { overflow: hidden; }
+.jc-expand-breakdown .jc-summary-title { padding: 1rem 1.25rem 0.75rem; }
+.jc-expand-loading { padding: 1.25rem; }
+
+.jc-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+@media (max-width: 720px) {
+  .jc-summary-grid { grid-template-columns: 1fr; }
+}
+
+.jc-summary-card { padding: 1rem 1.25rem; }
+.jc-summary-title {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.5rem;
+}
+.jc-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.875rem;
+}
+.jc-summary-row:last-child { border-bottom: none; }
+.jc-summary-label { color: var(--secondary-text); }
+.jc-summary-value { font-variant-numeric: tabular-nums; color: var(--primary-text); }
+.jc-summary-total { font-weight: 700; }
+.jc-summary-total .jc-summary-label,
+.jc-summary-total .jc-summary-value { color: var(--primary-text); font-weight: 700; }
+
+/* Footer "Total" row — matches the .jc-cost-th band for visual symmetry. */
+.jc-total-row {
+  border-top: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--primary-text) 3%, var(--card-color));
+}
+
+.jc-total-row td {
+  padding: 0.875rem 1.125rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Indent the Total label so it aligns with group names (which sit after a chevron). */
+.jc-total-row td.jc-cost-code-col {
+  padding-left: 2.5rem;
+}
+
 /* ── Transaction sub-table ── */
 .jc-txn-container-row > td {
   padding: 0;
@@ -2461,13 +3308,13 @@ body{
 .jcd-skel-bar {
   border-radius: 4px;
   background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--primary-text) 8%, var(--card-color)) 20%,
-    color-mix(in srgb, var(--primary-text) 3%, var(--card-color)) 50%,
-    color-mix(in srgb, var(--primary-text) 8%, var(--card-color)) 80%
+    115deg,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 20%,
+    color-mix(in srgb, var(--primary-text) 2%, var(--card-color)) 50%,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 80%
   );
   background-size: 800px 100%;
-  animation: jcd-shimmer 2.2s linear infinite;
+  animation: jcd-shimmer 3.2s linear infinite;
 }
 .jcd-skel-value { height: 1.5rem; width: 55%; }
 .jcd-skel-label { height: 0.65rem; width: 75%; margin-top: 0.4rem; }
@@ -2582,6 +3429,7 @@ body{
 /* Cost breakdown widget: table flush to card edges */
 .jcd-cost-widget.card {
   padding: 1.25rem 0 0 0;
+  overflow: hidden;
 }
 .jcd-cost-widget .widget-header {
   padding: 0 1.25rem;
@@ -3132,13 +3980,13 @@ body{
   border-top: 1px solid var(--border-color);
   background: var(--card-color);
   background-image: linear-gradient(
-    90deg,
+    115deg,
     transparent 0%,
     color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 50%,
     transparent 100%
   );
   background-size: 900px 100%;
-  animation: shimmer 2.2s linear infinite;
+  animation: shimmer 3.2s linear infinite;
 }
 
 .inv-metrics-row {
@@ -3186,8 +4034,139 @@ body{
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.04em;
 }
-.inv-type-badge--ar { background: rgba(31, 120, 197, 0.1);  color: #1f78c5; }
-.inv-type-badge--ap { background: rgba(194, 65, 12, 0.1);   color: #c2410c; }
+.inv-type-badge--ar { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+.inv-type-badge--ap { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+/* ── Invoices header: period selector + year, filter/summary toolbar ── */
+.invoices-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.invoices-toolbar {
+  padding: 0;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.invoices-filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.invoices-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.invoices-filter-label {
+  font-size: var(--footnote-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+}
+
+.filter-pills {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.filter-pill {
+  --pill: var(--secondary-text);
+  appearance: none;
+  border: 1.5px solid var(--border-color);
+  background: transparent;
+  color: var(--secondary-text);
+  border-radius: 999px;
+  padding: 0.3rem 0.75rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
+}
+
+/* Muted until hovered — hint the accent color — or active (filled). */
+.filter-pill:hover:not(.filter-pill--active) {
+  color: var(--pill);
+  border-color: color-mix(in srgb, var(--pill) 40%, transparent);
+  background: color-mix(in srgb, var(--pill) 10%, transparent);
+}
+
+.filter-pill--active {
+  background: var(--pill);
+  border-color: var(--pill);
+  color: #fff;
+}
+
+.invoices-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 200px;
+  padding: 0.4rem 0.875rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: 999px;
+  color: var(--secondary-text);
+}
+
+.invoices-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--primary-text);
+  font-size: var(--body-size);
+  font-family: var(--font-family);
+}
+
+.invoices-search input::placeholder {
+  color: var(--secondary-text);
+}
+
+.invoices-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.invoices-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem 1.25rem;
+}
+
+.invoices-stat + .invoices-stat {
+  border-left: 1px solid var(--border-color);
+}
+
+.invoices-stat-value {
+  font-size: 1.75rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.1;
+  color: var(--primary-text);
+}
+
+.invoices-stat-label {
+  font-size: var(--footnote-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+}
+
+@media (max-width: 640px) {
+  .invoices-stats { grid-template-columns: 1fr; }
+  .invoices-stat + .invoices-stat { border-left: none; border-top: 1px solid var(--border-color); }
+}
 
 /* Table widget — full-bleed table */
 .inv-table-widget { padding: 0; overflow: hidden; }
@@ -3231,6 +4210,22 @@ body{
 .inv-table .inv-th-type   { width: 4rem; }
 .inv-table .inv-th-date   { width: 6.5rem; }
 .inv-table .inv-th-status { width: 5.5rem; }
+.inv-table .jcd-co-th-num { width: 6rem; }
+
+/* Subtitle line on the Job Costing detail page — status pill + meta. */
+.jcd-subtitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+/* Larger status pill in the page subtitle. Scoped so the smaller list-table
+   pills are unaffected. */
+.jcd-subtitle .status-badge {
+  font-size: 0.8125rem;
+  padding: 0.25rem 0.75rem;
+  letter-spacing: 0.01em;
+}
 
 /* Two-line entity / description cell */
 .inv-entity {
@@ -3384,6 +4379,226 @@ body{
 .co-th-btn-active { color: var(--primary-color); }
 .co-th-btn-active:hover { color: var(--primary-color); }
 
+/* Roomier gaps within the left column group (Name / Project / Units /
+   Budget / Markup / Total Cost — columns 1-6). Column 7 is the flex
+   spacer; columns 8+ are the right-aligned Submitted By / Date / actions
+   group, which the spacer pushes right. */
+.co-widget .spend-rank-table th:nth-child(-n + 6),
+.co-widget .spend-rank-table td:nth-child(-n + 6),
+.co-widget .spend-rank-table th:nth-child(n + 8),
+.co-widget .spend-rank-table td:nth-child(n + 8) {
+  /* Fluid gap: full width on desktop, shrinking toward the row's base
+     padding on narrow/mobile viewports so the table stays readable. */
+  padding-left: clamp(0.625rem, 2.5vw, 2.25rem);
+  padding-right: clamp(0.625rem, 2.5vw, 2.25rem);
+}
+.co-widget .spend-rank-table th:first-child,
+.co-widget .spend-rank-table td:first-child {
+  padding-left: 0.75rem;
+}
+.co-widget .spend-rank-table th:last-child,
+.co-widget .spend-rank-table td:last-child {
+  padding-right: 0.75rem;
+}
+
+/* Keep the wide table inside the widget: at middle widths the nowrap
+   cells + fluid gaps can exceed the container, so scroll horizontally
+   here instead of overflowing onto the page. */
+.co-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+/* Drag-and-drop target wrapping the Change Orders widget. Dropping an
+   Excel file here hands it to the upload flow (same as the "+ New"
+   button). The overlay is purely visual — pointer-events:none lets the
+   drop land on the wrapper. */
+.co-dropzone {
+  position: relative;
+}
+.co-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  border: 2px dashed var(--primary-color);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+  backdrop-filter: blur(1px);
+  color: var(--primary-color);
+  pointer-events: none;
+}
+
+/* New Change Order: parsed-file preview header holds the title, the
+   job-number picker, Replace file, and Submit. */
+.co-preview-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.co-preview-head-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.co-preview-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  flex: 0 1 26rem;
+  min-width: 14rem;
+  margin-left: auto;
+}
+.co-preview-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.co-preview-actions-row .co-combobox {
+  flex: 1;
+  min-width: 0;
+}
+.co-preview-actions-row .primary-button {
+  flex: none;
+}
+.co-preview-hint {
+  display: flex;
+  align-items: center;
+}
+
+/* Neutral/secondary button — pairs with .primary-button (same pill
+   geometry, bordered + transparent instead of filled). */
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4rem 0.875rem;
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  font-family: var(--font-family);
+  border-radius: 999px;
+  border: 1.5px solid var(--border-color);
+  background: transparent;
+  color: var(--secondary-text);
+  cursor: pointer;
+  transition: all 140ms ease;
+  white-space: nowrap;
+}
+.secondary-button:hover {
+  border-color: var(--primary-text);
+  color: var(--primary-text);
+}
+.secondary-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Filled red button for destructive confirmations — pairs with .primary-button. */
+.danger-button {
+  background: #ef4444 !important;
+  color: #fff !important;
+  font-weight: var(--font-weight-semibold);
+  font-size: 0.875rem;
+  padding: 0.4rem 0.875rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+.danger-button:hover {
+  background: #dc2626 !important;
+}
+.danger-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Compact confirmation dialog (uses the shared .modal infrastructure). */
+.confirm-modal {
+  min-width: 0;
+  max-width: 440px;
+  width: min(440px, 90vw);
+  gap: 0.75rem;
+}
+.confirm-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.625rem;
+  margin-top: 0.5rem;
+}
+
+/* Clickable project that opens its job-costing page (CO table + modal). */
+.co-project-link {
+  cursor: pointer;
+}
+.co-project-link:hover .body-text.emphasized {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+.co-modal-subtitle.co-project-link:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+
+/* Searchable job/phase picker (New Change Order). */
+.co-combobox {
+  position: relative;
+}
+.co-combobox-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+.co-combobox-input[aria-invalid="true"] {
+  border-color: #ef4444;
+}
+.co-combobox-menu {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  max-height: 16rem;
+  overflow-y: auto;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--button-shadow);
+}
+.co-combobox-option {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: var(--body-size);
+  color: var(--primary-text);
+}
+.co-combobox-option-active {
+  background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+}
+.co-combobox-recnum {
+  color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.co-combobox-empty {
+  padding: 0.5rem 0.625rem;
+  color: var(--secondary-text);
+  font-size: var(--body-size);
+}
+
 .co-no-results {
   padding: 2.5rem 1.25rem;
   text-align: center;
@@ -3481,6 +4696,56 @@ body{
   font-weight: 500;
 }
 
+/* Reset-view template dropdown (in the edit toolbar) */
+.template-picker {
+  position: relative;
+  display: inline-flex;
+}
+.template-picker > .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.template-picker-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: 0.375rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: light-dark(0 10px 28px rgba(0, 0, 0, 0.18), 0 10px 28px rgba(0, 0, 0, 0.5));
+}
+.template-picker-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  text-align: left;
+  padding: 0.5rem 0.625rem;
+  border: none;
+  background: none;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.template-picker-option:hover {
+  background: var(--hover-bg);
+}
+.template-picker-option-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--primary-text);
+}
+.template-picker-option-desc {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+}
+
 /* Icon button (edit mode toggle) */
 .btn-icon {
   display: flex;
@@ -3527,6 +4792,12 @@ body{
 .widget-placeholder-stat .widget-placeholder-body { flex: none; }
 .widget-placeholder-line  { height: 280px; }
 .widget-placeholder-pie   { height: 280px; }
+.widget-placeholder-bar   { height: 280px; }
+.widget-placeholder-table { height: 280px; }
+/* Summary = two stacked stat snapshots. Sized to roughly match the real
+   merged card's rendered footprint (two .widget cards: each header +
+   snapshot-headline + 4-tile stat-grid, with .card padding 1.25rem). */
+.widget-placeholder-summary { height: 400px; }
 
 /* Item being dragged — faded in place */
 .widget-placeholder-dragging {
@@ -3645,6 +4916,33 @@ svg.placeholder-illustration {
   align-items: center;
 }
 
+/* Table illustration — stacked skeleton rows */
+.placeholder-illustration-table {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.placeholder-table-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.placeholder-table-cell {
+  height: 10px;
+  border-radius: 5px;
+  background: var(--border-color);
+}
+
+.widget-placeholder-body:has(.placeholder-illustration-table) {
+  align-items: center;
+}
+
 /* Stat illustration */
 .placeholder-illustration-stat {
   width: 100%;
@@ -3658,6 +4956,65 @@ svg.placeholder-illustration {
   color: var(--primary-text);
   opacity: 0.15;
   letter-spacing: -0.02em;
+}
+
+/* Summary illustration — two equal-height sections (the real card's Period
+   + Year snapshots), each with a 4-tile row pinned to its bottom. The empty
+   top of each section is where the snapshot headline sits in the rendered
+   widget ("May 2026 / OPEN", "2026 / YEAR TO DATE"), so tile rows land in
+   the same proportional spots. Override the body's default
+   `align-items: flex-end` (which bunches both rows at the bottom) with
+   `stretch` so the illustration fills the body and the two sections can
+   split it cleanly. */
+.widget-placeholder-body:has(.placeholder-illustration-summary) {
+  align-items: stretch;
+}
+
+.placeholder-illustration-summary {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Section layout mirrors the real card body: snapshot-headline directly
+   above the 4-tile row, the pair centered vertically inside the section
+   so the placeholder reads balanced on both sides of the seam. */
+.placeholder-summary-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 1rem 0;
+  gap: 0.75rem;
+}
+
+.placeholder-summary-section + .placeholder-summary-section {
+  border-top: 1px solid var(--border-color);
+}
+
+/* Small headline bar = where "May 2026 OPEN" / "2026 YEAR TO DATE" sit in
+   the rendered card. Reuses the same border-color + pill-radius vocabulary
+   as the table-row skeleton bars. */
+.placeholder-summary-headline {
+  height: 10px;
+  width: 30%;
+  max-width: 160px;
+  border-radius: 5px;
+  background: var(--border-color);
+}
+
+.placeholder-summary-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  width: 100%;
+}
+
+.placeholder-summary-tile {
+  height: 56px;
+  border-radius: 6px;
+  background: var(--border-color);
 }
 
 .widget-size-toggle {
@@ -3798,6 +5155,292 @@ svg.placeholder-illustration {
 
   .widget-gap-dropzone {
     min-height: 80px;
+  }
+}
+
+/* ─── Section pager (home page) ──────────────────────────────────────── */
+/* Content-sized sections stacked in a native scroll-snap column. The header is
+   a transparent overlay holding only the corner items; dots on the right
+   indicate/jump to sections; the native scrollbar sits at the right edge. */
+.page:has(.section-pager) {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Header → transparent overlay, just the top-left text + top-right actions.
+   pointer-events none lets wheel/touch pass through the empty bar; the actions
+   re-enable so the year selector + edit gear stay clickable. */
+.page:has(.section-pager) .page-header {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 10;
+  margin: 0;
+  padding: 1rem 2.5rem;
+  background: transparent;
+  pointer-events: none;
+}
+.page:has(.section-pager) .page-header-actions {
+  pointer-events: auto;
+}
+
+.section-pager {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-y: scroll;
+  /* mandatory → every section's top snaps to the same spot, consistently. */
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  /* Content fades out under the overlay header. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 3rem);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 3rem);
+  /* Scrollbar hidden — the section dots are the only position reference. */
+  scrollbar-width: none;
+}
+.section-pager::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Each section is a snap target. Content-sized (so the next peeks in below).
+   Opacity is driven per-frame from scroll position (see SectionPager) so a
+   section fades in as it rises toward place; this is just the initial value. */
+.section-pager-panel {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  opacity: 0.3;
+}
+
+/* The last section gets a screen's worth of height so it can settle at the top
+   (nothing below it to scroll against). */
+.section-pager-panel:last-child {
+  min-height: 100vh;
+}
+
+/* Top-aligned, padded content. The 3rem top keeps the title clear of the header
+   overlay + fade band; the bottom pad spaces the next (peeking) section.
+   max-height caps a too-tall section to the screen so it scrolls internally
+   (and chains to the next at its edge); shorter sections stay content-sized. */
+.section-slide-content {
+  display: flex;
+  flex-direction: column;
+  padding: 3rem 2.5rem 3rem;
+  max-height: 100vh;
+  overflow-y: auto;
+  /* Scrollbar hidden here too (tall sections scroll internally) for the clean,
+     dots-only home page. */
+  scrollbar-width: none;
+}
+.section-slide-content::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.section-pager-title {
+  text-align: center;
+  margin: 0 0 1.5rem;
+}
+
+.section-pager-empty {
+  text-align: center;
+  color: var(--secondary-text);
+  padding: 3rem 0;
+}
+
+/* Section dots — vertical, right edge (iOS-style page indicator). */
+.section-pager-dots {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.section-pager-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 99px;
+  background: var(--primary-text);
+  opacity: 0.25;
+  cursor: pointer;
+  transition: opacity 0.2s ease, background 0.2s ease, height 0.2s ease;
+}
+.section-pager-dot:hover {
+  opacity: 0.5;
+}
+.section-pager-dot-active {
+  opacity: 1;
+  background: var(--primary-color);
+  /* Elongate the active dot like an iOS page indicator. */
+  height: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-pager {
+    scroll-behavior: auto;
+  }
+}
+
+/* ─── Section editor (edit mode dual pane) ───────────────────────────── */
+
+/* Transparent header while editing — the toolbar floats over the page. */
+.page:has(.section-editor) .page-header-sticky {
+  background: transparent;
+}
+
+/* Centered on screen, constrained width. */
+.section-editor {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  justify-content: center;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.section-editor-list {
+  flex: 0 0 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  position: sticky;
+  top: 0;
+}
+
+.section-editor-list-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--secondary-text);
+  font-weight: 600;
+  padding: 0 0.25rem 0.25rem;
+}
+
+/* Section rectangle — mirrors .widget-placeholder's draggable look. */
+.section-rect {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.875rem;
+  cursor: pointer;
+  border: 2px solid transparent;
+  user-select: none;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+.section-rect:hover {
+  border-color: color-mix(in srgb, var(--primary-color) 40%, transparent);
+}
+
+.section-rect-selected {
+  border-color: var(--primary-color);
+  background: rgb(from var(--primary-color) r g b / 0.06);
+}
+
+.section-rect-dragging {
+  opacity: 0.5;
+}
+
+.section-rect-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--secondary-text);
+  cursor: grab;
+  touch-action: none;
+  flex: none;
+}
+
+.section-rect-grip:active {
+  cursor: grabbing;
+}
+
+.section-rect-title {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--primary-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.section-rect-count {
+  flex: none;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.4rem;
+  border-radius: 99px;
+  background: var(--hover-bg);
+  color: var(--secondary-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.section-editor-canvas {
+  flex: 1;
+  min-width: 0;
+}
+
+.section-editor-canvas-title {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--secondary-text);
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+}
+
+/* Miniaturized cards: compact placeholders so the section reads at a glance.
+   Compact sizing (not transform: scale) keeps dnd-kit pointer math 1:1. */
+.section-editor-canvas .widget-placeholder-line,
+.section-editor-canvas .widget-placeholder-pie,
+.section-editor-canvas .widget-placeholder-bar,
+.section-editor-canvas .widget-placeholder-table {
+  height: 150px;
+}
+
+.section-editor-canvas .widget-placeholder-summary {
+  height: 200px;
+}
+
+.section-editor-canvas .widget-placeholder-body {
+  opacity: 0.7;
+}
+
+.section-editor-canvas .widget-gap-dropzone {
+  min-height: 80px;
+}
+
+.dashboard-editor-empty {
+  color: var(--secondary-text);
+  font-size: 0.875rem;
+  padding: 1.5rem 0;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .section-editor {
+    flex-direction: column;
+  }
+  .section-editor-list {
+    flex: none;
+    width: 100%;
+    position: static;
   }
 }
 
@@ -4422,11 +6065,6 @@ svg.placeholder-illustration {
     font-size: 0.875rem;
   }
 
-  .jc-sort-btn {
-    font-size: 0.6875rem;
-    padding: 0.2rem 0.375rem;
-  }
-
   /* ── 1c. Directory toolbar ── */
   .co-widget-toolbar {
     flex-wrap: wrap;
@@ -4503,8 +6141,118 @@ svg.placeholder-illustration {
   color: var(--primary-text);
 }
 
+.table-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--secondary-text);
+  padding: 2rem 0.75rem;
+}
+
 .data-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+/* Airier variant — more vertical breathing room between rows */
+.data-table-airy th {
+  padding: 0.75rem 0.875rem;
+}
+.data-table-airy td {
+  padding: 1rem 0.875rem;
+}
+
+/* ─── Employee Performance widget ───────────────────────────────────────────
+   Round initials badge to the left of each employee name, plus tighter
+   typography on the numeric columns so the row reads as
+   [avatar · name] ························ [$ amount] [margin %]   */
+
+.emp-perf-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.emp-perf-name {
+  color: var(--primary-text);
+  /* Allow the name to truncate gracefully on narrow widget widths
+     rather than forcing the row to overflow. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emp-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  /* Soft brand-orange tint background with the deeper brand color as
+     text. Both derive from `--primary-color` via color-mix so a brand
+     change ripples to the badge without hand-editing this rule. The
+     20% mix gives a peachy chip; pushing the text 18% toward black
+     deepens it enough for legible contrast at 0.7rem. */
+  background: color-mix(in srgb, var(--primary-color) 20%, var(--card-color));
+  color: color-mix(in srgb, var(--primary-color) 82%, #000);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  /* Subtle outline in the same brand hue ties the chip together and
+     gives the soft background a hint of edge against the card surface. */
+  border: 1px solid color-mix(in srgb, var(--primary-color) 30%, transparent);
+}
+
+/* Generic gray-tint variant for "Unassigned Work" — same soft-tint /
+   dark-text pattern as the brand variant, just in a neutral palette so
+   it reads as an aggregation bucket rather than a real person. */
+.emp-avatar--unassigned {
+  background: color-mix(in srgb, var(--secondary-text) 18%, var(--card-color));
+  color: color-mix(in srgb, var(--secondary-text) 82%, #000);
+  border-color: color-mix(in srgb, var(--secondary-text) 25%, transparent);
+}
+
+/* Tabular numerics keep the money column right-aligned and easy to scan
+   vertically; margin column gets a touch more weight since color alone
+   carries the signal. */
+.emp-perf-money {
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+
+.emp-perf-margin {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+/* ── Tables inside widgets ───────────────────────────────────────────────────
+   Any widget containing a data table: the table spans the full width and down
+   to the bottom edge. We zero the card padding and re-pad the header instead of
+   using negative margins, so this stays idempotent with widgets (e.g. change
+   orders) that already zero their own padding. */
+.widget:has(.data-table) {
+  padding: 0;
+  overflow: hidden;
+}
+.widget:has(.data-table) > .widget-header {
+  padding: 1.25rem 1.25rem 0;
+}
+.widget:has(.data-table) > .widget-body {
+  padding: 0;
+}
+/* Re-inset the outer columns so cell content lines up with the widget title. */
+.widget:has(.data-table) .data-table th:first-child,
+.widget:has(.data-table) .data-table td:first-child {
+  padding-left: 1.25rem;
+}
+.widget:has(.data-table) .data-table th:last-child,
+.widget:has(.data-table) .data-table td:last-child {
+  padding-right: 1.25rem;
 }
 
 .sortable-header {
@@ -4515,6 +6263,16 @@ svg.placeholder-illustration {
 }
 
 .sortable-header:hover {
+  color: var(--primary-color);
+}
+
+/* Sortable header on the cell itself — keeps the <th> a real table cell so the
+   column stays full width; the inner .sortable-header span holds the label+icon. */
+.data-table th.sortable-th {
+  cursor: pointer;
+}
+
+.data-table th.sortable-th:hover .sortable-header {
   color: var(--primary-color);
 }
 
@@ -4554,6 +6312,132 @@ svg.placeholder-illustration {
 .status-1 { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
 .status-3 { background: rgba(234, 179, 8, 0.15); color: #eab308; }
 
+/* ── Widget link button (right-side "View" / "Clear" links in widget header) ── */
+.widget-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  font-family: var(--font-family);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--secondary-text);
+  /* Strip the browser's default <a> underline; restore it on hover so the
+     link still gets an obvious affordance when the user mouses over. */
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.widget-link-btn:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
+}
+
+/* ── Monthly Breakdown Page (port of 93E MonthlyBreakdownPage layout) ── */
+.mbp-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.mbp-chart-widget .widget-body {
+  min-height: 22rem;
+}
+
+/* Make point markers feel clickable when onPointClick is wired in. */
+.mbp-chart-widget .chart-container svg circle { cursor: pointer; }
+
+/* Flush widget: remove card padding, keep header padded so the table touches edges. */
+.mbp-table-widget { padding: 0 !important; overflow: hidden; }
+.mbp-table-widget .widget-header { padding: 1.25rem 1.25rem 0.75rem; }
+.mbp-table-widget .widget-body { padding: 0; gap: 0; }
+
+/* ── Monthly Detail Table (shared component) ── */
+/* Outer monthly table — fixed layout so the inner items row can't widen the card. */
+.mdt-table {
+  margin: 0;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.mdt-month-col { width: 40%; }
+.mdt-total-col { width: 60%; text-align: right; }
+.mdt-table th.mdt-total-col { text-align: right; }
+
+.mdt-loading,
+.mdt-empty {
+  padding: 1rem 1.125rem;
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  text-align: center;
+}
+
+/* The items cell uses max-width:0 so the inner scroll container respects the
+   outer column width instead of forcing the table to expand. */
+.mdt-items-cell {
+  padding: 0 !important;
+  max-width: 0;
+  overflow: hidden;
+}
+
+.mdt-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  width: 100%;
+  /* Prevent trackpad horizontal scroll from bubbling up and triggering the
+     browser's swipe-back / swipe-forward navigation. */
+  overscroll-behavior-x: contain;
+}
+
+.mdt-line-table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.mdt-line-table .jc-txn-th,
+.mdt-line-table .jc-txn-row td {
+  white-space: nowrap;
+}
+
+/* Sort header button inside the line-item table. */
+.mdt-line-table .jc-txn-th { padding: 0; }
+
+.mdt-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.5rem 1.125rem;
+  background: transparent;
+  border: none;
+  font-family: var(--font-family);
+  font-size: 0.5938rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.mdt-sort-btn:hover {
+  color: var(--primary-text);
+  background: color-mix(in srgb, var(--primary-color) 5%, transparent);
+}
+
+.mdt-sort-btn.active {
+  color: var(--primary-color);
+}
+
 /* ── Widget Search ── */
 .widget-search {
   display: flex;
@@ -4583,6 +6467,9 @@ svg.placeholder-illustration {
   background: var(--primary-color) !important;
   color: white !important;
   font-weight: var(--font-weight-semibold);
+  font-size: 0.875rem;
+  padding: 0.4rem 0.875rem;
+  border-radius: 999px;
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
@@ -4628,6 +6515,22 @@ svg.placeholder-illustration {
 .toggle-button.active {
   background: var(--primary-color) !important;
   color: white !important;
+}
+
+/* ── Revenue map hover tooltip (follows the cursor) ── */
+.map-tooltip {
+  position: fixed;
+  z-index: 300;
+  pointer-events: none;
+  padding: 0.375rem 0.625rem;
+  border-radius: 8px;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--button-shadow);
+  color: var(--primary-text);
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
 }
 
 /* ── Drop Zone (Change Orders) ── */
@@ -4821,29 +6724,74 @@ svg.placeholder-illustration {
 }
 
 /* ── Org Chart ── */
-.org-chart-list {
-  display: flex;
+/* ─── Org chart ──────────────────────────────────────────────────────── */
+
+.org-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
   gap: 1.25rem;
-  overflow-x: auto;
-  padding-bottom: 0.5rem;
-  scroll-snap-type: x mandatory;
+  align-items: start;
 }
 
-.org-card {
-  min-width: 320px;
-  scroll-snap-align: start;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
+.org-emp-card {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  border-color: color-mix(in srgb, var(--border-color) 70%, transparent);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.org-emp-card:hover {
+  border-color: var(--border-color);
+  box-shadow: light-dark(0 8px 24px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.35));
+}
+
+.org-emp-head {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
   padding: 1.25rem;
 }
 
-.org-card h3 {
-  margin: 0 0 1rem;
+.org-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: var(--font-weight-bold);
+  font-size: 0.9375rem;
+  flex-shrink: 0;
+}
+
+.org-emp-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.org-emp-name {
+  font-size: var(--headline-size);
+  font-weight: var(--font-weight-semibold);
   color: var(--primary-text);
 }
 
-.org-group {
-  margin-bottom: 0.25rem;
+.org-emp-total {
+  font-size: var(--footnote-size);
+  color: var(--secondary-text);
+}
+
+.org-groups {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
+}
+
+.org-group + .org-group {
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
 }
 
 .org-group-header {
@@ -4851,83 +6799,431 @@ svg.placeholder-illustration {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.375rem 0 !important;
-  font-weight: var(--font-weight-medium) !important;
-  color: var(--primary-text) !important;
+  padding: 0.75rem 1.25rem;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  color: var(--primary-text);
+  font-family: inherit;
+  font-size: var(--callout-size);
+  transition: background 0.15s;
 }
 
-.org-time-badge {
-  margin-left: auto;
-  font-size: var(--caption1-size);
+.org-group-header:not(:disabled):hover {
+  background: var(--hover-bg);
+}
+
+.org-group-header:focus-visible {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--primary-color) 40%, transparent);
+}
+
+/* Soft highlight on the expanded group instead of a hard outline. */
+.org-group-open > .org-group-header {
+  background: color-mix(in srgb, var(--primary-color) 7%, transparent);
+}
+
+.org-group-header:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.org-group-chevron {
+  flex-shrink: 0;
   color: var(--secondary-text);
-  font-weight: var(--font-weight-regular);
+  transform: rotate(-90deg);
+  transition: transform 0.2s ease;
+}
+
+.org-group-open .org-group-chevron {
+  transform: rotate(0deg);
+}
+
+.org-group-title {
+  font-weight: var(--font-weight-medium);
+  text-align: left;
+}
+
+.org-group-count {
+  margin-left: auto;
+  min-width: 1.5rem;
+  text-align: center;
+  font-size: var(--caption1-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--secondary-text);
+  background: var(--hover-bg);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
+.org-group-hours {
+  min-width: 3rem;
+  text-align: right;
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
 }
 
 .org-group-items {
-  padding-left: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  margin-bottom: 0.5rem;
+  background: color-mix(in srgb, var(--primary-text) 3%, transparent);
 }
 
 .org-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.625rem;
+  padding: 0.625rem 1.25rem 0.625rem 2.25rem;
   font-size: var(--callout-size);
   color: var(--primary-text);
 }
 
-.org-category-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.org-item + .org-item {
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 45%, transparent);
 }
 
-.org-time {
-  margin-left: auto;
+.org-item-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.org-cat-pill {
+  font-size: var(--caption1-size);
+  font-weight: var(--font-weight-semibold);
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.org-item-hours {
+  min-width: 2.5rem;
+  text-align: right;
   color: var(--secondary-text);
   font-size: var(--caption1-size);
+  white-space: nowrap;
 }
 
-.org-chart-bar {
+/* ─── Reports (dashboard data-validation cards) ──────────────────────── */
+/* Each report is now a standalone widget filling its own grid slot. */
+
+/* Match the lift-on-hover used by .widget-expandable elsewhere in the app. */
+.report-card {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease;
+  height: 100%;
 }
 
-.org-bar-row {
+/* Fill the home grid slot so two report cards sharing a row match height. */
+.dashboard-home-grid .report-card {
+  min-height: 160px;
+}
+
+.report-card:hover:not(:disabled) {
+  box-shadow: light-dark(0 6px 20px rgba(0, 0, 0, 0.18), 0 6px 20px rgba(255, 255, 255, 0.07));
+}
+
+.report-card:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.report-card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.report-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: var(--font-weight-bold);
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.report-icon-red {
+  background: #e0483d;
+}
+
+.report-icon-orange {
+  background: #e8893a;
+}
+
+.report-icon-gray {
+  background: light-dark(#7c8794, #5b6470);
+}
+
+.report-card-count {
+  font-size: 2.5rem;
+  line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  /* Breathing room between the icon/title row and the count. */
+  margin-top: 0.75rem;
+}
+
+/* Shimmer block sized to occupy the same vertical space as `.report-card-count`
+   so the card doesn't reflow between loading and loaded states. */
+.report-card-count-skeleton {
+  display: block;
+  width: 3.5rem;
+  height: 2.5rem;
+  min-height: 0;
+  border-radius: 6px;
+  margin-top: 0.75rem;
+}
+
+.report-card-subtitle {
+  font-size: var(--callout-size);
+  color: var(--secondary-text);
+}
+
+/* Reports detail modal. Padding is zeroed and the table rendered edge-to-edge,
+   mirroring the .widget:has(.data-table) rules so it reads like a widget. */
+.reports-modal {
+  min-width: min(640px, 90vw);
+  max-width: 760px;
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.reports-modal .modal-header {
+  padding: 1.25rem 1.25rem 0.75rem;
+  align-items: flex-start;
+}
+
+.reports-modal-title {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.org-bar-label {
-  min-width: 120px;
-  font-size: var(--body-size);
-  color: var(--primary-text);
+.reports-modal-title h2 {
+  margin: 0;
+  line-height: 1.2;
 }
 
-.org-bar-track {
+.reports-modal-subtitle {
+  display: block;
+  font-size: var(--callout-size);
+  color: var(--secondary-text);
+}
+
+.reports-modal-body {
   flex: 1;
-  height: 1.25rem;
-  background: var(--hover-bg);
-  border-radius: 999px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Re-inset the outer columns so cell content lines up with the header. */
+.reports-modal .data-table th:first-child,
+.reports-modal .data-table td:first-child {
+  padding-left: 1.25rem;
+}
+
+.reports-modal .data-table th:last-child,
+.reports-modal .data-table td:last-child {
+  padding-right: 1.25rem;
+}
+
+.reports-modal-empty {
+  padding: 1.5rem 1.25rem 2rem;
+  text-align: center;
+}
+
+/* Job / Job # cells in the reports modal navigate to the job page on click. */
+.reports-modal-job-cell {
+  cursor: pointer;
+  color: var(--brand-primary);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.reports-modal-job-cell:hover {
+  background: color-mix(in srgb, var(--brand-primary) 8%, transparent);
+  text-decoration: underline;
+}
+
+.reports-modal-job-cell:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: -2px;
+}
+
+/* Change order detail modal — same edge-to-edge table treatment as a widget. */
+.co-modal {
+  min-width: min(720px, 92vw);
+  max-width: 880px;
+  padding: 0;
+  gap: 0;
   overflow: hidden;
 }
 
-.org-bar-fill {
-  height: 100%;
-  background: var(--primary-color);
-  border-radius: 999px;
-  transition: width 0.4s ease;
+.co-modal .modal-header {
+  padding: 1.25rem 1.25rem 0.75rem;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-color);
 }
 
-.org-bar-value {
-  min-width: 40px;
-  text-align: right;
+.co-modal-title h2 {
+  margin: 0;
+  line-height: 1.2;
+}
+
+.co-modal-subtitle {
+  display: block;
+  margin-top: 0.25rem;
   font-size: var(--callout-size);
+  color: var(--secondary-text);
+}
+
+.co-modal-totals {
+  display: flex;
+  gap: 2rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.co-modal-total {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.co-modal-total-label {
+  font-size: var(--footnote-size);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--secondary-text);
+}
+
+.co-modal-total-value {
+  font-size: 1.125rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+
+.co-modal-total-primary .co-modal-total-value {
+  font-size: 1.375rem;
+  color: var(--primary-color);
+}
+
+.co-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.co-modal .data-table th:first-child,
+.co-modal .data-table td:first-child {
+  padding-left: 1.25rem;
+}
+
+.co-modal .data-table th:last-child,
+.co-modal .data-table td:last-child {
+  padding-right: 1.25rem;
+}
+
+.co-modal-foot td {
+  border-top: 1px solid var(--border-color);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+
+.co-modal-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--border-color);
+  font-size: var(--callout-size);
+  color: var(--secondary-text);
+}
+
+/* ─── Job cost detail ────────────────────────────────────────────────── */
+
+.jcd-summary {
+  display: flex;
+  flex-direction: column;
+}
+
+.jcd-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 55%, transparent);
+}
+
+.jcd-summary-row:last-child {
+  border-bottom: none;
+}
+
+.jcd-summary-label {
+  color: var(--secondary-text);
+  font-size: var(--callout-size);
+}
+
+.jcd-summary-value {
+  color: var(--primary-text);
+  font-size: var(--body-size);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+}
+
+.jcd-summary-total .jcd-summary-label,
+.jcd-summary-total .jcd-summary-value {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--headline-size);
+}
+
+/* Table footer total rows on the detail tables. */
+.jcd-total-row td {
+  border-top: 1px solid var(--border-color);
+  border-bottom: none;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+
+.jcd-cost-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0 1.25rem 0.75rem;
+}
+
+.jcd-cost-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: 999px;
+  color: var(--secondary-text);
+  min-width: 200px;
+}
+
+.jcd-cost-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--primary-text);
+  font-size: var(--body-size);
+  font-family: var(--font-family);
+}
+
+.jcd-cost-search input::placeholder {
   color: var(--secondary-text);
 }
