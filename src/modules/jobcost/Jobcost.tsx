@@ -39,6 +39,9 @@ interface RawProject {
   // consolidation.
   totalBudget?: number
   budget?: number
+  // Raw (unconsolidated) phase rows carry the PM name directly; consolidated
+  // projects only expose it on their nested `phases`. Accept both.
+  pmName?: string | null
   phases?: ProjectPhase[]
 }
 
@@ -77,7 +80,10 @@ function normalizeProject(p: RawProject): Job {
     totalIncome: p.totalIncome ?? 0,
     budget: p.totalBudget ?? p.budget ?? 0,
     margin: contract > 0 ? ((contract - totalCost) / contract) * 100 : null,
-    supervisor: p.phases?.find((ph) => ph.pmName?.trim())?.pmName?.trim() ?? "",
+    supervisor:
+      p.pmName?.trim() ??
+      p.phases?.find((ph) => ph.pmName?.trim())?.pmName?.trim() ??
+      "",
   }
 }
 
