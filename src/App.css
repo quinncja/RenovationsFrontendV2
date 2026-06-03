@@ -2040,6 +2040,86 @@ body{
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
 }
 
+/* Wider variant for modals holding a full data table (e.g. the employee-page
+   drill-downs). The base .modal keeps width: 90vw, so this just lifts the cap
+   on large screens; the .data-table inside is width:100% and fills it. */
+.modal--wide {
+  max-width: 960px;
+}
+
+/* Full-bleed the drill-down table to the modal's edges — the modal's 1.5rem
+   padding would otherwise inset it. Re-inset the outer columns so cell content
+   still lines up with the header. Mirrors the widget table pattern above. */
+.modal--wide .data-table {
+  width: calc(100% + 3rem);
+  margin-left: -1.5rem;
+  margin-right: -1.5rem;
+}
+
+.modal--wide .data-table th:first-child,
+.modal--wide .data-table td:first-child {
+  padding-left: 1.5rem;
+}
+
+.modal--wide .data-table th:last-child,
+.modal--wide .data-table td:last-child {
+  padding-right: 1.5rem;
+}
+
+/* Employee page — top summary cards (Watchlist / Open / Closed). A 3-up row of
+   clickable stat cards, each drilling into its project list. */
+.employee-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+/* Professional KPI tiles: a left-aligned row of fixed-width stat cards with a
+   muted label + icon badge on top and the figure pinned to the bottom (so the
+   three numbers line up regardless of label length). They don't stretch to
+   fill the row on large screens; below 768px they go full width and stack. */
+.employee-stat-card {
+  flex: 0 1 240px;
+  min-height: 124px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--button-shadow);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+@media (max-width: 768px) {
+  .employee-stat-card {
+    flex: 1 1 100%;
+  }
+}
+
+/* Slight gray hover, matching the project table's clickable rows. */
+.employee-stat-card:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+}
+
+.employee-stat-card:disabled {
+  cursor: default;
+}
+
+.employee-stat-card-value {
+  color: var(--primary-text);
+  font-size: 2.25rem;
+  line-height: 1;
+}
+
+.employee-stat-card--warn .employee-stat-card-value {
+  color: #ef4444;
+}
+
 /* Flex-based centering container used by portalled modals.
    Keeps centering out of the transform property so framer-motion
    can freely animate scale/y without clobbering translate(-50%,-50%). */
@@ -3930,6 +4010,150 @@ body{
 .waiting-room-refresh-btn:hover {
   border-color: var(--primary-color);
   color: var(--primary-color);
+}
+
+
+/* ─── Supervisor select (project-manager onboarding) ─────────────────── */
+
+.supervisor-select {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background-color);
+  padding: 2rem;
+}
+
+.supervisor-select-card {
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 1.25rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+  padding: 2.5rem;
+  max-width: 44rem;
+  width: 100%;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.supervisor-select-preview-banner {
+  align-self: stretch;
+  background: var(--primary-color);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.5rem;
+  text-align: center;
+}
+
+.supervisor-select-title {
+  font-size: var(--title1-size);
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-text);
+  margin: 0;
+}
+
+.supervisor-select-subtitle {
+  font-size: 0.9375rem;
+  color: var(--secondary-text);
+  line-height: 1.5;
+  margin: 0 0 0.5rem;
+  max-width: 30rem;
+}
+
+.supervisor-select-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 0;
+  font-size: 0.9375rem;
+  color: var(--secondary-text);
+  line-height: 1.5;
+}
+
+.supervisor-select-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.supervisor-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.25rem 1rem;
+  background: var(--background-color);
+  border: 1.5px solid var(--border-color);
+  border-radius: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.supervisor-card:hover {
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.supervisor-card--recommended {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.supervisor-card-badge {
+  position: absolute;
+  top: -0.6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--primary-color);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.supervisor-card-name {
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--primary-text);
+}
+
+.supervisor-card-id {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+}
+
+.supervisor-select-notlisted {
+  margin-top: 1.25rem;
+  background: none;
+  border: none;
+  color: var(--primary-color);
+  font-size: 0.875rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.supervisor-select-notlisted-note {
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  line-height: 1.5;
+  max-width: 30rem;
+  margin: 0.5rem 0 0;
 }
 
 

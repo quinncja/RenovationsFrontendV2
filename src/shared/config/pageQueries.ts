@@ -26,14 +26,6 @@ export const PAGE_QUERIES = {
     "currentPeriodProjects",
   ],
 
-  // Dashboard — PM view
-  employeeDashboard: [
-    "employeePerformanceBreakdown",
-    "watchlist",
-    "projectsMissingContracts",
-    "projectCount",
-  ],
-
   // Dashboard "View" breakdown pages — each pulls its corresponding
   // monthly chart query plus the line-item drill-down for the table.
   dashboardBreakdownRevenue: ["monthlyRevenueComparison", "openMonthFinances", "revenueLineItems"],
@@ -61,16 +53,11 @@ export const PAGE_QUERIES = {
     employeePerformance: ["employeePerformanceBreakdown"],
   },
 
-  // Business Summary
+  // Business Summary — Period & Year Summary, Margin (MoM), Employee Performance.
   businessSummary: [
-    "annualDirectExpenses",
-    "annualRevenueTrend",
     "marginPerformance",
     "openMonthFinances",
-    "phaseCompletion",
     "employeePerformance",
-    "overHeadExpenses",
-    "currentPeriodProjects",
   ],
 
   // Job Costing

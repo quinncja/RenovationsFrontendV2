@@ -118,6 +118,16 @@ export function changeUserRole(userId: string, role: string) {
   return apiRequest("user-role", "POST", { userId, role })
 }
 
+/**
+ * A manager self-selects which supervisor (SAGE employee) they are. The backend
+ * validates the id against the live supervisor list and ties it to the user's
+ * account as an `employeeId` custom claim. The caller must then force-refresh
+ * the ID token (`getIdToken(true)`) to pick up the new claim.
+ */
+export function selectSupervisor(employeeId: number) {
+  return apiRequest("user/select-supervisor", "POST", { employeeId })
+}
+
 export function getUserActivity(userId: string, timezone?: string) {
   const params = timezone ? `?timezone=${encodeURIComponent(timezone)}` : ""
   return apiGet(`user-activity/${userId}${params}`)

@@ -1,11 +1,8 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import Page from "../../shared/components/Page"
-import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
+import { PageDataProvider } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
-import { Widget } from "../../shared/components/Widget/Widget"
-import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
-import { StatWidget } from "../../shared/components/StatWidget/StatWidget"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { useAuth } from "../../core/auth/AuthProvider"
 import type { AppRole } from "../../core/auth/roles"
@@ -15,6 +12,7 @@ import { SectionEditor } from "./components/SectionEditor"
 import { EditModeToggle } from "./components/EditModeToggle"
 import { EditModeToolbar } from "./components/EditModeToolbar"
 import { WelcomeWalkthrough, GearHintPopover } from "./components/WelcomeWalkthrough"
+import { EmployeeDetail } from "./EmployeeDetailPage"
 
 export default function Dashboard() {
   const { claims } = useAuth()
@@ -22,20 +20,28 @@ export default function Dashboard() {
   const isAdmin = role === "executive" || role === "admin"
   const [year, setYear] = useLocalStorage("dashboardYear", new Date().getFullYear())
 
-  const queries = useMemo(
-    () => (isAdmin ? PAGE_QUERIES.adminDashboard : PAGE_QUERIES.employeeDashboard),
-    [isAdmin]
-  )
+  // A manager's home is the exact per-employee view admins see at
+  // /employees/:id, scoped to their own supervisor id. The backend auto-scopes
+  // managers from the verified token (client detailId is ignored for them), so
+  // this always shows their own numbers.
+  if (!isAdmin) {
+    const employeeId = Number(claims["employeeId"])
+    return (
+      <PageDataProvider
+        module="dashboard"
+        queries={PAGE_QUERIES.employeeDetail}
+        params={{ detailId: employeeId, year }}
+      >
+        <EmployeeDetail employeeId={employeeId} year={year} onYearChange={setYear} />
+      </PageDataProvider>
+    )
+  }
 
   return (
-    <PageDataProvider module="dashboard" queries={queries} params={{ year }}>
-      {isAdmin ? (
-        <DashboardLayoutProvider>
-          <AdminDashboard year={year} onYearChange={setYear} />
-        </DashboardLayoutProvider>
-      ) : (
-        <PMDashboard year={year} onYearChange={setYear} />
-      )}
+    <PageDataProvider module="dashboard" queries={PAGE_QUERIES.adminDashboard} params={{ year }}>
+      <DashboardLayoutProvider>
+        <AdminDashboard year={year} onYearChange={setYear} />
+      </DashboardLayoutProvider>
     </PageDataProvider>
   )
 }
@@ -95,73 +101,6 @@ function AdminDashboard({ year, onYearChange }: { year: number; onYearChange: (y
           {gearHint && <GearHintPopover onDismiss={() => setGearHint(false)} />}
         </>
       )}
-    </Page>
-  )
-}
-
-// ─── PM Dashboard ────────────────────────────────────────────────────
-
-function PMDashboard({ year, onYearChange }: { year: number; onYearChange: (y: number) => void }) {
-  const { data, isLoading } = useWidgetData<{
-    employeePerformanceBreakdown: Record<string, unknown> | null
-    watchlist: unknown[] | null
-    projectsMissingContracts: unknown[] | null
-    projectCount: Record<string, number> | null
-  }>(["employeePerformanceBreakdown", "watchlist", "projectsMissingContracts", "projectCount"])
-
-  const counts = data?.projectCount as Record<string, number> | null
-
-  return (
-    <Page title="Dashboard" actions={<YearSelector value={year} onChange={onYearChange} />}>
-      <MotionList className="dashboard-grid">
-        {/* Project Counts */}
-        <MotionItem>
-          <Widget title="Project Counts" loading={isLoading} noData={!counts}>
-            {counts && (
-              <div className="stat-grid">
-                {Object.entries(counts).map(([status, count]) => (
-                  <StatWidget key={status} title={status} value={count} format="number" />
-                ))}
-              </div>
-            )}
-          </Widget>
-        </MotionItem>
-
-        {/* Watchlist */}
-        <MotionItem>
-          <Widget title="Watchlist" loading={isLoading} noData={!data?.watchlist || (data.watchlist as unknown[]).length === 0}>
-            {Array.isArray(data?.watchlist) && (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Project</th>
-                    <th>Reason</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.watchlist as { name: string; reason: string }[]).map((item, i) => (
-                    <tr key={i}>
-                      <td>{item.name}</td>
-                      <td>{item.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Widget>
-        </MotionItem>
-
-        {/* My Performance */}
-        <MotionItem>
-          <Widget title="My Performance" loading={isLoading} noData={!data?.employeePerformanceBreakdown}>
-            {data?.employeePerformanceBreakdown && (
-              <pre style={{ fontSize: "0.75rem", color: "var(--secondary-text)" }}>
-                {JSON.stringify(data.employeePerformanceBreakdown, null, 2)}
-              </pre>
-            )}
-          </Widget>
-        </MotionItem>
-      </MotionList>
     </Page>
   )
 }
