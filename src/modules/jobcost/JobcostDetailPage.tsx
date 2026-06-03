@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
-import { useParams } from "react-router-dom"
-import { ChevronDown, Download } from "lucide-react"
+import { useParams, useNavigate } from "react-router-dom"
+import { ArrowLeft, ChevronDown, Download } from "lucide-react"
 import { downloadXlsx } from "../../shared/utils/exportXlsx"
 import { buildJobCostXlsx } from "./exportJobCostXlsx"
 import { CostBreakdownTable } from "./components/CostBreakdownTable"
@@ -70,6 +70,7 @@ export default function JobcostDetailPage() {
 }
 
 function JobcostDetail({ recnum }: { recnum: string }) {
+  const navigate = useNavigate()
   const marginColorsOn = useMarginColorsEnabled()
   const { data, isLoading } = useWidgetData<{
     getPhases: Project[] | null
@@ -197,10 +198,15 @@ function JobcostDetail({ recnum }: { recnum: string }) {
       title={project?.name ?? `Job #${recnum}`}
       subtitle={subtitle}
       actions={
-        <button className="jc-export-btn" onClick={handleExport} disabled={isLoading || !project}>
-          <Download size={14} />
-          Export Report
-        </button>
+        <>
+          <button className="jc-export-btn" onClick={() => navigate("/jobcost")} title="Back to Job Costing">
+            <ArrowLeft size={14} /> Job Costing
+          </button>
+          <button className="jc-export-btn" onClick={handleExport} disabled={isLoading || !project}>
+            <Download size={14} />
+            Export Report
+          </button>
+        </>
       }
     >
       <MotionList className="widget-grid widget-grid-2">

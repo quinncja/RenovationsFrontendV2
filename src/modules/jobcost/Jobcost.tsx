@@ -329,8 +329,8 @@ export default function Jobcost() {
                     <SortTh col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="supervisor" label="PM" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <th className="spend-rank-table-name jc-view-th" aria-label="Actions" />
                   </tr>
@@ -364,8 +364,8 @@ export default function Jobcost() {
                           </td>
                           <td className="spend-rank-table-name body-text text-secondary">{job.supervisor || "—"}</td>
                           <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.contract)}</td>
-                          <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.totalCost)}</td>
                           <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.budget)}</td>
+                          <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.totalCost)}</td>
                           <td
                             className="spend-rank-table-value body-text emphasized"
                             style={{

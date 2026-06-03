@@ -33,6 +33,10 @@ interface BreakdownProject {
   status: number
   totalContract?: number
   totalCost?: number
+  // Raw phase rows expose the budget as `budget`; consolidated rows as
+  // `totalBudget` (see project-utils.js). Accept either.
+  totalBudget?: number
+  budget?: number
   // Raw phase rows (consolidate:false from backend) carry pmName directly.
   pmName?: string | null
   // Consolidated rows (consolidate:true) bundle phases under here.
@@ -58,6 +62,7 @@ interface ProjectRow {
   status: number
   contract: number
   totalCost: number
+  budget: number
   margin: number | null
   supervisor: string
 }
@@ -77,6 +82,7 @@ function normalizeProject(p: BreakdownProject): ProjectRow {
     status: p.status,
     contract,
     totalCost,
+    budget: p.totalBudget ?? p.budget ?? 0,
     margin: contract > 0 ? ((contract - totalCost) / contract) * 100 : null,
     supervisor:
       p.pmName?.trim() ??
@@ -100,7 +106,7 @@ function marginColor(margin: number): string {
 // getWatchList uses 17%; this page surfaces the stricter 15% the team asked for.
 const WATCHLIST_MARGIN_THRESHOLD = 15
 
-type ProjectSortKey = "name" | "status" | "supervisor" | "contract" | "totalCost" | "margin"
+type ProjectSortKey = "name" | "status" | "supervisor" | "contract" | "budget" | "totalCost" | "margin"
 
 // Shared projects table — used by the page's Projects section and by the
 // drill-down modals so columns/behavior never drift between them. Sortable via
@@ -123,6 +129,7 @@ function ProjectsTable({
           <SortableHeader label="Status" columnKey="status" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
           <SortableHeader label="PM" columnKey="supervisor" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
           <SortableHeader label="Contract" columnKey="contract" align="right" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+          <SortableHeader label="Budget" columnKey="budget" align="right" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
           <SortableHeader label="Cost" columnKey="totalCost" align="right" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
           <SortableHeader label="Margin" columnKey="margin" align="right" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
         </tr>
@@ -141,6 +148,7 @@ function ProjectsTable({
             </td>
             <td>{job.supervisor || "—"}</td>
             <td style={{ textAlign: "right" }}>{formatMoneyFull(job.contract)}</td>
+            <td style={{ textAlign: "right" }}>{formatMoneyFull(job.budget)}</td>
             <td style={{ textAlign: "right" }}>{formatMoneyFull(job.totalCost)}</td>
             <td
               style={{
