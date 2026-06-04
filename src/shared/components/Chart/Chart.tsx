@@ -7,6 +7,7 @@ import { useTooltip } from "@nivo/tooltip"
 import type { ChartConfig, LineSeries } from "./chart.types"
 import { formatMoney, formatMoneyFull } from "../../utils/format"
 import { useDarkMode } from "../../hooks/useDarkMode"
+import useIsMobile from "../../hooks/useIsMobile"
 
 // ─── Zoom-safe sizing ─────────────────────────────────────────────────────────
 // nivo's Responsive* components measure their container with
@@ -680,7 +681,8 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
             ? (serie: { color?: string }) => serie.color ?? CHART_COLORS[0]
             : CHART_COLORS
       }
-      margin={{ top: marginTop, right: isMobile ? 12 : 24, bottom: 48, left: isMobile ? 48 : 68 }}
+      // Mobile right inset is wide enough that the centered last x-label isn't clipped.
+      margin={{ top: marginTop, right: isMobile ? 22 : 24, bottom: 48, left: isMobile ? 48 : 68 }}
       xScale={{ type: "point" }}
       yScale={{ type: "linear", min: yMin, max: "auto", stacked: false }}
       curve={curve}
@@ -840,8 +842,13 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
     )
   }
 
+  // Mobile: skip the pie entirely — the ranked list alone reads better in a
+  // full-width single-column widget.
+  const isMobile = useIsMobile()
+
   return (
     <div className="pie-with-list">
+      {!isMobile && (
       <div
         className={`pie-with-list-chart pie-with-list-chart--${chartSize}`}
         onClick={onItemClick ? (e) => e.stopPropagation() : undefined}
@@ -878,6 +885,7 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
           }}
         />
       </div>
+      )}
 
       <ol className="spend-list">
         {preview.map((item, i) => {

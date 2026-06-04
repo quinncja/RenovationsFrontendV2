@@ -101,8 +101,12 @@ export function CostBreakdownTable({
               onKeyDown={(e) => e.key === "Enter" && toggleGroup(group.key)}
             >
               <td className="spend-rank-table-name body-text emphasized">
-                <span className="jc-group-chevron">{expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}</span>
-                {group.key}
+                {/* Flex keeps the label beside the chevron even when a longer
+                    name (e.g. Subcontractor) wraps on narrow screens. */}
+                <span className="jc-group-label">
+                  <span className="jc-group-chevron">{expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}</span>
+                  {group.key}
+                </span>
               </td>
               <td className="spend-rank-table-value body-text">{formatMoneyFull(group.budget)}</td>
               <td className="spend-rank-table-value body-text">{formatMoneyFull(group.actual)}</td>

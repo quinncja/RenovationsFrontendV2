@@ -10,6 +10,9 @@ import { fetchPageData } from "../../shared/api/pageApi"
 import { formatMoneyFull, formatDate } from "../../shared/utils/format"
 import { Search } from "lucide-react"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
+import useIsMobile from "../../shared/hooks/useIsMobile"
+import { MobileFilterSheet, activeFilterCount, type FilterGroup } from "../../shared/components/MobileFilterSheet/MobileFilterSheet"
+import { MobileFilterButton } from "../../shared/components/MobileFilterSheet/MobileFilterButton"
 
 // Shape returned by the `allInvoices` query (AR + AP unioned).
 interface Invoice {
@@ -88,7 +91,37 @@ function FilterPills<T extends string | number>({
   )
 }
 
+// Sheet groups mirror the desktop pills (single-select per group).
+const FILTER_GROUPS: FilterGroup[] = [
+  {
+    key: "type",
+    label: "Type",
+    options: [
+      { value: "all", label: "All" },
+      { value: "AR", label: "AR – Receivable", colorClass: "inv-filter-ar" },
+      { value: "AP", label: "AP – Payable", colorClass: "inv-filter-ap" },
+    ],
+  },
+  {
+    key: "status",
+    label: "Status",
+    options: [
+      { value: "all", label: "All" },
+      { value: "1", label: "Open", colorClass: "inv-filter-open" },
+      { value: "2", label: "Review", colorClass: "inv-filter-review" },
+      { value: "3", label: "Dispute", colorClass: "inv-filter-dispute" },
+      { value: "4", label: "Paid", colorClass: "inv-filter-paid" },
+      { value: "5", label: "Void", colorClass: "inv-filter-void" },
+    ],
+  },
+]
+const FILTER_DEFAULTS = { type: "all", status: "all" }
+
 export default function Invoices() {
+  // Mobile: the filter pills overflow the toolbar — a Filters button opens a
+  // bottom sheet instead (same pattern as the 93E directory pages).
+  const isMobile = useIsMobile()
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [year, setYear] = useLocalStorage("invoicesYear", new Date().getFullYear())
   const [search, setSearch] = useState("")
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all")
@@ -152,17 +185,27 @@ export default function Invoices() {
         <MotionItem>
       <div className="invoices-toolbar card">
         <div className="invoices-filter-row">
-          <FilterPills label="Type" options={TYPE_FILTERS} value={typeFilter} onChange={setTypeFilter} />
-          <FilterPills label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
+          {!isMobile && (
+            <>
+              <FilterPills label="Type" options={TYPE_FILTERS} value={typeFilter} onChange={setTypeFilter} />
+              <FilterPills label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
+            </>
+          )}
           <div className="invoices-search">
             <Search size={14} />
             <input
               type="text"
-              placeholder="Search invoice #, entity, or description..."
+              placeholder={isMobile ? "Search invoices..." : "Search invoice #, entity, or description..."}
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
+          {isMobile && (
+            <MobileFilterButton
+              count={activeFilterCount({ type: typeFilter, status: String(statusFilter) }, FILTER_DEFAULTS)}
+              onClick={() => setFilterSheetOpen(true)}
+            />
+          )}
         </div>
         <div className="invoices-stats">
           <div className="invoices-stat">
@@ -182,7 +225,7 @@ export default function Invoices() {
         </MotionItem>
 
         <MotionItem>
-      <Widget loading={loading} noData={!loading && invoices.length === 0}>
+      <Widget loading={loading} noData={!loading && invoices.length === 0} className="invoices-table-widget">
         <table className="data-table">
           <thead>
             <tr>
@@ -217,6 +260,20 @@ export default function Invoices() {
       </Widget>
         </MotionItem>
       </MotionList>
+
+      {isMobile && (
+        <MobileFilterSheet
+          open={filterSheetOpen}
+          onClose={() => setFilterSheetOpen(false)}
+          groups={FILTER_GROUPS}
+          values={{ type: typeFilter, status: String(statusFilter) }}
+          defaults={FILTER_DEFAULTS}
+          onChange={(v) => {
+            setTypeFilter(v.type as TypeFilter)
+            setStatusFilter(v.status === "all" ? "all" : Number(v.status))
+          }}
+        />
+      )}
 
       <InvoiceDetailModal
         invoiceId={selected ? String(selected.id) : null}

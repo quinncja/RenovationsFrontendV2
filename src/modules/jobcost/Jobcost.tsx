@@ -7,6 +7,7 @@ import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { formatMoneyFull, marginTextColor } from "../../shared/utils/format"
+import useIsMobile from "../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { CostBreakdownTable } from "./components/CostBreakdownTable"
@@ -194,6 +195,9 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
 export default function Jobcost() {
   const navigate = useNavigate()
   const marginColorsOn = useMarginColorsEnabled()
+  // Mobile: the table collapses to a simple tap-through list — name + status
+  // on the left, margin + chevron on the right, tap → full project report.
+  const isMobile = useIsMobile()
   const [year, setYear] = useLocalStorage<number | null>("jobcostYear", new Date().getFullYear())
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("name")
@@ -320,6 +324,43 @@ export default function Jobcost() {
 
             {filtered.length === 0 && search ? (
               <div className="co-no-results body-text text-secondary">No jobs match "{search}"</div>
+            ) : isMobile ? (
+              <ul className="jc-mobile-list">
+                {filtered.map((job) => (
+                  <li key={job.recnum}>
+                    <button
+                      type="button"
+                      className="jc-mobile-row"
+                      onClick={() => navigate(`/jobcost/${job.jobNumber}`)}
+                      title="Open full report"
+                    >
+                      <span className="jc-mobile-main">
+                        <span className="body-text emphasized jc-mobile-name">{job.name}</span>
+                        <span className="jc-mobile-sub">
+                          <span className={`status-badge status-${job.status}`}>
+                            {STATUS_LABELS[job.status] ?? job.status}
+                          </span>
+                          {job.supervisor && <span className="jc-mobile-pm">{job.supervisor}</span>}
+                        </span>
+                      </span>
+                      <span className="jc-mobile-right">
+                        <span
+                          className="jc-mobile-margin"
+                          style={{
+                            color:
+                              !marginColorsOn || job.margin == null
+                                ? undefined
+                                : marginTextColor(job.margin),
+                          }}
+                        >
+                          {job.margin == null ? "—" : `${job.margin.toFixed(1)}%`}
+                        </span>
+                        <ChevronRight size={16} className="jc-mobile-chevron" />
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             ) : (
               <table className="spend-rank-table">
                 <thead>

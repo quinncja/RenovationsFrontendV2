@@ -3,6 +3,7 @@ import { Widget } from "../../../shared/components/Widget/Widget"
 import { Chart } from "../../../shared/components/Chart/Chart"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import { formatPercent, shortMonth } from "../../../shared/utils/format"
+import useIsMobile from "../../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import type { LineMarker } from "../../../shared/components/Chart/chart.types"
 
@@ -115,6 +116,13 @@ export function MarginWidget() {
     ]
   }, [openMonth, openYear, pageYear])
 
+  // Mobile: twelve month labels crowd the x axis — show every other one.
+  const isMobile = useIsMobile()
+  const axisBottomTickValues = useMemo(
+    () => (isMobile && chart ? chart.bars.filter((_, i) => i % 2 === 0).map((b) => b.label) : undefined),
+    [isMobile, chart]
+  )
+
   return (
     <Widget title="Monthly Margin Performance" loading={isLoading} noData={!chart}>
       {chart && (
@@ -129,6 +137,7 @@ export function MarginWidget() {
             minValue: chart.minValue,
             maxValue: chart.maxValue,
             axisLeftTickValues: chart.ticks,
+            axisBottomTickValues,
             emphasizeZero: true,
             markers,
           }}

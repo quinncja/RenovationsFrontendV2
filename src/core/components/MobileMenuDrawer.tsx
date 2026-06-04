@@ -15,7 +15,9 @@ interface MobileMenuDrawerProps {
 export default function MobileMenuDrawer({ open, onClose }: MobileMenuDrawerProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const navItems = useNavItems()
+  // The Charts pages (org chart, cash flow, revenue map) are desktop-oriented
+  // visualizations — drop the whole group from the mobile menu.
+  const navItems = useNavItems().filter((item) => !(isNavGroup(item) && item.label === "Charts"))
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [theme, setTheme] = useLocalStorage<"light" | "dark">("theme", "light")
 

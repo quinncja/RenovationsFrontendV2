@@ -4,7 +4,8 @@ import { ChevronRight } from "lucide-react"
 import { Widget } from "../../../shared/components/Widget/Widget"
 import { EmployeeAvatar } from "../../../shared/components/EmployeeAvatar/EmployeeAvatar"
 import { useWidgetData } from "../../../shared/context/PageContext"
-import { formatMoneyFull, marginTextColor } from "../../../shared/utils/format"
+import { formatMoney, formatMoneyFull, marginTextColor } from "../../../shared/utils/format"
+import useIsMobile from "../../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 
 interface EmployeeRow {
@@ -25,6 +26,10 @@ export function EmployeePerformanceWidget() {
   const employees = data?.employeePerformance
   const navigate = useNavigate()
   const marginColorsOn = useMarginColorsEnabled()
+  // Mobile: full dollar amounts push the row past the widget edge — compact
+  // them ($1.1M / $805K) so the whole row fits.
+  const isMobile = useIsMobile()
+  const money = isMobile ? formatMoney : formatMoneyFull
 
   // Always rank by work completed descending; show only the top N. Sort
   // headers removed alongside this — the widget's purpose now is "who got
@@ -75,7 +80,7 @@ export function EmployeePerformanceWidget() {
                       </span>
                     </div>
                   </td>
-                  <td className="emp-perf-money" style={{ textAlign: "right" }}>{formatMoneyFull(emp.totalIncome)}</td>
+                  <td className="emp-perf-money" style={{ textAlign: "right" }}>{money(emp.totalIncome)}</td>
                   <td
                     className="emp-perf-margin"
                     style={{ textAlign: "right", color: marginColorsOn ? marginTextColor(emp.margin) : undefined }}

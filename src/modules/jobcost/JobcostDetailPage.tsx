@@ -12,6 +12,7 @@ import { Chart } from "../../shared/components/Chart/Chart"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { formatMoneyFull, formatDate, marginTextColor } from "../../shared/utils/format"
+import useIsMobile from "../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import { JOB_STATUS_LABELS } from "../directory/directoryShared"
 import { ChangeOrderModal } from "../change-orders/components/ChangeOrderModal"
@@ -72,6 +73,10 @@ export default function JobcostDetailPage() {
 function JobcostDetail({ recnum }: { recnum: string }) {
   const navigate = useNavigate()
   const marginColorsOn = useMarginColorsEnabled()
+  // Mobile: a slim header — just the job name with status + PM beneath
+  // (mirroring the Job Costing list rows). The job number, back button and
+  // export are desktop-only; the bottom nav covers navigation on mobile.
+  const isMobile = useIsMobile()
   const { data, isLoading } = useWidgetData<{
     getPhases: Project[] | null
     getBudgetByRecnum: BudgetBreakdown | null
@@ -124,12 +129,16 @@ function JobcostDetail({ recnum }: { recnum: string }) {
     x: `${MONTH_ABBR[m.month - 1] ?? m.month} '${String(m.year).slice(2)}`,
     y: m.spending,
   }))
-  // Thin x-axis labels when there are too many months.
-  const MAX_X_LABELS = 12
-  const monthlyTickValues = monthlyLine.length > MAX_X_LABELS
-    ? monthlyLine
-        .filter((_, i) => i % Math.ceil(monthlyLine.length / MAX_X_LABELS) === 0)
-        .map(d => d.x)
+  // Thin x-axis labels when there are too many months — phones fit far fewer.
+  // Anchored from the end so the most recent month always keeps its label.
+  const maxXLabels = isMobile ? 5 : 12
+  const monthlyTickValues = monthlyLine.length > maxXLabels
+    ? (() => {
+        const stride = Math.ceil(monthlyLine.length / maxXLabels)
+        return monthlyLine
+          .filter((_, i) => (monthlyLine.length - 1 - i) % stride === 0)
+          .map(d => d.x)
+      })()
     : undefined
 
   // Invoice totals (exclude void)
@@ -150,6 +159,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const coTotalContract = changeOrders.reduce((s, co) => s + (Number(co.total) || 0), 0)
   const coPctOfContract = originalContract > 0 ? (coTotalContract / originalContract) * 100 : 0
 
+  const subtitleText = isMobile ? pm : [`#${recnum}`, pm].filter(Boolean).join(" · ")
   const subtitle = project ? (
     <span className="jcd-subtitle">
       {project.status != null && (
@@ -157,7 +167,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
           {JOB_STATUS_LABELS[project.status] ?? project.status}
         </span>
       )}
-      <span>{[`#${recnum}`, pm].filter(Boolean).join(" · ")}</span>
+      {subtitleText && <span>{subtitleText}</span>}
     </span>
   ) : undefined
 
@@ -198,15 +208,17 @@ function JobcostDetail({ recnum }: { recnum: string }) {
       title={project?.name ?? `Job #${recnum}`}
       subtitle={subtitle}
       actions={
-        <>
-          <button className="jc-export-btn" onClick={() => navigate("/jobcost")} title="Back to Job Costing">
-            <ArrowLeft size={14} /> Job Costing
-          </button>
-          <button className="jc-export-btn" onClick={handleExport} disabled={isLoading || !project}>
-            <Download size={14} />
-            Export Report
-          </button>
-        </>
+        isMobile ? undefined : (
+          <>
+            <button className="jc-export-btn" onClick={() => navigate("/jobcost")} title="Back to Job Costing">
+              <ArrowLeft size={14} /> Job Costing
+            </button>
+            <button className="jc-export-btn" onClick={handleExport} disabled={isLoading || !project}>
+              <Download size={14} />
+              Export Report
+            </button>
+          </>
+        )
       }
     >
       <MotionList className="widget-grid widget-grid-2">

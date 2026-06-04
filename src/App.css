@@ -1765,6 +1765,12 @@ body{
   .billings-pair {
     flex-direction: column;
   }
+  /* Stacked: cards size to their content — the desktop 1:2 row ratio
+     (flex-basis 0) would otherwise squeeze the Overdue card below its
+     content, overflowing its bottom padding. */
+  .billings-pair > .widget {
+    flex: 0 0 auto;
+  }
 }
 
 /* ── Banking widget: Cash in Bank + Line of Credit ──────────────────────
@@ -1848,6 +1854,40 @@ body{
   background: color-mix(in srgb, var(--primary-color) 5%, var(--hover-bg));
   border-color: color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
 }
+/* Mobile: the AR/AP position buttons read fine compact — stop them stretching
+   to fill the (desktop-height) card and tighten their padding. Charts also get
+   ~10px more height by reclaiming card bottom padding. */
+@media (max-width: 768px) {
+  .billings-pair > .billings-overdue-card {
+    min-height: 0;
+  }
+  /* The flex:1 chain (flex-basis 0) on the body/positions lets the content
+     overflow the card's bottom padding once the buttons stop stretching —
+     size both to their content instead. */
+  .billings-overdue-card .widget-body,
+  .billings-overdue-card .billings-positions {
+    flex: 0 0 auto;
+  }
+  .billings-positions .overdue-stat {
+    flex: 0 0 auto;
+  }
+  .overdue-stat {
+    padding: 0.55rem 1rem;
+    gap: 0.15rem;
+  }
+  .widget.card:has(.chart-container) {
+    padding-bottom: calc(1.25rem - 10px);
+  }
+  /* Employee performance: fixed column widths so the whole row always fits —
+     the name truncates (ellipsis) instead of pushing the margin column off
+     the right edge. Headers may wrap ("Work Completed" → two lines). */
+  .emp-perf-table { table-layout: fixed; }
+  .emp-perf-table th:nth-child(1) { width: 44%; }
+  .emp-perf-table th:nth-child(2) { width: 34%; }
+  .emp-perf-table th:nth-child(3) { width: 22%; }
+  .emp-perf-table th { white-space: normal; }
+}
+
 .overdue-stat-clickable:disabled {
   cursor: default;
   opacity: 0.7;
@@ -3172,6 +3212,18 @@ body{
   transition: color 120ms;
 }
 
+/* Chevron + group name as one flex line — a wrapping label (Subcontractor on
+   phones) stays beside the chevron instead of dropping underneath it. */
+.jc-group-label {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  text-align: left;
+}
+.jc-group-label .jc-group-chevron {
+  flex: 0 0 auto;
+}
+
 .jc-group-row:hover .jc-group-chevron { color: var(--primary-text); }
 
 /* Variance colors */
@@ -4364,6 +4416,27 @@ body{
   border-bottom: 1px solid var(--border-color);
 }
 
+/* Mobile: the row is just [search | Filters button] — keep it one line, and
+   let the table pan horizontally instead of clipping. */
+@media (max-width: 768px) {
+  .invoices-filter-row {
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+  }
+  .invoices-filter-row .invoices-search {
+    flex: 1;
+    min-width: 0;
+  }
+  .invoices-table-widget .data-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .invoices-table-widget .data-table td {
+    white-space: nowrap;
+  }
+}
+
 .invoices-filter-group {
   display: flex;
   align-items: center;
@@ -4629,6 +4702,73 @@ body{
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+}
+
+/* Job Costing mobile list — one tap-through row per project: name with its
+   status beneath on the left, margin + chevron on the right. */
+.jc-mobile-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0.4rem;
+}
+.jc-mobile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  /* Slimmer right inset so the chevron hugs the card edge. */
+  padding: 0.75rem 0.7rem 0.75rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border-color);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.jc-mobile-list li:last-child .jc-mobile-row {
+  border-bottom: none;
+}
+.jc-mobile-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0; /* lets the name ellipsize instead of widening the row */
+}
+.jc-mobile-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Second line: status badge + PM name. */
+.jc-mobile-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+}
+.jc-mobile-pm {
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jc-mobile-right {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 0 0 auto;
+}
+.jc-mobile-margin {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.jc-mobile-chevron {
+  color: var(--secondary-text);
 }
 
 .co-widget-toolbar {
@@ -6400,19 +6540,13 @@ svg.placeholder-illustration {
   flex-shrink: 0;
 }
 
-/* Reuse existing filter color classes for dots */
-.mfs-option-dot.jc-filter-current  { background: #15803d; }
-.mfs-option-dot.jc-filter-complete { background: #1f78c5; }
-.mfs-option-dot.jc-filter-closed   { background: #64748b; }
-.mfs-option-dot.jc-filter-high     { background: #16a34a; }
-.mfs-option-dot.jc-filter-target   { background: #d97706; }
-.mfs-option-dot.jc-filter-critical { background: #dc2626; }
-.mfs-option-dot.inv-filter-open    { background: #1f78c5; }
-.mfs-option-dot.inv-filter-ar      { background: #1f78c5; }
-.mfs-option-dot.inv-filter-ap      { background: #c2410c; }
+/* Dot colors match the desktop filter pills / status badges (RD palette). */
+.mfs-option-dot.inv-filter-ar      { background: #22c55e; }
+.mfs-option-dot.inv-filter-ap      { background: #ef4444; }
+.mfs-option-dot.inv-filter-open    { background: #3b82f6; }
 .mfs-option-dot.inv-filter-review  { background: #d97706; }
 .mfs-option-dot.inv-filter-dispute { background: #dc2626; }
-.mfs-option-dot.inv-filter-paid    { background: #16a34a; }
+.mfs-option-dot.inv-filter-paid    { background: #22c55e; }
 .mfs-option-dot.inv-filter-void    { background: #6b7280; }
 
 .mfs-option-label {
