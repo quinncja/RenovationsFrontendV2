@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { X } from "lucide-react"
+import { X, ChevronRight } from "lucide-react"
 import { useParams, useNavigate } from "react-router-dom"
+import useIsMobile from "../../shared/hooks/useIsMobile"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
@@ -121,6 +122,50 @@ function ProjectsTable({
   const marginColorsOn = useMarginColorsEnabled()
   const sort = useTableSort<ProjectSortKey>()
   const sorted = applySort(projects, sort, (row, key) => row[key])
+  // Mobile mirrors the Job Costing list: name + status/PM on the left,
+  // margin + chevron on the right, tap → full project report (same classes,
+  // so the two lists can't drift apart visually).
+  const isMobile = useIsMobile()
+  if (isMobile) {
+    return (
+      <ul className="jc-mobile-list">
+        {sorted.map((job) => (
+          <li key={job.recnum}>
+            <button
+              type="button"
+              className="jc-mobile-row"
+              onClick={() => onRowClick(job.jobNumber)}
+              title="Open full report"
+            >
+              <span className="jc-mobile-main">
+                <span className="body-text emphasized jc-mobile-name">{job.name}</span>
+                <span className="jc-mobile-sub">
+                  <span className={`status-badge status-${job.status}`}>
+                    {STATUS_LABELS[job.status] ?? job.status}
+                  </span>
+                  {job.supervisor && <span className="jc-mobile-pm">{job.supervisor}</span>}
+                </span>
+              </span>
+              <span className="jc-mobile-right">
+                <span
+                  className="jc-mobile-margin"
+                  style={{
+                    color:
+                      !marginColorsOn || job.margin == null
+                        ? undefined
+                        : marginTextColor(job.margin),
+                  }}
+                >
+                  {job.margin == null ? "—" : `${job.margin.toFixed(1)}%`}
+                </span>
+                <ChevronRight size={16} className="jc-mobile-chevron" />
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    )
+  }
   return (
     <table className="data-table">
       <thead>
