@@ -28,12 +28,13 @@ export function UpcomingBillingsWidget() {
     [forecast]
   )
 
-  // Symmetric y-bound = next nice step above the largest single AR-or-AP
-  // magnitude. Equal ± range keeps the zero baseline vertically centered;
-  // a sensible floor avoids a degenerate axis when everything is zero.
-  const bound = useMemo(() => {
-    const magnitude = Math.max(0, ...(forecast?.weeks.flatMap((w) => [w.ar, w.ap]) ?? []))
-    return niceCeil(magnitude) || 10_000
+  // Each direction gets its own nice ceiling so the bars fill the vertical
+  // space — a symmetric ± range wasted half the chart whenever one side
+  // (usually AP) is much smaller. A floor avoids a degenerate axis at zero.
+  const bounds = useMemo(() => {
+    const arMax = Math.max(0, ...(forecast?.weeks.map((w) => w.ar) ?? []))
+    const apMax = Math.max(0, ...(forecast?.weeks.map((w) => w.ap) ?? []))
+    return { max: niceCeil(arMax) || 10_000, min: -(niceCeil(apMax) || 10_000) }
   }, [forecast])
 
   const viewLink = (
@@ -54,10 +55,9 @@ export function UpcomingBillingsWidget() {
             colors: [AR_COLOR, AP_COLOR],
             // Read magnitudes outward from zero — both directions positive.
             yFormat: (v) => formatMoney(Math.abs(v)),
-            minValue: -bound,
-            maxValue: bound,
-            // A small tick count keeps the axis clean; symmetric bounds put 0
-            // in the middle with equal ticks above and below.
+            minValue: bounds.min,
+            maxValue: bounds.max,
+            // A small tick count keeps the axis clean.
             axisLeftTickValues: 5,
             emphasizeZero: true,
             // One combined tooltip per week: AR, AP, and their net difference.

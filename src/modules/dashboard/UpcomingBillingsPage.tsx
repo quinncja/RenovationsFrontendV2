@@ -1,5 +1,6 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
+import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, ChevronDown, ChevronRight, Download } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
@@ -19,9 +20,10 @@ import {
 } from "./utils/agingForecast"
 import { AR_COLOR, AP_COLOR, niceCeil } from "./widgets/billings/billingsShared"
 
-// Drill-down for the home Upcoming Billings widget: the forecast chart plus a
-// Week → AR/AP → invoices folder tree. Clicking a bar (here or on the home page,
-// via ?week=&side=) expands the matching folder.
+// Drill-down for the home Upcoming Billings widget: the forecast chart plus one
+// expandable card per week (accordion — a single card open at a time, so the
+// reader keeps context). Clicking a bar (here or on the home page, via ?week=)
+// expands the matching card, revealing its AR and AP invoices.
 
 interface WeekGroup {
   index: number
@@ -34,7 +36,7 @@ interface WeekGroup {
 
 type Side = "AR" | "AP"
 
-type LeafSortKey = "counterparty" | "invnum" | "job" | "mark" | "amount"
+type LeafSortKey = "counterparty" | "invnum" | "job" | "due" | "mark" | "total" | "amount"
 
 function InvoiceTable({
   list,
@@ -50,13 +52,17 @@ function InvoiceTable({
   const sorted = applySort(list, sort, (inv, key) =>
     key === "amount"
       ? inv.amount
-      : key === "mark"
-        ? inv.mark.getTime()
-        : key === "invnum"
-          ? inv.invnum
-          : key === "job"
-            ? inv.job
-            : inv.counterparty
+      : key === "total"
+        ? inv.total
+        : key === "mark"
+          ? inv.mark.getTime()
+          : key === "due"
+            ? inv.due.getTime()
+            : key === "invnum"
+              ? inv.invnum
+              : key === "job"
+                ? inv.job
+                : inv.counterparty
   )
   return (
     <table className="data-table billings-leaf-table">
@@ -65,8 +71,10 @@ function InvoiceTable({
           <SortableHeader label="Client / Vendor" columnKey="counterparty" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
           <SortableHeader label="Invoice" columnKey="invnum" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
           <SortableHeader label="Job" columnKey="job" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-          <SortableHeader label="Expected" columnKey="mark" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-          <SortableHeader label="Amount" columnKey="amount" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} align="right" />
+          <SortableHeader label="Due" columnKey="due" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+          <SortableHeader label="Overdue on" columnKey="mark" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+          <SortableHeader label="Invoice Amt" columnKey="total" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} align="right" />
+          <SortableHeader label="Balance" columnKey="amount" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} align="right" />
         </tr>
       </thead>
       <tbody>
@@ -80,7 +88,9 @@ function InvoiceTable({
             <td>{inv.counterparty || "—"}</td>
             <td className="text-secondary">{inv.invnum || "—"}</td>
             <td className="text-secondary">{inv.job || "—"}</td>
+            <td className="text-secondary">{formatDate(inv.due)}</td>
             <td className="text-secondary">{formatDate(inv.mark)}</td>
+            <td className="num text-secondary">{inv.total ? formatMoneyFull(inv.total) : "—"}</td>
             <td className="num" style={{ color }}>
               {formatMoneyFull(inv.amount)}
             </td>
@@ -127,41 +137,55 @@ function UpcomingBillingsContent() {
     () => forecast?.weeks.map((w) => ({ label: w.label, AR: w.ar, AP: -w.ap })) ?? [],
     [forecast]
   )
-  const bound = useMemo(() => {
-    const magnitude = Math.max(0, ...(forecast?.weeks.flatMap((w) => [w.ar, w.ap]) ?? []))
-    return niceCeil(magnitude) || 10_000
+  // Each direction gets its own nice ceiling — a symmetric ± range wasted half
+  // the chart whenever one side (usually AP) is much smaller than the other.
+  const bounds = useMemo(() => {
+    const arMax = Math.max(0, ...(forecast?.weeks.map((w) => w.ar) ?? []))
+    const apMax = Math.max(0, ...(forecast?.weeks.map((w) => w.ap) ?? []))
+    return { max: niceCeil(arMax) || 10_000, min: -(niceCeil(apMax) || 10_000) }
   }, [forecast])
 
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // Accordion: a single open card keeps the reader anchored to one week.
+  const [openWeek, setOpenWeek] = useState<number | null>(null)
+  // The AR/AP section headers only become sticky once the expand animation has
+  // finished — while the body still has overflow:hidden, sticky would resolve
+  // against the body instead of the page and the headers render ~2rem low,
+  // snapping up when the overflow is released.
+  const [bodySettled, setBodySettled] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<
     { recnum: string; module: "clients" | "suppliers" } | null
   >(null)
-  const weekRefs = useRef<(HTMLTableRowElement | null)[]>([])
+  const weekRefs = useRef<(HTMLDivElement | null)[]>([])
+  // Week index waiting to be scrolled to the top once its expand animation
+  // finishes (scrolling while the body is still collapsed can't reach the
+  // top — the page doesn't have its full height yet).
+  const pendingScroll = useRef<number | null>(null)
 
-  function toggle(key: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
+  function toggleWeek(weekIndex: number) {
+    setBodySettled(false)
+    setOpenWeek((prev) => (prev === weekIndex ? null : weekIndex))
   }
 
-  function openFolder(weekIndex: number, side?: Side) {
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      next.add(`w${weekIndex}`)
-      if (side) next.add(`w${weekIndex}-${side}`)
-      return next
-    })
-    requestAnimationFrame(() =>
-      weekRefs.current[weekIndex]?.scrollIntoView({ behavior: "smooth", block: "center" })
-    )
+  // "start" pins the card to the top of the page, where its sticky header
+  // lands anyway — "center" left it floating mid-viewport.
+  function scrollWeekToTop(weekIndex: number) {
+    weekRefs.current[weekIndex]?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
-  function handleBarClick(label: string, side?: string) {
+  function openWeekCard(weekIndex: number) {
+    if (openWeek === weekIndex) {
+      // Already open — no expand animation will fire, scroll straight away.
+      scrollWeekToTop(weekIndex)
+      return
+    }
+    setBodySettled(false)
+    setOpenWeek(weekIndex)
+    pendingScroll.current = weekIndex
+  }
+
+  function handleBarClick(label: string) {
     const i = weeks.findIndex((w) => w.label === label)
-    if (i >= 0) openFolder(i, side === "AR" || side === "AP" ? side : undefined)
+    if (i >= 0) openWeekCard(i)
   }
 
   function openInvoice(recnum: string, side: Side) {
@@ -170,7 +194,9 @@ function UpcomingBillingsContent() {
 
   function handleExport() {
     if (invoices.length === 0) return
-    const header = ["Week", "Type", "Client / Vendor", "Invoice", "Job", "Expected", "Amount"]
+    // Balances split into AR In / AP Out columns (the other side left blank)
+    // so each column sums independently in the spreadsheet.
+    const header = ["Week", "Type", "Client / Vendor", "Invoice", "Job", "Due", "Overdue on", "AR In", "AP Out"]
     const rows: (string | number)[][] = [header]
     for (const inv of invoices) {
       rows.push([
@@ -179,8 +205,10 @@ function UpcomingBillingsContent() {
         inv.counterparty,
         inv.invnum,
         inv.job,
+        formatDate(inv.due),
         formatDate(inv.mark),
-        inv.amount,
+        inv.side === "AR" ? inv.amount : "",
+        inv.side === "AP" ? inv.amount : "",
       ])
     }
     const date = new Date().toISOString().slice(0, 10)
@@ -190,7 +218,8 @@ function UpcomingBillingsContent() {
     })
   }
 
-  // Deep link from the home widget: ?week=<index>&side=<AR|AP> opens that folder.
+  // Deep link from the home widget: ?week=<index> opens that card (both AR and
+  // AP are visible in an open card, so ?side= no longer changes anything).
   const didInit = useRef(false)
   useEffect(() => {
     if (didInit.current || weeks.length === 0) return
@@ -199,8 +228,7 @@ function UpcomingBillingsContent() {
     if (wParam == null) return
     const i = Number(wParam)
     if (!Number.isInteger(i) || i < 0 || i >= weeks.length) return
-    const sParam = searchParams.get("side")
-    openFolder(i, sParam === "AR" || sParam === "AP" ? sParam : undefined)
+    openWeekCard(i)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weeks.length])
 
@@ -225,7 +253,7 @@ function UpcomingBillingsContent() {
     >
       <div className="mbp-stack">
         <Widget
-          title="Forecast — next 6 weeks"
+          title="Forecast — weeks until invoices reach 30 days past due"
           loading={isLoading}
           noData={!forecast}
           className="mbp-chart-widget"
@@ -239,8 +267,8 @@ function UpcomingBillingsContent() {
                 indexBy: "label",
                 colors: [AR_COLOR, AP_COLOR],
                 yFormat: (v) => formatMoney(Math.abs(v)),
-                minValue: -bound,
-                maxValue: bound,
+                minValue: bounds.min,
+                maxValue: bounds.max,
                 axisLeftTickValues: 5,
                 emphasizeZero: true,
                 groupTooltip: true,
@@ -252,109 +280,120 @@ function UpcomingBillingsContent() {
           )}
         </Widget>
 
-        <Widget title="Invoices by week" loading={isLoading} noData={!isLoading && invoices.length === 0}>
-          <table className="data-table billings-tree">
-            <thead>
-              <tr>
-                <th>Week</th>
-                <th className="num">AR in</th>
-                <th className="num">AP out</th>
-                <th className="num">Net</th>
-              </tr>
-            </thead>
-            <tbody>
-              {weeks.map((week) => {
-                const count = week.ar.length + week.ap.length
-                const weekOpen = expanded.has(`w${week.index}`)
-                const net = week.arTotal - week.apTotal
-                return (
-                  <Fragment key={week.index}>
-                    <tr
-                      ref={(el) => {
-                        weekRefs.current[week.index] = el
-                      }}
-                      className={`billings-week-row${weekOpen ? " expanded" : ""}${count === 0 ? " is-empty" : ""}`}
-                      onClick={count > 0 ? () => toggle(`w${week.index}`) : undefined}
-                      role={count > 0 ? "button" : undefined}
-                      tabIndex={count > 0 ? 0 : undefined}
-                      onKeyDown={count > 0 ? (e) => e.key === "Enter" && toggle(`w${week.index}`) : undefined}
-                    >
-                      <td className="billings-week-name">
-                        <span className="billings-folder-label">
-                          <span className="jc-group-chevron">
-                            {count > 0 ? weekOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} /> : null}
-                          </span>
-                          {week.label}
-                          <span className="billings-count">
-                            {count} invoice{count === 1 ? "" : "s"}
-                          </span>
+        {/* Week cards render straight onto the page (no parent card) — each
+            week is its own standalone card. */}
+        <section className="billings-week-section">
+          {/* Same text treatment as a widget header, just floating on the page. */}
+          <h2 className="widget-title headline billings-week-section-title">Invoices by week</h2>
+          {!isLoading && invoices.length === 0 && (
+            <p className="body-text text-secondary">No upcoming invoices.</p>
+          )}
+          <div className="billings-week-cards">
+            {weeks.map((week) => {
+              const count = week.ar.length + week.ap.length
+              const isOpen = openWeek === week.index
+              const net = week.arTotal - week.apTotal
+              return (
+                <div
+                  key={week.index}
+                  ref={(el) => {
+                    weekRefs.current[week.index] = el
+                  }}
+                  className={`billings-week-card${isOpen ? " expanded" : ""}${count === 0 ? " is-empty" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="billings-week-card-header"
+                    onClick={() => toggleWeek(week.index)}
+                    disabled={count === 0}
+                    aria-expanded={isOpen}
+                    title={count > 0 ? `${isOpen ? "Collapse" : "Expand"} ${week.label}` : undefined}
+                  >
+                    <span className="billings-week-card-title">
+                      {/* Empty weeks render an invisible chevron so labels stay aligned. */}
+                      <span className={`jc-group-chevron${count === 0 ? " jc-group-chevron-spacer" : ""}`}>
+                        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      </span>
+                      {week.label}
+                      <span className="billings-count">
+                        {count} invoice{count === 1 ? "" : "s"}
+                      </span>
+                    </span>
+                    <span className="billings-week-card-stats">
+                      {/* Zero amounts read as inert gray — color is reserved for real money. */}
+                      <span className="billings-week-stat">
+                        <span className="billings-week-stat-label">AR in</span>
+                        <span className="num" style={{ color: week.arTotal ? AR_COLOR : "var(--secondary-text)" }}>
+                          {formatMoneyFull(week.arTotal)}
                         </span>
-                      </td>
-                      <td className="num" style={{ color: AR_COLOR }}>{formatMoneyFull(week.arTotal)}</td>
-                      <td className="num" style={{ color: AP_COLOR }}>{formatMoneyFull(week.apTotal)}</td>
-                      <td className="num" style={{ color: net >= 0 ? AR_COLOR : AP_COLOR }}>
-                        {formatMoneyFull(net)}
-                      </td>
-                    </tr>
+                      </span>
+                      <span className="billings-week-stat">
+                        <span className="billings-week-stat-label">AP out</span>
+                        <span className="num" style={{ color: week.apTotal ? AP_COLOR : "var(--secondary-text)" }}>
+                          {formatMoneyFull(week.apTotal)}
+                        </span>
+                      </span>
+                      <span className="billings-week-stat">
+                        <span className="billings-week-stat-label">Net</span>
+                        <span className="num" style={{ color: net === 0 ? "var(--secondary-text)" : net > 0 ? AR_COLOR : AP_COLOR }}>
+                          {formatMoneyFull(net)}
+                        </span>
+                      </span>
+                    </span>
+                  </button>
 
-                    {weekOpen &&
-                      (["AR", "AP"] as const).map((side) => {
-                        const list = side === "AR" ? week.ar : week.ap
-                        const sideOpen = expanded.has(`w${week.index}-${side}`)
-                        const sideTotal = side === "AR" ? week.arTotal : week.apTotal
-                        const color = side === "AR" ? AR_COLOR : AP_COLOR
-                        const hasRows = list.length > 0
-                        const toggleSide = () => toggle(`w${week.index}-${side}`)
-                        return (
-                          <Fragment key={side}>
-                            <tr
-                              className={`billings-side-row${sideOpen ? " expanded" : ""}${hasRows ? "" : " is-empty"}`}
-                              onClick={hasRows ? toggleSide : undefined}
-                              role={hasRows ? "button" : undefined}
-                              tabIndex={hasRows ? 0 : undefined}
-                              onKeyDown={hasRows ? (e) => e.key === "Enter" && toggleSide() : undefined}
-                            >
-                              <td className="billings-side-name">
-                                <span className="billings-folder-label">
-                                  <span className="jc-group-chevron">
-                                    {hasRows ? sideOpen ? <ChevronDown size={13} /> : <ChevronRight size={13} /> : null}
-                                  </span>
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        className={`billings-week-card-body${bodySettled ? " is-settled" : ""}`}
+                        // overflow stays hidden only while the height animates —
+                        // a persistent overflow ancestor would break the sticky
+                        // AR/AP section headers inside the body.
+                        initial={{ height: 0, opacity: 0, overflow: "hidden" }}
+                        animate={{ height: "auto", opacity: 1, overflow: "hidden", transitionEnd: { overflow: "visible" } }}
+                        exit={{ height: 0, opacity: 0, overflow: "hidden" }}
+                        transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+                        onAnimationComplete={(def) => {
+                          // Only the expand animation ends at height:auto.
+                          if (typeof def === "object" && def !== null && (def as { height?: unknown }).height === "auto") {
+                            setBodySettled(true)
+                            // Now that the page has its full height, the
+                            // deferred chart-click scroll can reach the top.
+                            if (pendingScroll.current != null) {
+                              const target = pendingScroll.current
+                              pendingScroll.current = null
+                              requestAnimationFrame(() => scrollWeekToTop(target))
+                            }
+                          }
+                        }}
+                      >
+                        <div className="billings-week-card-body-inner">
+                          {(["AR", "AP"] as const).map((side) => {
+                            const list = side === "AR" ? week.ar : week.ap
+                            if (list.length === 0) return null
+                            return (
+                              <div key={side} className="billings-side-section">
+                                <div className="billings-side-section-header">
                                   <span className={`inv-type-badge inv-type-badge--${side.toLowerCase()}`}>{side}</span>
                                   <span className="billings-count">
                                     {list.length} invoice{list.length === 1 ? "" : "s"}
                                   </span>
-                                </span>
-                              </td>
-                              <td className="num">
-                                {side === "AR" ? (
-                                  <span style={{ color }}>{formatMoneyFull(sideTotal)}</span>
-                                ) : null}
-                              </td>
-                              <td className="num">
-                                {side === "AP" ? (
-                                  <span style={{ color }}>{formatMoneyFull(sideTotal)}</span>
-                                ) : null}
-                              </td>
-                              <td />
-                            </tr>
-                            {sideOpen && hasRows && (
-                              <tr className="billings-subrow">
-                                <td colSpan={4}>
-                                  <div className="billings-leaf-wrap">
-                                    <InvoiceTable list={list} side={side} onOpen={openInvoice} />
-                                  </div>
-                                </td>
-                              </tr>
-                            )}
-                          </Fragment>
-                        )
-                      })}
-                  </Fragment>
-                )
-              })}
-            </tbody>
-          </table>
-        </Widget>
+                                </div>
+                                <div className="billings-leaf-wrap">
+                                  <InvoiceTable list={list} side={side} onOpen={openInvoice} />
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )
+            })}
+          </div>
+        </section>
       </div>
 
       <InvoiceDetailModal

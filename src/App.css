@@ -1546,81 +1546,143 @@ body{
   padding-top: 0.75rem;
 }
 
-/* Week → AR/AP → invoices folder tree. Every level lives in the same table so
-   the money columns line up; fixed layout pins those column widths. border-box
-   keeps cell padding inside those widths so nothing overflows the card. */
-.billings-tree,
-.billings-tree th,
-.billings-tree td,
+/* Invoices-by-week cards — one expandable card per week, spaced apart, with an
+   accordion (single card open at a time) so the reader keeps context. border-box
+   keeps leaf-table cell padding inside its fixed column widths. */
 .billings-leaf-table th,
 .billings-leaf-table td {
   box-sizing: border-box;
 }
-.billings-tree {
-  table-layout: fixed;
+.billings-week-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
-.billings-tree th:nth-child(1),
-.billings-tree td:nth-child(1) { width: 46%; }
-.billings-tree th:nth-child(2),
-.billings-tree td:nth-child(2),
-.billings-tree th:nth-child(3),
-.billings-tree td:nth-child(3),
-.billings-tree th:nth-child(4),
-.billings-tree td:nth-child(4) { width: 18%; }
-
-/* Week row — the top-level folder. */
-.billings-week-row > td {
-  background: color-mix(in srgb, var(--primary-text) 3%, transparent);
+.billings-week-section-title {
+  margin: 0;
 }
-.billings-week-row:not(.is-empty) {
-  cursor: pointer;
+.billings-week-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
-.billings-week-row:not(.is-empty):hover > td {
-  background: var(--hover-bg);
+/* Standalone cards on the page background — match the app's card surface.
+   No overflow:hidden here — an overflow ancestor would break the sticky
+   header; the header and body clip their own corners instead. */
+.billings-week-card {
+  /* Fixed header height so the AR/AP section headers can pin exactly
+     beneath the pinned week header. */
+  --billings-week-header-h: 4rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--card-color);
 }
-.billings-week-row.is-empty {
+.billings-week-card.is-empty {
   opacity: 0.5;
 }
-.billings-week-name {
-  font-weight: 600;
+.billings-week-card.expanded {
+  border-color: color-mix(in srgb, var(--primary-text) 22%, transparent);
 }
-/* Flex lives on an inner span, not the <td>, so the cell still fills its full
-   fixed-layout column (a flex <td> only paints behind its content → white gap). */
-.billings-folder-label {
+/* The whole header is the expand/collapse button. */
+.billings-week-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  min-height: var(--billings-week-header-h);
+  box-sizing: border-box;
+  padding: 0.8rem 1rem;
+  background: none;
+  border: none;
+  border-radius: 11px; /* nest just inside the card's 12px corner */
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* While its card is open, the header pins to the top of the page scrollport so
+   the week context (label, counts, AR/AP/Net) stays visible over long lists.
+   top: -2rem cancels .page's 2rem top padding — Chrome insets the sticky
+   constraint rect by the scroll container's padding, so top: 0 would pin 2rem
+   low with rows visible above (same correction as .page-header-sticky). */
+.billings-week-card.expanded .billings-week-card-header {
+  position: sticky;
+  top: -2rem;
+  z-index: 5;
+  background: var(--card-color); /* opaque — rows scroll under it */
+  border-radius: 11px 11px 0 0;
+  border-bottom: 1px solid var(--border-color);
+}
+.billings-week-card-header:disabled {
+  cursor: default;
+}
+.billings-week-card:not(.is-empty) .billings-week-card-header:hover {
+  background: var(--hover-bg);
+}
+/* The sticky (expanded) header must stay opaque on hover — the translucent
+   --hover-bg would let rows scrolling underneath show through. */
+.billings-week-card.expanded .billings-week-card-header:hover {
+  background: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+}
+.billings-week-card-title {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  max-width: 100%;
+  font-weight: 600;
 }
 .billings-count {
   font-weight: 400;
   font-size: 0.8125rem;
   color: var(--secondary-text);
 }
-
-/* AR / AP folder row — second level. Spans the full table width; its total sits
-   in the matching week column (AR under "AR in", AP under "AP out"). */
-.billings-side-row > td {
-  background: color-mix(in srgb, var(--primary-text) 1.5%, transparent);
+/* AR in / AP out / Net summary on the right of the header. */
+.billings-week-card-stats {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.75rem;
 }
-.billings-side-row:not(.is-empty) {
-  cursor: pointer;
+.billings-week-stat {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  min-width: 6.5rem;
 }
-.billings-side-row:not(.is-empty):hover > td {
-  background: var(--hover-bg);
+.billings-week-stat-label {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
 }
-.billings-side-row.is-empty {
-  opacity: 0.45;
+/* The body's overflow is managed inline by framer-motion: hidden while the
+   height animates, visible once settled — so the sticky section headers
+   inside it keep working. */
+.billings-week-card-body {
+  border-radius: 0 0 11px 11px;
 }
-.billings-tree td.billings-side-name {
-  padding-left: 3.25rem; /* indent one step under the week folder */
+.billings-week-card-body-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 0.25rem 1rem 1rem;
 }
-
-/* Leaf invoice table — the third level. It sits in a rounded, bordered panel,
-   inset and indented under its AR/AP folder so it reads as a distinct layer. */
-.billings-subrow > td {
-  padding: 0.35rem 0.75rem 0.8rem 3.25rem;
-  background: color-mix(in srgb, var(--primary-text) 1.5%, transparent);
+/* AR/AP section header — pins just beneath the pinned week header while its
+   section is in view (the -2rem cancels .page's top padding, same as the week
+   header). Padding instead of margin so the opaque background fully covers
+   rows scrolling beneath it. */
+.billings-side-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 5px 0 0.45rem;
+}
+/* Sticky only once the expand animation settles (.is-settled) — while the
+   body still has overflow:hidden, sticky would resolve against the body and
+   the headers would render low, snapping up when the overflow releases. */
+.billings-week-card.expanded .billings-week-card-body.is-settled .billings-side-section-header {
+  position: sticky;
+  top: calc(var(--billings-week-header-h) - 2rem);
+  z-index: 4; /* beneath the week header (5), above the rows */
+  background: var(--card-color);
 }
 .billings-leaf-wrap {
   border: 1px solid var(--border-color);
@@ -1646,16 +1708,24 @@ body{
 .billings-leaf-table td:last-child {
   padding-right: 1rem;
 }
+/* 7 columns: Client/Vendor, Invoice, Job, Due, Overdue on, Invoice Amt,
+   Balance. Widths must cover every column and sum to 100% — under fixed
+   layout, columns without a width get squeezed to nothing and clipped by the
+   wrapper's overflow:hidden. */
 .billings-leaf-table th:nth-child(1),
-.billings-leaf-table td:nth-child(1) { width: 30%; }
+.billings-leaf-table td:nth-child(1) { width: 21%; }
 .billings-leaf-table th:nth-child(2),
-.billings-leaf-table td:nth-child(2) { width: 15%; }
+.billings-leaf-table td:nth-child(2) { width: 11%; }
 .billings-leaf-table th:nth-child(3),
-.billings-leaf-table td:nth-child(3) { width: 28%; }
+.billings-leaf-table td:nth-child(3) { width: 18%; }
 .billings-leaf-table th:nth-child(4),
-.billings-leaf-table td:nth-child(4) { width: 13%; }
+.billings-leaf-table td:nth-child(4) { width: 11%; }
 .billings-leaf-table th:nth-child(5),
-.billings-leaf-table td:nth-child(5) { width: 14%; }
+.billings-leaf-table td:nth-child(5) { width: 11%; }
+.billings-leaf-table th:nth-child(6),
+.billings-leaf-table td:nth-child(6) { width: 14%; }
+.billings-leaf-table th:nth-child(7),
+.billings-leaf-table td:nth-child(7) { width: 14%; }
 
 /* The Overdue card stacks two AR/AP position cards; the Upcoming card holds the
    weekly forecast chart. */

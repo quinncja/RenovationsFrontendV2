@@ -1,8 +1,11 @@
-// Buckets open AR/AP invoices by the calendar week in which they reach their
-// 31-day mark (invoice date + 31 days), so the dashboard can forecast upcoming
-// billings. Powers the UpcomingBillingsWidget: the next 6 weeks drive the
-// diverging chart, while anything already past its 31-day mark feeds the
-// overdue AR/AP position cards.
+// Classifies every open AR/AP invoice on a single timeline anchored to its due
+// date (`duedte`): the "mark" is the day the invoice reaches OVERDUE_DAYS past
+// due. A mark already passed → the overdue AR/AP position cards (the same
+// "over 30" aging cutoff the accounting software uses, so totals reconcile).
+// A mark still ahead → the upcoming-billings forecast, bucketed by the
+// calendar week the mark lands in (FORECAST_WEEKS weekly buckets plus a
+// trailing "Later" catch-all). Every open invoice is in exactly one bucket —
+// overdue or upcoming, never unaccounted for.
 //
 // Source query: `agingSummaryOpen` — per-invoice rows already filtered to open,
 // non-void invoices (status < 4, invbal <> 0). The `type` field is prefixed
@@ -13,6 +16,8 @@ export interface AgingOpenRow {
   type?: string | null
   invdte?: string | number | null
   invbal?: number | string | null
+  /** Full invoice amount (the open balance `invbal` may be partially paid down). */
+  invttl?: number | string | null
   // Extra per-invoice fields (used by the breakdown view, ignored by the chart):
   /** Invoice record number — the id the standard invoice-detail modal loads by. */
   recnum?: string | number | null
@@ -24,27 +29,35 @@ export interface AgingOpenRow {
   duedte?: string | number | null
 }
 
-/** Net terms assumed for every invoice — the 31-day mark from the invoice date. */
+/** Fallback net terms — only used to synthesize a due date when Sage has none. */
 export const NET_DAYS = 31
-/** How many forward weeks the upcoming-billings forecast spans. */
-export const FORECAST_WEEKS = 6
+/** Weekly buckets in the upcoming forecast (a trailing "Later" bucket follows). */
+export const FORECAST_WEEKS = 8
+/**
+ * An invoice counts as overdue only once its due date is more than this many
+ * days in the past — matching the backend's `over30`/`over60`/`over90` aging
+ * buckets (and the accounting software). Invoices 0–30 days past due are NOT
+ * overdue yet; they sit in the upcoming buckets, approaching their mark.
+ */
+export const OVERDUE_DAYS = 30
 
 const MS_PER_DAY = 86_400_000
 
 export interface WeekBucket {
   label: string
-  /** Receivables (money in) reaching their 31-day mark this week. */
+  /** Receivables (money in) reaching OVERDUE_DAYS past due this week. */
   ar: number
-  /** Payables (money out) reaching their 31-day mark this week. */
+  /** Payables (money out) reaching OVERDUE_DAYS past due this week. */
   ap: number
 }
 
 export interface AgingForecast {
-  /** Exactly FORECAST_WEEKS entries, index 0 = current week. */
+  /** FORECAST_WEEKS weekly entries plus a trailing "Later" bucket; index 0 = current week. */
   weeks: WeekBucket[]
+  /** All upcoming (not-yet-overdue) totals, including the "Later" bucket. */
   arTotal: number
   apTotal: number
-  /** Open invoices whose 31-day mark fell before the current week started. */
+  /** Open invoices more than OVERDUE_DAYS past their due date. */
   overdueAR: number
   overdueAP: number
   overdueARCount: number
@@ -88,6 +101,42 @@ function startOfWeek(d: Date): Date {
   return s
 }
 
+// Component-wise date arithmetic keeps results at local midnight across DST.
+function addDays(d: Date, days: number): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days)
+}
+
+/** Bucket label — index FORECAST_WEEKS is the trailing "Later" catch-all. */
+const weekLabel = (i: number) =>
+  i === 0 ? "This Week" : i >= FORECAST_WEEKS ? "Later" : `Week ${i + 1}`
+
+/**
+ * Per-row classification shared by all three builders: side, open balance, the
+ * real due date (invoice date + NET_DAYS only when Sage has no due date), and
+ * the mark — the day the invoice reaches OVERDUE_DAYS past due. Returns null
+ * for rows that can't be classified (no side, zero balance, no usable date).
+ */
+function resolveInvoice(row: AgingOpenRow): {
+  side: "AR" | "AP"
+  amount: number
+  invoiced: Date | null
+  due: Date
+  mark: Date
+} | null {
+  const type = typeof row.type === "string" ? row.type.toUpperCase() : ""
+  const side = type.startsWith("AR") ? "AR" : type.startsWith("AP") ? "AP" : null
+  if (!side) return null
+
+  const amount = Number(row.invbal) || 0
+  if (amount === 0) return null
+
+  const invoiced = parseInvoiceDate(row.invdte)
+  const due = parseInvoiceDate(row.duedte) ?? (invoiced ? addDays(invoiced, NET_DAYS) : null)
+  if (!due) return null
+
+  return { side, amount, invoiced, due, mark: addDays(startOfDay(due), OVERDUE_DAYS) }
+}
+
 export function buildAgingForecast(
   rows: AgingOpenRow[] | null | undefined,
   now: Date
@@ -95,8 +144,11 @@ export function buildAgingForecast(
   if (!Array.isArray(rows)) return null
 
   const weekStart = startOfWeek(now)
-  const weeks: WeekBucket[] = Array.from({ length: FORECAST_WEEKS }, (_, i) => ({
-    label: i === 0 ? "This wk" : `Wk ${i + 1}`,
+  const today = startOfDay(now)
+  // FORECAST_WEEKS weekly buckets plus the trailing "Later" catch-all, so every
+  // upcoming invoice lands in exactly one bucket.
+  const weeks: WeekBucket[] = Array.from({ length: FORECAST_WEEKS + 1 }, (_, i) => ({
+    label: weekLabel(i),
     ar: 0,
     ap: 0,
   }))
@@ -107,36 +159,30 @@ export function buildAgingForecast(
   let overdueAPCount = 0
 
   for (const row of rows) {
-    const type = typeof row.type === "string" ? row.type.toUpperCase() : ""
-    const isAR = type.startsWith("AR")
-    const isAP = type.startsWith("AP")
-    if (!isAR && !isAP) continue
+    const inv = resolveInvoice(row)
+    if (!inv) continue
 
-    const amount = Number(row.invbal) || 0
-    if (amount === 0) continue
-
-    const invoiced = parseInvoiceDate(row.invdte)
-    if (!invoiced) continue
-
-    // The 31-day mark, normalized to local midnight.
-    const mark = new Date(invoiced.getFullYear(), invoiced.getMonth(), invoiced.getDate() + NET_DAYS)
-    const weekIndex = Math.floor((startOfDay(mark).getTime() - weekStart.getTime()) / (7 * MS_PER_DAY))
-
-    if (weekIndex < 0) {
-      // 31-day mark already passed before this week → overdue bucket.
-      if (isAR) {
-        overdueAR += amount
+    if (inv.mark.getTime() < today.getTime()) {
+      // Mark already passed → more than OVERDUE_DAYS past due. Same boundary as
+      // the backend's `duedte < today - 30` over30/over60/over90 buckets.
+      if (inv.side === "AR") {
+        overdueAR += inv.amount
         overdueARCount += 1
       } else {
-        overdueAP += amount
+        overdueAP += inv.amount
         overdueAPCount += 1
       }
       continue
     }
-    if (weekIndex >= FORECAST_WEEKS) continue // beyond the forecast horizon
 
-    if (isAR) weeks[weekIndex].ar += amount
-    else weeks[weekIndex].ap += amount
+    // Upcoming: mark >= today >= weekStart, so the index is never negative;
+    // marks beyond the horizon collapse into the "Later" bucket.
+    const weekIndex = Math.min(
+      Math.floor((inv.mark.getTime() - weekStart.getTime()) / (7 * MS_PER_DAY)),
+      FORECAST_WEEKS
+    )
+    if (inv.side === "AR") weeks[weekIndex].ar += inv.amount
+    else weeks[weekIndex].ap += inv.amount
   }
 
   const arTotal = weeks.reduce((sum, w) => sum + w.ar, 0)
@@ -160,14 +206,17 @@ export function buildAgingForecast(
   }
 }
 
-/** A single open invoice placed in the forecast window — the per-invoice rows
- *  behind the Upcoming Billings chart, for the breakdown view. */
+/** A single upcoming (not-yet-overdue) invoice — the per-invoice rows behind
+ *  the Upcoming Billings chart, for the breakdown view. */
 export interface BillingsInvoice {
   side: "AR" | "AP"
-  /** 0 = this week … FORECAST_WEEKS-1. */
+  /** 0 = this week … FORECAST_WEEKS = the trailing "Later" bucket. */
   weekIndex: number
   weekLabel: string
+  /** Open balance (what the chart and roll-up totals sum). */
   amount: number
+  /** Full invoice amount (before any partial payments). */
+  total: number
   /** Invoice record number (for the standard invoice-detail modal). */
   recnum: string
   invnum: string
@@ -176,17 +225,17 @@ export interface BillingsInvoice {
   job: string
   description: string
   invoiceDate: Date | null
-  /** The 31-day mark — when the invoice is expected to settle. */
+  /** The real due date (invoice date + NET_DAYS only when Sage has none). */
+  due: Date
+  /** The day the invoice reaches OVERDUE_DAYS past due. */
   mark: Date
 }
 
-const weekLabel = (i: number) => (i === 0 ? "This wk" : `Wk ${i + 1}`)
-
 /**
- * Same date math as buildAgingForecast, but returns the individual invoices
- * whose 31-day mark falls within the forecast window (so the breakdown view can
- * show exactly the invoices that make up each bar). Sorted by week, then AR
- * before AP, then largest first.
+ * Same classification as buildAgingForecast, but returns the individual
+ * upcoming invoices (so the breakdown view can show exactly the invoices that
+ * make up each bar, including "Later"). Sorted by week, then AR before AP,
+ * then largest first.
  */
 export function buildBillingsInvoices(
   rows: AgingOpenRow[] | null | undefined,
@@ -195,36 +244,33 @@ export function buildBillingsInvoices(
   if (!Array.isArray(rows)) return []
 
   const weekStart = startOfWeek(now)
+  const today = startOfDay(now)
   const out: BillingsInvoice[] = []
 
   for (const row of rows) {
-    const type = typeof row.type === "string" ? row.type.toUpperCase() : ""
-    const isAR = type.startsWith("AR")
-    const isAP = type.startsWith("AP")
-    if (!isAR && !isAP) continue
+    const inv = resolveInvoice(row)
+    if (!inv) continue
+    if (inv.mark.getTime() < today.getTime()) continue // overdue → OverdueWidget, not here
 
-    const amount = Number(row.invbal) || 0
-    if (amount === 0) continue
-
-    const invoiced = parseInvoiceDate(row.invdte)
-    if (!invoiced) continue
-
-    const mark = new Date(invoiced.getFullYear(), invoiced.getMonth(), invoiced.getDate() + NET_DAYS)
-    const weekIndex = Math.floor((startOfDay(mark).getTime() - weekStart.getTime()) / (7 * MS_PER_DAY))
-    if (weekIndex < 0 || weekIndex >= FORECAST_WEEKS) continue
+    const weekIndex = Math.min(
+      Math.floor((inv.mark.getTime() - weekStart.getTime()) / (7 * MS_PER_DAY)),
+      FORECAST_WEEKS
+    )
 
     out.push({
-      side: isAR ? "AR" : "AP",
+      side: inv.side,
       weekIndex,
       weekLabel: weekLabel(weekIndex),
-      amount,
+      amount: inv.amount,
+      total: Number(row.invttl) || 0,
       recnum: row.recnum != null ? String(row.recnum) : "",
       invnum: row.invnum != null ? String(row.invnum) : "",
       counterparty: row.vndnum ?? "",
       job: row.jobnme ?? "",
       description: row.dscrpt ?? "",
-      invoiceDate: invoiced,
-      mark,
+      invoiceDate: inv.invoiced,
+      due: inv.due,
+      mark: inv.mark,
     })
   }
 
@@ -238,8 +284,8 @@ export function buildBillingsInvoices(
   return out
 }
 
-/** A single open invoice already past its 31-day mark — the overdue AR/AP
- *  positions, for the click-through modal. */
+/** A single open invoice more than OVERDUE_DAYS past its due date — the
+ *  overdue AR/AP positions, for the click-through modal. */
 export interface OverdueInvoice {
   side: "AR" | "AP"
   amount: number
@@ -251,15 +297,15 @@ export interface OverdueInvoice {
   job: string
   description: string
   invoiceDate: Date | null
-  /** The 31-day mark — when the invoice was expected to settle. */
+  /** The real due date (invoice date + NET_DAYS only when Sage has none). */
   due: Date
   daysOverdue: number
 }
 
 /**
- * Open invoices whose 31-day mark fell before the current week started (the
- * same set that feeds the overdue AR/AP totals in buildAgingForecast), as a
- * per-invoice list filtered to one side. Sorted most-overdue first.
+ * Open invoices more than OVERDUE_DAYS past their due date (the same set that
+ * feeds the overdue AR/AP totals in buildAgingForecast), as a per-invoice list
+ * filtered to one side. Sorted most-overdue first.
  */
 export function buildOverdueInvoices(
   rows: AgingOpenRow[] | null | undefined,
@@ -268,36 +314,27 @@ export function buildOverdueInvoices(
 ): OverdueInvoice[] {
   if (!Array.isArray(rows)) return []
 
-  const weekStart = startOfWeek(now)
   const today = startOfDay(now)
   const out: OverdueInvoice[] = []
 
   for (const row of rows) {
-    const type = typeof row.type === "string" ? row.type.toUpperCase() : ""
-    const rowSide = type.startsWith("AR") ? "AR" : type.startsWith("AP") ? "AP" : null
-    if (rowSide !== side) continue
-
-    const amount = Number(row.invbal) || 0
-    if (amount === 0) continue
-
-    const invoiced = parseInvoiceDate(row.invdte)
-    if (!invoiced) continue
-
-    const mark = new Date(invoiced.getFullYear(), invoiced.getMonth(), invoiced.getDate() + NET_DAYS)
-    const markStart = startOfDay(mark)
-    if (markStart.getTime() >= weekStart.getTime()) continue // not yet overdue
+    const inv = resolveInvoice(row)
+    if (!inv || inv.side !== side) continue
+    // Same mark rule as buildAgingForecast, so the modal reconciles with the
+    // card total: mark passed → more than OVERDUE_DAYS past due.
+    if (inv.mark.getTime() >= today.getTime()) continue
 
     out.push({
       side,
-      amount,
+      amount: inv.amount,
       recnum: row.recnum != null ? String(row.recnum) : "",
       invnum: row.invnum != null ? String(row.invnum) : "",
       counterparty: row.vndnum ?? "",
       job: row.jobnme ?? "",
       description: row.dscrpt ?? "",
-      invoiceDate: invoiced,
-      due: mark,
-      daysOverdue: Math.round((today.getTime() - markStart.getTime()) / MS_PER_DAY),
+      invoiceDate: inv.invoiced,
+      due: inv.due,
+      daysOverdue: Math.round((today.getTime() - startOfDay(inv.due).getTime()) / MS_PER_DAY),
     })
   }
 
