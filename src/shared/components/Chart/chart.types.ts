@@ -77,6 +77,9 @@ export type ChartConfig =
       maxValue?: number | "auto"
       /** Explicit left-axis tick values (fewer labels); also used for grid lines */
       axisLeftTickValues?: number | number[]
+      /** Subset of category labels to render on the x axis (e.g. every other
+       *  label on mobile, where the full set would crowd). */
+      axisBottomTickValues?: string[]
       /** Value-axis scale (default "linear"). "symlog" compresses extreme
        *  magnitudes while still showing zero and negatives. */
       scaleType?: "linear" | "symlog"

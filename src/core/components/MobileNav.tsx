@@ -5,7 +5,7 @@ import useNavItems from "../auth/hooks/useNavItems"
 import { isNavGroup, isNavDivider } from "../auth/roles"
 import MobileMenuDrawer from "./MobileMenuDrawer"
 
-const PINNED_PATHS = ["/dashboard", "/jobcosting"]
+const PINNED_PATHS = ["/dashboard", "/jobcost"]
 
 export default function MobileNav() {
   const navigate = useNavigate()
@@ -34,7 +34,7 @@ export default function MobileNav() {
 
   const MenuIcon = menuIcon
   const isOnHome = location.pathname === "/dashboard"
-  const isOnProjects = location.pathname.startsWith("/jobcosting")
+  const isOnProjects = location.pathname.startsWith("/jobcost")
   const isOnOther = !isOnHome && !isOnProjects
 
   return (
@@ -49,7 +49,7 @@ export default function MobileNav() {
         </button>
         <button
           className={`mobile-nav-button${isOnProjects ? " mobile-nav-button-active" : ""}`}
-          onClick={() => navigate("/jobcosting")}
+          onClick={() => navigate("/jobcost")}
         >
           <Building size={22} />
           <span>Projects</span>

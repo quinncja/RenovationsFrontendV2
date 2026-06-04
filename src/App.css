@@ -4619,6 +4619,18 @@ body{
 .co-widget .widget-no-data { margin: 1.25rem; }
 .co-widget .widget-skeleton { border-radius: 12px; min-height: 360px; }
 
+/* Mobile: these list tables are far wider than a phone — let the table pan
+   horizontally inside the card instead of overflowing and getting clipped.
+   display:block makes the <table> its own scroll container; the rows form an
+   anonymous inner table at natural column widths. */
+@media (max-width: 768px) {
+  .co-widget .spend-rank-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 .co-widget-toolbar {
   display: flex;
   align-items: center;
@@ -5643,6 +5655,10 @@ svg.placeholder-illustration {
   /* mandatory → every section's top snaps to the same spot, consistently. */
   scroll-snap-type: y mandatory;
   scroll-behavior: smooth;
+  /* SectionPager anchors the scroll position to the active section itself
+     (see its ResizeObserver) — turn native anchoring off so the two never
+     double-correct. */
+  overflow-anchor: none;
   /* Content fades out under the overlay header. */
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 3rem);
   mask-image: linear-gradient(to bottom, transparent 0, #000 3rem);
@@ -5696,10 +5712,41 @@ svg.placeholder-illustration {
   width: 0;
   height: 0;
 }
+/* Zoom-to-fit wrapper (SectionPager.fitSection): scaled down via CSS zoom when
+   the section's natural height would overflow the viewport, so the whole
+   section always fits on screen — no internal scrolling on small laptops. */
+.section-fit {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Readability under zoom-to-fit: key text counter-zooms by 1/√zoom (the
+   --fit-text-zoom var set by fitSection), landing at √zoom — it shrinks about
+   half as much as the layout. Scoped to the few places it matters: section
+   titles, widget titles, employee names, chart tooltips. */
+.section-fit .section-pager-title,
+.section-fit .widget-title,
+.section-fit .emp-perf-name,
+.section-fit .chart-tooltip,
+.section-fit .chart-line-tooltip {
+  zoom: var(--fit-text-zoom, 1);
+}
 
 .section-pager-title {
   text-align: center;
   margin: 0 0 1.5rem;
+}
+
+/* ─── Mobile section stack ───────────────────────────────────────────── */
+/* On mobile the pager is replaced by a plain stacked flow: section after
+   section in the page's normal scroll, every widget full width. */
+.section-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+.section-stack-grid {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .section-pager-empty {

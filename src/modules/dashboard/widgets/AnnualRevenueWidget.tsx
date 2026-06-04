@@ -2,6 +2,7 @@ import { useMemo } from "react"
 import { Widget } from "../../../shared/components/Widget/Widget"
 import { Chart } from "../../../shared/components/Chart/Chart"
 import { useWidgetData } from "../../../shared/context/PageContext"
+import useIsMobile from "../../../shared/hooks/useIsMobile"
 import { PRE_2018_REVENUE } from "../config/historicalRevenue"
 
 export function AnnualRevenueWidget() {
@@ -35,10 +36,19 @@ export function AnnualRevenueWidget() {
     [currentYear]
   )
 
+  // Mobile: the full run of years crowds the x axis — label every other one,
+  // anchored from the end so the latest year always keeps its label.
+  const isMobile = useIsMobile()
+  const axisBottomTickValues = useMemo(() => {
+    if (!isMobile || !series) return undefined
+    const xs = series[0].data.map((p) => String(p.x))
+    return xs.filter((_, i) => (xs.length - 1 - i) % 2 === 0)
+  }, [isMobile, series])
+
   return (
     <Widget title="Annual Revenue Trend" loading={isLoading} noData={!series}>
       {series && (
-        <Chart config={{ type: "line", series, enableArea: true, pulsePoint }} />
+        <Chart config={{ type: "line", series, enableArea: true, pulsePoint, axisBottomTickValues }} />
       )}
     </Widget>
   )

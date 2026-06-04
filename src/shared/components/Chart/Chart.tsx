@@ -1,12 +1,57 @@
-import { useMemo, useState } from "react"
-import { ResponsiveLine } from "@nivo/line"
-import { ResponsivePie } from "@nivo/pie"
-import { ResponsiveBar } from "@nivo/bar"
-import { ResponsiveRadialBar } from "@nivo/radial-bar"
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react"
+import { Line } from "@nivo/line"
+import { Pie } from "@nivo/pie"
+import { Bar } from "@nivo/bar"
+import { RadialBar } from "@nivo/radial-bar"
 import { useTooltip } from "@nivo/tooltip"
 import type { ChartConfig, LineSeries } from "./chart.types"
 import { formatMoney, formatMoneyFull } from "../../utils/format"
 import { useDarkMode } from "../../hooks/useDarkMode"
+
+// ─── Zoom-safe sizing ─────────────────────────────────────────────────────────
+// nivo's Responsive* components measure their container with
+// getBoundingClientRect, which returns *visual* pixels. Under the dashboard's
+// zoom-to-fit (CSS `zoom` on small screens) that double-shrinks every chart:
+// the SVG renders at the zoomed size and is then zoomed again. ResizeObserver
+// boxes are reported in *layout* pixels — zoom-independent — so we measure
+// ourselves and feed explicit sizes to the non-responsive nivo components.
+// (nivo's cursor math self-corrects under zoom via its getBBox ratio, so
+// tooltips stay accurate.)
+function withLayoutSize<P extends { width: number; height: number }>(Component: ComponentType<P>) {
+  return function LayoutSized(props: Omit<P, "width" | "height">) {
+    const ref = useRef<HTMLDivElement>(null)
+    const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+    useEffect(() => {
+      // Measure the PARENT (like AutoSizer did) — our own div is 0×0 so the
+      // chart never contributes to the container's size. Sizing the chart from
+      // a box it also grows would feed back into itself and inflate forever.
+      const parent = ref.current?.parentElement
+      if (!parent) return
+      const ro = new ResizeObserver(([entry]) => {
+        // contentRect: content box (excl. padding), in layout px.
+        setSize({
+          width: Math.floor(entry.contentRect.width),
+          height: Math.floor(entry.contentRect.height),
+        })
+      })
+      ro.observe(parent)
+      return () => ro.disconnect()
+    }, [])
+    return (
+      <div ref={ref} style={{ width: 0, height: 0, overflow: "visible" }}>
+        {size && size.width > 0 && size.height > 0 ? (
+          <Component {...(props as P)} width={size.width} height={size.height} />
+        ) : null}
+      </div>
+    )
+  }
+}
+const SizedBar = withLayoutSize(Bar)
+const SizedRadialBar = withLayoutSize(RadialBar)
+// Instantiation expression pins the generic to the app's series shape — the
+// wrapper can't infer it from `data` the way ResponsiveLine did.
+const SizedLine = withLayoutSize(Line<LineSeries>)
+const SizedPie = withLayoutSize(Pie)
 
 // ─── Theme ───────────────────────────────────────────────────────────────────
 
@@ -168,7 +213,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth }: {
 // ─── Bar chart ────────────────────────────────────────────────────────────────
 
 function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> }) {
-  const { data, keys, indexBy, color = CHART_COLORS[0], colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, onBarClick } = config
+  const { data, keys, indexBy, color = CHART_COLORS[0], colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, axisBottomTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, onBarClick } = config
 
   const dark = useDarkMode()
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
@@ -413,7 +458,7 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
   }
 
   return (
-    <ResponsiveBar
+    <SizedBar
       data={barData}
       keys={barKeys}
       indexBy={barIndexBy}
@@ -436,6 +481,7 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
       axisBottom={{
         tickSize: 0,
         tickPadding: 12,
+        tickValues: axisBottomTickValues,
       }}
       gridYValues={axisLeftTickValues}
       markers={nivoMarkers}
@@ -486,7 +532,7 @@ function RadialBarChart({ config }: { config: Extract<ChartConfig, { type: "radi
   const trackColor = dark ? "rgba(148,163,184,0.08)" : "rgba(25,55,90,0.06)"
 
   return (
-    <ResponsiveRadialBar
+    <SizedRadialBar
       data={data}
       theme={nivoTheme}
       colors={colors}
@@ -624,7 +670,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
   const yMin = minY >= 0 ? 0 : "auto"
 
   return (
-    <ResponsiveLine
+    <SizedLine
       data={series}
       theme={nivoTheme}
       colors={
@@ -800,7 +846,7 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
         className={`pie-with-list-chart pie-with-list-chart--${chartSize}`}
         onClick={onItemClick ? (e) => e.stopPropagation() : undefined}
       >
-        <ResponsivePie
+        <SizedPie
           data={pieData}
           theme={nivoTheme}
           colors={{ datum: "data.color" }}

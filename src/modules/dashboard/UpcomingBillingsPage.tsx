@@ -10,6 +10,7 @@ import { Chart } from "../../shared/components/Chart/Chart"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { SortableHeader } from "../../shared/components/SortableHeader"
 import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
+import useIsMobile from "../../shared/hooks/useIsMobile"
 import { downloadXlsx } from "../../shared/utils/exportXlsx"
 import { formatMoney, formatMoneyFull, formatDate } from "../../shared/utils/format"
 import {
@@ -145,6 +146,13 @@ function UpcomingBillingsContent() {
     return { max: niceCeil(arMax) || 10_000, min: -(niceCeil(apMax) || 10_000) }
   }, [forecast])
 
+  // Mobile: nine bucket labels crowd the x axis — show every other one.
+  const isMobile = useIsMobile()
+  const axisBottomTickValues = useMemo(
+    () => (isMobile ? bars.filter((_, i) => i % 2 === 0).map((b) => b.label) : undefined),
+    [isMobile, bars]
+  )
+
   // Accordion: a single open card keeps the reader anchored to one week.
   const [openWeek, setOpenWeek] = useState<number | null>(null)
   // The AR/AP section headers only become sticky once the expand animation has
@@ -270,6 +278,7 @@ function UpcomingBillingsContent() {
                 minValue: bounds.min,
                 maxValue: bounds.max,
                 axisLeftTickValues: 5,
+                axisBottomTickValues,
                 emphasizeZero: true,
                 groupTooltip: true,
                 tooltipTotalLabel: "Net",

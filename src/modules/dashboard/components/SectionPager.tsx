@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
+import useIsMobile from "../../../shared/hooks/useIsMobile"
 import { useDashboardLayout } from "../context/DashboardLayoutContext"
 import { SECTION_REGISTRY } from "../config/sectionRegistry"
 import { WIDGET_REGISTRY } from "../config/widgetRegistry"
@@ -56,7 +57,14 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
   const navigate = useNavigate()
   const sections = layout.sections
 
+  // Mobile renders a plain stacked flow instead of the snap pager — the
+  // `.page:has(.section-pager)` overlay rules stop matching, so the dashboard
+  // becomes an ordinary scrolling page. All pager behaviors (snap, fades,
+  // dots, zoom-fit, scroll restore/anchoring) are skipped.
+  const isMobile = useIsMobile()
+
   const scrollRef = useRef<HTMLDivElement>(null)
+  const stackRef = useRef<HTMLDivElement>(null)
   const panelRefs = useRef<(HTMLElement | null)[]>([])
 
   const lastIndex = sections.length - 1
@@ -71,6 +79,25 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
     const clamped = Math.max(0, Math.min(i, panelRefs.current.length - 1))
     panelRefs.current[clamped]?.scrollIntoView({ behavior: scrollBehavior(), block: "start" })
   }
+
+  // ── Scroll anchoring across widget loads ──────────────────────────────
+  // Skeletons are swapped for real widgets of different heights, shifting
+  // every section below them — on a restored (non-first) section that read as
+  // a ~20px jump followed by the mandatory snap re-settling. Native browser
+  // anchoring can't compensate because the node it anchors to is often the
+  // skeleton being removed. So we anchor manually to the active panel: its
+  // offset within the scroll content is scroll-invariant, so any change means
+  // content above it grew or shrank — counter that exactly, pre-paint.
+  const activeIndexRef = useRef(active)
+  const anchorBaseline = useRef<number | null>(null)
+
+  const measureAnchor = useCallback(() => {
+    const root = scrollRef.current
+    const el = panelRefs.current[activeIndexRef.current]
+    if (!root || !el) return null
+    // Offset of the panel within the scrollable content (scroll-position-free).
+    return el.getBoundingClientRect().top - root.getBoundingClientRect().top + root.scrollTop
+  }, [])
 
   // Mark the active section + fade each one in by scroll position. A section is
   // full opacity once its top is within FADE_END of the top (above the sticky
@@ -98,13 +125,19 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
             : FADE_MIN + (1 - FADE_MIN) * ((fadeStart - top) / (fadeStart - fadeEnd))
       el.style.opacity = String(opacity)
     }
+    if (best !== activeIndexRef.current) {
+      // The anchor follows the active section — re-baseline on every switch.
+      activeIndexRef.current = best
+      anchorBaseline.current = measureAnchor()
+    }
     setActiveRef.current(best)
-  }, [])
+  }, [measureAnchor])
 
   // On first mount, jump to the persisted section (instant, before paint), then
   // set the initial fades so there's no flash of all-dim before scrolling.
   const didInit = useRef(false)
   useLayoutEffect(() => {
+    if (isMobile) return
     if (didInit.current) return
     didInit.current = true
     // A navbar Home/logo navigation arrives with `state.resetHome` → start at the
@@ -122,14 +155,134 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
   useEffect(() => {
     const resetHome = (location.state as { resetHome?: boolean } | null)?.resetHome
     if (!resetHome) return
-    scrollRef.current?.scrollTo({ top: 0, behavior: scrollBehavior() })
-    setActiveSectionIndex(0)
+    if (isMobile) {
+      // Plain stacked flow — the page itself is the scroll container.
+      stackRef.current?.closest(".page")?.scrollTo({ top: 0, behavior: scrollBehavior() })
+    } else {
+      scrollRef.current?.scrollTo({ top: 0, behavior: scrollBehavior() })
+      setActiveSectionIndex(0)
+    }
     // Consume the flag so returning to this history entry later won't force the top.
     navigate(location.pathname, { replace: true, state: null })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key])
 
+  // ── Fit-to-viewport ───────────────────────────────────────────────────
+  // A section must always fit the screen whole — no internal scrolling. When
+  // its natural height exceeds the viewport (smaller laptops), zoom the
+  // content down just enough to fit. CSS `zoom` reflows real layout (unlike
+  // transform), so panel heights, snap points and the scroll anchoring all
+  // stay coherent for free. The slide padding sits outside the zoomed
+  // wrapper, so the title's clearance from the header overlay never shrinks.
+  const fitRefs = useRef<(HTMLDivElement | null)[]>([])
+
+  const fitSection = useCallback((i: number) => {
+    const root = scrollRef.current
+    const inner = fitRefs.current[i]
+    const slide = inner?.parentElement // .section-slide-content (owns the padding)
+    if (!root || !inner || !slide) return
+    const cs = getComputedStyle(slide)
+    const available = root.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
+    if (available <= 0) return
+
+    // Apply the zoom plus a counter-zoom var for select text (section title,
+    // widget titles, key labels, chart tooltips — see the .section-fit CSS):
+    // counter-zooming by 1/√z lands that text at √z, so it shrinks roughly
+    // half as much as the layout around it.
+    const applyZoom = (z: number) => {
+      inner.style.zoom = z >= 1 ? "" : String(z)
+      inner.style.setProperty("--fit-text-zoom", z >= 1 ? "1" : String(1 / Math.sqrt(z)))
+    }
+
+    // Growth ceiling: the highest zoom known to overflow at this viewport
+    // size. Counter-zoomed text can wrap at a higher zoom and unwrap at a
+    // lower one (a ~20px discontinuity with no stable zoom in between), which
+    // made some sections bounce forever. The ceiling ratchets each failed
+    // growth attempt down until a stable zoom exists. Reset on viewport change.
+    if (inner.dataset.fitAvail !== String(available)) {
+      inner.dataset.fitAvail = String(available)
+      delete inner.dataset.fitCeil
+    }
+    const ceiling = inner.dataset.fitCeil ? parseFloat(inner.dataset.fitCeil) : 1
+
+    const current = parseFloat(inner.dataset.fitZoom || "1")
+    const first = inner.getBoundingClientRect().height
+    if (!first) return
+    // Dead zone: our own zoom writes echo back through the ResizeObserver —
+    // re-entries that land in this band make no writes, so the echo (and the
+    // visible bouncing) stops. Up to 2px overflow is tolerated; growing back
+    // requires more than a wrapped line's worth of slack so wrap/unwrap can't
+    // ping-pong the fit.
+    const overflow = first - available
+    if (overflow <= 2 && (overflow > -40 || current >= Math.min(1, ceiling))) return
+
+    let zoom = current
+    // Shrinking reflows text/grids, which changes the natural height again —
+    // a few passes settle it. Visual height = rect (already includes zoom).
+    for (let pass = 0; pass < 4; pass++) {
+      const visual = inner.getBoundingClientRect().height
+      if (!visual) return
+      const desired = Math.min(1, ceiling, (zoom * available) / visual)
+      if (Math.abs(desired - zoom) < 0.01) break
+      zoom = desired
+      applyZoom(zoom)
+    }
+    // Exact final pass — never end visibly over the viewport. Reaching here
+    // means a growth attempt overshot (likely text wrapping): remember it.
+    const after = inner.getBoundingClientRect().height
+    if (after > available + 1) {
+      inner.dataset.fitCeil = String(Math.max(0.2, zoom - 0.005))
+      zoom = (zoom * available) / after
+      applyZoom(zoom)
+    }
+    inner.dataset.fitZoom = String(zoom)
+  }, [])
+
+  // Refit when a section's content settles (data load) or the window resizes.
   useEffect(() => {
+    if (isMobile) return
+    const fitAll = () => {
+      for (let i = 0; i < sections.length; i++) fitSection(i)
+    }
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const idx = Number((entry.target as HTMLElement).dataset.fitIndex)
+        if (Number.isInteger(idx)) fitSection(idx)
+      }
+    })
+    for (const el of fitRefs.current) if (el) ro.observe(el)
+    fitAll()
+    window.addEventListener("resize", fitAll)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener("resize", fitAll)
+    }
+  }, [sections.length, fitSection, isMobile])
+
+  // Watch every panel for size changes (widgets settling after data load) and
+  // counter any movement of the anchor in the same frame, before paint — the
+  // viewport never visibly shifts and the snap never has to re-settle.
+  useEffect(() => {
+    if (isMobile) return
+    const root = scrollRef.current
+    if (!root) return
+    anchorBaseline.current = measureAnchor()
+    const ro = new ResizeObserver(() => {
+      const next = measureAnchor()
+      const prev = anchorBaseline.current
+      if (next != null && prev != null && next !== prev) {
+        // behavior: "instant" — the container's CSS scroll-behavior is smooth,
+        // which would turn this correction into a visible glide.
+        root.scrollTo({ top: root.scrollTop + (next - prev), behavior: "instant" })
+      }
+      anchorBaseline.current = next
+    })
+    for (const el of panelRefs.current) if (el) ro.observe(el)
+    return () => ro.disconnect()
+  }, [sections.length, measureAnchor, isMobile])
+
+  useEffect(() => {
+    if (isMobile) return
     const root = scrollRef.current
     if (!root) return
 
@@ -151,7 +304,36 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
       window.removeEventListener("resize", onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [sections.length, applyFades])
+  }, [sections.length, applyFades, isMobile])
+
+  if (isMobile) {
+    return (
+      <div className="section-stack" ref={stackRef}>
+        {sections.map((section) => (
+          <section key={section.id} className="section-stack-panel">
+            <h2 className="section-pager-title title2 emphasized">
+              {SECTION_REGISTRY[section.id].title}
+            </h2>
+            {section.widgets.length === 0 ? (
+              <p className="section-pager-empty">This section has no widgets.</p>
+            ) : (
+              <div className="widget-grid section-stack-grid">
+                {/* Every widget full width — no half columns, offsets or spacers. */}
+                {section.widgets.map((item) => {
+                  const Component = WIDGET_REGISTRY[item.id].component
+                  return (
+                    <div key={item.id} className={`widget-slot widget-slot-${item.id}`}>
+                      <Component colSpan={item.colSpan} />
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        ))}
+      </div>
+    )
+  }
 
   return (
     <>
@@ -169,19 +351,29 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
             className="section-pager-panel"
           >
             <div className="section-slide-content">
-              <h2 className="section-pager-title title2 emphasized">
-                {SECTION_REGISTRY[section.id].title}
-              </h2>
+              {/* Zoom-to-fit wrapper — scaled down only when the section would
+                  overflow the viewport (see fitSection). */}
+              <div
+                className="section-fit"
+                data-fit-index={i}
+                ref={(el) => {
+                  fitRefs.current[i] = el
+                }}
+              >
+                <h2 className="section-pager-title title2 emphasized">
+                  {SECTION_REGISTRY[section.id].title}
+                </h2>
 
-              {section.widgets.length === 0 ? (
-                <p className="section-pager-empty">This section has no widgets.</p>
-              ) : (
-                <div
-                  className={`widget-grid widget-grid-${SECTION_REGISTRY[section.id].columns ?? 2} dashboard-home-grid`}
-                >
-                  {renderSectionWidgets(section.widgets)}
-                </div>
-              )}
+                {section.widgets.length === 0 ? (
+                  <p className="section-pager-empty">This section has no widgets.</p>
+                ) : (
+                  <div
+                    className={`widget-grid widget-grid-${SECTION_REGISTRY[section.id].columns ?? 2} dashboard-home-grid`}
+                  >
+                    {renderSectionWidgets(section.widgets)}
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         ))}

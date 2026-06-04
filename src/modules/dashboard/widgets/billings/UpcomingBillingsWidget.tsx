@@ -4,6 +4,7 @@ import { ChevronRight } from "lucide-react"
 import { Widget } from "../../../../shared/components/Widget/Widget"
 import { Chart } from "../../../../shared/components/Chart/Chart"
 import { formatMoney } from "../../../../shared/utils/format"
+import useIsMobile from "../../../../shared/hooks/useIsMobile"
 import { AR_COLOR, AP_COLOR, niceCeil, useAgingForecast } from "./billingsShared"
 
 /**
@@ -37,6 +38,14 @@ export function UpcomingBillingsWidget() {
     return { max: niceCeil(arMax) || 10_000, min: -(niceCeil(apMax) || 10_000) }
   }, [forecast])
 
+  // Mobile: nine bucket labels crowd the x axis — show every other one
+  // ("This Week", Week 3, Week 5, Week 7, "Later").
+  const isMobile = useIsMobile()
+  const axisBottomTickValues = useMemo(
+    () => (isMobile ? bars.filter((_, i) => i % 2 === 0).map((b) => b.label) : undefined),
+    [isMobile, bars]
+  )
+
   const viewLink = (
     <Link to="/dashboard/upcoming-billings" className="widget-link-btn" title="View upcoming billings invoices">
       View <ChevronRight size={12} />
@@ -59,6 +68,7 @@ export function UpcomingBillingsWidget() {
             maxValue: bounds.max,
             // A small tick count keeps the axis clean.
             axisLeftTickValues: 5,
+            axisBottomTickValues,
             emphasizeZero: true,
             // One combined tooltip per week: AR, AP, and their net difference.
             groupTooltip: true,
