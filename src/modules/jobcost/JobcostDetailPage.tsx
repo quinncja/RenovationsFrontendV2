@@ -14,11 +14,12 @@ import { fetchPageData } from "../../shared/api/pageApi"
 import { formatMoneyFull, formatDate, marginTextColor } from "../../shared/utils/format"
 import useIsMobile from "../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
+import useHashedRelationColors from "../../shared/hooks/useHashedRelationColors"
 import { JOB_STATUS_LABELS } from "../directory/directoryShared"
 import { ChangeOrderModal } from "../change-orders/components/ChangeOrderModal"
 import type { ChangeOrder } from "../change-orders/types"
 import type { SpendItem } from "../../shared/components/Chart/chart.types"
-import { colorRamp, RAMP_SCHEMES } from "../../shared/config/chartColors"
+import { colorRamp, hashColor, RAMP_SCHEMES } from "../../shared/config/chartColors"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 
 const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
@@ -73,6 +74,7 @@ export default function JobcostDetailPage() {
 function JobcostDetail({ recnum }: { recnum: string }) {
   const navigate = useNavigate()
   const marginColorsOn = useMarginColorsEnabled()
+  const hashedRelationColors = useHashedRelationColors()
   // Mobile: a slim header — just the job name with status + PM beneath
   // (mirroring the Job Costing list rows). The job number, back button and
   // export are desktop-only; the bottom nav covers navigation on mobile.
@@ -484,7 +486,11 @@ function JobcostDetail({ recnum }: { recnum: string }) {
               centerLabel: "VENDOR SPEND",
               showPercent: true,
               chartSize: "md",
-              colors: colorRamp(RAMP_SCHEMES.orange.hue, RAMP_SCHEMES.orange.drift, 5),
+              // Hashed mode keeps each vendor's color consistent with the
+              // dashboard's Top Suppliers widget.
+              colors: hashedRelationColors
+                ? vendorSpend.map(v => hashColor(v.label))
+                : colorRamp(RAMP_SCHEMES.orange.hue, RAMP_SCHEMES.orange.drift, 5),
             }} />
           </Widget>
         </MotionItem>

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useAuth } from "../../../core/auth/AuthProvider"
 import { fetchSqlStatus, connectSql, disconnectSql } from "../../api/sqlApi"
 import useLocalStorage from "../../hooks/useLocalStorage"
+import { HASHED_RELATION_COLORS_KEY } from "../../hooks/useHashedRelationColors"
 
 interface SettingsModalProps {
   open: boolean
@@ -17,6 +18,7 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
   const isAdmin = claims["role"] === "executive"
 
   const [marginColorsEnabled, setMarginColorsEnabled] = useLocalStorage("marginColorsEnabled", true)
+  const [hashedRelationColors, setHashedRelationColors] = useLocalStorage(HASHED_RELATION_COLORS_KEY, false)
   const [sqlConnected, setSqlConnected] = useState<boolean | null>(null)
   const [sqlLoading, setSqlLoading] = useState(false)
 
@@ -103,6 +105,21 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                     onClick={() => setMarginColorsEnabled(!marginColorsEnabled)}
                   >
                     {marginColorsEnabled ? "On" : "Off"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="settings-section">
+                <div className="settings-row">
+                  <div className="settings-row-info">
+                    <span className="settings-row-label">Randomize Relation Colors</span>
+                    <span className="settings-row-description">Give each client, subcontractor and supplier its own consistent color instead of shades of one hue</span>
+                  </div>
+                  <button
+                    className={`settings-sql-toggle ${hashedRelationColors ? "settings-sql-connected" : "settings-sql-disconnected"}`}
+                    onClick={() => setHashedRelationColors(!hashedRelationColors)}
+                  >
+                    {hashedRelationColors ? "On" : "Off"}
                   </button>
                 </div>
               </div>

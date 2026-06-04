@@ -52,6 +52,54 @@ export function colorRamp(hue: number, drift: number, count: number): string[] {
   })
 }
 
+/** Curated muted bases for hashColor — the same family as the Treemap
+ *  palette (terracotta / sage / teal / dusty rose ...), spread around the
+ *  wheel so any subset still reads as one set. [hue, sat%, light%]. */
+const HASH_BASES: ReadonlyArray<readonly [number, number, number]> = [
+  [2, 45, 58],    // clay red
+  [14, 48, 46],   // sienna
+  [24, 58, 56],   // terracotta
+  [28, 35, 38],   // coffee
+  [36, 58, 62],   // saffron
+  [45, 48, 50],   // mustard gold
+  [70, 32, 52],   // olive
+  [85, 32, 40],   // moss
+  [108, 25, 56],  // sage
+  [150, 30, 40],  // forest
+  [162, 32, 52],  // eucalyptus
+  [180, 42, 37],  // deep teal
+  [198, 38, 54],  // mediterranean blue
+  [214, 32, 60],  // slate blue
+  [222, 36, 44],  // indigo
+  [240, 36, 66],  // soft lavender
+  [258, 30, 52],  // iris
+  [272, 28, 60],  // plum
+  [288, 30, 44],  // aubergine
+  [306, 26, 60],  // mauve
+  [320, 32, 62],  // rose lavender
+  [333, 42, 48],  // berry
+  [346, 45, 62],  // dusty rose
+  [352, 48, 42],  // burgundy
+]
+
+/** Deterministic "random" color for an entity name: FNV-1a hash → one of the
+ *  curated muted bases above, with spare hash bits nudging saturation and
+ *  lightness so two names landing on the same base still differ. The same
+ *  name always maps to the same color, on every render and every page. */
+export function hashColor(name: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < name.length; i++) {
+    h ^= name.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  h >>>= 0
+  const [hue, sat, light] = HASH_BASES[h % HASH_BASES.length]
+  const hh = hue + ((h >>> 25) % 17) - 8  // ±8° — stays within the family
+  const s = sat + ((h >>> 9) % 11) - 5    // ±5%
+  const l = light + ((h >>> 17) % 13) - 6 // ±6%
+  return `hsl(${hh}, ${s}%, ${l}%)`
+}
+
 /** Per-family hue + drift used by the dashboard insight widgets. */
 export const RAMP_SCHEMES = {
   orange: { hue: 28, drift: 16 },

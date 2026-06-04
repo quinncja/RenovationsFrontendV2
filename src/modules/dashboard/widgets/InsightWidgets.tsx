@@ -4,7 +4,8 @@ import { Chart } from "../../../shared/components/Chart/Chart"
 import { useWidgetData } from "../../../shared/context/PageContext"
 import type { SpendItem } from "../../../shared/components/Chart/chart.types"
 import type { DashboardWidgetProps } from "../config/widgetRegistry"
-import { colorRamp, RAMP_SCHEMES } from "../../../shared/config/chartColors"
+import { colorRamp, hashColor, RAMP_SCHEMES } from "../../../shared/config/chartColors"
+import useHashedRelationColors from "../../../shared/hooks/useHashedRelationColors"
 
 // Backend insight rows are { id, name, value }; the chart wants { id, label, value }.
 interface RawInsight {
@@ -38,8 +39,13 @@ function InsightWidget({ query, noun, metric, centerLabel, route, scheme, colSpa
   const items: SpendItem[] = hasData
     ? raw.map((r) => ({ id: String(r.id), label: r.name, value: r.value }))
     : []
+  // Hashed mode gives every entity its own stable name-derived color (the
+  // same one on every page); ramp mode shades the widget's family hue.
+  const hashed = useHashedRelationColors()
   const { hue, drift } = RAMP_SCHEMES[scheme]
-  const colors = colorRamp(hue, drift, previewCount)
+  const colors = hashed
+    ? items.map((it) => hashColor(it.label))
+    : colorRamp(hue, drift, previewCount)
 
   return (
     <Widget
