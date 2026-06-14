@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth"
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth"
 import { auth } from "../firebase"
 import { useAuth } from "../AuthProvider"
 import { ALLOWED_EMAIL_DOMAIN, DOMAIN_ERROR, isAllowedEmail } from "../domain"
@@ -9,8 +9,6 @@ import Logo from "../../components/Logo"
 export default function LoginPage() {
   const navigate = useNavigate()
   const { user, loading: authLoading } = useAuth()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
@@ -19,24 +17,6 @@ export default function LoginPage() {
       navigate("/dashboard", { replace: true })
     }
   }, [user, authLoading, navigate])
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError("")
-    if (!isAllowedEmail(email)) {
-      setError(DOMAIN_ERROR)
-      return
-    }
-    setLoading(true)
-    try {
-      await signInWithEmailAndPassword(auth, email, password)
-      navigate("/dashboard")
-    } catch (err: unknown) {
-      setError((err as Error).message)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   async function handleGoogleLogin() {
     setError("")
@@ -68,38 +48,7 @@ export default function LoginPage() {
           <h1 className="title1">Welcome back</h1>
           <p className="body-text">Sign in to Renovations Delivered</p>
         </div>
-        <form onSubmit={handleSubmit} className="auth-form">
-          <div className="form-field">
-            <label htmlFor="email">Email address</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              autoFocus
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-            />
-          </div>
-          {error && <p className="auth-error">{error}</p>}
-          <button type="submit" className="button auth-submit" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
-        <div className="auth-divider">
-          <span>or</span>
-        </div>
+        {error && <p className="auth-error">{error}</p>}
         <button className="button auth-google" onClick={handleGoogleLogin} disabled={loading}>
           <svg width="18" height="18" viewBox="0 0 48 48">
             <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
