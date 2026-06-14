@@ -2,7 +2,7 @@ import { useMemo } from "react"
 import { Widget } from "../../../shared/components/Widget/Widget"
 import { Chart } from "../../../shared/components/Chart/Chart"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
-import { formatPercent, shortMonth } from "../../../shared/utils/format"
+import { formatPercent, marginTextColor, shortMonth } from "../../../shared/utils/format"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import type { LineMarker } from "../../../shared/components/Chart/chart.types"
@@ -18,13 +18,6 @@ interface OpenMonthPayload {
 }
 
 const OPEN_MARKER_COLOR = "#94a3b8" // matches the line charts' "Open" reference
-
-// Bar color by margin health, mirroring the old frontend's thresholds.
-function marginColor(margin: number): string {
-  if (margin >= 20) return "#22c55e" // green
-  if (margin >= 17) return "#f59e0b" // amber
-  return "#ef4444" // red
-}
 
 // marginPerformance returns one row per month for the selected year; plot the
 // monthly margin_percentage as bars (like the old Monthly Margin Performance).
@@ -131,7 +124,7 @@ export function MarginWidget() {
             type: "bar",
             data: chart.bars,
             yFormat: formatPercent,
-            colorBy: marginColorsOn ? marginColor : undefined,
+            colorBy: marginColorsOn ? marginTextColor : undefined,
             scaleType: "symlog",
             scaleConstant: chart.scaleConstant,
             minValue: chart.minValue,
