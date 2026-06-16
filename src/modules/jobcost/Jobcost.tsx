@@ -349,28 +349,11 @@ export default function Jobcost() {
               {!isMobile && (
                 <FilterPills label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
               )}
-              <div className="co-search-wrapper">
-                <Search size={13} className="co-search-icon" />
-                <input
-                  className="co-search-input"
-                  type="text"
-                  placeholder="Search jobs..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
-              {isMobile && (
-                <MobileFilterButton
-                  count={activeFilterCount({ status: String(statusFilter) }, FILTER_DEFAULTS)}
-                  onClick={() => setFilterSheetOpen(true)}
-                />
-              )}
-              {isManager && (
+              {isManager && !isMobile && (
                 <div
-                  className="period-selector period-selector--equal"
+                  className="period-selector period-selector--equal jc-scope-toggle"
                   role="tablist"
                   aria-label="Project scope"
-                  style={{ marginLeft: "auto" }}
                 >
                   <button
                     type="button"
@@ -391,6 +374,22 @@ export default function Jobcost() {
                     All Projects
                   </button>
                 </div>
+              )}
+              <div className="co-search-wrapper">
+                <Search size={13} className="co-search-icon" />
+                <input
+                  className="co-search-input"
+                  type="text"
+                  placeholder="Search jobs..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              {isMobile && (
+                <MobileFilterButton
+                  count={activeFilterCount({ status: String(statusFilter) }, FILTER_DEFAULTS)}
+                  onClick={() => setFilterSheetOpen(true)}
+                />
               )}
               <span className="co-count subheadline text-secondary">
                 {filtered.length} {filtered.length === 1 ? "project" : "projects"}

@@ -4813,6 +4813,15 @@ body{
 
 .co-count { margin-left: auto; flex-shrink: 0; }
 
+/* Job Costing scope toggle (My Projects / All Projects) sits in the left
+   filter cluster, divided from the Status pills so the two filters read as
+   distinct groups. */
+.jc-scope-toggle {
+  padding-left: 1rem;
+  border-left: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
 /* Sortable column headers inside spend-rank-table */
 .co-th-btn {
   display: flex;
