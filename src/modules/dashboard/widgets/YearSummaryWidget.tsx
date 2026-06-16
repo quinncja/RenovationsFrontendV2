@@ -88,7 +88,7 @@ export function YearSummaryWidget() {
 
   return (
     <SummarySnapshotCard
-      title={overUnderApplied ? "Year Summary — including current over / under" : "Year Summary"}
+      title={overUnderApplied ? "Year Summary + WIP" : "Year Summary"}
       className="year-summary-widget"
       actions={
         <>

@@ -132,7 +132,7 @@ export function CurrentPeriodSummaryWidget() {
 
   return (
     <SummarySnapshotCard
-      title={overUnderApplied ? "Period Summary — including current over / under" : "Period Summary"}
+      title={overUnderApplied ? "Period Summary + WIP" : "Period Summary"}
       className="period-summary-widget"
       actions={
         <>
