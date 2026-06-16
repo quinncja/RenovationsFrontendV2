@@ -6548,6 +6548,9 @@ svg.placeholder-illustration {
 .mfs-option-dot.inv-filter-dispute { background: #dc2626; }
 .mfs-option-dot.inv-filter-paid    { background: #22c55e; }
 .mfs-option-dot.inv-filter-void    { background: #6b7280; }
+.mfs-option-dot.jc-filter-current  { background: var(--primary-color); }
+.mfs-option-dot.jc-filter-complete { background: #22c55e; }
+.mfs-option-dot.jc-filter-closed   { background: #6b7280; }
 
 .mfs-option-label {
   flex: 1;

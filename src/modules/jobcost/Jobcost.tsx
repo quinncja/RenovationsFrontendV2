@@ -10,6 +10,10 @@ import { formatMoneyFull, marginTextColor } from "../../shared/utils/format"
 import useIsMobile from "../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
+import { useAuth } from "../../core/auth/AuthProvider"
+import { FilterPills } from "../../shared/components/FilterPills"
+import { MobileFilterSheet, activeFilterCount, type FilterGroup } from "../../shared/components/MobileFilterSheet/MobileFilterSheet"
+import { MobileFilterButton } from "../../shared/components/MobileFilterSheet/MobileFilterButton"
 import { CostBreakdownTable } from "./components/CostBreakdownTable"
 import type { BudgetBreakdown, CostItem } from "./types"
 
@@ -99,6 +103,32 @@ const STATUS_LABELS: Record<number, string> = {
   5: "Complete",
   6: "Closed",
 }
+
+// Status filter (same pill look as the Invoices toolbar). Pill colors match
+// the status-4/5/6 badge colors.
+type StatusFilter = "all" | number
+
+const STATUS_FILTERS: { key: StatusFilter; label: string; color: string }[] = [
+  { key: "all", label: "All", color: "var(--primary-color)" },
+  { key: 4, label: "Current", color: "var(--primary-color)" },
+  { key: 5, label: "Complete", color: "#22c55e" },
+  { key: 6, label: "Closed", color: "#6b7280" },
+]
+
+// Mobile sheet group mirrors the desktop pills (single-select).
+const FILTER_GROUPS: FilterGroup[] = [
+  {
+    key: "status",
+    label: "Status",
+    options: [
+      { value: "all", label: "All" },
+      { value: "4", label: "Current", colorClass: "jc-filter-current" },
+      { value: "5", label: "Complete", colorClass: "jc-filter-complete" },
+      { value: "6", label: "Closed", colorClass: "jc-filter-closed" },
+    ],
+  },
+]
+const FILTER_DEFAULTS = { status: "all" }
 
 // Number of <td>s in a job row — drives the expanded panel's colSpan.
 const COLUMN_COUNT = 9
@@ -198,8 +228,15 @@ export default function Jobcost() {
   // Mobile: the table collapses to a simple tap-through list — name + status
   // on the left, margin + chevron on the right, tap → full project report.
   const isMobile = useIsMobile()
+  // Managers (PMs) default to their own projects but can flip to the whole
+  // company list via a toolbar toggle; everyone else always sees all projects.
+  const { claims } = useAuth()
+  const isManager = claims["role"] === "manager"
+  const [showAllProjects, setShowAllProjects] = useLocalStorage("jobcostShowAllProjects", false)
   const [year, setYear] = useLocalStorage<number | null>("jobcostYear", new Date().getFullYear())
   const [search, setSearch] = useState("")
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>("name")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
   const [jobs, setJobs] = useState<Job[]>([])
@@ -216,7 +253,9 @@ export default function Jobcost() {
     fetchPageData({
       module: "jobcost",
       queries: ["getPhases"],
-      params: { year },
+      // allProjects is a manager-only hint: when on, the backend drops the
+      // PM scoping and returns the whole company list. Ignored for other roles.
+      params: { year, allProjects: isManager ? showAllProjects : null },
       signal: controller.signal,
     })
       .then((result) => {
@@ -228,7 +267,7 @@ export default function Jobcost() {
         if (err.name !== "AbortError") setLoading(false)
       })
     return () => controller.abort()
-  }, [year])
+  }, [year, isManager, showAllProjects])
 
   function loadDetail(job: Job) {
     setDetails((d) => ({ ...d, [job.recnum]: "loading" }))
@@ -278,14 +317,14 @@ export default function Jobcost() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    const list = q
-      ? jobs.filter(
-          (j) =>
-            j.name?.toLowerCase().includes(q) ||
-            j.jobNumber?.toLowerCase().includes(q) ||
-            j.supervisor?.toLowerCase().includes(q),
-        )
-      : jobs
+    let list = statusFilter === "all" ? jobs : jobs.filter((j) => j.status === statusFilter)
+    if (q)
+      list = list.filter(
+        (j) =>
+          j.name?.toLowerCase().includes(q) ||
+          j.jobNumber?.toLowerCase().includes(q) ||
+          j.supervisor?.toLowerCase().includes(q),
+      )
     return [...list].sort((a, b) => {
       const dir = sortDir === "asc" ? 1 : -1
       if (sortKey === "name") return a.name.localeCompare(b.name) * dir
@@ -299,7 +338,7 @@ export default function Jobcost() {
       const bm = b.margin == null ? Number.NEGATIVE_INFINITY : b.margin
       return (am - bm) * dir
     })
-  }, [jobs, search, sortKey, sortDir])
+  }, [jobs, search, statusFilter, sortKey, sortDir])
 
   return (
     <Page title="Job Costing" actions={<YearSelector value={year} onChange={setYear} allowAllTime />}>
@@ -307,6 +346,9 @@ export default function Jobcost() {
         <MotionItem>
           <Widget loading={loading} noData={!loading && jobs.length === 0} className="co-widget">
             <div className="co-widget-toolbar">
+              {!isMobile && (
+                <FilterPills label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
+              )}
               <div className="co-search-wrapper">
                 <Search size={13} className="co-search-icon" />
                 <input
@@ -317,13 +359,48 @@ export default function Jobcost() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
+              {isMobile && (
+                <MobileFilterButton
+                  count={activeFilterCount({ status: String(statusFilter) }, FILTER_DEFAULTS)}
+                  onClick={() => setFilterSheetOpen(true)}
+                />
+              )}
+              {isManager && (
+                <div
+                  className="period-selector period-selector--equal"
+                  role="tablist"
+                  aria-label="Project scope"
+                  style={{ marginLeft: "auto" }}
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={!showAllProjects}
+                    className={`period-selector-btn${!showAllProjects ? " period-selector-btn--active" : ""}`}
+                    onClick={() => setShowAllProjects(false)}
+                  >
+                    My Projects
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={showAllProjects}
+                    className={`period-selector-btn${showAllProjects ? " period-selector-btn--active" : ""}`}
+                    onClick={() => setShowAllProjects(true)}
+                  >
+                    All Projects
+                  </button>
+                </div>
+              )}
               <span className="co-count subheadline text-secondary">
                 {filtered.length} {filtered.length === 1 ? "project" : "projects"}
               </span>
             </div>
 
-            {filtered.length === 0 && search ? (
-              <div className="co-no-results body-text text-secondary">No jobs match "{search}"</div>
+            {filtered.length === 0 && (search || statusFilter !== "all") ? (
+              <div className="co-no-results body-text text-secondary">
+                {search ? `No jobs match "${search}"` : "No jobs match your filters"}
+              </div>
             ) : isMobile ? (
               <ul className="jc-mobile-list">
                 {filtered.map((job) => (
@@ -447,6 +524,17 @@ export default function Jobcost() {
           </Widget>
         </MotionItem>
       </MotionList>
+
+      {isMobile && (
+        <MobileFilterSheet
+          open={filterSheetOpen}
+          onClose={() => setFilterSheetOpen(false)}
+          groups={FILTER_GROUPS}
+          values={{ status: String(statusFilter) }}
+          defaults={FILTER_DEFAULTS}
+          onChange={(v) => setStatusFilter(v.status === "all" ? "all" : Number(v.status))}
+        />
+      )}
     </Page>
   )
 }

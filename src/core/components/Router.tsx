@@ -53,8 +53,8 @@ export default function Router() {
             <Route path="/dashboard" element={<SuspenseWrapper><Dashboard /></SuspenseWrapper>} />
             <Route path="/dashboard/breakdown/:category" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><MonthlyBreakdownPage /></SuspenseWrapper></RequireRole>} />
             <Route path="/dashboard/upcoming-billings" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><UpcomingBillingsPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/employees" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><EmployeesPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/employees/:employeeNum" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><EmployeeDetailPage /></SuspenseWrapper></RequireRole>} />
+            <Route path="/employees" element={<RequireRole allowed={["executive", "admin", "manager"]}><SuspenseWrapper><EmployeesPage /></SuspenseWrapper></RequireRole>} />
+            <Route path="/employees/:employeeNum" element={<RequireRole allowed={["executive", "admin", "manager"]}><SuspenseWrapper><EmployeeDetailPage /></SuspenseWrapper></RequireRole>} />
 
             {/* Company — shown in nav for managers (PMs); see roles.ts */}
             <Route path="/company" element={
