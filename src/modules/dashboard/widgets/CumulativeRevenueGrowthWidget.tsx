@@ -13,6 +13,7 @@ export function CumulativeRevenueGrowthWidget() {
       valueKey="revenue"
       includeOpenPeriod
       overUnderApplies
+      wipTitleSuffix
     />
   )
 }

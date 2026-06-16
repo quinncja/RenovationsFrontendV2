@@ -34,5 +34,11 @@ export function CurrentYearRevenueWidget() {
     }
   }
 
-  return <StatWidget title={`${year} Revenue`} value={value} loading={isLoading} />
+  return (
+    <StatWidget
+      title={includeOverUnder ? `${year} Revenue + Work Completed` : `${year} Revenue`}
+      value={value}
+      loading={isLoading}
+    />
+  )
 }

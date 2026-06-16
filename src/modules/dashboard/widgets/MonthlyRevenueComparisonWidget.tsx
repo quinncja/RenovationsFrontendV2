@@ -11,6 +11,7 @@ export function MonthlyRevenueComparisonWidget() {
       valueKey="revenue"
       viewHref="/dashboard/breakdown/revenue"
       overUnderApplies
+      wipTitleSuffix
     />
   )
 }

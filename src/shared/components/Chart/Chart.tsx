@@ -115,14 +115,18 @@ function everyOtherYTicks(series: LineSeries[]): number[] | undefined {
 
 // ─── Slice tooltip ────────────────────────────────────────────────────────────
 
-function SliceTooltip({ slice, series, valueFormat, disableGrowth }: {
+function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel }: {
   slice: { points: readonly { data: { x: unknown; y: unknown }; seriesId: string }[] }
   series: LineSeries[]
   valueFormat?: (v: number) => string
   disableGrowth?: boolean
+  wipMonthLabel?: string | null
 }) {
   const points = slice.points
   const xLabel = String(points[0]?.data?.x ?? "")
+  // The open month's figure has WIP folded in — flag it so the tooltip isn't
+  // misread as billed-only. Other months stay just the month name.
+  const headerLabel = wipMonthLabel != null && xLabel === wipMonthLabel ? `${xLabel} Billed + WIP` : xLabel
   const fmt = valueFormat ?? formatMoneyFull
 
   // Single-series: large value + optional growth vs previous data point
@@ -144,7 +148,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth }: {
 
     return (
       <div className="chart-line-tooltip">
-        <div className="chart-line-tooltip-header">{xLabel}</div>
+        <div className="chart-line-tooltip-header">{headerLabel}</div>
         <div className="chart-line-tooltip-single-value">{fmt(currVal)}</div>
         {growth != null && (
           <div className="chart-line-tooltip-growth" style={{ color: growthColor }}>
@@ -181,7 +185,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth }: {
 
   return (
     <div className="chart-line-tooltip">
-      <div className="chart-line-tooltip-header">{xLabel}</div>
+      <div className="chart-line-tooltip-header">{headerLabel}</div>
       {orderedRows.map((row) => {
         const isCurrent = row.id === currentRow.id
         return (
@@ -214,7 +218,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth }: {
 // ─── Bar chart ────────────────────────────────────────────────────────────────
 
 function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> }) {
-  const { data, keys, indexBy, color = CHART_COLORS[0], colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, axisBottomTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, onBarClick } = config
+  const { data, keys, indexBy, color = CHART_COLORS[0], colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, axisBottomTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, wipMonthLabel, onBarClick } = config
 
   const dark = useDarkMode()
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
@@ -512,12 +516,20 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
             ]
           : []
       }
-      tooltip={({ id, value, indexValue }) => (
-        <div className="chart-tooltip">
-          <span>{stacked ? `${String(indexValue)} · ${String(id)}` : String(indexValue)}</span>
-          <strong>{tooltipFormat(value as number)}</strong>
-        </div>
-      )}
+      tooltip={({ id, value, indexValue }) => {
+        // The open month's bar has WIP folded in — flag it so the figure isn't
+        // misread as billed-only. Other bars keep just their category label.
+        const label =
+          wipMonthLabel != null && String(indexValue) === wipMonthLabel
+            ? `${String(indexValue)} Billed + WIP`
+            : String(indexValue)
+        return (
+          <div className="chart-tooltip">
+            <span>{stacked ? `${label} · ${String(id)}` : label}</span>
+            <strong>{tooltipFormat(value as number)}</strong>
+          </div>
+        )
+      }}
     />
   )
 }
@@ -644,7 +656,7 @@ function buildPulseLayer(pulse: PulsePointConfig | undefined) {
 }
 
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
-  const { series, yFormat, enableArea = true, legend = false, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, markers, pulsePoint, highlightedX, onPointClick } = config
+  const { series, yFormat, enableArea = true, legend = false, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick } = config
 
   const dark = useDarkMode()
   const isMobile = window.innerWidth <= 768
@@ -727,7 +739,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       }
       enableSlices="x"
       tooltip={() => null}
-      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} />}
+      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} />}
       axisLeft={{
         tickSize: 0,
         tickPadding: 10,

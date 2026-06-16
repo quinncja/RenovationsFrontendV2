@@ -103,6 +103,10 @@ export type ChartConfig =
       markers?: LineMarker[]
       /** Hide the auto legend (the row of key swatches) under stacked bars. */
       hideLegend?: boolean
+      /** Category label of the bar whose value has WIP (over/under) folded in.
+       *  When set, that bar's tooltip header reads "{label} Billed + WIP" to
+       *  flag it isn't billed-only. Other bars are unaffected. */
+      wipMonthLabel?: string | null
       /** Called when a bar's category column is clicked. Receives the
        *  category's indexValue (e.g. the week label) and, for a two-key
        *  diverging chart, which key was clicked based on the cursor's side of
@@ -127,6 +131,11 @@ export type ChartConfig =
       axisBottomTickValues?: string[]
       axisBottomFormat?: (v: string | number) => string
       disableGrowthTooltip?: boolean
+      /** X-axis label of the open month whose value has WIP (over/under)
+       *  folded in. When set, that month's slice tooltip header reads
+       *  "{Month} Billed + WIP" to flag that the figure isn't billed-only.
+       *  Other months are unaffected. */
+      wipMonthLabel?: string | null
       /** Reference markers — typically a vertical dashed line at a
        *  specific x value (e.g. the open accounting month, to indicate
        *  "you are here" on a monthly trend chart). Passes through to

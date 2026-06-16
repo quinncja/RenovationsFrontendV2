@@ -35,5 +35,11 @@ export function AllTimeRevenueWidget() {
     value = dbTotal + PRE_2018_REVENUE_TOTAL + openContribution
   }
 
-  return <StatWidget title="All-Time Revenue" value={value} loading={isLoading} />
+  return (
+    <StatWidget
+      title={includeOverUnder ? "All-Time Revenue + Work Completed" : "All-Time Revenue"}
+      value={value}
+      loading={isLoading}
+    />
+  )
 }

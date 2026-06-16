@@ -178,7 +178,7 @@ export function CurrentPeriodSummaryWidget() {
           // Multiply at the call site rather than changing the helper.
           valueColor: marginColorsOn && view.margin != null ? marginTextColor(view.margin * 100) : undefined,
         },
-        { title: "Income", value: view.income },
+        { title: includeOverUnder ? "Billed Income + Work Completed" : "Billed Income", value: view.income },
         { title: "COGS", value: view.cogs },
         { title: "Gross Profit", value: view.grossProfit },
       ]}

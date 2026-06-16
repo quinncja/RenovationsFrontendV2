@@ -116,7 +116,7 @@ export function YearSummaryWidget() {
           // Margin is a ratio; marginTextColor's thresholds are in whole-%.
           valueColor: marginColorsOn && totals.margin != null ? marginTextColor(totals.margin * 100) : undefined,
         },
-        { title: "Income", value: totals.income },
+        { title: includeOverUnder ? "Billed Income + Work Completed" : "Billed Income", value: totals.income },
         { title: "COGS", value: totals.cogs },
         { title: "Gross Profit", value: totals.grossProfit },
       ]}

@@ -11,6 +11,7 @@ export function MonthlyNetProfitWidget() {
       queryName="monthlyNetProfitComparison"
       valueKey="profit"
       overUnderApplies
+      wipTitleSuffix
     />
   )
 }

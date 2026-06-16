@@ -56,6 +56,10 @@ interface Props {
    *  Gross Revenue / Net Profit / Cumulative Revenue; omit for the cost
    *  charts (Direct Expense, Overhead), which over/under never affects. */
   overUnderApplies?: boolean
+  /** When true, append " (Incl. WIP)" to the widget's title while the WIP
+   *  toggle is folding the open period into this chart. Opt-in (Gross Revenue
+   *  / Net Profit) rather than tied to `overUnderApplies`. */
+  wipTitleSuffix?: boolean
 }
 
 export function MonthlyYearComparisonWidget({
@@ -66,6 +70,7 @@ export function MonthlyYearComparisonWidget({
   viewHref,
   includeOpenPeriod,
   overUnderApplies,
+  wipTitleSuffix,
 }: Props) {
   const year = usePageYear()
   const lastYear = year - 1
@@ -176,11 +181,24 @@ export function MonthlyYearComparisonWidget({
     </Link>
   ) : undefined
 
+  // Flag the open month's tooltip as "Billed + WIP" only when WIP is actually
+  // folded into one of the plotted lines (the toggle is on and the open year
+  // is one of the two years on the chart).
+  const wipMonthLabel =
+    overUnderApplies &&
+    includeOverUnder &&
+    openMonth != null &&
+    (openYear === year || openYear === lastYear)
+      ? shortMonth(openMonth)
+      : null
+
+  const displayTitle = wipTitleSuffix && wipMonthLabel != null ? `${title} (Incl. WIP)` : title
+
   return (
-    <Widget title={title} loading={isLoading} noData={!series} actions={viewLink}>
+    <Widget title={displayTitle} loading={isLoading} noData={!series} actions={viewLink}>
       {series && (
         <Chart
-          config={{ type: "line", series, legend: true, markers, pulsePoint }}
+          config={{ type: "line", series, legend: true, markers, pulsePoint, wipMonthLabel }}
         />
       )}
     </Widget>

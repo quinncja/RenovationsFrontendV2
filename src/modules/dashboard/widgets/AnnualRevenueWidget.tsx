@@ -69,8 +69,17 @@ export function AnnualRevenueWidget() {
     return xs.filter((_, i) => (xs.length - 1 - i) % 2 === 0)
   }, [isMobile, series])
 
+  // Flag the title when the toggle is folding the open year's WIP into its
+  // trend point (income is always folded; the over/under is the WIP part).
+  const wipActive =
+    includeOverUnder &&
+    data?.openMonthFinances?.openMonthYear != null &&
+    Array.isArray(data?.annualRevenueTrend) &&
+    data.annualRevenueTrend.some((d) => d.year === data.openMonthFinances!.openMonthYear)
+  const title = wipActive ? "Annual Revenue Trend (Incl. WIP)" : "Annual Revenue Trend"
+
   return (
-    <Widget title="Annual Revenue Trend" loading={isLoading} noData={!series}>
+    <Widget title={title} loading={isLoading} noData={!series}>
       {series && (
         <Chart config={{ type: "line", series, enableArea: true, pulsePoint, axisBottomTickValues }} />
       )}
