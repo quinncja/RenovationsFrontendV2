@@ -5,16 +5,21 @@ import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import { formatPercent, marginTextColor, shortMonth } from "../../../shared/utils/format"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
+import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import type { LineMarker } from "../../../shared/components/Chart/chart.types"
 
 interface MarginRow {
   month: number
   margin_percentage: number
+  // Needed to recompute the open-month bar when over/under is folded in.
+  revenue?: number
+  total_expenses?: number
 }
 
 interface OpenMonthPayload {
   openMonthPeriod?: number
   openMonthYear?: number
+  openMonthOverUnder?: number
 }
 
 const OPEN_MARKER_COLOR = "#94a3b8" // matches the line charts' "Open" reference
@@ -26,6 +31,7 @@ const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const
 export function MarginWidget() {
   const pageYear = usePageYear()
   const marginColorsOn = useMarginColorsEnabled()
+  const [includeOverUnder] = useIncludeOverUnder()
   const { data, isLoading } = useWidgetData<{
     marginPerformance: MarginRow[] | null
     openMonthFinances: OpenMonthPayload | null
@@ -42,6 +48,27 @@ export function MarginWidget() {
     const byMonth = new Map<number, number>()
     for (const d of raw) {
       if (d.month >= 1 && d.month <= 12) byMonth.set(d.month, d.margin_percentage)
+    }
+
+    // Toggle on: recompute the open month's bar with over/under folded into
+    // revenue. marginPerformance already carries the open month (oldestOpen
+    // period), so we adjust that single bar in place — revenue + WIP against
+    // the same expenses. Only when the page year is the open year.
+    const om = data?.openMonthFinances ?? null
+    if (
+      includeOverUnder &&
+      om?.openMonthPeriod != null &&
+      om.openMonthYear === pageYear &&
+      om.openMonthPeriod >= 1 &&
+      om.openMonthPeriod <= 12
+    ) {
+      const row = raw.find((d) => d.month === om.openMonthPeriod)
+      const ou = om.openMonthOverUnder ?? 0
+      if (row && ou !== 0) {
+        const rev = (row.revenue ?? 0) + ou
+        const exp = row.total_expenses ?? 0
+        byMonth.set(om.openMonthPeriod, rev !== 0 ? ((rev - exp) / rev) * 100 : 0)
+      }
     }
     const bars = MONTHS.map((m) => ({
       label: shortMonth(m),
@@ -75,7 +102,7 @@ export function MarginWidget() {
     ticks.sort((a, b) => a - b)
 
     return { bars, minValue, maxValue, scaleConstant, ticks }
-  }, [data?.marginPerformance])
+  }, [data?.marginPerformance, data?.openMonthFinances, includeOverUnder, pageYear])
 
   // Vertical "Open" reference at the in-progress month — same visual
   // language as the four monthly line charts on the home page. Only

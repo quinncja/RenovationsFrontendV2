@@ -2,8 +2,11 @@ import { useEffect, useState } from "react"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import { fetchPageData } from "../../../shared/api/pageApi"
 
-// One row of `marginPerformance`. The backend caps at mostRecentPeriod.actprd
-// when year === currentYear, so summing all rows for the current year is YTD.
+// One row of `marginPerformance`. The backend caps at oldestOpenPeriod.actprd
+// when year === currentYear — i.e. it INCLUDES the currently-open month
+// (confirmed billings only) — so summing all rows for the current year is YTD
+// through the open period. Over/under (WIP) is layered on separately by widgets
+// reading openMonthFinances.openMonthOverUnder when the toggle is on.
 export interface MarginRow {
   month: number
   revenue: number

@@ -12,6 +12,7 @@ export function CumulativeRevenueGrowthWidget() {
       queryName="cumulativeRevenueGrowth"
       valueKey="revenue"
       includeOpenPeriod
+      overUnderApplies
     />
   )
 }

@@ -10,6 +10,7 @@ export function MonthlyRevenueComparisonWidget() {
       queryName="monthlyRevenueComparison"
       valueKey="revenue"
       viewHref="/dashboard/breakdown/revenue"
+      overUnderApplies
     />
   )
 }

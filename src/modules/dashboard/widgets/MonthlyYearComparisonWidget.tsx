@@ -5,6 +5,7 @@ import { Widget } from "../../../shared/components/Widget/Widget"
 import { Chart } from "../../../shared/components/Chart/Chart"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import { shortMonth } from "../../../shared/utils/format"
+import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import type { LineMarker } from "../../../shared/components/Chart/chart.types"
 
 // Shared building block for the four "metric by month, current vs previous
@@ -31,6 +32,7 @@ interface OpenMonthPayload {
   openMonthPeriod?: number
   openMonthYear?: number
   openMonthIncome?: number
+  openMonthOverUnder?: number
 }
 
 interface Props {
@@ -49,6 +51,11 @@ interface Props {
    *  its income onto the prior point. Used for the cumulative-revenue chart,
    *  whose query only covers closed periods. */
   includeOpenPeriod?: boolean
+  /** Whether this metric is revenue-side, so the "include over/under" toggle
+   *  should fold the open period's WIP into its open-month point. Set for
+   *  Gross Revenue / Net Profit / Cumulative Revenue; omit for the cost
+   *  charts (Direct Expense, Overhead), which over/under never affects. */
+  overUnderApplies?: boolean
 }
 
 export function MonthlyYearComparisonWidget({
@@ -58,9 +65,11 @@ export function MonthlyYearComparisonWidget({
   currentYearColor = CURRENT_YEAR_COLOR,
   viewHref,
   includeOpenPeriod,
+  overUnderApplies,
 }: Props) {
   const year = usePageYear()
   const lastYear = year - 1
+  const [includeOverUnder] = useIncludeOverUnder()
   const { data, isLoading } = useWidgetData<{
     [key: string]: MonthRow[] | OpenMonthPayload | null
   }>([queryName, "openMonthFinances"])
@@ -75,30 +84,40 @@ export function MonthlyYearComparisonWidget({
     (data?.openMonthFinances as OpenMonthPayload | null)?.openMonthYear ?? null
   const openIncome =
     (data?.openMonthFinances as OpenMonthPayload | null)?.openMonthIncome ?? null
+  const openOverUnder =
+    (data?.openMonthFinances as OpenMonthPayload | null)?.openMonthOverUnder ?? 0
 
   const series = useMemo(() => {
     const raw = data?.[queryName] as MonthRow[] | null | undefined
     if (!Array.isArray(raw) || raw.length === 0) return null
 
+    // Over/under (WIP) only adjusts revenue-side metrics, and only the open
+    // month's point on its own year's line, when the toggle is on.
+    const wip = overUnderApplies && includeOverUnder ? openOverUnder : 0
+
     const toSeries = (y: number, color: string) => {
+      const isOpenYear = openMonth != null && openYear === y
       const yearRows = raw
         .filter((d) => d.year === y && d.month >= 1 && d.month <= 12)
         .sort((a, b) => a.month - b.month)
       const points = yearRows.map((d) => ({ x: shortMonth(d.month), y: Number(d[valueKey] ?? 0) }))
 
-      // Extend the current-year line through the open period: take the running
-      // total at the month before the open one and add the open month's income.
-      // (The cumulative query only returns closed periods.)
-      if (
-        includeOpenPeriod &&
-        openMonth != null &&
-        openYear === y &&
-        openIncome != null &&
-        !yearRows.some((d) => d.month === openMonth)
-      ) {
-        const before = yearRows.filter((d) => d.month < openMonth).pop()
-        const cumulativeBefore = before ? Number(before[valueKey] ?? 0) : 0
-        points.push({ x: shortMonth(openMonth), y: cumulativeBefore + openIncome })
+      if (includeOpenPeriod) {
+        // Extend the current-year line through the open period: take the
+        // running total at the month before the open one and add the open
+        // month's income (+ WIP when toggled). The cumulative query only
+        // returns closed periods, so the open month isn't already a row.
+        if (isOpenYear && openIncome != null && !yearRows.some((d) => d.month === openMonth)) {
+          const before = yearRows.filter((d) => d.month < openMonth!).pop()
+          const cumulativeBefore = before ? Number(before[valueKey] ?? 0) : 0
+          points.push({ x: shortMonth(openMonth!), y: cumulativeBefore + openIncome + wip })
+        }
+      } else if (wip !== 0 && isOpenYear) {
+        // Non-cumulative revenue metrics already have a row for the open month
+        // (fetched with oldestOpenPeriod); bump that single point by the WIP.
+        const label = shortMonth(openMonth!)
+        const i = points.findIndex((p) => p.x === label)
+        if (i !== -1) points[i] = { ...points[i], y: points[i].y + wip }
       }
 
       return { id: `${y}`, color, data: points }
@@ -108,7 +127,7 @@ export function MonthlyYearComparisonWidget({
       toSeries(year, currentYearColor),
       toSeries(lastYear, PREVIOUS_YEAR_COLOR),
     ]
-  }, [data, queryName, valueKey, year, lastYear, currentYearColor, includeOpenPeriod, openMonth, openYear, openIncome])
+  }, [data, queryName, valueKey, year, lastYear, currentYearColor, includeOpenPeriod, openMonth, openYear, openIncome, overUnderApplies, includeOverUnder, openOverUnder])
 
   // Vertical dashed reference at the open month. Only relevant when one
   // of the years we're plotting is the open year — otherwise the marker

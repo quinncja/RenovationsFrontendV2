@@ -10,6 +10,7 @@ export function MonthlyNetProfitWidget() {
       title="Net Profit by Month"
       queryName="monthlyNetProfitComparison"
       valueKey="profit"
+      overUnderApplies
     />
   )
 }

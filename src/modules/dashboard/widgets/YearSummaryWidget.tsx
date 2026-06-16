@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react"
 import { RotateCcw } from "lucide-react"
 import { YearSelector } from "../../../shared/components/YearSelector/YearSelector"
-import { usePageYear } from "../../../shared/context/PageContext"
+import { usePageYear, useWidgetData } from "../../../shared/context/PageContext"
 import { marginTextColor } from "../../../shared/utils/format"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
+import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import { useSummaryYear } from "./summaryYearContext"
 import { useMarginPerformanceFor, type MarginRow } from "./useMarginPerformanceFor"
 import { SummarySnapshotCard } from "./SummarySnapshotCard"
@@ -28,10 +29,19 @@ function totalsFor(rows: MarginRow[] | null) {
   }
 }
 
+interface OpenMonth {
+  openMonthOverUnder?: number
+  openMonthYear?: number
+}
+
 export function YearSummaryWidget() {
   const pageYear = usePageYear()
   const ctx = useSummaryYear()
   const marginColorsOn = useMarginColorsEnabled()
+  const [includeOverUnder] = useIncludeOverUnder()
+  const { data: openData } = useWidgetData<{ openMonthFinances: OpenMonth | null }>([
+    "openMonthFinances",
+  ])
 
   // Standalone mode (no SummaryYearProvider above): keep the historical
   // per-widget year override behavior — local state, snap-to-pageYear on
@@ -48,7 +58,27 @@ export function YearSummaryWidget() {
   const setYear = ctx ? ctx.setYear : setLocalYear
 
   const { rows, isLoading: loading } = useMarginPerformanceFor(year)
-  const totals = useMemo(() => totalsFor(rows), [rows])
+
+  // marginPerformance already includes the open month's *confirmed* billings
+  // (it's fetched with oldestOpenPeriod). When the toggle is on and the
+  // displayed year is the open year, also fold in the open period's over/under
+  // (WIP) — a revenue-side adjustment, so it lifts income & gross profit (and
+  // thus margin) but never costs.
+  const open = openData?.openMonthFinances ?? null
+  const overUnderApplied = includeOverUnder && open?.openMonthYear === year
+  const totals = useMemo(() => {
+    const base = totalsFor(rows)
+    if (!overUnderApplied) return base
+    const wip = open?.openMonthOverUnder ?? 0
+    const income = base.income + wip
+    const grossProfit = base.grossProfit + wip
+    return {
+      income,
+      cogs: base.cogs,
+      grossProfit,
+      margin: income !== 0 ? grossProfit / income : null,
+    }
+  }, [rows, overUnderApplied, open])
 
   const currentYearNum = new Date().getFullYear()
   const meta = year === currentYearNum ? "Year to date" : "Full year"
@@ -58,7 +88,7 @@ export function YearSummaryWidget() {
 
   return (
     <SummarySnapshotCard
-      title="Year Summary"
+      title={overUnderApplied ? "Year Summary — including current over / under" : "Year Summary"}
       className="year-summary-widget"
       actions={
         <>

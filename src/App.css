@@ -703,6 +703,54 @@ body{
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent);
 }
 
+/* ─── Over/Under (WIP) toggle ───────────────────────────────────────────
+   Single pill beside the dashboard YearSelector. Inactive reads as a quiet
+   outline (matches .year-selector); active fills with brand orange (matches
+   .period-selector-btn--active) so the on-state is unmistakable. */
+.over-under-toggle {
+  appearance: none;
+  background-color: transparent;
+  border: 1.5px solid var(--border-color);
+  border-radius: 999px;
+  color: var(--secondary-text);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.01em;
+  padding: 0.4rem 0.85rem;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.over-under-toggle:hover:not(:disabled) {
+  border-color: var(--primary-color);
+  color: var(--primary-text);
+}
+
+.over-under-toggle:focus-visible {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent);
+}
+
+.over-under-toggle--active {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  color: #fff;
+}
+
+.over-under-toggle--active:hover:not(:disabled) {
+  background-color: var(--primary-color-hover);
+  border-color: var(--primary-color-hover);
+  color: #fff;
+}
+
+.over-under-toggle:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ─── Period selector ───────────────────────────────────────────────── */
 
 .period-selector {

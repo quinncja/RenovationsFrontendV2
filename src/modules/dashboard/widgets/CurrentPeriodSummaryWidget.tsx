@@ -3,6 +3,7 @@ import { RotateCcw } from "lucide-react"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import { fullMonth, shortMonth, marginTextColor } from "../../../shared/utils/format"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
+import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import { useSummaryYear } from "./summaryYearContext"
 import { useMarginPerformanceFor } from "./useMarginPerformanceFor"
 import { SummarySnapshotCard } from "./SummarySnapshotCard"
@@ -17,6 +18,7 @@ type Period = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
 interface OpenMonth {
   openMonthIncome?: number
   openMonthSpent?: number
+  openMonthOverUnder?: number
   openMonthPeriod?: number
   openMonthYear?: number
 }
@@ -39,6 +41,7 @@ export function CurrentPeriodSummaryWidget() {
   const pageYear = usePageYear()
   const ctx = useSummaryYear()
   const marginColorsOn = useMarginColorsEnabled()
+  const [includeOverUnder] = useIncludeOverUnder()
   // Inside the merged card, follow the shared year (the YearSummary half's
   // selector). Standalone (e.g. BusinessSummaryPage), follow page year.
   const effectiveYear = ctx?.year ?? pageYear
@@ -79,22 +82,28 @@ export function CurrentPeriodSummaryWidget() {
   const showReset =
     explicitPeriod != null && openMonth != null && explicitPeriod !== openMonth
 
-  const view = useMemo(() => {
-    // Whenever the resolved month points at the actually-open month for the
-    // open year, prefer the `openMonthFinances` payload — it's the only
-    // source of in-progress data for that month. `marginPerformance` is
-    // built from posted data only and the backend caps it at
-    // mostRecentPeriod.actprd for the current year, so the open month has
-    // no row there and a fall-through would render zeros.
-    const useOpenPayload =
-      open != null &&
-      openYear != null &&
-      openMonth != null &&
-      effectiveYear === openYear &&
-      resolvedMonth === openMonth
+  // True when the card is displaying the actually-open month for the open
+  // year — the only case where the open period's over/under (WIP) applies.
+  const showingOpenMonth =
+    open != null &&
+    openYear != null &&
+    openMonth != null &&
+    effectiveYear === openYear &&
+    resolvedMonth === openMonth
 
-    if (useOpenPayload) {
-      const income = open!.openMonthIncome ?? 0
+  // The over/under (WIP) actually moves the displayed numbers only when the
+  // toggle is on AND the open month is what's on screen.
+  const overUnderApplied = includeOverUnder && showingOpenMonth
+
+  const view = useMemo(() => {
+    // For the actually-open month, prefer the `openMonthFinances` payload —
+    // it's the only source of in-progress data (income/spent and the WIP
+    // over/under). `marginPerformance` does include the open month (it's
+    // fetched with oldestOpenPeriod), but openMonthFinances is the canonical
+    // source for the open-period card and the only one carrying over/under.
+    if (showingOpenMonth) {
+      const wip = includeOverUnder ? open!.openMonthOverUnder ?? 0 : 0
+      const income = (open!.openMonthIncome ?? 0) + wip
       const cogs = open!.openMonthSpent ?? 0
       const grossProfit = income - cogs
       const margin = income !== 0 ? grossProfit / income : null
@@ -114,7 +123,7 @@ export function CurrentPeriodSummaryWidget() {
     const grossProfit = row?.gross_profit ?? 0
     const margin = income !== 0 ? grossProfit / income : null
     return { income, cogs, grossProfit, margin }
-  }, [open, marginRows, openYear, openMonth, effectiveYear, resolvedMonth])
+  }, [open, marginRows, resolvedMonth, showingOpenMonth, includeOverUnder])
 
   const status: Status | null =
     resolvedMonth != null ? monthStatus(effectiveYear, resolvedMonth, openYear, openMonth) : null
@@ -123,7 +132,7 @@ export function CurrentPeriodSummaryWidget() {
 
   return (
     <SummarySnapshotCard
-      title="Period Summary"
+      title={overUnderApplied ? "Period Summary — including current over / under" : "Period Summary"}
       className="period-summary-widget"
       actions={
         <>

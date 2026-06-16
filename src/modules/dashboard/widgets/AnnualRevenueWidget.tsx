@@ -3,12 +3,21 @@ import { Widget } from "../../../shared/components/Widget/Widget"
 import { Chart } from "../../../shared/components/Chart/Chart"
 import { useWidgetData } from "../../../shared/context/PageContext"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
+import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import { PRE_2018_REVENUE } from "../config/historicalRevenue"
 
+interface OpenMonth {
+  openMonthYear?: number
+  openMonthIncome?: number
+  openMonthOverUnder?: number
+}
+
 export function AnnualRevenueWidget() {
+  const [includeOverUnder] = useIncludeOverUnder()
   const { data, isLoading } = useWidgetData<{
     annualRevenueTrend: { year: number; revenue: number }[] | null
-  }>(["annualRevenueTrend"])
+    openMonthFinances: OpenMonth | null
+  }>(["annualRevenueTrend", "openMonthFinances"])
 
   const series = useMemo(() => {
     const raw = data?.annualRevenueTrend
@@ -19,11 +28,26 @@ export function AnnualRevenueWidget() {
     const dbYears = raw.filter((d) => d.year > 0)
     if (dbYears.length === 0) return null
     const years = [...PRE_2018_REVENUE, ...dbYears].sort((a, b) => a.year - b.year)
+
+    // annualRevenueTrend is capped at the last closed period, so the open
+    // month isn't in its year's point. Fold the open month's confirmed
+    // billings into that point (matching the Year Summary / stat cards), plus
+    // its over/under WIP when the toggle is on.
+    const open = data?.openMonthFinances
+    const openYear = open?.openMonthYear ?? null
+    const openContribution =
+      open && openYear != null
+        ? (open.openMonthIncome ?? 0) + (includeOverUnder ? open.openMonthOverUnder ?? 0 : 0)
+        : 0
+
     return [{
       id: "Revenue",
-      data: years.map((d) => ({ x: String(d.year), y: d.revenue })),
+      data: years.map((d) => ({
+        x: String(d.year),
+        y: d.year === openYear ? d.revenue + openContribution : d.revenue,
+      })),
     }]
-  }, [data?.annualRevenueTrend])
+  }, [data?.annualRevenueTrend, data?.openMonthFinances, includeOverUnder])
 
   // "You are here" pulse on the current calendar year's data point. The
   // chart shows years as x-values (`String(year)`), so the seriesId +

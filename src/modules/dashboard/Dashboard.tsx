@@ -10,6 +10,7 @@ import { DashboardLayoutProvider, useDashboardLayout } from "./context/Dashboard
 import { SectionPager } from "./components/SectionPager"
 import { SectionEditor } from "./components/SectionEditor"
 import { EditModeToggle } from "./components/EditModeToggle"
+import { OverUnderToggle } from "./components/OverUnderToggle"
 import { EditModeToolbar } from "./components/EditModeToolbar"
 import { WelcomeWalkthrough, GearHintPopover } from "./components/WelcomeWalkthrough"
 import { EmployeeDetail } from "./EmployeeDetailPage"
@@ -80,6 +81,7 @@ function AdminDashboard({ year, onYearChange }: { year: number; onYearChange: (y
           <EditModeToolbar />
         ) : showWelcome ? undefined : (
           <>
+            <OverUnderToggle />
             <YearSelector value={year} onChange={onYearChange} />
             <EditModeToggle highlight={gearHint} onActivate={() => setGearHint(false)} />
           </>
