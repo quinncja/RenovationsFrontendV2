@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, type CSSProperties } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Page from "../../shared/components/Page"
+import { FilterPills } from "../../shared/components/FilterPills"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
@@ -62,34 +63,6 @@ const STATUS_FILTERS: { key: StatusFilter; label: string; color: string }[] = [
 ]
 
 type SortKey = "type" | "invoiceDate" | "total" | "entityName" | "status"
-
-function FilterPills<T extends string | number>({
-  label, options, value, onChange,
-}: {
-  label: string
-  options: { key: T; label: string; color: string }[]
-  value: T
-  onChange: (v: T) => void
-}) {
-  return (
-    <div className="invoices-filter-group">
-      <span className="invoices-filter-label">{label}</span>
-      <div className="filter-pills">
-        {options.map((opt) => (
-          <button
-            key={String(opt.key)}
-            type="button"
-            className={`filter-pill${value === opt.key ? " filter-pill--active" : ""}`}
-            style={{ "--pill": opt.color } as CSSProperties}
-            onClick={() => onChange(opt.key)}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 // Sheet groups mirror the desktop pills (single-select per group).
 const FILTER_GROUPS: FilterGroup[] = [

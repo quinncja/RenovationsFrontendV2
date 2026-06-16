@@ -754,6 +754,19 @@ body{
   border-right: 1px solid var(--border-color);
 }
 
+/* Round the end buttons' outer corners directly rather than relying on the
+   parent's `overflow: hidden` + `border-radius` to clip the active fill.
+   WebKit frequently fails to clip a child background to a rounded parent,
+   which renders the active button as a square inside the pill. */
+.period-selector-btn:first-child {
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+}
+.period-selector-btn:last-child {
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+}
+
 .period-selector-btn:hover:not(:disabled) {
   background-color: color-mix(in srgb, var(--primary-color) 8%, transparent);
 }
@@ -4772,11 +4785,37 @@ body{
 }
 
 .co-widget-toolbar {
+  /* Shared height for the search bar, status pills, and scope toggle so the
+     whole control row aligns to a single line. */
+  --co-control-h: 2.125rem;
   display: flex;
   align-items: center;
   gap: 1rem;
   padding: 0.75rem 1.25rem 0.875rem;
   border-bottom: 1px solid var(--border-color);
+}
+
+/* Status pills and scope toggle match the search bar's height. The search
+   input is border-box, but pills/toggle default to content-box (no global
+   reset), so their 1.5px borders must be folded into the height to align. */
+.co-widget-toolbar .filter-pill {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  height: var(--co-control-h);
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.co-widget-toolbar .jc-scope-toggle {
+  box-sizing: border-box;
+  height: var(--co-control-h);
+}
+.co-widget-toolbar .jc-scope-toggle .period-selector-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .co-search-wrapper {
@@ -4796,7 +4835,8 @@ body{
 
 .co-search-input {
   width: 100%;
-  padding: 0.4375rem 0.875rem 0.4375rem 2.25rem;
+  height: var(--co-control-h);
+  padding: 0 0.875rem 0 2.25rem;
   font-size: 0.875rem;
   font-family: var(--font-family);
   background: transparent;
@@ -4815,11 +4855,22 @@ body{
 
 /* Job Costing scope toggle (My Projects / All Projects) sits in the left
    filter cluster, divided from the Status pills so the two filters read as
-   distinct groups. */
+   distinct groups. The divider is drawn as a pseudo-element in the toolbar
+   gap rather than as padding/border on the pill itself — putting it on the
+   pill would push empty space inside the rounded border. */
 .jc-scope-toggle {
-  padding-left: 1rem;
-  border-left: 1px solid var(--border-color);
+  position: relative;
   flex-shrink: 0;
+}
+.jc-scope-toggle::before {
+  content: "";
+  position: absolute;
+  left: -0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 60%;
+  background: var(--border-color);
 }
 
 /* Sortable column headers inside spend-rank-table */
