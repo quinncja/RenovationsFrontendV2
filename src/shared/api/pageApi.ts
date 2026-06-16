@@ -1,4 +1,5 @@
 import fetchWithRetry from "../utils/fetchWithRetry"
+import fetchWithTimeout from "../utils/fetchWithTimeout"
 import { auth } from "../../core/auth/firebase"
 
 export type ModuleName =
@@ -95,11 +96,7 @@ export async function fetchPageData(
     const queryString = searchParams.toString()
     const url = `${API_BASE_URL}${endpoint}${queryString ? `?${queryString}` : ""}`
 
-    const response = await fetch(url, {
-      method: "GET",
-      headers,
-      signal,
-    })
+    const response = await fetchWithTimeout(url, { method: "GET", headers, signal })
 
     if (!response.ok) {
       const error = new Error(`HTTP ${response.status}`) as Error & { status: number }

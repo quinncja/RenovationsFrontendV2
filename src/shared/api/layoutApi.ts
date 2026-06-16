@@ -1,4 +1,5 @@
 import fetchWithRetry from "../utils/fetchWithRetry"
+import fetchWithTimeout from "../utils/fetchWithTimeout"
 import { auth } from "../../core/auth/firebase"
 import type { DashboardLayout } from "../../modules/dashboard/types/dashboardLayout"
 
@@ -9,7 +10,7 @@ export async function fetchDashboardLayout(): Promise<DashboardLayout | null> {
   return fetchWithRetry(async () => {
     const token = await auth.currentUser?.getIdToken()
 
-    const response = await fetch(`${API_BASE_URL}/user/dashboard-layout`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/user/dashboard-layout`, {
       method: "GET",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -32,7 +33,7 @@ export async function saveDashboardLayout(layout: DashboardLayout): Promise<void
   return fetchWithRetry(async () => {
     const token = await auth.currentUser?.getIdToken()
 
-    const response = await fetch(`${API_BASE_URL}/user/dashboard-layout`, {
+    const response = await fetchWithTimeout(`${API_BASE_URL}/user/dashboard-layout`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",

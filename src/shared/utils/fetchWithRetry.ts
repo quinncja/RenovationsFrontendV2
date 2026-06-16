@@ -28,7 +28,7 @@ export default async function fetchWithRetry<T>(
   apiFn: () => Promise<T>,
   config: RetryConfig = {}
 ): Promise<T> {
-  const { retries = 3, baseDelay = 300, onRetry } = config
+  const { retries = 5, baseDelay = 300, onRetry } = config
 
   let lastError: unknown
 
