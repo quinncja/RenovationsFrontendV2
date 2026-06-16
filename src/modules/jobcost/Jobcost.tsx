@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, Fragment } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ExternalLink } from "lucide-react"
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ExternalLink, ChartNoAxesColumn } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
@@ -344,7 +344,11 @@ export default function Jobcost() {
     <Page title="Job Costing" actions={<YearSelector value={year} onChange={setYear} allowAllTime />}>
       <MotionList className="inv-page-stack">
         <MotionItem>
-          <Widget loading={loading} noData={!loading && jobs.length === 0} className="co-widget">
+          {/* No `loading`/`noData` on the Widget: those swap the whole body for a
+              skeleton, which would take the toolbar (scope toggle, search,
+              filters) with it. Keep the toolbar mounted and skeleton only the
+              data region below so the navbar stays put across reloads/toggles. */}
+          <Widget className="co-widget">
             <div className="co-widget-toolbar">
               {!isMobile && (
                 <FilterPills label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
@@ -396,7 +400,14 @@ export default function Jobcost() {
               </span>
             </div>
 
-            {filtered.length === 0 && (search || statusFilter !== "all") ? (
+            {loading ? (
+              <div className="widget-skeleton" />
+            ) : jobs.length === 0 ? (
+              <div className="widget-no-data">
+                <ChartNoAxesColumn size={24} className="widget-no-data-icon" />
+                <span className="body-text">No data available</span>
+              </div>
+            ) : filtered.length === 0 && (search || statusFilter !== "all") ? (
               <div className="co-no-results body-text text-secondary">
                 {search ? `No jobs match "${search}"` : "No jobs match your filters"}
               </div>
