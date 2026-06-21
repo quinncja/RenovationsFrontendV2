@@ -128,6 +128,29 @@ function ProgressBillingsContent() {
     })
   }, [projects, search, sortKey, sortDir])
 
+  // Column sum totals for the table footer — over the currently-visible
+  // (filtered) rows so the row reconciles with what's on screen. Billed/Earned
+  // percentages roll up against the summed contract.
+  const footer = useMemo(() => {
+    const t = filtered.reduce(
+      (acc, p) => {
+        acc.contract += p.contract
+        acc.budget += p.budget
+        acc.cost += p.cost
+        acc.billed += p.billed
+        acc.expected += p.expected
+        acc.variance += p.variance
+        return acc
+      },
+      { contract: 0, budget: 0, cost: 0, billed: 0, expected: 0, variance: 0 },
+    )
+    return {
+      ...t,
+      billedPct: t.contract > 0 ? t.billed / t.contract : 0,
+      expectedPct: t.contract > 0 ? t.expected / t.contract : 0,
+    }
+  }, [filtered])
+
   return (
     <Page
       title="Progress Billings"
@@ -225,9 +248,18 @@ function ProgressBillingsContent() {
                             <div className="body-text emphasized">{p.name}</div>
                             {p.client && <div className="cell-secondary">{p.client}</div>}
                           </td>
-                          <td className="spend-rank-table-value body-text">{formatMoneyFull(p.contract)}</td>
-                          <td className="spend-rank-table-value body-text">{formatMoneyFull(p.budget)}</td>
-                          <td className="spend-rank-table-value body-text">{formatMoneyFull(p.cost)}</td>
+                          <td className="spend-rank-table-value body-text">
+                            <div>{formatMoneyFull(p.contract)}</div>
+                            <div className="cell-secondary">Contract</div>
+                          </td>
+                          <td className="spend-rank-table-value body-text">
+                            <div>{formatMoneyFull(p.budget)}</div>
+                            <div className="cell-secondary">Budget</div>
+                          </td>
+                          <td className="spend-rank-table-value body-text">
+                            <div>{formatMoneyFull(p.cost)}</div>
+                            <div className="cell-secondary">Cost</div>
+                          </td>
                           <td className="spend-rank-table-value body-text">
                             <div>{formatMoneyFull(p.billed)}</div>
                             <div className="cell-secondary">{pct(p.billedPct)} billed</div>
@@ -252,6 +284,48 @@ function ProgressBillingsContent() {
                       )
                     })}
                   </tbody>
+                  <tfoot>
+                    <tr className="pb-total-row">
+                      <td className="spend-rank-table-name body-text emphasized">
+                        Total
+                        <span className="cell-secondary">
+                          {filtered.length} {filtered.length === 1 ? "project" : "projects"}
+                        </span>
+                      </td>
+                      <td className="spend-rank-table-value body-text emphasized">
+                        <div>{formatMoneyFull(footer.contract)}</div>
+                        <div className="cell-secondary">Contract</div>
+                      </td>
+                      <td className="spend-rank-table-value body-text emphasized">
+                        <div>{formatMoneyFull(footer.budget)}</div>
+                        <div className="cell-secondary">Budget</div>
+                      </td>
+                      <td className="spend-rank-table-value body-text emphasized">
+                        <div>{formatMoneyFull(footer.cost)}</div>
+                        <div className="cell-secondary">Cost</div>
+                      </td>
+                      <td className="spend-rank-table-value body-text emphasized">
+                        <div>{formatMoneyFull(footer.billed)}</div>
+                        <div className="cell-secondary">{pct(footer.billedPct)} billed</div>
+                      </td>
+                      <td className="spend-rank-table-value body-text emphasized">
+                        <div>{formatMoneyFull(footer.expected)}</div>
+                        <div className="cell-secondary">{pct(footer.expectedPct)} complete</div>
+                      </td>
+                      <td className="spend-rank-table-value body-text emphasized pb-overunder-cell">
+                        <div className="pb-overunder-inner">
+                          <span>{formatMoneyFull(Math.abs(footer.variance))}</span>
+                          {footer.variance < 0 ? (
+                            <span className="pb-dir-pill pb-dir-pill--over">over</span>
+                          ) : footer.variance > 0 ? (
+                            <span className="pb-dir-pill pb-dir-pill--under">under</span>
+                          ) : (
+                            <span className="pb-dir-pill pb-dir-pill--even">even</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             )}

@@ -5995,6 +5995,11 @@ body{
 .widget-placeholder-pie   { height: 280px; }
 .widget-placeholder-bar   { height: 280px; }
 .widget-placeholder-table { height: 280px; }
+/* Business Financials bespoke shapes — sized like the other chart-class
+   placeholders so rows line up in the editor. */
+.widget-placeholder-bankingPair      { height: 280px; }
+.widget-placeholder-forecast         { height: 280px; }
+.widget-placeholder-progressBillings { height: 280px; }
 /* Summary = two stacked stat snapshots. Sized to roughly match the real
    merged card's rendered footprint (two .widget cards: each header +
    snapshot-headline + 4-tile stat-grid, with .card padding 1.25rem). */
@@ -6216,6 +6221,123 @@ svg.placeholder-illustration {
   height: 56px;
   border-radius: 6px;
   background: var(--border-color);
+}
+
+/* Banking & Overdue illustration — two cards side by side (Banking |
+   Overdue), each filling the body height so the pair reads like the real
+   widget. */
+.widget-placeholder-body:has(.placeholder-illustration-banking),
+.widget-placeholder-body:has(.placeholder-illustration-progress) {
+  align-items: stretch;
+}
+
+.placeholder-illustration-banking {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  gap: 1rem;
+}
+
+.placeholder-bank-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.875rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+/* Small header bar = the card title ("Banking" / "Overdue Billings"). */
+.placeholder-bank-headline {
+  height: 10px;
+  width: 45%;
+  border-radius: 5px;
+  background: var(--border-color);
+}
+
+/* The Cash-in-Bank hero figure. */
+.placeholder-bank-stat {
+  height: 22px;
+  width: 65%;
+  border-radius: 5px;
+  background: var(--border-color);
+}
+
+/* Line-of-Credit meter — a partially-drawn track. */
+.placeholder-bank-meter {
+  margin-top: auto;
+  height: 12px;
+  width: 100%;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgb(from var(--primary-color) r g b / 0.35) 0 55%,
+    var(--border-color) 55% 100%
+  );
+}
+
+/* AR / AP rows in the Overdue card. */
+.placeholder-bank-line {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--border-color);
+}
+
+/* Net-position footer. */
+.placeholder-bank-footer {
+  margin-top: auto;
+  height: 12px;
+  width: 50%;
+  border-radius: 6px;
+  background: var(--border-color);
+}
+
+/* Progress Billings illustration — net-stat column beside a project table. */
+.placeholder-illustration-progress {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  gap: 1.25rem;
+  align-items: stretch;
+}
+
+.placeholder-progress-stat {
+  flex: 0 0 32%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+  padding-right: 1.25rem;
+  border-right: 1px solid var(--border-color);
+}
+
+/* Hero "Net over/under-billed" figure. */
+.placeholder-progress-hero {
+  height: 32px;
+  width: 80%;
+  border-radius: 6px;
+  background: var(--border-color);
+}
+
+.placeholder-progress-sub {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.placeholder-progress-subtile {
+  flex: 1;
+  height: 44px;
+  border-radius: 6px;
+  background: var(--border-color);
+}
+
+.placeholder-progress-table {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
 }
 
 .widget-size-toggle {
@@ -6655,7 +6777,10 @@ svg.placeholder-illustration {
 .section-editor-canvas .widget-placeholder-line,
 .section-editor-canvas .widget-placeholder-pie,
 .section-editor-canvas .widget-placeholder-bar,
-.section-editor-canvas .widget-placeholder-table {
+.section-editor-canvas .widget-placeholder-table,
+.section-editor-canvas .widget-placeholder-bankingPair,
+.section-editor-canvas .widget-placeholder-forecast,
+.section-editor-canvas .widget-placeholder-progressBillings {
   height: 150px;
 }
 
@@ -8790,6 +8915,17 @@ svg.placeholder-illustration {
 .pb-dir-pill--even {
   background: var(--hover-bg);
   color: var(--secondary-text);
+}
+
+/* Progress Billings table summary row — a non-clickable sum-totals row pinned
+   to the table foot. Heavier top border + faint tint sets it apart from the
+   data rows without the row-hover affordance. */
+.pb-total-row td {
+  border-top: 2px solid var(--border-color);
+  background: var(--hover-bg);
+}
+.pb-total-row .cell-secondary {
+  margin-left: 0.5rem;
 }
 
 /* Mobile: the half-width Progress Billings layout (net headline + 4-column

@@ -32,8 +32,20 @@ import { BankingOverdueWidget } from "../widgets/banking/BankingOverdueWidget"
 import { UpcomingBillingsWidget } from "../widgets/billings/UpcomingBillingsWidget"
 import { ProgressBillingsWidget } from "../widgets/ProgressBillingsWidget"
 
-// Drives the placeholder illustration shown in edit mode.
-export type WidgetVisualType = "stat" | "line" | "pie" | "bar" | "table" | "summary"
+// Drives the placeholder illustration shown in edit mode. The last three are
+// bespoke shapes for the Business Financials widgets so their edit-mode
+// skeletons read like the real widgets (a card pair, a diverging forecast, a
+// net-stat + table) rather than a generic stat/bar.
+export type WidgetVisualType =
+  | "stat"
+  | "line"
+  | "pie"
+  | "bar"
+  | "table"
+  | "summary"
+  | "bankingPair"
+  | "forecast"
+  | "progressBillings"
 
 export interface WidgetRegistryEntry {
   id: WidgetId
@@ -158,7 +170,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
     id: "banking",
     component: BankingOverdueWidget,
     label: "Banking & Overdue",
-    visualType: "stat",
+    visualType: "bankingPair",
     // Half width — shares the first row with Upcoming Billings.
     defaultColSpan: 1,
   },
@@ -166,7 +178,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
     id: "billings",
     component: UpcomingBillingsWidget,
     label: "Upcoming Billings",
-    visualType: "bar",
+    visualType: "forecast",
     // Half width — shares the first row with Banking & Overdue.
     defaultColSpan: 1,
   },
@@ -174,7 +186,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
     id: "progressBillings",
     component: ProgressBillingsWidget,
     label: "Progress Billings",
-    visualType: "stat",
+    visualType: "progressBillings",
     // Full width — its own second row (stat column beside the project table).
     defaultColSpan: 2,
   },

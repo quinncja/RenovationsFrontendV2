@@ -137,6 +137,83 @@ function SummaryPlaceholder() {
   )
 }
 
+/** Decorative Banking & Overdue — two side-by-side cards mirroring the real
+ * widget: Banking (Cash stat + Line-of-Credit meter) beside Overdue (AR + AP
+ * lines + a net-position footer). */
+function BankingPairPlaceholder() {
+  return (
+    <div className="placeholder-illustration placeholder-illustration-banking">
+      {/* Banking: cash value + credit meter */}
+      <div className="placeholder-bank-card">
+        <div className="placeholder-bank-headline" />
+        <div className="placeholder-bank-stat" />
+        <div className="placeholder-bank-meter" />
+      </div>
+      {/* Overdue: AR / AP lines + net footer */}
+      <div className="placeholder-bank-card">
+        <div className="placeholder-bank-headline" />
+        <div className="placeholder-bank-line" style={{ width: "80%" }} />
+        <div className="placeholder-bank-line" style={{ width: "62%" }} />
+        <div className="placeholder-bank-footer" />
+      </div>
+    </div>
+  )
+}
+
+/** Decorative billings forecast — two diverging lines about a zero axis: AR
+ * (money in) riding above, AP (money out) dipping below, matching the real
+ * Upcoming Billings line chart. */
+function ForecastPlaceholder() {
+  return (
+    <svg viewBox="0 0 200 80" preserveAspectRatio="none" className="placeholder-illustration">
+      <line x1="0" y1="40" x2="200" y2="40" stroke="var(--border-color)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+      {/* AR — above zero (green, money in) */}
+      <path
+        d="M0,32 C30,28 50,20 80,24 C110,28 140,14 170,18 C185,20 195,15 200,14"
+        fill="none"
+        stroke="#22c55e"
+        strokeWidth="2"
+        strokeOpacity="0.45"
+        vectorEffect="non-scaling-stroke"
+      />
+      {/* AP — below zero (brand, money out) */}
+      <path
+        d="M0,48 C30,52 50,60 80,56 C110,52 140,66 170,62 C185,60 195,65 200,66"
+        fill="none"
+        stroke="var(--primary-color)"
+        strokeWidth="2"
+        strokeOpacity="0.45"
+        vectorEffect="non-scaling-stroke"
+      />
+    </svg>
+  )
+}
+
+/** Decorative Progress Billings — a net-position stat column (hero figure +
+ * two sub-tiles) beside the top-variance project table, mirroring the real
+ * full-width widget. */
+function ProgressBillingsPlaceholder() {
+  return (
+    <div className="placeholder-illustration placeholder-illustration-progress">
+      <div className="placeholder-progress-stat">
+        <div className="placeholder-progress-hero" />
+        <div className="placeholder-progress-sub">
+          <div className="placeholder-progress-subtile" />
+          <div className="placeholder-progress-subtile" />
+        </div>
+      </div>
+      <div className="placeholder-progress-table">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="placeholder-table-row">
+            <div className="placeholder-table-cell" style={{ width: "55%" }} />
+            <div className="placeholder-table-cell" style={{ width: "20%" }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function PlaceholderIllustration({ type }: { type: WidgetVisualType }) {
   switch (type) {
     case "line":
@@ -151,5 +228,11 @@ export function PlaceholderIllustration({ type }: { type: WidgetVisualType }) {
       return <StatPlaceholder />
     case "summary":
       return <SummaryPlaceholder />
+    case "bankingPair":
+      return <BankingPairPlaceholder />
+    case "forecast":
+      return <ForecastPlaceholder />
+    case "progressBillings":
+      return <ProgressBillingsPlaceholder />
   }
 }
