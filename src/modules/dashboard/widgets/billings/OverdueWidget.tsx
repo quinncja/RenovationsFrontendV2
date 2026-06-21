@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { X } from "lucide-react"
-import { Widget } from "../../../../shared/components/Widget/Widget"
+import { X, ArrowDown, ArrowUp } from "lucide-react"
+import { StatPairCard } from "../StatPairCard"
 import { InvoiceDetailModal } from "../../../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { useWidgetData } from "../../../../shared/context/PageContext"
 import { SortableHeader } from "../../../../shared/components/SortableHeader"
@@ -151,34 +151,67 @@ export function OverdueWidget() {
     { recnum: string; module: "clients" | "suppliers" } | null
   >(null)
 
+  // Net overdue position: receivables (money in) minus payables (money out).
+  const net = forecast ? forecast.overdueAR - forecast.overdueAP : 0
+
   return (
-    <Widget title="Overdue" loading={isLoading} noData={!forecast} className="billings-overdue-card">
-      {forecast && (
-        <div className="billings-positions">
-          <button
-            type="button"
-            className="overdue-stat overdue-ar overdue-stat-clickable"
-            onClick={() => setOpenSide("AR")}
-            disabled={forecast.overdueARCount === 0}
-            title="View overdue AR invoices"
-          >
-            <span className="overdue-label">AR overdue</span>
-            <span className="overdue-amount">{formatMoneyFull(forecast.overdueAR)}</span>
-            <span className="overdue-count">{invoiceLabel(forecast.overdueARCount)}</span>
-          </button>
-          <button
-            type="button"
-            className="overdue-stat overdue-ap overdue-stat-clickable"
-            onClick={() => setOpenSide("AP")}
-            disabled={forecast.overdueAPCount === 0}
-            title="View overdue AP invoices"
-          >
-            <span className="overdue-label">AP overdue</span>
-            <span className="overdue-amount">{formatMoneyFull(forecast.overdueAP)}</span>
-            <span className="overdue-count">{invoiceLabel(forecast.overdueAPCount)}</span>
-          </button>
-        </div>
-      )}
+    <>
+      <StatPairCard
+        title="Overdue Billings"
+        loading={isLoading}
+        noData={!forecast}
+        className="billings-overdue-card"
+        top={
+          forecast && (
+            <button
+              type="button"
+              className="overdue-line overdue-line--ar"
+              onClick={() => setOpenSide("AR")}
+              disabled={forecast.overdueARCount === 0}
+              title="View overdue AR invoices"
+            >
+              <span className="overdue-line-head">
+                <span className="overdue-line-title">
+                  <span className="overdue-line-code overdue-line-code--ar">AR</span>
+                </span>
+                <span className="overdue-line-dir"><ArrowDown size={13} /> in</span>
+              </span>
+              <span className="overdue-line-value">{formatMoneyFull(forecast.overdueAR)}</span>
+              <span className="overdue-line-sub">{invoiceLabel(forecast.overdueARCount)}</span>
+            </button>
+          )
+        }
+        bottom={
+          forecast && (
+            <button
+              type="button"
+              className="overdue-line overdue-line--ap"
+              onClick={() => setOpenSide("AP")}
+              disabled={forecast.overdueAPCount === 0}
+              title="View overdue AP invoices"
+            >
+              <span className="overdue-line-head">
+                <span className="overdue-line-title">
+                  <span className="overdue-line-code overdue-line-code--ap">AP</span>
+                </span>
+                <span className="overdue-line-dir"><ArrowUp size={13} /> out</span>
+              </span>
+              <span className="overdue-line-value">{formatMoneyFull(forecast.overdueAP)}</span>
+              <span className="overdue-line-sub">{invoiceLabel(forecast.overdueAPCount)}</span>
+            </button>
+          )
+        }
+        footer={
+          forecast && (
+            <>
+              <span className="overdue-net-label">Net overdue position</span>
+              <span className={`overdue-net-value${net < 0 ? " overdue-net-value--neg" : ""}`}>
+                {formatMoneyFull(net)}
+              </span>
+            </>
+          )
+        }
+      />
 
       <OverdueModal
         side={openSide}
@@ -195,6 +228,6 @@ export function OverdueWidget() {
         module={selectedInvoice?.module ?? "clients"}
         onClose={() => setSelectedInvoice(null)}
       />
-    </Widget>
+    </>
   )
 }

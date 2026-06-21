@@ -1,6 +1,7 @@
 import { StatWidget } from "../../../shared/components/StatWidget/StatWidget"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
+import useIsMobile from "../../../shared/hooks/useIsMobile"
 
 interface OpenMonth {
   openMonthYear?: number
@@ -19,6 +20,8 @@ interface OpenMonth {
 export function CurrentYearRevenueWidget() {
   const year = usePageYear()
   const [includeOverUnder] = useIncludeOverUnder()
+  // Match the WIP toggle's label on mobile; "Work Completed" overflows the card.
+  const isMobile = useIsMobile()
   const { data, isLoading } = useWidgetData<{
     annualRevenueTrend: { year: number; revenue: number }[] | null
     openMonthFinances: OpenMonth | null
@@ -36,7 +39,7 @@ export function CurrentYearRevenueWidget() {
 
   return (
     <StatWidget
-      title={includeOverUnder ? `${year} Revenue + Work Completed` : `${year} Revenue`}
+      title={includeOverUnder ? `${year} Revenue + ${isMobile ? "WIP" : "Work Completed"}` : `${year} Revenue`}
       value={value}
       loading={isLoading}
     />

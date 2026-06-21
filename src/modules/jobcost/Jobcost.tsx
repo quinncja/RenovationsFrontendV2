@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, Fragment } from "react"
-import { useNavigate } from "react-router-dom"
+import { useJobcostNav } from "./useJobcostNav"
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ExternalLink, ChartNoAxesColumn } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
@@ -62,6 +62,9 @@ interface Job {
   totalCommitted: number
   totalIncome: number
   budget: number
+  // Budget − Cost. Positive = under budget, negative = over (mirrors the
+  // expanded view's Projected Variance).
+  variance: number
   margin: number | null
   supervisor: string
 }
@@ -72,6 +75,7 @@ type JobDetail = { budget: BudgetBreakdown | null; costItems: CostItem[] }
 function normalizeProject(p: RawProject): Job {
   const contract = p.totalContract ?? 0
   const totalCost = p.totalCost ?? 0
+  const budget = p.totalBudget ?? p.budget ?? 0
   return {
     recnum: String(p.recnum),
     jobNumber: p.phases?.[0]?.recnum ?? String(p.recnum),
@@ -83,7 +87,8 @@ function normalizeProject(p: RawProject): Job {
     totalCost,
     totalCommitted: p.totalCommitted ?? 0,
     totalIncome: p.totalIncome ?? 0,
-    budget: p.totalBudget ?? p.budget ?? 0,
+    budget,
+    variance: budget - totalCost,
     margin: contract > 0 ? ((contract - totalCost) / contract) * 100 : null,
     supervisor:
       p.pmName?.trim() ??
@@ -92,7 +97,7 @@ function normalizeProject(p: RawProject): Job {
   }
 }
 
-type SortKey = "name" | "status" | "supervisor" | "contract" | "totalCost" | "budget" | "margin"
+type SortKey = "name" | "status" | "supervisor" | "contract" | "totalCost" | "budget" | "variance" | "margin"
 type SortDir = "asc" | "desc"
 
 const STATUS_LABELS: Record<number, string> = {
@@ -130,8 +135,11 @@ const FILTER_GROUPS: FilterGroup[] = [
 ]
 const FILTER_DEFAULTS = { status: "all" }
 
-// Number of <td>s in a job row — drives the expanded panel's colSpan.
-const COLUMN_COUNT = 9
+// <td> count in a job row — drives the expanded panel's colSpan. Base layout
+// is 9 cells; +1 for the Variance column, −1 when Contract is hidden (managers).
+function columnCount(isManager: boolean): number {
+  return 10 - (isManager ? 1 : 0)
+}
 
 function SortTh({ col, label, align = "left", sortKey, sortDir, onSort }: {
   col: SortKey
@@ -223,7 +231,7 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
 }
 
 export default function Jobcost() {
-  const navigate = useNavigate()
+  const { goToJobcost } = useJobcostNav()
   const marginColorsOn = useMarginColorsEnabled()
   // Mobile: the table collapses to a simple tap-through list — name + status
   // on the left, margin + chevron on the right, tap → full project report.
@@ -333,6 +341,7 @@ export default function Jobcost() {
       if (sortKey === "contract") return (a.contract - b.contract) * dir
       if (sortKey === "totalCost") return (a.totalCost - b.totalCost) * dir
       if (sortKey === "budget") return (a.budget - b.budget) * dir
+      if (sortKey === "variance") return (a.variance - b.variance) * dir
       // margin can be null — push nulls to the end regardless of direction.
       const am = a.margin == null ? Number.NEGATIVE_INFINITY : a.margin
       const bm = b.margin == null ? Number.NEGATIVE_INFINITY : b.margin
@@ -418,7 +427,7 @@ export default function Jobcost() {
                     <button
                       type="button"
                       className="jc-mobile-row"
-                      onClick={() => navigate(`/jobcost/${job.jobNumber}`)}
+                      onClick={() => goToJobcost(job.jobNumber)}
                       title="Open full report"
                     >
                       <span className="jc-mobile-main">
@@ -456,9 +465,12 @@ export default function Jobcost() {
                     <SortTh col="name" label="Project" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="supervisor" label="PM" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    {!isManager && (
+                      <SortTh col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    )}
                     <SortTh col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="variance" label="Budget Variance" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <th className="spend-rank-table-name jc-view-th" aria-label="Actions" />
                   </tr>
@@ -491,9 +503,22 @@ export default function Jobcost() {
                             </span>
                           </td>
                           <td className="spend-rank-table-name body-text text-secondary">{job.supervisor || "—"}</td>
-                          <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.contract)}</td>
+                          {!isManager && (
+                            <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.contract)}</td>
+                          )}
                           <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.budget)}</td>
                           <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.totalCost)}</td>
+                          <td
+                            className="spend-rank-table-value body-text emphasized"
+                            style={{
+                              color:
+                                !marginColorsOn || job.margin == null
+                                  ? undefined
+                                  : marginTextColor(job.margin),
+                            }}
+                          >
+                            {formatMoneyFull(job.variance)}
+                          </td>
                           <td
                             className="spend-rank-table-value body-text emphasized"
                             style={{
@@ -510,7 +535,7 @@ export default function Jobcost() {
                               className="button secondary-button jc-view-btn"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                navigate(`/jobcost/${job.jobNumber}`)
+                                goToJobcost(job.jobNumber)
                               }}
                               title="Open full report"
                             >
@@ -520,7 +545,7 @@ export default function Jobcost() {
                         </tr>
                         {isOpen && (
                           <tr className="jc-expand-row">
-                            <td colSpan={COLUMN_COUNT}>
+                            <td colSpan={columnCount(isManager)}>
                               <JobExpandedPanel job={job} detail={details[job.recnum]} marginColorsOn={marginColorsOn} />
                             </td>
                           </tr>

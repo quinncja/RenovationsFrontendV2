@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams, useNavigate, useLocation } from "react-router-dom"
 import { ArrowLeft, ChevronDown, Download } from "lucide-react"
 import { downloadXlsx } from "../../shared/utils/exportXlsx"
 import { buildJobCostXlsx } from "./exportJobCostXlsx"
@@ -21,6 +21,7 @@ import type { ChangeOrder } from "../change-orders/types"
 import type { SpendItem } from "../../shared/components/Chart/chart.types"
 import { colorRamp, hashColor, RAMP_SCHEMES } from "../../shared/config/chartColors"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
+import { JOBCOST_BACK_FALLBACK, type JobcostBackState } from "./useJobcostNav"
 
 const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const INV_STATUS_LABEL: Record<number, string> = { 1: "Open", 2: "Review", 3: "Dispute", 4: "Paid", 5: "Void" }
@@ -52,6 +53,21 @@ interface JobInvoice {
   amountPaid: number
   amountRemaining: number
 }
+// One job's billing position: how much has been billed vs. how much *should* be
+// billed (earned via cost-to-cost % of completion). `variance` (expected −
+// billed) is positive when under-billed, negative when over-billed. Mirrors the
+// dashboard Progress Billings row so the two reconcile.
+interface ProgressBilling {
+  contract: number
+  budget: number
+  cost: number
+  billed: number
+  expected: number
+  billedPct: number // billed ÷ contract (0–1)
+  expectedPct: number // earned ÷ contract (0–1) = % complete
+  variance: number
+  hasBudget: boolean
+}
 
 export default function JobcostDetailPage() {
   const { recnum } = useParams<{ recnum: string }>()
@@ -63,7 +79,7 @@ export default function JobcostDetailPage() {
   return (
     <PageDataProvider
       module="jobcostDetail"
-      queries={["getPhases", "getBudgetByRecnum", "getAllCostItems", "getJobMonthlySpend", "getJobInvoices"]}
+      queries={["getPhases", "getBudgetByRecnum", "getAllCostItems", "getJobMonthlySpend", "getJobInvoices", "getProgressBilling"]}
       params={{ recnum: numericId }}
     >
       <JobcostDetail recnum={recnum} />
@@ -73,6 +89,10 @@ export default function JobcostDetailPage() {
 
 function JobcostDetail({ recnum }: { recnum: string }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const back = (location.state as JobcostBackState | null) ?? null
+  const backTo = back?.backTo ?? JOBCOST_BACK_FALLBACK.to
+  const backLabel = back?.backLabel ?? JOBCOST_BACK_FALLBACK.label
   const marginColorsOn = useMarginColorsEnabled()
   const hashedRelationColors = useHashedRelationColors()
   // Mobile: a slim header — just the job name with status + PM beneath
@@ -85,13 +105,15 @@ function JobcostDetail({ recnum }: { recnum: string }) {
     getAllCostItems: CostItem[] | null
     getJobMonthlySpend: MonthlyCost[] | null
     getJobInvoices: JobInvoice[] | null
-  }>(["getPhases", "getBudgetByRecnum", "getAllCostItems", "getJobMonthlySpend", "getJobInvoices"])
+    getProgressBilling: ProgressBilling | null
+  }>(["getPhases", "getBudgetByRecnum", "getAllCostItems", "getJobMonthlySpend", "getJobInvoices", "getProgressBilling"])
 
   const project = data?.getPhases?.[0] ?? null
   const budget = data?.getBudgetByRecnum ?? null
   const costItems = Array.isArray(data?.getAllCostItems) ? data.getAllCostItems : []
   const monthlyCosts = Array.isArray(data?.getJobMonthlySpend) ? data.getJobMonthlySpend : []
   const invoices = Array.isArray(data?.getJobInvoices) ? data.getJobInvoices : []
+  const pb = data?.getProgressBilling ?? null
 
   const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([])
   const [selectedCO, setSelectedCO] = useState<ChangeOrder | null>(null)
@@ -161,7 +183,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const coTotalContract = changeOrders.reduce((s, co) => s + (Number(co.total) || 0), 0)
   const coPctOfContract = originalContract > 0 ? (coTotalContract / originalContract) * 100 : 0
 
-  const subtitleText = isMobile ? pm : [`#${recnum}`, pm].filter(Boolean).join(" · ")
+  const subtitleText = isMobile ? pm : [pm, `#${recnum}`].filter(Boolean).join(" · ")
   const subtitle = project ? (
     <span className="jcd-subtitle">
       {project.status != null && (
@@ -212,8 +234,8 @@ function JobcostDetail({ recnum }: { recnum: string }) {
       actions={
         isMobile ? undefined : (
           <>
-            <button className="jc-export-btn" onClick={() => navigate("/jobcost")} title="Back to Job Costing">
-              <ArrowLeft size={14} /> Job Costing
+            <button className="jc-export-btn" onClick={() => navigate(backTo)} title={`Back to ${backLabel}`}>
+              <ArrowLeft size={14} /> {backLabel}
             </button>
             <button className="jc-export-btn" onClick={handleExport} disabled={isLoading || !project}>
               <Download size={14} />
@@ -249,6 +271,13 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                 <div className="inv-metric">
                   <span className="inv-metric-value">{formatMoneyFull(project.totalCost)}</span>
                   <span className="inv-metric-label">Spending to Date</span>
+                </div>
+                <div className="inv-metric-divider" />
+                <div className="inv-metric">
+                  <span className="inv-metric-value" style={!marginColorsOn || margin == null ? undefined : { color: marginTextColor(margin) }}>
+                    {formatMoneyFull(totalBudget - project.totalCost)}
+                  </span>
+                  <span className="inv-metric-label">Budget Variance</span>
                 </div>
                 <div className="inv-metric-divider" />
                 <div className="inv-metric">
@@ -343,13 +372,16 @@ function JobcostDetail({ recnum }: { recnum: string }) {
 
         {/* ── Invoiced vs Contract ── */}
         <MotionItem className="col-span-full">
-          <div className="det-section card">
-            <div className="det-section-toggle" onClick={isLoading ? undefined : () => setInvoicesOpen(o => !o)}>
+          <div className="det-section card jcd-billing-card">
+            <div
+              className={!isLoading && invoices.length > 0 ? "det-section-toggle" : undefined}
+              onClick={!isLoading && invoices.length > 0 ? () => setInvoicesOpen(o => !o) : undefined}
+            >
               <div className="det-section-header">
-                <span className="widget-title headline">Invoiced vs Contract</span>
-                {!isLoading && (
+                <span className="widget-title headline">Billing Position</span>
+                {!isLoading && invoices.length > 0 && (
                   <span className="det-section-action">
-                    {invoicesOpen ? "Hide" : "Show"}
+                    {invoicesOpen ? "Hide Invoices" : "Show Invoices"}
                     <ChevronDown size={13} className={`det-section-chevron${invoicesOpen ? " open" : ""}`} />
                   </span>
                 )}
@@ -366,43 +398,113 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                 </div>
               ) : (
                 <>
-                  <div className="jcd-inv-hero">
-                    <div className="jcd-inv-hero-left">
-                      <span className="jcd-inv-pct">{invoicePct.toFixed(1)}%</span>
-                      <span className="jcd-inv-pct-label">of contract invoiced</span>
-                    </div>
-                    <div className="jcd-inv-hero-right">
-                      <span className="jcd-inv-amounts subheadline">
-                        {formatMoneyFull(totalInvoiced)} <span className="text-secondary">of</span> {formatMoneyFull(revisedContract)}
-                      </span>
-                      <div className="jc-invoice-progress-bar">
-                        <div className="jc-invoice-progress-fill" style={{ width: `${Math.min(invoicePct, 100)}%` }} />
+                  {pb && pb.contract > 0 ? (
+                    (() => {
+                      const dir = pb.variance > 0 ? "under" : pb.variance < 0 ? "over" : "even"
+                      const label = dir === "under" ? "Under-billed" : dir === "over" ? "Over-billed" : "On track"
+                      const billedW = Math.min(pb.billedPct * 100, 100)
+                      const earnedW = Math.min(pb.expectedPct * 100, 100)
+                      return (
+                        <div className="jcd-billing-pos">
+                          <div className="jcd-bp-hero">
+                            <div className="jcd-bp-stat">
+                              <span className="jcd-bp-stat-label">Billed</span>
+                              <span className="jcd-bp-stat-value">{formatMoneyFull(pb.billed)}</span>
+                              <span className="jcd-bp-stat-sub">{Math.round(pb.billedPct * 100)}% of contract</span>
+                            </div>
+                            <div className="jcd-bp-stat-divider" />
+                            <div className="jcd-bp-stat">
+                              <span className="jcd-bp-stat-label">Earned</span>
+                              <span className="jcd-bp-stat-value">{formatMoneyFull(pb.expected)}</span>
+                              <span className="jcd-bp-stat-sub">
+                                {pb.hasBudget ? `${Math.round(pb.expectedPct * 100)}% complete` : "no budget — est."}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* One combined meter: billed fill against the contract track,
+                              with a marker at the earned (% complete) position. */}
+                          <div className="jcd-bp-meter-wrap">
+                            <div
+                              className="jcd-bp-meter"
+                              tabIndex={0}
+                              onMouseMove={e => {
+                                const meter = e.currentTarget
+                                const rect = meter.getBoundingClientRect()
+                                const x = e.clientX - rect.left
+                                const tip = meter.querySelector<HTMLElement>(".jcd-bp-meter-tip")
+                                const half = (tip?.offsetWidth ?? 0) / 2
+                                const clamped = Math.max(half, Math.min(x, rect.width - half))
+                                meter.style.setProperty("--bp-tip-x", `${clamped}px`)
+                                meter.style.setProperty("--bp-arrow-x", `${x - clamped}px`)
+                              }}
+                            >
+                              <div className="jcd-bp-meter-fill" style={{ width: `${billedW}%` }} />
+                              <div className="jcd-bp-meter-marker" style={{ left: `${earnedW}%` }} />
+                              <div className="jcd-bp-meter-tip" role="tooltip">
+                                <div className="jcd-bp-tip-row"><span>Billed</span><strong>{formatMoneyFull(pb.billed)}</strong></div>
+                                <div className="jcd-bp-tip-row"><span>Earned</span><strong>{formatMoneyFull(pb.expected)}</strong></div>
+                                <div className="jcd-bp-tip-row"><span>Contract</span><strong>{formatMoneyFull(pb.contract)}</strong></div>
+                              </div>
+                            </div>
+                            <div className="jcd-bp-earned-label" style={{ left: `${earnedW}%` }}>Earned</div>
+                          </div>
+
+                          <div className={`jcd-bp-variance jcd-bp-variance--${dir}`}>
+                            <span className={`pb-dir-pill pb-dir-pill--${dir}`}>{label}</span>
+                            <span className="jcd-bp-variance-amt">{formatMoneyFull(Math.abs(pb.variance))}</span>
+                            <span className="jcd-bp-variance-sub">
+                              {dir === "under"
+                                ? "earned but not yet billed"
+                                : dir === "over"
+                                ? "billed ahead of work earned"
+                                : "billing matches work earned"}
+                            </span>
+                          </div>
+                        </div>
+                      )
+                    })()
+                  ) : (
+                    <div className="jcd-inv-hero">
+                      <div className="jcd-inv-hero-left">
+                        <span className="jcd-inv-pct">{invoicePct.toFixed(1)}%</span>
+                        <span className="jcd-inv-pct-label">of contract invoiced</span>
+                      </div>
+                      <div className="jcd-inv-hero-right">
+                        <span className="jcd-inv-amounts subheadline">
+                          {formatMoneyFull(totalInvoiced)} <span className="text-secondary">of</span> {formatMoneyFull(revisedContract)}
+                        </span>
+                        <div className="jc-invoice-progress-bar">
+                          <div className="jc-invoice-progress-fill" style={{ width: `${Math.min(invoicePct, 100)}%` }} />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="inv-metrics-row jcd-inv-metrics">
-                    <div className="inv-metric">
-                      <span className="inv-metric-value">{formatMoneyFull(totalInvoiced)}</span>
-                      <span className="inv-metric-label">Total Invoiced</span>
-                    </div>
-                    <div className="inv-metric-divider" />
-                    <div className="inv-metric">
-                      <span className="inv-metric-value">{formatMoneyFull(totalPaid)}</span>
-                      <span className="inv-metric-label">Amount Paid</span>
-                    </div>
-                    <div className="inv-metric-divider" />
-                    <div className="inv-metric">
-                      <span className="inv-metric-value invoice-amount-value--remaining">{formatMoneyFull(totalOutstanding)}</span>
-                      <span className="inv-metric-label">Outstanding</span>
-                    </div>
-                  </div>
+                  )}
                 </>
               )}
             </div>
+          </div>
 
             {!isLoading && invoices.length > 0 && (
-              <div className={`det-section-body${invoicesOpen ? " open" : ""}`}>
+              <div className={`det-section-body jcd-invoice-drop${invoicesOpen ? " open" : ""}`}>
                 <div className="det-section-body-inner">
+                  <div className="card jcd-invoice-card">
+                  <div className="jcd-inv-summary">
+                    <div className="jcd-inv-summary-card">
+                      <div className="jcd-inv-summary-card-head">
+                        <span className="jcd-inv-summary-label">Amount Paid</span>
+                        <span className="invoice-status-badge invoice-status-badge--paid">Paid</span>
+                      </div>
+                      <span className="jcd-inv-summary-value">{formatMoneyFull(totalPaid)}</span>
+                    </div>
+                    <div className="jcd-inv-summary-card">
+                      <div className="jcd-inv-summary-card-head">
+                        <span className="jcd-inv-summary-label">Outstanding</span>
+                        <span className="invoice-status-badge invoice-status-badge--open">Open</span>
+                      </div>
+                      <span className="jcd-inv-summary-value">{formatMoneyFull(totalOutstanding)}</span>
+                    </div>
+                  </div>
                   <table className="spend-rank-table inv-table">
                     <thead>
                       <tr>
@@ -438,10 +540,10 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               </div>
             )}
-          </div>
         </MotionItem>
 
         {/* ── Monthly Spend ── */}

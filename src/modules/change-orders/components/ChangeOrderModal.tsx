@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom"
-import { useNavigate } from "react-router-dom"
+import { useJobcostNav } from "../../jobcost/useJobcostNav"
 import { X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { formatMoneyFull, formatDate } from "../../../shared/utils/format"
@@ -48,11 +48,11 @@ export function ChangeOrderModal({ order, onClose }: ChangeOrderModalProps) {
 }
 
 function ChangeOrderModalContent({ order, onClose }: { order: ChangeOrder; onClose: () => void }) {
-  const navigate = useNavigate()
+  const { goToJobcost } = useJobcostNav()
   const items = order.lineItems ?? []
   const openJobcost = () => {
     if (!order.jobnum) return
-    navigate(`/jobcost/${order.jobnum}`)
+    goToJobcost(order.jobnum)
     onClose()
   }
   const subtotal = order.material + order.labor + order.subs + order.wtpm

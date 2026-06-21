@@ -4,6 +4,7 @@ import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import { fullMonth, shortMonth, marginTextColor } from "../../../shared/utils/format"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
+import useIsMobile from "../../../shared/hooks/useIsMobile"
 import { useSummaryYear } from "./summaryYearContext"
 import { useMarginPerformanceFor } from "./useMarginPerformanceFor"
 import { SummarySnapshotCard } from "./SummarySnapshotCard"
@@ -42,6 +43,9 @@ export function CurrentPeriodSummaryWidget() {
   const ctx = useSummaryYear()
   const marginColorsOn = useMarginColorsEnabled()
   const [includeOverUnder] = useIncludeOverUnder()
+  // On mobile match the WIP toggle's label rather than spelling out "Work
+  // Completed", which overflows the stat row.
+  const isMobile = useIsMobile()
   // Inside the merged card, follow the shared year (the YearSummary half's
   // selector). Standalone (e.g. BusinessSummaryPage), follow page year.
   const effectiveYear = ctx?.year ?? pageYear
@@ -178,7 +182,7 @@ export function CurrentPeriodSummaryWidget() {
           // Multiply at the call site rather than changing the helper.
           valueColor: marginColorsOn && view.margin != null ? marginTextColor(view.margin * 100) : undefined,
         },
-        { title: includeOverUnder ? "Billed Income + Work Completed" : "Billed Income", value: view.income },
+        { title: includeOverUnder ? `Billed Income + ${isMobile ? "WIP" : "Work Completed"}` : "Billed Income", value: view.income },
         { title: "COGS", value: view.cogs },
         { title: "Gross Profit", value: view.grossProfit },
       ]}

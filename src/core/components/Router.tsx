@@ -28,6 +28,7 @@ const EmployeeDetailPage = lazy(() => import("../../modules/dashboard/EmployeeDe
 const EmployeesPage = lazy(() => import("../../modules/directory/employees/EmployeesPage.tsx"))
 const MonthlyBreakdownPage = lazy(() => import("../../modules/dashboard/MonthlyBreakdownPage.tsx"))
 const UpcomingBillingsPage = lazy(() => import("../../modules/dashboard/UpcomingBillingsPage.tsx"))
+const ProgressBillingsPage = lazy(() => import("../../modules/dashboard/ProgressBillingsPage.tsx"))
 const Invoices = lazy(() => import("../../modules/invoices/Invoices.tsx"))
 const Users = lazy(() => import("../../modules/users/Users.tsx"))
 const FeedbackPage = lazy(() => import("../../modules/feedback/FeedbackPage.tsx"))
@@ -53,6 +54,7 @@ export default function Router() {
             <Route path="/dashboard" element={<SuspenseWrapper><Dashboard /></SuspenseWrapper>} />
             <Route path="/dashboard/breakdown/:category" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><MonthlyBreakdownPage /></SuspenseWrapper></RequireRole>} />
             <Route path="/dashboard/upcoming-billings" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><UpcomingBillingsPage /></SuspenseWrapper></RequireRole>} />
+            <Route path="/dashboard/progress-billings" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><ProgressBillingsPage /></SuspenseWrapper></RequireRole>} />
             <Route path="/employees" element={<RequireRole allowed={["executive", "admin", "manager"]}><SuspenseWrapper><EmployeesPage /></SuspenseWrapper></RequireRole>} />
             <Route path="/employees/:employeeNum" element={<RequireRole allowed={["executive", "admin", "manager"]}><SuspenseWrapper><EmployeeDetailPage /></SuspenseWrapper></RequireRole>} />
 

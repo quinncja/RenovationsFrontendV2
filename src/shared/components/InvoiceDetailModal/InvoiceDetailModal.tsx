@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { useNavigate } from "react-router-dom"
+import { useJobcostNav } from "../../../modules/jobcost/useJobcostNav"
 import { X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { fetchPageData } from "../../api/pageApi"
@@ -234,7 +234,7 @@ export function InvoiceDetailModal({ invoiceId, module, onClose }: InvoiceDetail
 // ─── AR invoice body ──────────────────────────────────────────────────────────
 
 function ClientInvoiceBody({ header: h }: { header: ClientInvoiceDetail }) {
-  const navigate = useNavigate()
+  const { goToJobcost } = useJobcostNav()
   return (
     <div className="invoice-modal-sections">
       <AmountsStrip
@@ -247,10 +247,10 @@ function ClientInvoiceBody({ header: h }: { header: ClientInvoiceDetail }) {
       {h.jobNum && (
         <section
           className="invoice-modal-section invoice-modal-section-link"
-          onClick={() => navigate(`/jobcost/${h.jobNum}`)}
+          onClick={() => goToJobcost(h.jobNum!)}
           role="button"
           tabIndex={0}
-          onKeyDown={(e) => e.key === "Enter" && navigate(`/jobcost/${h.jobNum}`)}
+          onKeyDown={(e) => e.key === "Enter" && goToJobcost(h.jobNum!)}
         >
           <p className="invoice-modal-section-label">Job</p>
           <div className="invoice-modal-info">

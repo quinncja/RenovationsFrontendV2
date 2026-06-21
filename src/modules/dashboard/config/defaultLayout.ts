@@ -2,7 +2,13 @@ import type { DashboardLayout, SectionLayout, WidgetId } from "../types/dashboar
 import { SECTION_ORDER, WIDGET_DEFAULT_ORDER, WIDGET_HOME_SECTION } from "./sectionRegistry"
 import { WIDGET_REGISTRY } from "./widgetRegistry"
 
-// Default sectioned home layout (v2). Derived from the section registry so it
+// Current layout schema version. Bump when a change must be force-applied to
+// existing saved layouts; reconcileLayout runs the matching one-time migration.
+//   v3 — Business Financials reflow: Banking & Overdue full width, then Progress
+//        Billings + Upcoming Billings half width on the next row.
+export const LAYOUT_VERSION = 3
+
+// Default sectioned home layout. Derived from the section registry so it
 // can never drift from WIDGET_HOME_SECTION / WIDGET_REGISTRY:
 //   • Reports             — Reconciliation, Data Quality, Missing Contracts
 //   • Business Development — Current Year, All-Time, Annual Revenue Trend
@@ -18,7 +24,7 @@ function buildDefaultLayout(): DashboardLayout {
     return { id: sectionId, widgets }
   })
 
-  return { version: 2, columns: 2, sections }
+  return { version: LAYOUT_VERSION, columns: 2, sections }
 }
 
 export const DEFAULT_DASHBOARD_LAYOUT: DashboardLayout = buildDefaultLayout()

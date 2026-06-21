@@ -12,7 +12,7 @@ import {
   WIDGET_DEFAULT_ORDER,
   WIDGET_HOME_SECTION,
 } from "./sectionRegistry"
-import { DEFAULT_DASHBOARD_LAYOUT } from "./defaultLayout"
+import { DEFAULT_DASHBOARD_LAYOUT, LAYOUT_VERSION } from "./defaultLayout"
 
 const KNOWN_WIDGET_IDS = new Set<string>(Object.keys(WIDGET_REGISTRY))
 const KNOWN_SECTION_IDS = new Set<string>(Object.keys(SECTION_REGISTRY))
@@ -102,11 +102,34 @@ function assembleSections(
 }
 
 /**
- * Reconciles a saved layout (v1 flat or v2 sectioned) against the current
- * registries: migrates v1 → v2, remaps split widget ids, drops widgets that no
- * longer exist, preserves the user's order, and appends any registry widgets
- * the saved layout doesn't have. Guarantees every widget lives in exactly one
- * section. Returns the canonical default for unrecognizable input.
+ * One-time, version-gated migrations applied after a saved layout is reconciled.
+ * Each gate runs only when the saved doc predates that version, so a user who
+ * has since re-customized (and been persisted at the current LAYOUT_VERSION) is
+ * left untouched.
+ */
+function migrateSections(sections: SectionLayout[], savedVersion: number): SectionLayout[] {
+  // v3 — force the Business Financials section to the canonical layout (Banking
+  // & Overdue full width; Progress Billings + Upcoming Billings half width on
+  // the next row). Only this section is overridden; every other section keeps
+  // the user's saved order and sizes.
+  if (savedVersion < 3) {
+    const canonical = DEFAULT_DASHBOARD_LAYOUT.sections.find((s) => s.id === "businessFinancials")
+    if (canonical) {
+      sections = sections.map((s) =>
+        s.id === "businessFinancials" ? { ...s, widgets: structuredClone(canonical.widgets) } : s
+      )
+    }
+  }
+  return sections
+}
+
+/**
+ * Reconciles a saved layout (v1 flat or v2+ sectioned) against the current
+ * registries: migrates v1 → sectioned, remaps split widget ids, drops widgets
+ * that no longer exist, preserves the user's order, appends any registry widgets
+ * the saved layout doesn't have, then runs version-gated migrations. Guarantees
+ * every widget lives in exactly one section. Returns the canonical default for
+ * unrecognizable input.
  */
 export function reconcileLayout(saved: unknown): DashboardLayout {
   if (!saved || typeof saved !== "object") {
@@ -114,11 +137,10 @@ export function reconcileLayout(saved: unknown): DashboardLayout {
   }
 
   const doc = saved as { version?: unknown; sections?: unknown; widgets?: unknown }
+  const savedVersion = typeof doc.version === "number" ? doc.version : 0
 
-  // ── v2: sectioned ──────────────────────────────────────────────────
-  if (doc.version === 2 || (doc.version === undefined && Array.isArray(doc.sections))) {
-    if (!Array.isArray(doc.sections)) return structuredClone(DEFAULT_DASHBOARD_LAYOUT)
-
+  // ── Sectioned format (v2+) ─────────────────────────────────────────
+  if (Array.isArray(doc.sections)) {
     const orderedItems: WidgetLayoutItem[] = []
     const savedSectionOrder: SectionId[] = []
 
@@ -133,14 +155,16 @@ export function reconcileLayout(saved: unknown): DashboardLayout {
       }
     }
 
-    return { version: 2, columns: 2, sections: assembleSections(orderedItems, savedSectionOrder) }
+    const sections = migrateSections(assembleSections(orderedItems, savedSectionOrder), savedVersion)
+    return { version: LAYOUT_VERSION, columns: 2, sections }
   }
 
-  // ── v1: flat widget list → migrate ─────────────────────────────────
+  // ── v1: flat widget list → migrate to sectioned ────────────────────
   if (doc.version === 1 || Array.isArray(doc.widgets)) {
     const widgets = Array.isArray(doc.widgets) ? doc.widgets : []
     const orderedItems = (widgets as RawItem[]).flatMap(expandV1Item)
-    return { version: 2, columns: 2, sections: assembleSections(orderedItems, SECTION_ORDER) }
+    const sections = migrateSections(assembleSections(orderedItems, SECTION_ORDER), savedVersion)
+    return { version: LAYOUT_VERSION, columns: 2, sections }
   }
 
   return structuredClone(DEFAULT_DASHBOARD_LAYOUT)

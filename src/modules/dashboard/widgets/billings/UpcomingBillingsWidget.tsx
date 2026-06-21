@@ -5,7 +5,7 @@ import { Widget } from "../../../../shared/components/Widget/Widget"
 import { Chart } from "../../../../shared/components/Chart/Chart"
 import { formatMoney } from "../../../../shared/utils/format"
 import useIsMobile from "../../../../shared/hooks/useIsMobile"
-import { AR_COLOR, AP_COLOR, niceCeil, useAgingForecast } from "./billingsShared"
+import { AR_COLOR, AP_COLOR, useAgingForecast } from "./billingsShared"
 
 /**
  * Upcoming Billings forecast chart. Split out of the former
@@ -17,33 +17,22 @@ export function UpcomingBillingsWidget() {
   const { forecast, isLoading } = useAgingForecast()
   const navigate = useNavigate()
 
-  // Diverging stacked bars: AR stacks up from zero, AP (negated) stacks down,
-  // so each week reads as money-in vs money-out at a glance.
-  const bars = useMemo(
-    () =>
-      forecast?.weeks.map((w) => ({
-        label: w.label,
-        AR: w.ar,
-        AP: -w.ap,
-      })) ?? [],
+  // Diverging lines: AR rides above zero, AP (negated) below, so each week
+  // still reads as money-in vs money-out at a glance — now as two trend lines.
+  const series = useMemo(
+    () => [
+      { id: "AR", color: AR_COLOR, data: forecast?.weeks.map((w) => ({ x: w.label, y: w.ar })) ?? [] },
+      { id: "AP", color: AP_COLOR, data: forecast?.weeks.map((w) => ({ x: w.label, y: -w.ap })) ?? [] },
+    ],
     [forecast]
   )
-
-  // Each direction gets its own nice ceiling so the bars fill the vertical
-  // space — a symmetric ± range wasted half the chart whenever one side
-  // (usually AP) is much smaller. A floor avoids a degenerate axis at zero.
-  const bounds = useMemo(() => {
-    const arMax = Math.max(0, ...(forecast?.weeks.map((w) => w.ar) ?? []))
-    const apMax = Math.max(0, ...(forecast?.weeks.map((w) => w.ap) ?? []))
-    return { max: niceCeil(arMax) || 10_000, min: -(niceCeil(apMax) || 10_000) }
-  }, [forecast])
 
   // Mobile: nine bucket labels crowd the x axis — show every other one
   // ("This Week", Week 3, Week 5, Week 7, "Later").
   const isMobile = useIsMobile()
   const axisBottomTickValues = useMemo(
-    () => (isMobile ? bars.filter((_, i) => i % 2 === 0).map((b) => b.label) : undefined),
-    [isMobile, bars]
+    () => (isMobile ? forecast?.weeks.filter((_, i) => i % 2 === 0).map((w) => w.label) : undefined),
+    [isMobile, forecast]
   )
 
   const viewLink = (
@@ -57,29 +46,22 @@ export function UpcomingBillingsWidget() {
       {forecast && (
         <Chart
           config={{
-            type: "bar",
-            data: bars,
-            keys: ["AR", "AP"],
-            indexBy: "label",
-            colors: [AR_COLOR, AP_COLOR],
+            type: "line",
+            series,
             // Read magnitudes outward from zero — both directions positive.
             yFormat: (v) => formatMoney(Math.abs(v)),
-            minValue: bounds.min,
-            maxValue: bounds.max,
-            // A small tick count keeps the axis clean.
-            axisLeftTickValues: 5,
+            enableArea: true,
+            curve: "monotoneX",
+            legend: true,
             axisBottomTickValues,
-            emphasizeZero: true,
-            // One combined tooltip per week: AR, AP, and their net difference.
-            groupTooltip: true,
-            tooltipTotalLabel: "Net",
-            hideLegend: true,
-            // Click a bar → open the breakdown page at that week's AR/AP folder.
-            onBarClick: (label, side) => {
+            // AR vs AP aren't a period-over-period comparison, so suppress the
+            // multi-series "growth" row in the slice tooltip.
+            disableGrowthTooltip: true,
+            // Click a point → open the breakdown page at that week's card.
+            onPointClick: (label) => {
               const i = forecast?.weeks.findIndex((w) => w.label === label) ?? -1
               const params = new URLSearchParams()
               if (i >= 0) params.set("week", String(i))
-              if (side === "AR" || side === "AP") params.set("side", side)
               const qs = params.toString()
               navigate(`/dashboard/upcoming-billings${qs ? `?${qs}` : ""}`)
             },

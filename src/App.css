@@ -1437,6 +1437,12 @@ body{
   font-weight: 500;
   color: var(--secondary-text);
   flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+/* Hovering the Billing Position card highlights its Show/Hide Invoices toggle. */
+.jcd-billing-card:hover .det-section-action {
+  color: var(--primary-color);
 }
 
 .det-section-chevron {
@@ -1563,6 +1569,22 @@ body{
   flex: 1;
   min-height: 200px;
   border-radius: 8px;
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 20%,
+    color-mix(in srgb, var(--primary-text) 2%, var(--card-color)) 50%,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 80%
+  );
+  background-size: 900px 100%;
+  animation: shimmer 3.2s linear infinite;
+}
+
+/* Inline shimmer bar for content-shaped skeletons that mirror real layout — the
+   width/height are set inline per use so the placeholder matches the value it
+   stands in for. */
+.skel-line {
+  display: block;
+  border-radius: 6px;
   background: linear-gradient(
     115deg,
     color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 20%,
@@ -1788,153 +1810,367 @@ body{
 .billings-leaf-table th:nth-child(7),
 .billings-leaf-table td:nth-child(7) { width: 14%; }
 
-/* The Overdue card stacks two AR/AP position cards; the Upcoming card holds the
-   weekly forecast chart. */
-.billings-positions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  flex: 1;
-}
-.billings-positions .overdue-stat {
-  flex: 1;
-  justify-content: center;
+/* Mobile: the header's three stats (AR in / AP out / Net) can't sit beside the
+   week title without spilling past the card. Stack the header — title row above
+   a full-width stats row — and let the stats share the width evenly. The taller
+   stacked header needs a matching --billings-week-header-h bump so the sticky
+   week header reserves the right height and the pinned AR/AP sub-headers (offset
+   by that variable) don't overlap the rows. */
+@media (max-width: 768px) {
+  .billings-week-card {
+    --billings-week-header-h: 6rem;
+  }
+  .billings-week-card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+  .billings-week-card-stats {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .billings-week-stat {
+    flex: 1 1 0;
+    min-width: 0;
+    align-items: flex-start;
+  }
+  /* First stat reads left-aligned with the title; last holds the right edge. */
+  .billings-week-stat:last-child {
+    align-items: flex-end;
+  }
+  /* The 7-column leaf table can't fit a phone width under fixed layout — the
+     columns crush to nothing. Let it size to its content and scroll horizontally
+     inside the rounded wrapper instead. overscroll-behavior-x keeps the swipe
+     from bubbling up to browser back/forward. */
+  .billings-leaf-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+  .billings-leaf-table {
+    table-layout: auto;
+    width: auto;
+    min-width: 100%;
+  }
+  /* Override the fixed %-width per-column rules (equal specificity, later in the
+     sheet) so each column sizes to its own content and nothing is truncated. */
+  .billings-week-card .billings-leaf-table th,
+  .billings-week-card .billings-leaf-table td {
+    width: auto;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+  }
 }
 
+/* The Overdue card stacks two AR/AP position cards; the Upcoming card holds the
+   weekly forecast chart. */
 /* Billings unit: one widget rendering two cards — Overdue (1/3) beside the
    Upcoming Billings forecast chart (2/3). */
-.billings-pair {
+/* Banking (Cash + LOC) beside the Overdue AR/AP positions — one editor widget,
+   two distinct cards. They share their column equally, but WRAP to stacked when
+   the column is too narrow for both, so the pair can never spill its cell (the
+   section zoom-to-fit only corrects height, not width). */
+.cash-overdue-pair {
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
   width: 100%;
+  min-width: 0;
 }
-.billings-pair > .widget {
+.cash-overdue-pair > .widget {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+/* With the stats side by side the cards no longer need the tall dashboard-home
+   card height — let them shrink to their content so the row sits as compact as
+   the Year / All-Time Revenue stat widgets. */
+.cash-overdue-pair--wide > .widget {
+  min-height: 0;
+}
+/* Upcoming Billings forecast — now its own widget; must be able to shrink to
+   its grid cell so the chart never paints past the row's right edge. */
+.billings-chart-card {
+  width: 100%;
+  /* This stylesheet has no global border-box reset (see note at .overdue-stat),
+     so without this the width:100% sets the CONTENT box to the full cell and the
+     card's 1.25rem padding + 1px border push the border-box ~42px past the cell,
+     spilling the chart at every width. */
+  box-sizing: border-box;
   min-width: 0;
   min-height: 340px;
-}
-.billings-overdue-card {
-  flex: 1; /* 1/3 of the row */
-}
-.billings-chart-card {
-  flex: 2; /* 2/3 of the row */
-  /* Clip the chart tooltip: a near-edge tooltip could briefly extend past the
-     widget and push the whole section into horizontal overflow (a flickering
-     scrollbar). Only the chart card — the Overdue card's hover must not clip. */
   overflow: hidden;
 }
 @media (max-width: 640px) {
-  .billings-pair {
-    flex-direction: column;
-  }
-  /* Stacked: cards size to their content — the desktop 1:2 row ratio
-     (flex-basis 0) would otherwise squeeze the Overdue card below its
-     content, overflowing its bottom padding. */
-  .billings-pair > .widget {
-    flex: 0 0 auto;
+  .cash-overdue-pair > .widget {
+    flex: 1 1 auto;
   }
 }
 
-/* ── Banking widget: Cash in Bank + Line of Credit ──────────────────────
-   Two cards that reuse the home StatWidget look (.stat-widget card). */
-.banking-pair {
-  display: flex;
-  gap: 1rem;
-  width: 100%;
-}
-.banking-pair > .stat-widget {
+/* ══ Banking & Overdue cards ════════════════════════════════════════════
+   Built from the dashboard's existing stat vocabulary (uppercase labels, copper
+   meters on a faint track, tinted status pills, AR-green / AP-red lead-ins) —
+   no card-in-card boxes. Each body is a flex column filling the card height; the
+   bottom action (Open banking / Net position) is pinned to the foot. */
+/* Shared layout for the paired Banking / Overdue cards — see StatPairCard.tsx.
+   Two equal-half stat slots above a fixed-height footer, so the center divider
+   lands at the same Y in both cards regardless of their content. */
+.statpair-body {
   flex: 1;
-  min-width: 0;
-}
-/* "ADVIA" reads as a bold brand lead-in on the stat title. */
-.advia-brand {
-  font-weight: var(--font-weight-bold);
-  color: var(--secondary-text);
-}
-
-/* Line of Credit: drawn / available fraction — the denominator is dimmed so the
-   drawn figure leads, then a status pill below. */
-.loc-fraction-denom {
-  color: var(--secondary-text);
-  font-weight: var(--font-weight-regular);
-}
-.loc-pill {
-  align-self: flex-start;
-  margin-top: 0.125rem;
-  padding: 0.15rem 0.55rem;
-  border-radius: 99px;
-  font-size: 0.75rem;
-  font-weight: var(--font-weight-medium);
-  line-height: 1.2;
-}
-.loc-pill--ok {
-  background: color-mix(in srgb, var(--primary-color) 12%, transparent);
-  color: var(--primary-color);
-}
-.loc-pill--over {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-}
-/* Pin the Overdrawn pill to the card's top-right corner (the "available to
-   draw" pill stays inline below the value). */
-.loc-card {
-  position: relative;
-}
-.loc-card .loc-pill--over {
-  position: absolute;
-  top: 0.85rem;
-  right: 1.25rem;
-  margin-top: 0;
-}
-@media (max-width: 640px) {
-  .banking-pair {
-    flex-direction: column;
-  }
-}
-
-/* AR/AP position stat blocks. Rendered as <button>s (click to open the invoice
-   list modal), so reset the button chrome. */
-.overdue-stat {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  padding: 1rem 1.25rem;
-  border-radius: 10px;
-  background: var(--hover-bg);
-  border: 1px solid var(--border-color);
+  min-width: 0;
+}
+.statpair-slot {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* "ADVIA" tag in the Banking header, mirroring the uppercase widget title. */
+.bank-brand {
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--secondary-text);
+  opacity: 0.75;
+}
+/* Center divider between the two stat slots — same tone as the jobcost stat
+   divider. Equal halves above/below pin it to the same Y across both cards. */
+.statpair-rule {
+  flex: 0 0 auto;
+  height: 1px;
+  background: color-mix(in srgb, var(--primary-text) 10%, transparent);
+}
+/* Pinned footer: a hairline + a single row. The row uses a FIXED height (not
+   min-height) so Overdue's filled net row and Banking's blank one reserve
+   identical space — the equal-halves math above depends on the footer being
+   the same height in both cards. */
+.statpair-footer {
+  flex: 0 0 auto;
+}
+.statpair-footer-rule {
+  border-top: 1px solid color-mix(in srgb, var(--primary-text) 10%, transparent);
+  margin: 1rem 0 0.85rem;
+}
+.statpair-footer-rule--ghost {
+  border-top-color: transparent;
+}
+.statpair-footer-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  height: var(--title2-line-height);
+}
+
+/* Shared uppercase stat label. */
+.bank-row-label,
+.overdue-net-label {
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--secondary-text);
+}
+
+/* ── Banking: Cash in Bank + Line of Credit ── */
+.bank-row {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.bank-cash-line {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+}
+.bank-cash-value {
+  font-size: var(--large-title-size);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+.bank-cash-value--neg {
+  color: #ef4444;
+}
+/* Status pill — same shape/tone as the .pb-dir-pill family used elsewhere. */
+.bank-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: 99px;
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.bank-pill--over {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+/* Drawn-vs-limit meter — same build as the jobcost billing-position meter
+   (copper fill on a faint track). The fill turns red when overdrawn rather than
+   adding a foreign striped overflow segment. */
+.bank-meter {
+  position: relative;
+  height: 12px;
+  margin: 0.6rem 0 0.55rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary-text) 9%, transparent);
+  overflow: hidden;
+}
+.bank-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--primary-color);
+  transition: width 0.5s ease;
+}
+.bank-meter--over .bank-meter-fill {
+  background: #ef4444;
+}
+.bank-loc-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.1rem;
+  font-size: var(--body-size);
+  color: var(--secondary-text);
+}
+.bank-loc-over {
+  color: #ef4444;
+  font-weight: var(--font-weight-semibold);
+}
+
+/* ── Overdue: AR / AP lines + net position ── */
+/* Borderless clickable lines; the AR/AP code carries the money-in green /
+   money-out red cue (the dashboard's established lead-in pattern) instead of an
+   accent bar. Negative inset margin lets the hover fill breathe past the text. */
+.overdue-line {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
   width: 100%;
+  padding: 0.3rem 0.5rem;
+  margin: 0 -0.5rem;
+  background: none;
+  border: none;
   text-align: left;
   font-family: inherit;
   color: inherit;
-}
-/* Subtle brand-orange hover (no lift). */
-.overdue-stat-clickable {
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  border-radius: 8px;
+  transition: background 0.15s ease;
 }
-.overdue-stat-clickable:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--primary-color) 5%, var(--hover-bg));
-  border-color: color-mix(in srgb, var(--primary-color) 18%, var(--border-color));
+.overdue-line:hover:not(:disabled) {
+  background: var(--hover-bg);
 }
-/* Mobile: the AR/AP position buttons read fine compact — stop them stretching
-   to fill the (desktop-height) card and tighten their padding. Charts also get
-   ~10px more height by reclaiming card bottom padding. */
+.overdue-line:disabled {
+  cursor: default;
+}
+.overdue-line-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.overdue-line-title {
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--secondary-text);
+}
+/* AR/AP lead-in: the only colored token on the line. */
+.overdue-line-code {
+  font-weight: var(--font-weight-bold);
+}
+.overdue-line-code--ar { color: #22c55e; }
+.overdue-line-code--ap { color: #ef4444; }
+.overdue-line-dir {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--secondary-text);
+}
+.overdue-line-value {
+  font-size: var(--large-title-size);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+.overdue-line-sub {
+  font-size: var(--body-size);
+  color: var(--secondary-text);
+}
+/* Net-position value in the pinned footer (the .statpair-footer-row supplies the
+   fixed height and the hairline above it). */
+.overdue-net-value {
+  font-size: var(--title2-size);
+  line-height: var(--title2-line-height);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+.overdue-net-value--neg {
+  color: #ef4444;
+}
+
+/* Mobile: cards size to content (no desktop min-height stretch); the chart card
+   reclaims ~10px of bottom padding. */
 @media (max-width: 768px) {
-  .billings-pair > .billings-overdue-card {
+  /* Stack the Banking and Overdue cards full-width rather than squeezing the
+     pair side by side in the narrow single-column cell. */
+  .cash-overdue-pair {
+    flex-direction: column;
+  }
+  .cash-overdue-pair > .widget {
+    flex: 0 0 auto;
+    /* Stack full-width via the column's stretch; an explicit width:100% would set
+       the CONTENT box to the full cell and let padding + border spill ~42px past
+       the screen (no global border-box reset in this sheet). */
+    box-sizing: border-box;
+  }
+  .cash-overdue-pair > .billings-overdue-card {
     min-height: 0;
   }
-  /* The flex:1 chain (flex-basis 0) on the body/positions lets the content
-     overflow the card's bottom padding once the buttons stop stretching —
-     size both to their content instead. */
-  .billings-overdue-card .widget-body,
-  .billings-overdue-card .billings-positions {
+  .billings-overdue-card .widget-body {
     flex: 0 0 auto;
   }
-  .billings-positions .overdue-stat {
+  /* The equal-halves divider layout (StatPairCard) assumes a tall, fixed card
+     height. On mobile the card sizes to content, which collapses the `flex:1 1 0`
+     slots to a zero basis — their large money figures then overflow the
+     zero-height slot and overlap each other and the divider. Let each slot size
+     to its own content and breathe instead. */
+  .billings-overdue-card .statpair-body {
     flex: 0 0 auto;
   }
-  .overdue-stat {
-    padding: 0.55rem 1rem;
-    gap: 0.15rem;
+  .billings-overdue-card .statpair-slot {
+    flex: 0 0 auto;
+    min-height: 0;
+    justify-content: flex-start;
+    padding: 0.6rem 0;
+  }
+  /* Banking's footer is intentionally blank — it only reserves space to keep its
+     divider aligned with Overdue's net-position footer when the two sit side by
+     side. Stacked on mobile there's no alignment to hold, so drop the empty
+     footer rather than leave dead space at the card's bottom. */
+  .banking-card .statpair-footer {
+    display: none;
   }
   .widget.card:has(.chart-container) {
     padding-bottom: calc(1.25rem - 10px);
@@ -1947,32 +2183,6 @@ body{
   .emp-perf-table th:nth-child(2) { width: 34%; }
   .emp-perf-table th:nth-child(3) { width: 22%; }
   .emp-perf-table th { white-space: normal; }
-}
-
-.overdue-stat-clickable:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
-.overdue-label {
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--secondary-text);
-}
-.overdue-amount {
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1.1;
-}
-.overdue-ar .overdue-amount {
-  color: #22c55e;
-}
-.overdue-ap .overdue-amount {
-  color: #ef4444;
-}
-.overdue-count {
-  font-size: 0.75rem;
-  color: var(--secondary-text);
 }
 
 .chart-tooltip {
@@ -3632,6 +3842,97 @@ body{
   border-bottom: 1px solid var(--border-color);
 }
 
+/* The invoice subsection is its own card that slides out from BEHIND the
+   (static) Billing Position widget — a negative margin tucks its top edge under
+   the billing card (which sits on top via z-index), and extra top padding on
+   the card pushes its content clear of the overlap. The negative margin is
+   animated alongside the height so it stays hidden when collapsed. */
+.jcd-billing-card {
+  position: relative;
+  z-index: 1;
+}
+/* The dropdown tucks 12px behind the billing card (which sits on top via
+   z-index, casting its shadow over the seam — the "emerging from behind" look).
+   The matching margin-bottom keeps the collapsed wrapper from shrinking the
+   parent (which would overlap the next widget). Only the height animates. */
+.jcd-invoice-drop {
+  position: relative;
+  z-index: 0;
+  margin-top: -12px;
+  margin-bottom: 12px;
+  /* Bleed the wrapper 12px wider on each side (negative margin) and pad it back
+     in by the same amount, so the card stays full-width/aligned but there's room
+     inside the clip region for its box-shadow to show on the left & right. */
+  margin-left: -12px;
+  margin-right: -12px;
+  padding-left: 12px;
+  padding-right: 12px;
+  /* Do the collapse clipping here (on the wrapper) instead of on the inner, so
+     the inner can let the card's box-shadow show. When closed the grid row is
+     0fr → this wrapper is 0 tall → everything (shadow included) is clipped, so
+     nothing shows. */
+  overflow: hidden;
+  /* Stay fully transparent while closed so no sliver of the undercard (or its
+     shadow) bleeds out from behind the billing card's rounded corners. Snap to
+     visible as it opens, before the height animation reveals it. */
+  opacity: 0;
+}
+.jcd-invoice-drop.open {
+  opacity: 1;
+}
+/* Let the card's shadow escape the inner; min-height:0 lets the 0fr row still
+   collapse with overflow visible. The padding-bottom is the bottom-shadow room,
+   clipped to nothing by the wrapper when closed. */
+.jcd-invoice-drop .det-section-body-inner {
+  overflow: visible;
+  min-height: 0;
+  padding-bottom: 10px;
+}
+.jcd-invoice-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Invoice summary shown when the list is expanded — Amount Paid & Outstanding,
+   mirroring the Billing Position hero's two-up stat language. */
+.jcd-inv-summary {
+  display: flex;
+  justify-content: flex-start;
+  gap: 1.5rem;
+  padding: 40px 1.5rem 1.5rem;
+  margin-top: 5px;
+  margin-bottom: 1.25rem;
+}
+.jcd-inv-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 11rem;
+  padding: 0.875rem 1.25rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+.jcd-inv-summary-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.jcd-inv-summary-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--secondary-text);
+}
+.jcd-inv-summary-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--primary-text);
+}
+
 /* Invoice hero: large percentage + bar */
 .jcd-inv-hero {
   display: flex;
@@ -3682,6 +3983,194 @@ body{
   border-radius: 5px;
   background: var(--primary-color);
   transition: width 0.5s ease;
+}
+
+/* Billing Position: lead with the Billed & Earned amounts; a single combined
+   meter (billed fill + earned marker) carries the visual, contract is context. */
+.jcd-billing-pos {
+  padding: 1rem 1.5rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+.jcd-bp-hero {
+  display: flex;
+  align-items: stretch;
+  gap: 2.5rem;
+  padding: 0.25rem 0 0.5rem;
+}
+.jcd-bp-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1;
+  min-width: 0;
+}
+.jcd-bp-stat-divider {
+  width: 1px;
+  align-self: stretch;
+  background: color-mix(in srgb, var(--primary-text) 10%, transparent);
+}
+.jcd-bp-stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--secondary-text);
+}
+.jcd-bp-stat-value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--primary-text);
+}
+.jcd-bp-stat-sub {
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+}
+
+/* Combined meter — the track is the contract, the fill is billed, the tick is
+   earned. Hovering anywhere on the bar reveals a tooltip with all three. */
+.jcd-bp-meter-wrap {
+  position: relative;
+  padding: 0.25rem 0 1.5rem;
+}
+.jcd-bp-meter {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--primary-text) 9%, transparent);
+  cursor: default;
+}
+.jcd-bp-meter-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
+  border-radius: 6px;
+  background: var(--primary-color);
+  transition: width 0.5s ease;
+}
+.jcd-bp-meter-marker {
+  position: absolute;
+  top: -7px;
+  bottom: -7px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--primary-text);
+  transform: translateX(-50%);
+  z-index: 1;
+  transition: left 0.5s ease;
+}
+/* "EARNED" caption centered under the tick. */
+.jcd-bp-earned-label {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+  white-space: nowrap;
+  transition: left 0.5s ease;
+}
+/* Unified tooltip — fires on hovering any part of the bar. */
+.jcd-bp-meter-tip {
+  position: absolute;
+  bottom: 100%;
+  /* Follows the cursor's X (set on mousemove); fixed on Y. Falls back to centered
+     before the first move. */
+  left: var(--bp-tip-x, 50%);
+  transform: translateX(-50%);
+  margin-bottom: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 12rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: var(--button-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 3;
+}
+.jcd-bp-tip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1.5rem;
+  font-size: 0.8125rem;
+}
+.jcd-bp-tip-row span {
+  color: var(--secondary-text);
+}
+.jcd-bp-tip-row strong {
+  color: var(--primary-text);
+  font-weight: 700;
+}
+.jcd-bp-meter-tip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  /* Keep the arrow pointing at the true cursor X even when the body is clamped. */
+  left: calc(50% + var(--bp-arrow-x, 0px));
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--card-color);
+}
+.jcd-bp-meter:hover .jcd-bp-meter-tip,
+.jcd-bp-meter:focus .jcd-bp-meter-tip {
+  opacity: 1;
+}
+.jcd-bp-variance {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.875rem 1.125rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+.jcd-bp-variance--under {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.55);
+}
+.jcd-bp-variance--over {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.55);
+}
+.jcd-bp-variance--even {
+  background: var(--hover-bg);
+  border-color: color-mix(in srgb, var(--primary-text) 20%, transparent);
+}
+.jcd-bp-variance-amt {
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--primary-text);
+}
+.jcd-bp-variance--under .jcd-bp-variance-amt {
+  color: #16a34a;
+}
+.jcd-bp-variance--over .jcd-bp-variance-amt {
+  color: #dc2626;
+}
+.jcd-bp-variance-sub {
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+}
+
+@media (max-width: 768px) {
+  .jcd-billing-pos {
+    padding: 0.25rem 1rem 1rem;
+  }
+  .jcd-bp-hero {
+    gap: 1rem;
+  }
+  .jcd-bp-stat-value {
+    font-size: 1.5rem;
+  }
 }
 
 /* Chart widget: tighter padding, space between header and chart */
@@ -4429,7 +4918,7 @@ body{
 
 .inv-metric-value {
   font-size: 1.5rem;
-  font-weight: var(--font-weight-semibold);
+  font-weight: 700;
   line-height: 1.15;
   color: var(--primary-text);
   font-variant-numeric: tabular-nums;
@@ -4454,6 +4943,8 @@ body{
 }
 .inv-type-badge--ar { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
 .inv-type-badge--ap { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+/* ADVIA bank — brand purple carried over from the old frontend. */
+.inv-type-badge--advia { background: rgba(159, 61, 172, 0.15); color: #9f3dac; }
 
 /* ── Invoices header: period selector + year, filter/summary toolbar ── */
 .invoices-header-actions {
@@ -4939,6 +5430,7 @@ body{
   white-space: nowrap;
 }
 .co-th-btn-right { justify-content: flex-end; }
+.co-th-btn-center { justify-content: center; }
 
 .co-th-btn:hover { color: var(--primary-text); }
 .co-th-btn-active { color: var(--primary-color); }
@@ -7715,6 +8207,10 @@ svg.placeholder-illustration {
   background: light-dark(#7c8794, #5b6470);
 }
 
+.report-icon-navy {
+  background: #19375a;
+}
+
 .report-card-count {
   font-size: 2.5rem;
   line-height: 1;
@@ -7979,3 +8475,350 @@ svg.placeholder-illustration {
 .jcd-cost-search input::placeholder {
   color: var(--secondary-text);
 }
+
+/* ─── Progress Billings widget ─────────────────────────────────────────────
+   Net over/under (WIP) headline above an airy, full-width data-table of the
+   most under-billed active jobs — same table system as Employee Performance.
+   The widget's `:has(.data-table)` rule zeroes body padding and insets the
+   table cells to 1.25rem; the headline + footer self-pad to match so
+   everything lines up with the widget title. */
+.pb-widget {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Full-width layout: two separate widget cards side by side — the Progress
+   Billings stat column (1/4) and the Top 5 Billing Variance table (3/4). Each is
+   a real .widget card (own shadow / header / skeleton); the pair fills the grid
+   cell exactly like the Banking/Overdue pair, so spacing and shadows match the
+   rest of the dashboard. */
+.pb-pair {
+  flex: 1;
+  display: flex;
+  gap: 1rem;
+  min-width: 0;
+}
+.pb-pair > .widget {
+  min-width: 0;
+}
+.pb-stats-widget {
+  /* Match the Banking card's width above so the gap to the projects card lines
+     up with the Banking/Overdue seam. Banking lives in a nested pair inside a
+     half-width grid column → (50% - 0.5rem grid gap - 1rem pair gap) / 2 =
+     25% - 0.75rem; mirror that here.
+     box-sizing:border-box is essential — this stylesheet has no global
+     border-box reset, so without it the card's 1.25rem padding + 1px border
+     would be added on top of the flex-basis, making it ~42px wider than Banking
+     (whose flex-grow absorbs its own padding). */
+  box-sizing: border-box;
+  flex: 0 0 calc(25% - 0.75rem);
+}
+.pb-projects-widget {
+  flex: 1;
+}
+/* Projects card hosts a full-bleed table: drop the card's body padding so the
+   rows reach the edges (cells carry their own inset); the header keeps padding,
+   and the skeleton/no-data states get an inset back. Mirrors .inv-table-widget. */
+.pb-projects-widget {
+  padding: 0;
+  overflow: hidden;
+}
+.pb-projects-widget .widget-header {
+  padding: 1.25rem 1.5rem 0.75rem;
+}
+.pb-projects-widget .widget-body {
+  padding: 0;
+}
+.pb-projects-widget .widget-no-data,
+.pb-projects-widget .widget-skeleton {
+  margin: 1.25rem;
+}
+/* Stat column body: net hero fills the space, under/over split pinned beneath. */
+.pb-stats-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+/* Net is the focus of this column: a large figure centered in the space below
+   the head, with the under/over split as small supporting context beneath a
+   hairline. Airy and borderless, in the Banking/Overdue vocabulary. */
+.pb-net-hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3rem;
+  min-width: 0;
+}
+/* Net figure → opens the full billing-positions breakdown (mirrors the Banking
+   Cash-in-Bank and Overdue AR/AP click targets). Reset the button chrome so the
+   metric keeps its stat-box / hero layout, then add a hover + focus cue. */
+.pb-net-clickable {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.pb-net-hero.pb-net-clickable {
+  /* Full width and left-aligned, but only as tall as the label + value rather
+     than stretching to fill the column. Auto vertical margin keeps it centered
+     in the space above the under/over split. */
+  flex: 0 0 auto;
+  margin: auto 0;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: none;
+  border-radius: 10px;
+}
+.pb-net-hero.pb-net-clickable:hover {
+  background: color-mix(in srgb, var(--primary-text) 5%, transparent);
+}
+.pb-headline-metric.pb-net-clickable:hover {
+  border-color: color-mix(in srgb, var(--primary-text) 25%, transparent);
+  background: color-mix(in srgb, var(--primary-text) 4%, var(--card-color));
+}
+.pb-net-clickable:focus-visible {
+  outline: 2px solid var(--accent-color, #3b82f6);
+  outline-offset: 2px;
+}
+.pb-net-hero-label {
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--secondary-text);
+}
+.pb-net-hero-value {
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+/* Net over-billed is the risk state — flag the hero in AP red. */
+.pb-net-hero-value--over {
+  color: #ef4444;
+}
+/* Under/over split: two quiet supporting figures under a hairline. */
+.pb-net-split {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 1.5rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid color-mix(in srgb, var(--primary-text) 10%, transparent);
+}
+.pb-net-split-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.pb-net-split-label {
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pb-net-split-label--under { color: #22c55e; }
+.pb-net-split-label--over { color: #ef4444; }
+.pb-net-split-value {
+  font-size: var(--title3-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+/* Let the Project column absorb the table's slack so the numeric columns stay
+   tight on the right — the centered "Over / Under" header then sits over them
+   the same way it does at half width (where the table is naturally narrow). */
+.pb-projects-widget .pb-table th:first-child {
+  width: 100%;
+}
+.pb-projects-widget .pb-table {
+  width: 100%;
+}
+
+/* ── Airier widget table ──────────────────────────────────────────────────
+   Roomier inline padding, a touch more row height, and a softened over/under
+   cue so the table reads calm beside the redesigned stat column. (The narrow
+   over/under amount + cue pair keep their tight inner gap, set further down.) */
+.pb-table td {
+  padding: 0.85rem 1.25rem;
+}
+.pb-table th {
+  padding: 0.75rem 1.25rem;
+}
+.widget:has(.data-table) .pb-table th:first-child,
+.widget:has(.data-table) .pb-table td:first-child {
+  padding-left: 1.5rem;
+}
+.widget:has(.data-table) .pb-table th:last-child,
+.widget:has(.data-table) .pb-table td:last-child {
+  padding-right: 1.5rem;
+}
+/* Headline band: the net figure reads as the hero metric (label stacked above a
+   large value on the left), with the under/over split as two pills on the right
+   so the number and the counts no longer crowd onto one baseline. Padded to
+   align with the title above and the table below. */
+.pb-headline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem 1rem;
+}
+/* The net total in its own contained stat box — same subtle fill/border/radius
+   as the Banking & Overdue boxes in this section, so it reads as a distinct
+   summary rather than floating text above the table. */
+.pb-headline-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  /* Span ~1/3 of the headline width, left-aligned. */
+  flex: 0 0 33.333%;
+  padding: 0.75rem 1rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+.pb-headline-label {
+  color: var(--secondary-text);
+  font-size: var(--footnote-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.pb-headline-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+/* Under / over split as pills. Under-billed is the expected/normal state, so it
+   stays neutral; over-billed is the risk, so it's flagged in the AP red (only
+   when there actually are over-billed jobs — a zero count reads neutral). */
+.pb-headline-counts {
+  display: inline-flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+.pb-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.3rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+.pb-count strong {
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+.pb-count-neutral {
+  background: var(--hover-bg);
+  color: var(--secondary-text);
+}
+/* Under green / over red, matching the per-row over/under pills. */
+.pb-count-under {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+.pb-count-over {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+/* Project name (single line, no client subline). */
+.pb-name {
+  color: var(--primary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Two-line numeric cell: the dollar figure with its % of contract beneath. */
+.pb-amt {
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+.pb-sub {
+  margin-top: 0.15rem;
+  color: var(--secondary-text);
+  font-size: var(--callout-size);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The Over/Under amount and its direction pill share ONE cell (a flex row) on
+   both the widget and the full page, so there's no extra column width to spread
+   them apart. Right-aligned (matching the Progress Billings page), with a fixed
+   small gap between the amount and pill. */
+.pb-overunder-cell {
+  text-align: right;
+}
+.pb-overunder-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+/* In the Progress Billings widget column, split the pair to opposite ends of the
+   cell: dollar amount left-aligned, direction pill held to the right. */
+.pb-table .pb-overunder-inner {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+}
+/* Per-row over/under direction pill — matches the header project-count pills
+   (.pb-count): same shape, padding, and type so they read as one family. */
+.pb-dir-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+}
+.pb-dir-pill--under {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+.pb-dir-pill--over {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+.pb-dir-pill--even {
+  background: var(--hover-bg);
+  color: var(--secondary-text);
+}
+
+/* Mobile: the half-width Progress Billings layout (net headline + 4-column
+   table) is too wide for a phone. Let the table scroll horizontally inside the
+   card instead of overflowing it, matching the invoices/jobcost table pattern.
+   Columns keep their content on one line so the scroll reveals the full row. */
+@media (max-width: 768px) {
+  .pb-widget .pb-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    /* Keep the horizontal swipe inside the table — without this, scrolling past
+       the table's edge bubbles up and triggers browser back/forward navigation. */
+    overscroll-behavior-x: contain;
+  }
+  /* Net headline box spans the full card width on mobile (it's the hero figure;
+     no second column sits beside it here). */
+  .pb-widget .pb-headline-metric {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+  .pb-widget .pb-table th,
+  .pb-widget .pb-table td {
+    white-space: nowrap;
+  }
+  /* Don't ellipsis-truncate the project name; the row scrolls to show it. */
+  .pb-widget .pb-name {
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+

@@ -19,7 +19,7 @@ import {
   type AgingOpenRow,
   type BillingsInvoice,
 } from "./utils/agingForecast"
-import { AR_COLOR, AP_COLOR, niceCeil } from "./widgets/billings/billingsShared"
+import { AR_COLOR, AP_COLOR } from "./widgets/billings/billingsShared"
 
 // Drill-down for the home Upcoming Billings widget: the forecast chart plus one
 // expandable card per week (accordion — a single card open at a time, so the
@@ -134,23 +134,20 @@ function UpcomingBillingsContent() {
     })
   }, [forecast, invoices])
 
-  const bars = useMemo(
-    () => forecast?.weeks.map((w) => ({ label: w.label, AR: w.ar, AP: -w.ap })) ?? [],
+  // Diverging lines: AR above zero, AP (negated) below — money-in vs money-out.
+  const series = useMemo(
+    () => [
+      { id: "AR", color: AR_COLOR, data: forecast?.weeks.map((w) => ({ x: w.label, y: w.ar })) ?? [] },
+      { id: "AP", color: AP_COLOR, data: forecast?.weeks.map((w) => ({ x: w.label, y: -w.ap })) ?? [] },
+    ],
     [forecast]
   )
-  // Each direction gets its own nice ceiling — a symmetric ± range wasted half
-  // the chart whenever one side (usually AP) is much smaller than the other.
-  const bounds = useMemo(() => {
-    const arMax = Math.max(0, ...(forecast?.weeks.map((w) => w.ar) ?? []))
-    const apMax = Math.max(0, ...(forecast?.weeks.map((w) => w.ap) ?? []))
-    return { max: niceCeil(arMax) || 10_000, min: -(niceCeil(apMax) || 10_000) }
-  }, [forecast])
 
   // Mobile: nine bucket labels crowd the x axis — show every other one.
   const isMobile = useIsMobile()
   const axisBottomTickValues = useMemo(
-    () => (isMobile ? bars.filter((_, i) => i % 2 === 0).map((b) => b.label) : undefined),
-    [isMobile, bars]
+    () => (isMobile ? forecast?.weeks.filter((_, i) => i % 2 === 0).map((w) => w.label) : undefined),
+    [isMobile, forecast]
   )
 
   // Accordion: a single open card keeps the reader anchored to one week.
@@ -269,21 +266,15 @@ function UpcomingBillingsContent() {
           {forecast && (
             <Chart
               config={{
-                type: "bar",
-                data: bars,
-                keys: ["AR", "AP"],
-                indexBy: "label",
-                colors: [AR_COLOR, AP_COLOR],
+                type: "line",
+                series,
                 yFormat: (v) => formatMoney(Math.abs(v)),
-                minValue: bounds.min,
-                maxValue: bounds.max,
-                axisLeftTickValues: 5,
+                enableArea: true,
+                curve: "monotoneX",
+                legend: true,
                 axisBottomTickValues,
-                emphasizeZero: true,
-                groupTooltip: true,
-                tooltipTotalLabel: "Net",
-                hideLegend: true,
-                onBarClick: handleBarClick,
+                disableGrowthTooltip: true,
+                onPointClick: handleBarClick,
               }}
             />
           )}

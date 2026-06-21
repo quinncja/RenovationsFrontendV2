@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { useNavigate } from "react-router-dom"
+import { useJobcostNav } from "../jobcost/useJobcostNav"
 import { Search, Plus, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Upload } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
@@ -61,6 +62,7 @@ function SortTh({ col, label, align = "left", sortKey, sortDir, onSort }: {
 
 export default function ChangeOrdersPage() {
   const navigate = useNavigate()
+  const { goToJobcost } = useJobcostNav()
   const [year, setYear] = useLocalStorage("changeOrderYear", new Date().getFullYear())
   const [search, setSearch] = useState("")
   const [orders, setOrders] = useState<ChangeOrder[]>([])
@@ -253,12 +255,12 @@ export default function ChangeOrdersPage() {
                           title="Open job costing"
                           onClick={(e) => {
                             e.stopPropagation()
-                            navigate(`/jobcost/${co.jobnum}`)
+                            goToJobcost(co.jobnum)
                           }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               e.stopPropagation()
-                              navigate(`/jobcost/${co.jobnum}`)
+                              goToJobcost(co.jobnum)
                             }
                           }}
                         >

@@ -1,5 +1,6 @@
 import { useState } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams } from "react-router-dom"
+import { useJobcostNav } from "../../jobcost/useJobcostNav"
 import Page from "../../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../../shared/config/pageQueries"
@@ -81,7 +82,7 @@ export default function ClientDetailPage() {
 }
 
 function ClientDetail({ year, onYearChange }: { year: number | null; onYearChange: (y: number | null) => void }) {
-  const navigate = useNavigate()
+  const { goToJobcost } = useJobcostNav()
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
   const [jobsOpen, setJobsOpen] = useState(false)
   const [invOpen, setInvOpen] = useState(false)
@@ -282,10 +283,10 @@ function ClientDetail({ year, onYearChange }: { year: number | null; onYearChang
                     <tr
                       key={job.recnum}
                       className="spend-rank-table-row"
-                      onClick={() => navigate(`/jobcost/${job.recnum}`)}
+                      onClick={() => goToJobcost(job.recnum)}
                       role="button"
                       tabIndex={0}
-                      onKeyDown={(e) => e.key === "Enter" && navigate(`/jobcost/${job.recnum}`)}
+                      onKeyDown={(e) => e.key === "Enter" && goToJobcost(job.recnum)}
                     >
                       <td className="spend-rank-table-num subheadline text-secondary">{job.recnum}</td>
                       <td className="spend-rank-table-name body-text">{job.jobName}</td>

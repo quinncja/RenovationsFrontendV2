@@ -10,6 +10,7 @@ import { YearSelector } from "../../../shared/components/YearSelector/YearSelect
 import { formatMoneyFull, marginTextColor } from "../../../shared/utils/format"
 import useLocalStorage from "../../../shared/hooks/useLocalStorage"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
+import useIsMobile from "../../../shared/hooks/useIsMobile"
 import { EmployeeAvatar } from "../../../shared/components/EmployeeAvatar/EmployeeAvatar"
 
 // Directory peer of ClientsPage / VendorsPage / SubcontractorsPage for the
@@ -67,6 +68,8 @@ export default function EmployeesPage() {
 function EmployeesContent({ year, onYearChange }: { year: number | null; onYearChange: (y: number | null) => void }) {
   const navigate = useNavigate()
   const marginColorsOn = useMarginColorsEnabled()
+  // On mobile match the WIP toggle's label rather than "Work Completed".
+  const isMobile = useIsMobile()
   const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("totalIncome")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
@@ -132,7 +135,7 @@ function EmployeesContent({ year, onYearChange }: { year: number | null; onYearC
                 <thead>
                   <tr>
                     <SortTh col="name" label="Employee" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="totalIncome" label="Work Completed" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="totalIncome" label={isMobile ? "WIP" : "Work Completed"} align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                   </tr>

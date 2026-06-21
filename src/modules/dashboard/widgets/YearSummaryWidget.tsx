@@ -5,6 +5,7 @@ import { usePageYear, useWidgetData } from "../../../shared/context/PageContext"
 import { marginTextColor } from "../../../shared/utils/format"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
+import useIsMobile from "../../../shared/hooks/useIsMobile"
 import { useSummaryYear } from "./summaryYearContext"
 import { useMarginPerformanceFor, type MarginRow } from "./useMarginPerformanceFor"
 import { SummarySnapshotCard } from "./SummarySnapshotCard"
@@ -39,6 +40,8 @@ export function YearSummaryWidget() {
   const ctx = useSummaryYear()
   const marginColorsOn = useMarginColorsEnabled()
   const [includeOverUnder] = useIncludeOverUnder()
+  // On mobile match the WIP toggle's label rather than "Work Completed".
+  const isMobile = useIsMobile()
   const { data: openData } = useWidgetData<{ openMonthFinances: OpenMonth | null }>([
     "openMonthFinances",
   ])
@@ -116,7 +119,7 @@ export function YearSummaryWidget() {
           // Margin is a ratio; marginTextColor's thresholds are in whole-%.
           valueColor: marginColorsOn && totals.margin != null ? marginTextColor(totals.margin * 100) : undefined,
         },
-        { title: includeOverUnder ? "Billed Income + Work Completed" : "Billed Income", value: totals.income },
+        { title: includeOverUnder ? `Billed Income + ${isMobile ? "WIP" : "Work Completed"}` : "Billed Income", value: totals.income },
         { title: "COGS", value: totals.cogs },
         { title: "Gross Profit", value: totals.grossProfit },
       ]}

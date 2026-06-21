@@ -16,6 +16,10 @@ interface WidgetProps {
   className?: string
   /** Optional controls rendered on the right side of the header (e.g. selectors). */
   actions?: ReactNode
+  /** Optional custom loading state. When provided, it replaces the generic
+   *  skeleton block while `loading` — use it to mirror the real content's
+   *  layout so the card doesn't change height when data resolves. */
+  skeleton?: ReactNode
   children?: ReactNode
 }
 
@@ -31,6 +35,7 @@ export function Widget({
   defaultOpen = false,
   className,
   actions,
+  skeleton,
   children,
 }: WidgetProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
@@ -38,7 +43,11 @@ export function Widget({
   const isDisconnected = disconnected || pageDisconnected
 
   const body = loading ? (
-    <div className="widget-skeleton" />
+    skeleton ? (
+      <div className="widget-body">{skeleton}</div>
+    ) : (
+      <div className="widget-skeleton" />
+    )
   ) : isDisconnected ? (
     <div className="widget-no-data widget-disconnected">
       <DatabaseZap size={24} className="widget-no-data-icon" />

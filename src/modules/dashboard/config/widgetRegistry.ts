@@ -26,9 +26,11 @@ import {
   ReconciliationWidget,
   DataQualityWidget,
   MissingContractsWidget,
+  OpenProjectsNoBudgetWidget,
 } from "../widgets/reports/ReportWidget"
-import { BankingWidget } from "../widgets/banking/BankingWidget"
-import { BillingsWidget } from "../widgets/billings/BillingsWidget"
+import { BankingOverdueWidget } from "../widgets/banking/BankingOverdueWidget"
+import { UpcomingBillingsWidget } from "../widgets/billings/UpcomingBillingsWidget"
+import { ProgressBillingsWidget } from "../widgets/ProgressBillingsWidget"
 
 // Drives the placeholder illustration shown in edit mode.
 export type WidgetVisualType = "stat" | "line" | "pie" | "bar" | "table" | "summary"
@@ -61,6 +63,13 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
     id: "missingContracts",
     component: MissingContractsWidget,
     label: "Missing Contracts Report",
+    visualType: "stat",
+    defaultColSpan: 1,
+  },
+  openProjectsNoBudget: {
+    id: "openProjectsNoBudget",
+    component: OpenProjectsNoBudgetWidget,
+    label: "Missing Budgets Report",
     visualType: "stat",
     defaultColSpan: 1,
   },
@@ -147,17 +156,26 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
   // ── Business Financials ──────────────────────────────────────────────
   banking: {
     id: "banking",
-    component: BankingWidget,
-    label: "Cash & Line of Credit",
+    component: BankingOverdueWidget,
+    label: "Banking & Overdue",
     visualType: "stat",
-    defaultColSpan: 2,
+    // Half width — shares the first row with Upcoming Billings.
+    defaultColSpan: 1,
   },
   billings: {
     id: "billings",
-    component: BillingsWidget,
-    label: "Overdue & Upcoming Billings",
+    component: UpcomingBillingsWidget,
+    label: "Upcoming Billings",
     visualType: "bar",
-    // Full width — Overdue (1/3) beside the forecast chart (2/3).
+    // Half width — shares the first row with Banking & Overdue.
+    defaultColSpan: 1,
+  },
+  progressBillings: {
+    id: "progressBillings",
+    component: ProgressBillingsWidget,
+    label: "Progress Billings",
+    visualType: "stat",
+    // Full width — its own second row (stat column beside the project table).
     defaultColSpan: 2,
   },
   // ── Business Relations ───────────────────────────────────────────────

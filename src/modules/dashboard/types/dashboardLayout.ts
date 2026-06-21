@@ -30,11 +30,15 @@ export type WidgetId =
   | "reconciliation"
   | "dataQuality"
   | "missingContracts"
+  | "openProjectsNoBudget"
   // ADVIA cash in bank + line of credit, one widget (two cards).
   | "banking"
   // Overdue AR/AP + Upcoming Billings forecast, as one full-width unit (Overdue
   // 1/3, chart 2/3). Rendered as two cards but a single widget in the editor.
   | "billings"
+  // Net over/under billings (WIP) headline + ranked list of the most
+  // under-billed active projects.
+  | "progressBillings"
 
 export type SectionId =
   | "reports"
@@ -57,7 +61,9 @@ export interface SectionLayout {
 }
 
 export interface DashboardLayout {
-  version: 2
+  // Schema version — bumped when a change must be force-applied to existing
+  // saved layouts (see LAYOUT_VERSION / reconcileLayout migrations).
+  version: number
   columns: 2
   sections: SectionLayout[]
 }

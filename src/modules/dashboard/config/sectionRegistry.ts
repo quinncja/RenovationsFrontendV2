@@ -40,6 +40,7 @@ export const WIDGET_HOME_SECTION: Record<WidgetId, SectionId> = {
   reconciliation: "reports",
   dataQuality: "reports",
   missingContracts: "reports",
+  openProjectsNoBudget: "reports",
   // Business Development
   currentYearRevenue: "businessDevelopment",
   allTimeRevenue: "businessDevelopment",
@@ -57,6 +58,7 @@ export const WIDGET_HOME_SECTION: Record<WidgetId, SectionId> = {
   // Business Financials
   banking: "businessFinancials",
   billings: "businessFinancials",
+  progressBillings: "businessFinancials",
   // Business Relations
   clientInsights: "businessRelations",
   subcontractorInsights: "businessRelations",
@@ -74,6 +76,7 @@ export const WIDGET_DEFAULT_ORDER: WidgetId[] = [
   "reconciliation",
   "dataQuality",
   "missingContracts",
+  "openProjectsNoBudget",
   // Business Development
   "currentYearRevenue",
   "allTimeRevenue",
@@ -88,9 +91,11 @@ export const WIDGET_DEFAULT_ORDER: WidgetId[] = [
   "monthlyDirectExpense",
   "monthlyOverhead",
   "monthlyNetProfit",
-  // Business Financials
+  // Business Financials — Banking & Overdue + Upcoming Billings half width on
+  // the first row, then Progress Billings full width on the second row.
   "banking",
   "billings",
+  "progressBillings",
   // Business Relations
   "clientInsights",
   "vendorInsights",

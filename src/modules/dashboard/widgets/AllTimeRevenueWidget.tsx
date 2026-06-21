@@ -1,6 +1,7 @@
 import { StatWidget } from "../../../shared/components/StatWidget/StatWidget"
 import { useWidgetData } from "../../../shared/context/PageContext"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
+import useIsMobile from "../../../shared/hooks/useIsMobile"
 import { PRE_2018_REVENUE_TOTAL } from "../config/historicalRevenue"
 
 interface OpenMonth {
@@ -17,6 +18,9 @@ interface OpenMonth {
 // match the Year Summary), plus its over/under WIP when the toggle is on.
 export function AllTimeRevenueWidget() {
   const [includeOverUnder] = useIncludeOverUnder()
+  // The WIP toggle's label is "WIP"; on mobile match it rather than spelling out
+  // "Work Completed", which overflows the narrow stat widget.
+  const isMobile = useIsMobile()
   const { data, isLoading } = useWidgetData<{
     annualRevenueTrend: { year: number; revenue: number }[] | null
     openMonthFinances: OpenMonth | null
@@ -37,7 +41,7 @@ export function AllTimeRevenueWidget() {
 
   return (
     <StatWidget
-      title={includeOverUnder ? "All-Time Revenue + Work Completed" : "All-Time Revenue"}
+      title={includeOverUnder ? `All-Time Revenue + ${isMobile ? "WIP" : "Work Completed"}` : "All-Time Revenue"}
       value={value}
       loading={isLoading}
     />

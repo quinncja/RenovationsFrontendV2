@@ -24,6 +24,7 @@ export const PAGE_QUERIES = {
     "overHeadExpenses",
     "projectsMissingContracts",
     "currentPeriodProjects",
+    "progressBillings",
   ],
 
   // Dashboard "View" breakdown pages — each pulls its corresponding
@@ -34,6 +35,9 @@ export const PAGE_QUERIES = {
 
   // Upcoming Billings breakdown — the per-invoice open AR/AP rows behind the chart.
   dashboardUpcomingBillings: ["agingSummaryOpen"],
+
+  // Progress Billings full list — every ranked project, over- and under-billed.
+  dashboardProgressBillings: ["progressBillings"],
 
   // Employee performance detail page. `openMonthFinances` is included so the
   // Period summary half can detect which month is the actually-open one

@@ -173,7 +173,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   const currentRow = rowsBySerie[0]
   const prevRow = rowsBySerie[1]
   let growth: number | null = null
-  if (rowsBySerie.length === 2 && currentRow.value != null && prevRow.value != null && prevRow.value !== 0) {
+  if (!disableGrowth && rowsBySerie.length === 2 && currentRow.value != null && prevRow.value != null && prevRow.value !== 0) {
     growth = ((currentRow.value - prevRow.value) / Math.abs(prevRow.value)) * 100
   }
   const growthColor = growth != null
@@ -183,17 +183,27 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   // Display chronologically (prior first, current last) regardless of paint order.
   const orderedRows = rowsBySerie.length === 2 ? [prevRow, currentRow] : rowsBySerie
 
+  // When series carry explicit colors (e.g. AR green / AP red), tint each row's
+  // label dot + value to match its line. Charts without per-series colors
+  // (the YoY comparisons) fall back to the legacy "current row in primary" look.
+  const colorById = new Map(series.map((s) => [String(s.id), s.color]))
+
   return (
     <div className="chart-line-tooltip">
       <div className="chart-line-tooltip-header">{headerLabel}</div>
       {orderedRows.map((row) => {
         const isCurrent = row.id === currentRow.id
+        const seriesColor = colorById.get(String(row.id))
+        const valueColor = seriesColor ?? (isCurrent ? "var(--primary-color)" : undefined)
         return (
           <div key={row.id} className="chart-line-tooltip-row">
-            <span className="chart-line-tooltip-label">{row.id}</span>
+            <span className="chart-line-tooltip-label" style={seriesColor ? { display: "inline-flex", alignItems: "center", gap: 6 } : undefined}>
+              {seriesColor && <span className="chart-tooltip-dot" style={{ background: seriesColor }} />}
+              {row.id}
+            </span>
             <span
               className="chart-line-tooltip-value"
-              style={isCurrent && row.value != null ? { color: "var(--primary-color)" } : undefined}
+              style={row.value != null && valueColor ? { color: valueColor } : undefined}
             >
               {row.value != null ? formatMoneyFull(row.value) : "—"}
             </span>

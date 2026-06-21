@@ -55,7 +55,7 @@ export function EmployeePerformanceWidget() {
           <thead>
             <tr>
               <th>Employee</th>
-              <th style={{ textAlign: "right" }}>Work Completed</th>
+              <th style={{ textAlign: "right" }}>{isMobile ? "WIP" : "Work Completed"}</th>
               <th style={{ textAlign: "right" }}>Margin</th>
             </tr>
           </thead>

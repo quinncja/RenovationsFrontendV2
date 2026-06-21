@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { createPortal } from "react-dom"
-import { useNavigate } from "react-router-dom"
-import { X, TriangleAlert } from "lucide-react"
+import { useJobcostNav } from "../../../jobcost/useJobcostNav"
+import { X, TriangleAlert, Calculator } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useWidgetData, usePageDisconnected } from "../../../../shared/context/PageContext"
 import { formatNumber } from "../../../../shared/utils/format"
@@ -17,6 +17,7 @@ interface ValidationCounts {
   unknown: number
   wrong: number
   subcontracts: number
+  noBudget: number
 }
 
 interface ValidationDetailRow {
@@ -27,9 +28,9 @@ interface ValidationDetailRow {
   detail: string
 }
 
-type ReportVariant = "red" | "orange" | "gray"
+type ReportVariant = "red" | "orange" | "gray" | "navy"
 
-type ReportWidgetId = "reconciliation" | "dataQuality" | "missingContracts"
+type ReportWidgetId = "reconciliation" | "dataQuality" | "missingContracts" | "openProjectsNoBudget"
 
 interface ReportDefinition {
   /** Field on the counts row, also the `category` tag on detail rows. */
@@ -64,6 +65,13 @@ const REPORT_DEFINITIONS: Record<ReportWidgetId, ReportDefinition> = {
     title: "Missing Contracts Report",
     subtitle: "Jobs Missing Contracts",
   },
+  openProjectsNoBudget: {
+    accessor: "noBudget",
+    variant: "navy",
+    glyph: <Calculator size={16} strokeWidth={2.5} />,
+    title: "Missing Budgets Report",
+    subtitle: "Open Projects With a Contract but No Budget",
+  },
 }
 
 /**
@@ -79,7 +87,7 @@ function ReportWidget({ reportId }: { reportId: ReportWidgetId }) {
     dataValidationOpen: ValidationDetailRow[] | null
   }>(["dataValidation", "dataValidationOpen"])
   const disconnected = usePageDisconnected()
-  const navigate = useNavigate()
+  const { goToJobcost } = useJobcostNav()
 
   const [open, setOpen] = useState(false)
 
@@ -90,7 +98,7 @@ function ReportWidget({ reportId }: { reportId: ReportWidgetId }) {
     const n = String(jobNumber ?? "").trim()
     if (!n) return
     setOpen(false)
-    navigate(`/jobcost/${n}`)
+    goToJobcost(n, { backLabel: "Reports" })
   }
 
   const counts = data?.dataValidation?.[0] ?? null
@@ -215,4 +223,8 @@ export function DataQualityWidget() {
 
 export function MissingContractsWidget() {
   return <ReportWidget reportId="missingContracts" />
+}
+
+export function OpenProjectsNoBudgetWidget() {
+  return <ReportWidget reportId="openProjectsNoBudget" />
 }

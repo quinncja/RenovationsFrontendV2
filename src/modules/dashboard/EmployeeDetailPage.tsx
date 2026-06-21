@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, ChevronRight } from "lucide-react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams } from "react-router-dom"
+import { useJobcostNav } from "../jobcost/useJobcostNav"
 import useIsMobile from "../../shared/hooks/useIsMobile"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
@@ -17,6 +18,7 @@ import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
 import { SortableHeader } from "../../shared/components/SortableHeader"
 import { fetchPageData } from "../../shared/api/pageApi"
+import { useAuth } from "../../core/auth/AuthProvider"
 import { EmployeePeriodAndYearSummary } from "./widgets/EmployeePeriodAndYearSummary"
 
 // ───── Breakdown shape (page-level fetch) ────────────────────────────────
@@ -64,6 +66,8 @@ interface ProjectRow {
   contract: number
   totalCost: number
   budget: number
+  // Budget − Cost. Positive = under budget, negative = over.
+  variance: number
   margin: number | null
   supervisor: string
 }
@@ -71,6 +75,7 @@ interface ProjectRow {
 function normalizeProject(p: BreakdownProject): ProjectRow {
   const contract = p.totalContract ?? 0
   const totalCost = p.totalCost ?? 0
+  const budget = p.totalBudget ?? p.budget ?? 0
   // Raw phase rows (consolidate:false) have an 8-digit recnum directly; that
   // doubles as the URL id /jobcost navigates with. Consolidated rows
   // (4-digit recnum) drill into their first phase for the 8-digit id.
@@ -83,7 +88,8 @@ function normalizeProject(p: BreakdownProject): ProjectRow {
     status: p.status,
     contract,
     totalCost,
-    budget: p.totalBudget ?? p.budget ?? 0,
+    budget,
+    variance: budget - totalCost,
     margin: contract > 0 ? ((contract - totalCost) / contract) * 100 : null,
     supervisor:
       p.pmName?.trim() ??
@@ -107,7 +113,7 @@ function marginColor(margin: number): string {
 // getWatchList uses 17%; this page surfaces the stricter 15% the team asked for.
 const WATCHLIST_MARGIN_THRESHOLD = 15
 
-type ProjectSortKey = "name" | "status" | "supervisor" | "contract" | "budget" | "totalCost" | "margin"
+type ProjectSortKey = "name" | "status" | "supervisor" | "contract" | "budget" | "totalCost" | "variance" | "margin"
 
 // Shared projects table — used by the page's Projects section and by the
 // drill-down modals so columns/behavior never drift between them. Sortable via
@@ -120,6 +126,10 @@ function ProjectsTable({
   onRowClick: (jobNumber: string) => void
 }) {
   const marginColorsOn = useMarginColorsEnabled()
+  // Managers don't see contract figures in project tables (kept on the
+  // jobcost open view + detail page only).
+  const { claims } = useAuth()
+  const isManager = claims["role"] === "manager"
   const sort = useTableSort<ProjectSortKey>()
   const sorted = applySort(projects, sort, (row, key) => row[key])
   // Mobile mirrors the Job Costing list: name + status/PM on the left,
@@ -173,9 +183,12 @@ function ProjectsTable({
           <SortableHeader label="Project" columnKey="name" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
           <SortableHeader label="Status" columnKey="status" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
           <SortableHeader label="PM" columnKey="supervisor" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-          <SortableHeader label="Contract" columnKey="contract" align="right" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+          {!isManager && (
+            <SortableHeader label="Contract" columnKey="contract" align="right" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+          )}
           <SortableHeader label="Budget" columnKey="budget" align="right" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
           <SortableHeader label="Cost" columnKey="totalCost" align="right" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+          <SortableHeader label="Budget Variance" columnKey="variance" align="right" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
           <SortableHeader label="Margin" columnKey="margin" align="right" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
         </tr>
       </thead>
@@ -192,9 +205,19 @@ function ProjectsTable({
               </span>
             </td>
             <td>{job.supervisor || "—"}</td>
-            <td style={{ textAlign: "right" }}>{formatMoneyFull(job.contract)}</td>
+            {!isManager && (
+              <td style={{ textAlign: "right" }}>{formatMoneyFull(job.contract)}</td>
+            )}
             <td style={{ textAlign: "right" }}>{formatMoneyFull(job.budget)}</td>
             <td style={{ textAlign: "right" }}>{formatMoneyFull(job.totalCost)}</td>
+            <td
+              style={{
+                textAlign: "right",
+                color: !marginColorsOn || job.margin == null ? undefined : marginTextColor(job.margin),
+              }}
+            >
+              {formatMoneyFull(job.variance)}
+            </td>
             <td
               style={{
                 textAlign: "right",
@@ -318,8 +341,12 @@ type ProjectsMode = "currentYear" | "allTime"
 // exact same per-employee view, scoped to their own supervisor id. Must be
 // wrapped in a PageDataProvider supplying PAGE_QUERIES.employeeDetail.
 export function EmployeeDetail({ employeeId, year, onYearChange }: { employeeId: number; year: number; onYearChange: (y: number) => void }) {
-  const navigate = useNavigate()
+  const { goToJobcost } = useJobcostNav()
   const marginColorsOn = useMarginColorsEnabled()
+  // On mobile match the WIP toggle's label rather than spelling out "Work
+  // Completed" (keeps the chart titles/legends short and consistent).
+  const isMobile = useIsMobile()
+  const wcLabel = isMobile ? "WIP" : "Work Completed"
   const { data, isLoading } = useWidgetData<{ employeePerformanceBreakdown: Breakdown | null }>([
     "employeePerformanceBreakdown",
   ])
@@ -337,10 +364,10 @@ export function EmployeeDetail({ employeeId, year, onYearChange }: { employeeId:
     if (!yearly || yearly.length === 0) return null
     const sorted = [...yearly].sort((a, b) => a.year - b.year)
     return [{
-      id: "Work Completed",
+      id: wcLabel,
       data: sorted.map((d) => ({ x: String(d.year), y: d.income })),
     }]
-  }, [yearly])
+  }, [yearly, wcLabel])
 
   // ── Monthly charts for the page year ─────────────────────────────────
   // breakdown.stats.monthly is already filtered to the selected year on
@@ -355,14 +382,14 @@ export function EmployeeDetail({ employeeId, year, onYearChange }: { employeeId:
     }
     return [
       {
-        id: "Work Completed",
+        id: wcLabel,
         data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => ({
           x: shortMonth(m),
           y: byMonth.get(m) ?? 0,
         })),
       },
     ]
-  }, [monthly])
+  }, [monthly, wcLabel])
 
   // Bar chart: monthly margin %. Mirrors the yearly margin's symlog
   // scaling so the chart degrades the same way for outlier months. Fills
@@ -517,7 +544,7 @@ export function EmployeeDetail({ employeeId, year, onYearChange }: { employeeId:
   }
   const activeContent = activeModal ? modalContent[activeModal] : null
 
-  const openJob = (jobNumber: string) => navigate(`/jobcost/${jobNumber}`)
+  const openJob = (jobNumber: string) => goToJobcost(jobNumber)
 
   return (
     <Page title={name} actions={<YearSelector value={year} onChange={onYearChange} />}>
@@ -553,7 +580,7 @@ export function EmployeeDetail({ employeeId, year, onYearChange }: { employeeId:
         {/* Monthly views for the page year — sit above the yearly charts
             since the page year is the user's primary lens. */}
         <MotionItem>
-          <Widget title={`Monthly Work Completed — ${year}`} loading={isLoading} noData={!monthlyWorkCompletedSeries}>
+          <Widget title={`Monthly ${wcLabel} — ${year}`} loading={isLoading} noData={!monthlyWorkCompletedSeries}>
             {monthlyWorkCompletedSeries && (
               <Chart config={{ type: "line", series: monthlyWorkCompletedSeries, enableArea: true }} />
             )}
@@ -582,7 +609,7 @@ export function EmployeeDetail({ employeeId, year, onYearChange }: { employeeId:
         </MotionItem>
 
         <MotionItem>
-          <Widget title="Yearly Work Completed" loading={isLoading} noData={!workCompletedSeries}>
+          <Widget title={`Yearly ${wcLabel}`} loading={isLoading} noData={!workCompletedSeries}>
             {workCompletedSeries && (
               <Chart config={{ type: "line", series: workCompletedSeries, enableArea: true }} />
             )}
