@@ -81,10 +81,22 @@ export default function Router() {
               </RequireRole>
             } />
 
-            {/* Invoices — admin/executive */}
+            {/* Finances — admin/executive. Billings reuse the dashboard
+                drill-down pages; the /dashboard/* routes above stay for the
+                dashboard widgets' own links. */}
             <Route path="/invoices" element={
               <RequireRole allowed={["executive", "admin"]}>
                 <SuspenseWrapper><Invoices /></SuspenseWrapper>
+              </RequireRole>
+            } />
+            <Route path="/upcoming-billings" element={
+              <RequireRole allowed={["executive", "admin"]}>
+                <SuspenseWrapper><UpcomingBillingsPage /></SuspenseWrapper>
+              </RequireRole>
+            } />
+            <Route path="/progress-billings" element={
+              <RequireRole allowed={["executive", "admin"]}>
+                <SuspenseWrapper><ProgressBillingsPage /></SuspenseWrapper>
               </RequireRole>
             } />
 

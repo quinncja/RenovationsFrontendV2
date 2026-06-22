@@ -16,6 +16,9 @@ import {
   Network,
   BarChart3,
   MessageSquare,
+  Landmark,
+  CalendarClock,
+  Receipt,
 } from "lucide-react"
 
 export interface NavItem {
@@ -53,6 +56,8 @@ const navItems = {
   jobcost: { label: "Job Costing", path: "/jobcost", icon: JobcostIcon as unknown as LucideIcon },
   changeOrders: { label: "Change Orders", path: "/change-orders", icon: ChangeOrderIcon as unknown as LucideIcon },
   invoices: { label: "Invoices", path: "/invoices", icon: FileText },
+  upcomingBillings: { label: "Upcoming Billings", path: "/upcoming-billings", icon: CalendarClock },
+  progressBillings: { label: "Progress Billings", path: "/progress-billings", icon: Receipt },
   users: { label: "Users", path: "/users", icon: Users },
   clients: { label: "Clients", path: "/clients", icon: Users2 },
   vendors: { label: "Vendors", path: "/vendors", icon: Truck },
@@ -63,6 +68,12 @@ const navItems = {
   orgChart: { label: "Org Chart", path: "/org-chart", icon: Network },
   feedback: { label: "Feedback", path: "/feedback", icon: MessageSquare },
 } as const satisfies Record<string, NavItem>
+
+const financesGroup: NavGroup = {
+  label: "Finances",
+  icon: Landmark,
+  items: [navItems.invoices, navItems.upcomingBillings, navItems.progressBillings],
+}
 
 const directoryGroup: NavGroup = {
   label: "Directory",
@@ -84,7 +95,7 @@ export const roles = {
       navItems.jobcost,
       NAV_DIVIDER,
       navItems.changeOrders,
-      navItems.invoices,
+      financesGroup,
       NAV_DIVIDER,
       chartsGroup,
       directoryGroup,
@@ -98,7 +109,7 @@ export const roles = {
       navItems.jobcost,
       NAV_DIVIDER,
       navItems.changeOrders,
-      navItems.invoices,
+      financesGroup,
       NAV_DIVIDER,
       chartsGroup,
       directoryGroup,

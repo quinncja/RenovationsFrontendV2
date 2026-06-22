@@ -1,74 +1,47 @@
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate, useLocation } from "react-router-dom"
-import { Settings, ChevronsRight, ChevronsLeft, ChevronDown } from "lucide-react"
+import { Settings, ChevronsRight, ChevronsLeft, ChevronRight } from "lucide-react"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import useNavItems from "../auth/hooks/useNavItems"
-import { isNavGroup, isNavDivider, type NavItem, type NavGroup } from "../auth/roles"
+import { isNavGroup, isNavDivider, type NavGroup } from "../auth/roles"
 import { SettingsModal } from "../../shared/components/SettingsModal/SettingsModal"
 import Logo from "./Logo"
 import LogoText from "./LogoText"
 
 type TooltipState = { label: string; y: number } | null
+type FlyoutState = { group: NavGroup; top: number; left: number } | null
 
 function NavGroupItem({
   group,
   isOpen: sidebarOpen,
-  expanded,
-  onToggle,
-  onTooltip,
+  active,
+  onOpenFlyout,
+  onScheduleClose,
 }: {
   group: NavGroup
   isOpen: boolean
-  expanded: boolean
-  onToggle: () => void
-  onTooltip: (state: TooltipState) => void
+  active: boolean
+  onOpenFlyout: (group: NavGroup, anchor: DOMRect) => void
+  onScheduleClose: () => void
 }) {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const isAnyChildActive = group.items.some(item => location.pathname.startsWith(item.path))
-
-  const tip = useCallback((label: string) => (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!sidebarOpen) {
-      const r = e.currentTarget.getBoundingClientRect()
-      onTooltip({ label, y: r.top + r.height / 2 })
-    }
-  }, [sidebarOpen, onTooltip])
+  const open = (e: React.MouseEvent<HTMLButtonElement> | React.FocusEvent<HTMLButtonElement>) =>
+    onOpenFlyout(group, e.currentTarget.getBoundingClientRect())
 
   return (
-    <div className={`nav-group${expanded ? " nav-group-open" : ""}${isAnyChildActive ? " nav-group-child-active" : ""}`}>
-      <button
-        className={`button nav-button nav-group-header${isAnyChildActive ? " nav-group-header-active" : ""}`}
-        onClick={onToggle}
-        onMouseEnter={tip(group.label)}
-        onMouseLeave={() => onTooltip(null)}
-      >
-        <group.icon size={20} />
-        <span className="nav-button-label">{group.label}</span>
-        {sidebarOpen && (
-          <ChevronDown
-            size={14}
-            className={`nav-group-chevron${expanded ? " nav-group-chevron-open" : ""}`}
-          />
-        )}
-      </button>
-      <div className={`nav-group-items${expanded ? " nav-group-items-open" : ""}`}>
-        <div className="nav-group-items-inner">
-          {group.items.map((item: NavItem) => (
-            <button
-              key={item.path}
-              className={`button nav-button${location.pathname.startsWith(item.path) ? " nav-button-active" : ""}`}
-              onClick={() => navigate(item.path)}
-              onMouseEnter={tip(item.label)}
-              onMouseLeave={() => onTooltip(null)}
-            >
-              <item.icon size={20} />
-              <span className="nav-button-label">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
+    <button
+      className={`button nav-button nav-group-header${active ? " nav-button-active" : ""}`}
+      onMouseEnter={open}
+      onMouseLeave={onScheduleClose}
+      onFocus={open}
+      onBlur={onScheduleClose}
+      onClick={open}
+      aria-haspopup="menu"
+    >
+      <group.icon size={20} />
+      <span className="nav-button-label">{group.label}</span>
+      {sidebarOpen && <ChevronRight size={14} className="nav-group-chevron" />}
+    </button>
   )
 }
 
@@ -81,23 +54,31 @@ function Navbar() {
   const [tooltip, setTooltip] = useState<TooltipState>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  const [openGroup, setOpenGroup] = useState<string | null>(() => {
-    const active = navItems.find(
-      item => isNavGroup(item) && item.items.some(child => location.pathname.startsWith(child.path))
-    )
-    return active && isNavGroup(active) ? active.label : null
-  })
+  // Flyout panel for nav groups: hover/click a group → its children float out to
+  // the right, anchored to the group row. Works the same open or collapsed.
+  const [flyout, setFlyout] = useState<FlyoutState>(null)
+  const closeTimer = useRef<number | undefined>(undefined)
 
-  // Clear tooltip when sidebar opens
+  const cancelClose = () => {
+    if (closeTimer.current !== undefined) {
+      window.clearTimeout(closeTimer.current)
+      closeTimer.current = undefined
+    }
+  }
+  const scheduleClose = () => {
+    cancelClose()
+    closeTimer.current = window.setTimeout(() => setFlyout(null), 140)
+  }
+  const openFlyout = (group: NavGroup, anchor: DOMRect) => {
+    cancelClose()
+    setTooltip(null)
+    setFlyout({ group, top: anchor.top, left: anchor.right })
+  }
+
+  useEffect(() => () => cancelClose(), [])
+
+  // Clear transient overlays when the sidebar toggles.
   useEffect(() => { if (isOpen) setTooltip(null) }, [isOpen])
-
-  // Auto-open the group containing the active child route
-  useEffect(() => {
-    const active = navItems.find(
-      item => isNavGroup(item) && item.items.some(child => location.pathname.startsWith(child.path))
-    )
-    if (active && isNavGroup(active)) setOpenGroup(active.label)
-  }, [location.pathname])
 
   useEffect(() => {
     document.documentElement.style.colorScheme = theme
@@ -148,9 +129,9 @@ function Navbar() {
                 key={item.label}
                 group={item}
                 isOpen={isOpen}
-                expanded={openGroup === item.label}
-                onToggle={() => setOpenGroup(openGroup === item.label ? null : item.label)}
-                onTooltip={setTooltip}
+                active={item.items.some(child => location.pathname.startsWith(child.path))}
+                onOpenFlyout={openFlyout}
+                onScheduleClose={scheduleClose}
               />
             ) : (
               <button
@@ -159,7 +140,7 @@ function Navbar() {
                 onClick={() => {
                   // Home button → reset the section pager to the top; other routes navigate as-is.
                   navigate(item.path, item.path === "/dashboard" ? { state: { resetHome: true } } : {})
-                  setOpenGroup(null)
+                  setFlyout(null)
                 }}
                 {...tipProps(item.label)}
               >
@@ -191,6 +172,34 @@ function Navbar() {
       {tooltip && !isOpen && createPortal(
         <div className="nav-tooltip" style={{ top: tooltip.y, left: "4.625rem" }}>
           {tooltip.label}
+        </div>,
+        document.body
+      )}
+
+      {flyout && createPortal(
+        <div
+          className="nav-flyout"
+          style={{ top: flyout.top, left: flyout.left }}
+          onMouseEnter={cancelClose}
+          onMouseLeave={scheduleClose}
+        >
+          <div className="nav-flyout-card" role="menu">
+            <div className="nav-flyout-title">{flyout.group.label}</div>
+            {flyout.group.items.map(child => (
+              <button
+                key={child.path}
+                className={`button nav-flyout-item${location.pathname.startsWith(child.path) ? " nav-flyout-item-active" : ""}`}
+                role="menuitem"
+                onClick={() => {
+                  navigate(child.path)
+                  setFlyout(null)
+                }}
+              >
+                <child.icon size={18} />
+                <span className="nav-flyout-item-label">{child.label}</span>
+              </button>
+            ))}
+          </div>
         </div>,
         document.body
       )}
