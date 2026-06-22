@@ -14,8 +14,8 @@ export const SECTION_REGISTRY: Record<SectionId, SectionRegistryEntry> = {
   reports: { id: "reports", title: "Reports", columns: 3 },
   businessDevelopment: { id: "businessDevelopment", title: "Business Development" },
   businessPerformance: { id: "businessPerformance", title: "Business Performance" },
-  financialTrends: { id: "financialTrends", title: "Financial Trends" },
-  businessFinancials: { id: "businessFinancials", title: "Business Financials" },
+  financialTrends: { id: "financialTrends", title: "P&L Trends" },
+  businessFinancials: { id: "businessFinancials", title: "Cash & Billing" },
   businessRelations: { id: "businessRelations", title: "Business Relations" },
 }
 

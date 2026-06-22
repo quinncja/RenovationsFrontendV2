@@ -6725,25 +6725,50 @@ svg.placeholder-illustration {
 .section-nav-card {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
+  /* stretch (not flex-end) so every row takes the CARD's width, never its own
+     content width — keeps each button pinned to the card so the label collapse
+     can't scaleX-squeeze a row and drag its dot inward. Closed the card is
+     width:max-content (just the 8px dots), so stretch and flex-end look
+     identical at rest — this only matters in-flight. */
+  align-items: stretch;
+  /* Closed gap 0 + fixed 18px rows → a uniform 18px dot pitch. Open overrides. */
+  gap: 0;
   width: max-content;
   margin-left: auto;
+  /* HORIZONTAL geometry is held CONSTANT across open/closed — this is what locks
+     the dots' x. The dots sit 1.1rem in from the card's right edge (0.4rem card
+     pad + 0.7rem row pad); margin-right:-1.1rem pushes the card's right edge out
+     by that same 1.1rem so the dots land exactly where they rest. Because none
+     of these toggle with state, the card's right edge never sweeps sideways and
+     the dots can only travel vertically. (Previously margin-right lived only on
+     the open card, so it snapped -1.1rem→0 on close and dragged the dots left.)
+     Closed the surface is transparent, so the constant padding/margin is
+     invisible — it only fixes where the dots sit. Vertical padding, gap, height
+     and the surface still animate (see .section-nav-card-open). */
+  margin-right: -1.1rem;
+  padding: 0 0.4rem;
 }
 .section-nav-card-open {
-  align-items: stretch;
+  /* align-items, horizontal padding and margin-right are inherited constant from
+     .section-nav-card (so the dots' x stays locked). Only the VERTICAL padding,
+     gap and min-width change here — none of them shift the dots horizontally. */
   gap: 2px;
-  padding: 0.4rem;
+  padding-top: 0.4rem;
+  padding-bottom: 0.4rem;
   min-width: 12rem;
 }
 
-/* A row is just its dot at rest; opens into a padded [label · dot] button. */
+/* A row is a fixed-height dot slot at rest (8px dot centered in 18px → 10px
+   pitch); opens into a padded [label · dot] button. */
 .section-nav-row {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0;
-  padding: 0;
+  height: 18px;
+  /* Horizontal padding is constant (part of the dots' fixed 1.1rem inset — see
+     .section-nav-card); only the row's height/gap animate on open. */
+  padding: 0 0.7rem;
   background: none;
   border: none;
   border-radius: 8px;
@@ -6753,7 +6778,6 @@ svg.placeholder-illustration {
 .section-nav-card-open .section-nav-row {
   height: 2.2rem;
   gap: 0.7rem;
-  padding: 0 0.7rem;
   transition: color 0.18s, background-color 0.18s;
 }
 .section-nav-card-open .section-nav-row:hover {
@@ -6768,8 +6792,35 @@ svg.placeholder-illustration {
 }
 
 .section-nav-label {
+  /* The collapsing/clipping box. On exit its width animates to 0 (see
+     SectionNav) and overflow:hidden clips the text as it shrinks, in lockstep
+     with the card. The text itself lives in .section-nav-label-text so it can be
+     scale-corrected independently (it right-aligns against this box's edge). */
+  overflow: hidden;
+  text-align: right;
+  /* As a flex item the label defaults to min-width:auto, which refuses to
+     shrink below the text's intrinsic width — that makes the width-collapse
+     fight the card's layout spring and snap. min-width:0 lets it shrink in
+     lockstep with the card. */
+  min-width: 0;
+  /* A FIXED width (not 100% / not content-sized) is what keeps the dots from
+     displacing with the text. A fixed box makes every row identical regardless
+     of its text: constant card width, constant dot x. Text longer than this
+     clips (overflow hidden); bump the value if a title is cut off. flex:0 1 auto
+     + min-width:0 still lets the box shrink to 0 on the exit width-collapse. */
+  flex: 0 1 auto;
+  width: 10.5rem;
+}
+/* The actual text. Fixed width + nowrap so it never reflows while the outer box
+   collapses around it; right-aligned so it stays pinned to the dot and clips
+   from the left. layout="position" (in SectionNav) scale-corrects these glyphs
+   against the button's layout scaleX, so they don't pinch on the exit collapse. */
+.section-nav-label-text {
+  display: inline-block;
+  width: 10.5rem;
   font-size: 0.85rem;
   white-space: nowrap;
+  text-align: right;
 }
 
 .section-nav-dot {
@@ -6779,20 +6830,46 @@ svg.placeholder-illustration {
   border-radius: 99px;
   background: var(--primary-text);
   opacity: 0.3;
+  /* Only colour/opacity ever change (no size morph) — cheap, no layout work. */
+  transition: background 0.18s ease, opacity 0.18s ease;
 }
-/* Closed active dot — the elongated copper pill (iOS page indicator). Motion
-   `layout` morphs it to a circle as the card opens. */
-.section-nav-card:not(.section-nav-card-open) .section-nav-row-active .section-nav-dot {
-  height: 18px;
-  opacity: 1;
-  background: var(--primary-color);
-}
-.section-nav-card-open .section-nav-row-active .section-nav-dot {
+/* Active dot — same circle, just copper. No shape change. */
+.section-nav-row-active .section-nav-dot {
   opacity: 1;
   background: var(--primary-color);
 }
 .section-nav-card-open .section-nav-row:hover .section-nav-dot {
   opacity: 0.6;
+}
+
+/* The in-row dot is now an invisible spacer (the visible one lives in the rail);
+   it still reserves its 8px slot so each row's width/spacing is unchanged. */
+.section-nav-dot--spacer {
+  visibility: hidden;
+}
+
+/* Dot rail — overlays the nav, holding the visible dots in a layer the card's
+   horizontal scale can't touch (see SectionNav). Visual only. */
+.section-nav-dotrail {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+/* Keep the rail at the dot-column width: drop the open card's min-width so it
+   never widens with the labels. With width:max-content (inherited) it stays
+   constant across open/close, so it only scales on Y — the dots are x-locked.
+   (Two classes here outweigh .section-nav-card-open's single class, so this
+   wins without !important.) */
+.section-nav-dotrail .section-nav-card {
+  min-width: 0;
+}
+/* Rail rows carry only the dot — no surface chrome. The card's own rows already
+   paint the active/hover background; the rail must not double it with a square
+   behind the dot. (Later source order beats the equal-specificity active rule.) */
+.section-nav-dotrail .section-nav-row,
+.section-nav-dotrail .section-nav-row-active {
+  background: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

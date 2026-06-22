@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
 import { useDashboardLayout } from "../context/DashboardLayoutContext"
 import { SECTION_REGISTRY } from "../config/sectionRegistry"
+import { SectionNav } from "./SectionNav"
 import { WIDGET_REGISTRY } from "../config/widgetRegistry"
 import type { WidgetLayoutItem } from "../types/dashboardLayout"
 
@@ -76,8 +77,22 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
   }, [setActiveSectionIndex])
 
   function goTo(i: number) {
-    const clamped = Math.max(0, Math.min(i, panelRefs.current.length - 1))
-    panelRefs.current[clamped]?.scrollIntoView({ behavior: scrollBehavior(), block: "start" })
+    const max = panelRefs.current.length - 1
+    const clamped = Math.max(0, Math.min(i, max))
+    const current = activeIndexRef.current
+    // Adjacent (or same) — a single smooth scroll already reads as one step.
+    if (Math.abs(clamped - current) <= 1) {
+      panelRefs.current[clamped]?.scrollIntoView({ behavior: scrollBehavior(), block: "start" })
+      return
+    }
+    // Far jump — instant-hop to the section just before the target, then smooth-
+    // scroll the final step. The user sees one section's worth of motion instead
+    // of flying through every section in between.
+    const neighbor = clamped > current ? clamped - 1 : clamped + 1
+    panelRefs.current[neighbor]?.scrollIntoView({ behavior: "instant", block: "start" })
+    requestAnimationFrame(() => {
+      panelRefs.current[clamped]?.scrollIntoView({ behavior: scrollBehavior(), block: "start" })
+    })
   }
 
   // ── Scroll anchoring across widget loads ──────────────────────────────
@@ -306,6 +321,28 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
     }
   }, [sections.length, applyFades, isMobile])
 
+  // Arrow keys page between sections with the SAME smooth scroll the dots use.
+  // Native arrow scrolling line-steps the snap container (the jumpy default), so
+  // we intercept Up/Down, preventDefault, and route through goTo (smooth glide
+  // to the next/prev panel). Driven off the live active index (activeIndexRef),
+  // so quick taps advance section-by-section as each one is crossed. Ignored
+  // while typing in a field / with modifiers so it never eats text-cursor keys.
+  useEffect(() => {
+    if (isMobile) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return
+      if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return
+      const el = document.activeElement
+      if (el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return
+      e.preventDefault()
+      goTo(activeIndexRef.current + (e.key === "ArrowDown" ? 1 : -1))
+    }
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+    // goTo + refs are stable for our purposes; bind once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobile])
+
   if (isMobile) {
     return (
       <div className="section-stack" ref={stackRef}>
@@ -379,18 +416,7 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
         ))}
       </div>
 
-      <div className="section-pager-dots" role="tablist" aria-label="Sections">
-        {sections.map((section, i) => (
-          <button
-            key={section.id}
-            type="button"
-            className={`section-pager-dot${i === active ? " section-pager-dot-active" : ""}`}
-            aria-label={SECTION_REGISTRY[section.id].title}
-            aria-selected={i === active}
-            onClick={() => goTo(i)}
-          />
-        ))}
-      </div>
+      <SectionNav sections={sections} active={active} onSelect={goTo} />
     </>
   )
 }
