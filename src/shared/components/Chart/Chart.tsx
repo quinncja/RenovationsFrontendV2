@@ -4,7 +4,7 @@ import { Pie } from "@nivo/pie"
 import { Bar } from "@nivo/bar"
 import { RadialBar } from "@nivo/radial-bar"
 import { useTooltip } from "@nivo/tooltip"
-import type { ChartConfig, LineSeries } from "./chart.types"
+import type { ChartConfig, LineSeries, LineMarker } from "./chart.types"
 import { formatMoney, formatMoneyFull } from "../../utils/format"
 import { useDarkMode } from "../../hooks/useDarkMode"
 import useIsMobile from "../../hooks/useIsMobile"
@@ -89,12 +89,17 @@ const CHART_COLORS = [
 
 // ─── Y-tick helper ────────────────────────────────────────────────────────────
 
-function everyOtherYTicks(series: LineSeries[]): number[] | undefined {
+// `ceiling` (the chart's numeric maxValue, when set) forces the ticks/grid to
+// span all the way to the axis top — e.g. a budget reference line sitting well
+// above the plotted data still gets gridlines up to it instead of the grid
+// stopping at the data max and the line floating in a blank band above.
+function everyOtherYTicks(series: LineSeries[], ceiling?: number): number[] | undefined {
   const allY = series
     .flatMap((s) => s.data.map((p) => p.y))
     .filter((v): v is number => typeof v === "number")
   if (allY.length === 0) return undefined
-  const max = Math.max(0, ...allY)
+  const dataMax = Math.max(0, ...allY)
+  const max = ceiling != null && ceiling > dataMax ? ceiling : dataMax
   const min = Math.min(0, ...allY)
   const range = max - min
   if (range === 0) return undefined
@@ -105,10 +110,21 @@ function everyOtherYTicks(series: LineSeries[]): number[] | undefined {
   // When data spans negative values use niceStep so zero stays centered;
   // for all-positive data skip every other tick to reduce clutter.
   const step = min < 0 ? niceStep : niceStep * 2
+  // With an explicit ceiling, round the top tick UP to the next step multiple
+  // so a gridline lands at/above the ceiling (the caller snaps the axis max to
+  // this tick — see LineChart — so the top gridline sits flush at the axis edge
+  // and a budget line below it isn't stranded under a blank band). Otherwise
+  // pad 15% past the data max like before.
+  const upper = ceiling != null ? Math.ceil(max / step) * step : max * 1.15
+  // For negative data, snap the bottom bound DOWN to a step multiple at or
+  // below the padded data min — mirrors the `ceiling` snap above. This
+  // guarantees the lowest tick sits at/below the data min so the axis (which
+  // LineChart pins to this tick) always contains every point with padding.
+  const lower = min < 0 ? Math.floor((min * 1.15) / step) * step : 0
   // Generate outward from 0 so zero is always a tick and spacing is uniform.
   const ticks: number[] = [0]
-  for (let v = step; v <= max * 1.15; v += step) ticks.push(Math.round(v))
-  for (let v = -step; v >= min * 1.15; v -= step) ticks.push(Math.round(v))
+  for (let v = step; v <= upper; v += step) ticks.push(Math.round(v))
+  for (let v = -step; v >= lower; v -= step) ticks.push(Math.round(v))
   ticks.sort((a, b) => a - b)
   return ticks.length > 1 ? ticks : undefined
 }
@@ -205,7 +221,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
               className="chart-line-tooltip-value"
               style={row.value != null && valueColor ? { color: valueColor } : undefined}
             >
-              {row.value != null ? formatMoneyFull(row.value) : "—"}
+              {row.value != null ? fmt(row.value) : "—"}
             </span>
           </div>
         )
@@ -228,7 +244,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
 // ─── Bar chart ────────────────────────────────────────────────────────────────
 
 function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> }) {
-  const { data, keys, indexBy, color = CHART_COLORS[0], colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, axisBottomTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, wipMonthLabel, onBarClick } = config
+  const { data, keys, indexBy, groupMode = "stacked", compactTop = false, color = CHART_COLORS[0], colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, axisBottomTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, wipMonthLabel, onBarClick, barTooltip, oppositeAxisLabels } = config
 
   const dark = useDarkMode()
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
@@ -283,7 +299,13 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
     return list.length > 0 ? list : undefined
   }, [emphasizeZero, configMarkers, zeroLineColor])
 
-  const marginTop = 20
+  // compactTop mirrors the line chart: a 40px top band the top-right legend
+  // tucks into (lifted -40), so a bar + line pair in one grid row align plot-
+  // to-plot. Default (20) keeps the legend in its bottom row.
+  const marginTop = compactTop ? 40 : 20
+  // Top-right legend (matching the line chart) only when compactTop is on AND
+  // there are keys to label; otherwise fall back to the bottom-center row.
+  const topLegend = compactTop && stacked && !hideLegend
 
   // Custom layer: vertical line through the band CENTER. The label sits
   // in the chart's bottom margin (alongside the month tick labels) so
@@ -370,7 +392,13 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
   const stackedPalette = Array.isArray(colors) ? colors : CHART_COLORS
   const groupTooltipOn = Boolean(groupTooltip) && stacked
   const GroupTooltip = ({ indexValue, row }: { indexValue: string; row: Record<string, unknown> }) => {
-    const diff = barKeys.reduce((sum, k) => sum + (Number(row[k]) || 0), 0)
+    // Grouped two-key charts (e.g. Budget vs Actual) compare their keys, so the
+    // summary row is the SIGNED DIFFERENCE key[0] − key[1] (budget − actual =
+    // variance). Stacked/diverging charts keep their keys' signed SUM (net).
+    const diff =
+      groupMode === "grouped" && barKeys.length === 2
+        ? (Number(row[barKeys[0]]) || 0) - (Number(row[barKeys[1]]) || 0)
+        : barKeys.reduce((sum, k) => sum + (Number(row[k]) || 0), 0)
     const diffColor = diff >= 0 ? "#22c55e" : "#ef4444"
     return (
       <div className="chart-line-tooltip">
@@ -411,13 +439,23 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
     const [hovered, setHovered] = useState<string | null>(null)
     if (!groupTooltipOn && !onBarClick) return null
     // Collapse the per-key bars into one transparent full-height band per
-    // category. Each band shares its segments' x/width (stacked), and carries
-    // the original data row so the tooltip can read every key at once. The same
-    // band intercepts clicks, so the whole column is a click target.
+    // category, carrying the original data row so the tooltip can read every
+    // key at once. The band spans the union of its segments — for stacked bars
+    // they share x/width, for grouped (side-by-side) bars it stretches from the
+    // leftmost bar to the rightmost so the whole cluster is one hover/click
+    // target.
     const bands = new Map<string, { x: number; width: number; row: Record<string, unknown> }>()
     for (const b of bars) {
       const key = String(b.data.indexValue)
-      if (!bands.has(key)) bands.set(key, { x: b.x, width: b.width, row: b.data.data })
+      const existing = bands.get(key)
+      if (!existing) {
+        bands.set(key, { x: b.x, width: b.width, row: b.data.data })
+      } else {
+        const left = Math.min(existing.x, b.x)
+        const right = Math.max(existing.x + existing.width, b.x + b.width)
+        existing.x = left
+        existing.width = right - left
+      }
     }
     const hoveredBand = hovered != null ? bands.get(hovered) : undefined
     return (
@@ -472,14 +510,60 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
     )
   }
 
+  // Big bold value label drawn on the opposite side of the zero axis from each
+  // simple bar — a positive (above-axis) bar's label sits just below the axis,
+  // a negative bar's just above. Colored to match the bar via colorBy. When a
+  // barTooltip is supplied the label is hoverable too, firing the same tooltip
+  // as the bar itself.
+  type LabelBar = { x: number; width: number; data: { value: number | null; indexValue: string | number } }
+  const valueLabelColor = dark ? "#e2e8f0" : "#1e293b"
+  const BarValueLabelsLayer = ({ bars, yScale }: { bars: readonly LabelBar[]; yScale: unknown }) => {
+    const { showTooltipFromEvent, hideTooltip } = useTooltip()
+    if (!oppositeAxisLabels || stacked) return null
+    const toY = yScale as (v: number) => number
+    const zeroY = toY(0)
+    const fmt = yFormat ?? ((v: number) => formatMoney(v))
+    return (
+      <g>
+        {bars.map((b, i) => {
+          const value = Number(b.data.value) || 0
+          const cx = b.x + b.width / 2
+          const above = value >= 0
+          const y = above ? zeroY + 12 : zeroY - 12
+          const tip = barTooltip ? barTooltip(String(b.data.indexValue), value) : null
+          return (
+            <text
+              key={i}
+              x={cx}
+              y={y}
+              textAnchor="middle"
+              dominantBaseline={above ? "hanging" : "auto"}
+              fill={colorBy ? colorBy(value) : valueLabelColor}
+              fontSize={16}
+              fontWeight={800}
+              pointerEvents={tip ? "all" : "none"}
+              style={tip ? { cursor: "default" } : undefined}
+              onMouseEnter={tip ? (e) => showTooltipFromEvent(<>{tip}</>, e) : undefined}
+              onMouseMove={tip ? (e) => showTooltipFromEvent(<>{tip}</>, e) : undefined}
+              onMouseLeave={tip ? () => hideTooltip() : undefined}
+            >
+              {fmt(value)}
+            </text>
+          )
+        })}
+      </g>
+    )
+  }
+
   return (
     <SizedBar
       data={barData}
       keys={barKeys}
       indexBy={barIndexBy}
+      groupMode={groupMode}
       theme={nivoTheme}
       colors={barColors}
-      margin={{ top: marginTop, right: 24, bottom: stacked && !hideLegend ? 56 : 40, left: 68 }}
+      margin={{ top: marginTop, right: 24, bottom: !topLegend && stacked && !hideLegend ? 56 : 40, left: 68 }}
       padding={0.35}
       borderRadius={3}
       valueScale={
@@ -504,29 +588,64 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
       // isInteractive is true, so the slice tooltip needs it. The slice layer's
       // bands sit topmost (last) and intercept hovers, so the bars beneath
       // never fire their own per-segment tooltip — no double tooltip.
-      layers={["grid", "axes", "bars", "markers", "legends", "annotations", BarXMarkersLayer, BarSliceLayer]}
+      layers={[
+        "grid",
+        "axes",
+        "bars",
+        ...(oppositeAxisLabels && !stacked ? [BarValueLabelsLayer] : []),
+        "markers",
+        "legends",
+        "annotations",
+        BarXMarkersLayer,
+        BarSliceLayer,
+      ]}
       enableGridX={false}
       enableLabel={false}
       animate
       motionConfig={{ tension: 120, friction: 14 }}
       legends={
         stacked && !hideLegend
-          ? [
-              {
-                dataFrom: "keys",
-                anchor: "bottom",
-                direction: "row",
-                translateY: 52,
-                itemsSpacing: 12,
-                itemWidth: 80,
-                itemHeight: 16,
-                symbolSize: 10,
-                symbolShape: "circle",
-              },
-            ]
+          ? topLegend
+            ? [
+                // Mirror the line chart's top-right legend exactly so a
+                // bar + line pair in one grid row share legend placement.
+                {
+                  dataFrom: "keys",
+                  anchor: "top-right",
+                  direction: "row",
+                  justify: false,
+                  translateX: 0,
+                  translateY: -40,
+                  itemsSpacing: 16,
+                  itemDirection: "left-to-right",
+                  itemWidth: 56,
+                  itemHeight: 20,
+                  itemOpacity: 0.9,
+                  symbolSize: 8,
+                  symbolShape: "circle",
+                },
+              ]
+            : [
+                {
+                  dataFrom: "keys",
+                  anchor: "bottom",
+                  direction: "row",
+                  translateY: 52,
+                  itemsSpacing: 12,
+                  itemWidth: 80,
+                  itemHeight: 16,
+                  symbolSize: 10,
+                  symbolShape: "circle",
+                },
+              ]
           : []
       }
       tooltip={({ id, value, indexValue }) => {
+        // Caller-supplied tooltip for simple bars (e.g. a plain-language
+        // explainer) takes precedence over the default label + value card.
+        if (barTooltip && !stacked) {
+          return <>{barTooltip(String(indexValue), value as number)}</>
+        }
         // The open month's bar has WIP folded in — flag it so the figure isn't
         // misread as billed-only. Other bars keep just their category label.
         const label =
@@ -665,15 +784,86 @@ function buildPulseLayer(pulse: PulsePointConfig | undefined) {
   }
 }
 
+// Custom nivo line layer: for y-axis markers that opt into `labelBackground`,
+// draw the legend as a pill centered ON the marker line (right-aligned in the
+// plot) with a filled background, so the label reads clearly atop the line
+// rather than floating above it. nivo draws the dashed line itself; we strip
+// its plain legend text (see nivoMarkers) and render this instead.
+function buildMarkerLabelsLayer(markers: LineMarker[] | undefined) {
+  const labeled = (markers ?? []).filter(
+    (m) => m.axis === "y" && m.legend && m.labelBackground
+  )
+  if (labeled.length === 0) return null
+  return ({ innerWidth, yScale }: { innerWidth: number; yScale: unknown }) => {
+    const toY = yScale as (v: number) => number
+    return (
+      <g>
+        {labeled.map((m, i) => {
+          const y = toY(Number(m.value))
+          const text = m.legend ?? ""
+          const fontSize = Number(m.textStyle?.fontSize ?? 11)
+          const fontWeight = m.textStyle?.fontWeight ?? 600
+          const fill = m.textStyle?.fill ?? "var(--secondary-text)"
+          const padX = 6
+          const padY = 3
+          // Approximate text width (no DOM measure available in render); the
+          // pill hugs the text closely enough for a short label like "Budget".
+          const w = text.length * fontSize * 0.6 + padX * 2
+          const h = fontSize + padY * 2
+          // Inset from the right edge so the dashed line keeps running past the
+          // pill on its right — the label reads as sitting ON the line rather
+          // than capping its end.
+          const rightInset = 24
+          const x = innerWidth - w - rightInset
+          return (
+            <g key={i} transform={`translate(${x}, ${y - h / 2})`} pointerEvents="none">
+              <rect width={w} height={h} rx={4} fill={m.labelBackground} />
+              <text
+                x={w / 2}
+                y={h / 2}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={fontSize}
+                fontWeight={fontWeight as number}
+                fill={fill}
+              >
+                {text}
+              </text>
+            </g>
+          )
+        })}
+      </g>
+    )
+  }
+}
+
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
-  const { series, yFormat, enableArea = true, legend = false, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick } = config
+  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick } = config
 
   const dark = useDarkMode()
   const isMobile = window.innerWidth <= 768
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
-  const yTicks = everyOtherYTicks(series)
+  // Extend ticks/grid to the numeric maxValue (e.g. a budget ceiling above the
+  // data) so the gridlines reach it instead of stopping at the data max.
+  const yTickCeiling = typeof maxValue === "number" ? maxValue : undefined
+  const yTicks = everyOtherYTicks(series, yTickCeiling)
+  // Markers with `labelBackground` get a custom backed pill (buildMarkerLabelsLayer)
+  // instead of nivo's plain text — strip their legend here so nivo draws only
+  // the line, then the custom layer renders the pill atop it.
+  const markerLabelsLayer = buildMarkerLabelsLayer(markers)
+  const nivoMarkers = markers?.map((m) => (m.labelBackground ? { ...m, legend: undefined } : m))
+  // When a numeric ceiling drove the ticks, snap the axis top to the highest
+  // tick so the topmost gridline sits flush at the plot edge — no empty band
+  // between the last gridline and a budget reference line above the data.
+  const effectiveMax =
+    yTickCeiling != null && yTicks && yTicks.length
+      ? yTicks[yTicks.length - 1]
+      : maxValue
   const hasSeriesColors = series.some((s) => s.color)
-  const marginTop = legend ? 40 : 20
+  // Compact charts keep a 40px top band: it gives a legend room to tuck into
+  // the top-right corner (lifted -40) without nivo clipping it at the SVG edge,
+  // and keeps the legend-less burn-up's plot top aligned with its neighbor.
+  const marginTop = compactTop ? 40 : (legend ? 40 : 20)
   // "Muted" mode: when the caller is highlighting a specific x value, all
   // series fade to gray and the single matching point paints in its
   // own series color. Communicates "this is what you clicked" without
@@ -690,7 +880,13 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
 
   const allY = series.flatMap((s) => s.data.map((p) => p.y)).filter((v): v is number => typeof v === "number")
   const minY = allY.length > 0 ? Math.min(...allY) : 0
-  const yMin = minY >= 0 ? 0 : "auto"
+  // All-positive data keeps a 0 floor. When values dip negative, pin the floor
+  // to the lowest generated tick (which everyOtherYTicks guarantees sits at/
+  // below the data min) — same snap-to-tick the top edge uses via effectiveMax.
+  // This keeps the negative gridlines/labels inside the axis instead of nivo's
+  // "auto" floor (= exact data min) clipping the bottom tick and crowding the
+  // lowest point against the edge.
+  const yMin = minY >= 0 ? 0 : (yTicks && yTicks.length ? yTicks[0] : "auto")
 
   return (
     <SizedLine
@@ -704,9 +900,9 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
             : CHART_COLORS
       }
       // Mobile right inset is wide enough that the centered last x-label isn't clipped.
-      margin={{ top: marginTop, right: isMobile ? 22 : 24, bottom: 48, left: isMobile ? 48 : 68 }}
+      margin={{ top: marginTop, right: isMobile ? 22 : 24, bottom: compactTop ? 40 : 48, left: isMobile ? 48 : 68 }}
       xScale={{ type: "point" }}
-      yScale={{ type: "linear", min: yMin, max: "auto", stacked: false }}
+      yScale={{ type: "linear", min: yMin, max: effectiveMax, stacked: false }}
       curve={curve}
       animate
       motionConfig={{ mass: 1, tension: 120, friction: 14, clamp: false, precision: 0.01, velocity: 0 }}
@@ -758,16 +954,19 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       }}
       axisBottom={{
         tickSize: 0,
-        tickPadding: 18,
+        // compactTop pairs this line chart with a bar chart in the same grid
+        // row (the jobcost detail page); match the bar's 12px tick padding so
+        // the x-labels share a baseline and the same gap to the card edge.
+        tickPadding: compactTop ? 12 : 18,
         tickValues: axisBottomTickValues,
         format: axisBottomFormat,
       }}
       gridYValues={yTicks ?? 5}
       enableGridX={false}
       enableCrosshair
-      markers={markers}
-      // Layers: default nivo order with the optional pulse layer appended
-      // last so the pulsing dot paints on top of the standard points.
+      markers={nivoMarkers}
+      // Layers: default nivo order, then the optional backed marker-label layer
+      // (drawn over the line + data), then the pulse dot on top of everything.
       layers={[
         "grid",
         "markers",
@@ -779,6 +978,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
         "slices",
         "mesh",
         "legends",
+        ...(markerLabelsLayer ? [markerLabelsLayer] : []),
         ...(pulsePoint ? [buildPulseLayer(pulsePoint)!] : []),
       ]}
       crosshairType="x"
@@ -791,10 +991,10 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
                 direction: "row",
                 justify: false,
                 translateX: 0,
-                translateY: -marginTop + 6,
+                translateY: compactTop ? -40 : -marginTop + 6,
                 itemsSpacing: 16,
                 itemDirection: "left-to-right",
-                itemWidth: 48,
+                itemWidth: legendItemWidth ?? 48,
                 itemHeight: 20,
                 itemOpacity: 0.9,
                 symbolSize: 8,
