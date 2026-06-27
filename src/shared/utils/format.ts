@@ -53,9 +53,18 @@ export function formatMoneyFull(value: number): string {
 }
 
 // Accepts either a ratio (0.18 → "18.0%") or a whole percentage (18 → "18.0%").
+// NOTE: this guesses by magnitude (|v| <= 1 → ratio), so a *ratio* whose
+// magnitude exceeds 1 (e.g. a 150%+ margin = 1.5) is misread as already-percent
+// and shown 100x too small. When the unit is known, prefer the explicit
+// formatters below instead of relying on the guess.
 export function formatPercent(value: number): string {
   const pct = Math.abs(value) <= 1 ? value * 100 : value
   return `${pct.toFixed(1)}%`
+}
+
+// Unambiguous: input is always a ratio (0.18 → "18.0%", 1.5 → "150.0%").
+export function formatRatioPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`
 }
 
 export function formatNumber(value: number): string {

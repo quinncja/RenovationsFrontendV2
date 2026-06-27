@@ -14,7 +14,8 @@ type StatusTone = "open" | "closed" | "future"
 export interface SummarySnapshotStat {
   title: string
   value: number | null | undefined
-  format?: "money" | "percent" | "number"
+  /** A preset, or a custom formatter when the unit is known (e.g. a ratio→percent). */
+  format?: "money" | "percent" | "number" | ((v: number) => string)
   /** Inline color for the value text (e.g. marginTextColor for the Margin tile). */
   valueColor?: string
 }

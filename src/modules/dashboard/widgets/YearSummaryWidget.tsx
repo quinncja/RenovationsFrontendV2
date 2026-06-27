@@ -2,7 +2,7 @@ import { useMemo, useState } from "react"
 import { RotateCcw } from "lucide-react"
 import { YearSelector } from "../../../shared/components/YearSelector/YearSelector"
 import { usePageYear, useWidgetData } from "../../../shared/context/PageContext"
-import { marginTextColor } from "../../../shared/utils/format"
+import { marginTextColor, formatRatioPercent } from "../../../shared/utils/format"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
@@ -26,7 +26,10 @@ function totalsFor(rows: MarginRow[] | null) {
     income,
     cogs,
     grossProfit,
-    margin: income !== 0 ? grossProfit / income : null,
+    // Divide by |income| so the margin keeps the sign of the profit — a
+    // negative income would otherwise flip a loss into a bogus positive
+    // margin (see CurrentPeriodSummaryWidget).
+    margin: income !== 0 ? grossProfit / Math.abs(income) : null,
   }
 }
 
@@ -79,7 +82,7 @@ export function YearSummaryWidget() {
       income,
       cogs: base.cogs,
       grossProfit,
-      margin: income !== 0 ? grossProfit / income : null,
+      margin: income !== 0 ? grossProfit / Math.abs(income) : null,
     }
   }, [rows, overUnderApplied, open])
 
@@ -115,8 +118,10 @@ export function YearSummaryWidget() {
         {
           title: "Margin",
           value: totals.margin,
-          format: "percent",
-          // Margin is a ratio; marginTextColor's thresholds are in whole-%.
+          // Margin is a ratio; format explicitly so a >100% margin isn't
+          // misread by the generic "percent" preset's magnitude heuristic.
+          format: formatRatioPercent,
+          // marginTextColor's thresholds are in whole-%.
           valueColor: marginColorsOn && totals.margin != null ? marginTextColor(totals.margin * 100) : undefined,
         },
         { title: includeOverUnder ? `Billed Income + ${isMobile ? "WIP" : "Work Completed"}` : "Billed Income", value: totals.income },

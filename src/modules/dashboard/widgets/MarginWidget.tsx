@@ -10,7 +10,9 @@ import type { LineMarker } from "../../../shared/components/Chart/chart.types"
 
 interface MarginRow {
   month: number
-  margin_percentage: number
+  // null when billed revenue for the month is non-positive (no meaningful
+  // margin — the backend guards `revenue > 0`).
+  margin_percentage: number | null
   // Needed to recompute the open-month bar when over/under is folded in.
   revenue?: number
   total_expenses?: number
@@ -47,7 +49,9 @@ export function MarginWidget() {
     // the chart axis always reads Jan→Dec.
     const byMonth = new Map<number, number>()
     for (const d of raw) {
-      if (d.month >= 1 && d.month <= 12) byMonth.set(d.month, d.margin_percentage)
+      // Skip null margins (non-positive-revenue months); they fall through to
+      // the 0-height bar below rather than plotting a bogus value.
+      if (d.month >= 1 && d.month <= 12 && d.margin_percentage != null) byMonth.set(d.month, d.margin_percentage)
     }
 
     // Toggle on: recompute the open month's bar with over/under folded into
@@ -67,7 +71,9 @@ export function MarginWidget() {
       if (row && ou !== 0) {
         const rev = (row.revenue ?? 0) + ou
         const exp = row.total_expenses ?? 0
-        byMonth.set(om.openMonthPeriod, rev !== 0 ? ((rev - exp) / rev) * 100 : 0)
+        // Divide by |rev| so the bar keeps the sign of the profit (a negative
+        // revenue+WIP would otherwise flip a loss into a bogus positive bar).
+        byMonth.set(om.openMonthPeriod, rev !== 0 ? ((rev - exp) / Math.abs(rev)) * 100 : 0)
       }
     }
     const bars = MONTHS.map((m) => ({

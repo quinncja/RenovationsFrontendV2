@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { RotateCcw } from "lucide-react"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
-import { fullMonth, shortMonth, marginTextColor } from "../../../shared/utils/format"
+import { fullMonth, shortMonth, marginTextColor, formatRatioPercent } from "../../../shared/utils/format"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
@@ -110,7 +110,13 @@ export function CurrentPeriodSummaryWidget() {
       const income = (open!.openMonthIncome ?? 0) + wip
       const cogs = open!.openMonthSpent ?? 0
       const grossProfit = income - cogs
-      const margin = income !== 0 ? grossProfit / income : null
+      // Divide by |income|, not income, so the margin keeps the *sign of the
+      // profit*. When billed income is negative (billings net negative, real
+      // revenue still in unbilled WIP), dividing a negative profit by a
+      // negative income would flip the sign and show a bogus *positive* margin
+      // (e.g. +462%, falsely green). Using |income| makes a loss read as a
+      // large negative margin (red) — honest, and still a real number.
+      const margin = income !== 0 ? grossProfit / Math.abs(income) : null
       return { income, cogs, grossProfit, margin }
     }
 
@@ -125,7 +131,7 @@ export function CurrentPeriodSummaryWidget() {
     const income = row?.revenue ?? 0
     const cogs = row?.total_expenses ?? 0
     const grossProfit = row?.gross_profit ?? 0
-    const margin = income !== 0 ? grossProfit / income : null
+    const margin = income !== 0 ? grossProfit / Math.abs(income) : null
     return { income, cogs, grossProfit, margin }
   }, [open, marginRows, resolvedMonth, showingOpenMonth, includeOverUnder])
 
@@ -176,10 +182,12 @@ export function CurrentPeriodSummaryWidget() {
         {
           title: "Margin",
           value: view.margin,
-          format: "percent",
-          // Margin is stored as a ratio (0..1); marginTextColor's thresholds
-          // are in whole-percentage units (20+ green / 15+ amber / red).
-          // Multiply at the call site rather than changing the helper.
+          // Margin is a ratio; format it explicitly (a >100% margin would be
+          // misread by the generic "percent" preset's magnitude heuristic).
+          format: formatRatioPercent,
+          // marginTextColor's thresholds are in whole-percentage units
+          // (20+ green / 15+ amber / red), so multiply the ratio at the call
+          // site — consistent with the formatter above.
           valueColor: marginColorsOn && view.margin != null ? marginTextColor(view.margin * 100) : undefined,
         },
         { title: includeOverUnder ? `Billed Income + ${isMobile ? "WIP" : "Work Completed"}` : "Billed Income", value: view.income },

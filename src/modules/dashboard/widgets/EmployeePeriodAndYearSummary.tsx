@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { RotateCcw } from "lucide-react"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
-import { fullMonth, shortMonth, marginTextColor } from "../../../shared/utils/format"
+import { fullMonth, shortMonth, marginTextColor, formatRatioPercent } from "../../../shared/utils/format"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import { SummarySnapshotCard } from "./SummarySnapshotCard"
 
@@ -94,7 +94,10 @@ export function EmployeePeriodAndYearSummary({ monthly, yearly, loading }: Props
       income,
       cost,
       profit,
-      margin: income !== 0 ? profit / income : null,
+      // Divide by |income| so the margin keeps the sign of the profit (a
+      // negative income would otherwise flip a loss into a bogus positive
+      // margin — see CurrentPeriodSummaryWidget).
+      margin: income !== 0 ? profit / Math.abs(income) : null,
     }
   }, [monthly, resolvedMonth])
 
@@ -108,7 +111,7 @@ export function EmployeePeriodAndYearSummary({ monthly, yearly, loading }: Props
       income,
       cost,
       profit,
-      margin: income !== 0 ? profit / income : null,
+      margin: income !== 0 ? profit / Math.abs(income) : null,
     }
   }, [yearly, pageYear])
 
@@ -163,7 +166,7 @@ export function EmployeePeriodAndYearSummary({ monthly, yearly, loading }: Props
           {
             title: "Margin",
             value: periodView.margin,
-            format: "percent",
+            format: formatRatioPercent,
             valueColor: marginColorsOn && periodView.margin != null ? marginTextColor(periodView.margin * 100) : undefined,
           },
           { title: "Income", value: periodView.income },
@@ -181,7 +184,7 @@ export function EmployeePeriodAndYearSummary({ monthly, yearly, loading }: Props
           {
             title: "Margin",
             value: yearView.margin,
-            format: "percent",
+            format: formatRatioPercent,
             valueColor: marginColorsOn && yearView.margin != null ? marginTextColor(yearView.margin * 100) : undefined,
           },
           { title: "Income", value: yearView.income },

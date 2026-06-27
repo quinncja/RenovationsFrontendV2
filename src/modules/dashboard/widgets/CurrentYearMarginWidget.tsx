@@ -15,9 +15,11 @@ export function CurrentYearMarginWidget() {
     ? data.annualRevenueTrend.find((d) => d.year === year)?.revenue ?? null
     : null
   const spent = data?.annualDirectExpenses?.total ?? null
+  // Divide by |revenue| so the margin keeps the sign of the profit — a negative
+  // revenue would otherwise flip a loss into a bogus positive margin.
   const margin =
     revenue != null && revenue !== 0 && spent != null
-      ? ((revenue - spent) / revenue) * 100
+      ? ((revenue - spent) / Math.abs(revenue)) * 100
       : null
 
   return <StatWidget title={`${year} Margin`} value={margin} format="percent" loading={isLoading} />
