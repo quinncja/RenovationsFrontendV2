@@ -1,3 +1,5 @@
+import type { ReactNode } from "react"
+
 // --- Shared data shapes ---
 
 export interface LinePoint {
@@ -44,6 +46,11 @@ export interface LineMarker {
     fontSize?: number
     fontWeight?: number | string
   }
+  /** When set (line charts, y-axis markers only), the legend renders as a pill
+   *  centered ON the marker line with this background fill — e.g. the widget
+   *  surface color — so the label stays legible sitting atop the line instead
+   *  of floating above it. Replaces nivo's plain in-line marker text. */
+  labelBackground?: string
 }
 
 export interface RadialBarSeries {
@@ -63,6 +70,15 @@ export type ChartConfig =
       keys?: string[]
       /** Category-axis field when `keys` is provided (default "label"). */
       indexBy?: string
+      /** Multi-key layout: "stacked" (default) piles keys into one bar;
+       *  "grouped" places them side by side — use for budget-vs-actual style
+       *  comparisons where stacking the two would be meaningless. */
+      groupMode?: "grouped" | "stacked"
+      /** Trim the top margin and tuck the multi-key legend into the top-right
+       *  corner (instead of the default bottom-center row). Mirrors the line
+       *  chart's `compactTop` so a bar + line pair in the same grid row align
+       *  plot-to-plot and share legend placement. */
+      compactTop?: boolean
       /** Bar fill color for single-series bars (defaults to primary chart color) */
       color?: string
       /** Color palette for stacked keys (defaults to the chart palette) */
@@ -103,6 +119,14 @@ export type ChartConfig =
       markers?: LineMarker[]
       /** Hide the auto legend (the row of key swatches) under stacked bars. */
       hideLegend?: boolean
+      /** Custom tooltip for simple (non-stacked) bars. Receives the category's
+       *  indexValue + numeric value; return any node. Overrides the default. */
+      barTooltip?: (indexValue: string, value: number) => ReactNode
+      /** Render each simple bar's value as a bold label on the opposite side of
+       *  the zero axis from the bar (a positive bar's label sits just below the
+       *  axis, a negative bar's just above). Uses yFormat for the text and
+       *  colorBy (if set) for the color. */
+      oppositeAxisLabels?: boolean
       /** Category label of the bar whose value has WIP (over/under) folded in.
        *  When set, that bar's tooltip header reads "{label} Billed + WIP" to
        *  flag it isn't billed-only. Other bars are unaffected. */
@@ -126,7 +150,17 @@ export type ChartConfig =
       series: LineSeries[]
       yFormat?: (v: number) => string
       enableArea?: boolean
+      /** Y-axis upper bound (default "auto", driven by the data). Set this when
+       *  a horizontal `markers` reference line (e.g. a budget ceiling) can sit
+       *  above the data and would otherwise be clipped off the top. */
+      maxValue?: number | "auto"
       legend?: boolean
+      /** Trim the top margin so the plot sits close under the widget header and
+       *  any legend tucks into the top-right corner. For tight cards where the
+       *  default headroom wastes vertical space. */
+      compactTop?: boolean
+      /** Per-legend-item width (px); widen for long series labels. Default 48. */
+      legendItemWidth?: number
       curve?: "linear" | "monotoneX" | "step" | "natural" | "catmullRom"
       axisBottomTickValues?: string[]
       axisBottomFormat?: (v: string | number) => string

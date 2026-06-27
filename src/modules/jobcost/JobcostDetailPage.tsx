@@ -9,6 +9,7 @@ import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { Chart } from "../../shared/components/Chart/Chart"
+import { ChartLegend } from "../../shared/components/Chart/ChartLegend"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { formatMoneyFull, formatDate, marginTextColor } from "../../shared/utils/format"
@@ -18,12 +19,12 @@ import useHashedRelationColors from "../../shared/hooks/useHashedRelationColors"
 import { JOB_STATUS_LABELS } from "../directory/directoryShared"
 import { ChangeOrderModal } from "../change-orders/components/ChangeOrderModal"
 import type { ChangeOrder } from "../change-orders/types"
-import type { SpendItem } from "../../shared/components/Chart/chart.types"
+import type { SpendItem, LineMarker } from "../../shared/components/Chart/chart.types"
+import { computeWeeklySpend, computeCostVsBilled, thinLabels, type DailySpend } from "./weeklySpend"
 import { colorRamp, hashColor, RAMP_SCHEMES } from "../../shared/config/chartColors"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { JOBCOST_BACK_FALLBACK, type JobcostBackState } from "./useJobcostNav"
 
-const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 const INV_STATUS_LABEL: Record<number, string> = { 1: "Open", 2: "Review", 3: "Dispute", 4: "Paid", 5: "Void" }
 const INV_STATUS_CLASS: Record<number, string> = { 1: "open", 2: "review", 3: "dispute", 4: "paid", 5: "void" }
 
@@ -79,7 +80,7 @@ export default function JobcostDetailPage() {
   return (
     <PageDataProvider
       module="jobcostDetail"
-      queries={["getPhases", "getBudgetByRecnum", "getAllCostItems", "getJobMonthlySpend", "getJobInvoices", "getProgressBilling"]}
+      queries={["getPhases", "getBudgetByRecnum", "getAllCostItems", "getJobMonthlySpend", "getJobDailySpend", "getJobInvoices", "getProgressBilling"]}
       params={{ recnum: numericId }}
     >
       <JobcostDetail recnum={recnum} />
@@ -104,14 +105,16 @@ function JobcostDetail({ recnum }: { recnum: string }) {
     getBudgetByRecnum: BudgetBreakdown | null
     getAllCostItems: CostItem[] | null
     getJobMonthlySpend: MonthlyCost[] | null
+    getJobDailySpend: DailySpend[] | null
     getJobInvoices: JobInvoice[] | null
     getProgressBilling: ProgressBilling | null
-  }>(["getPhases", "getBudgetByRecnum", "getAllCostItems", "getJobMonthlySpend", "getJobInvoices", "getProgressBilling"])
+  }>(["getPhases", "getBudgetByRecnum", "getAllCostItems", "getJobMonthlySpend", "getJobDailySpend", "getJobInvoices", "getProgressBilling"])
 
   const project = data?.getPhases?.[0] ?? null
   const budget = data?.getBudgetByRecnum ?? null
   const costItems = Array.isArray(data?.getAllCostItems) ? data.getAllCostItems : []
   const monthlyCosts = Array.isArray(data?.getJobMonthlySpend) ? data.getJobMonthlySpend : []
+  const dailySpend = Array.isArray(data?.getJobDailySpend) ? data.getJobDailySpend : []
   const invoices = Array.isArray(data?.getJobInvoices) ? data.getJobInvoices : []
   const pb = data?.getProgressBilling ?? null
 
@@ -148,22 +151,13 @@ function JobcostDetail({ recnum }: { recnum: string }) {
       .map(([label, value]) => ({ id: label, label, value }))
   })()
 
-  // Monthly spend line
-  const monthlyLine = monthlyCosts.map(m => ({
-    x: `${MONTH_ABBR[m.month - 1] ?? m.month} '${String(m.year).slice(2)}`,
-    y: m.spending,
-  }))
-  // Thin x-axis labels when there are too many months — phones fit far fewer.
-  // Anchored from the end so the most recent month always keeps its label.
-  const maxXLabels = isMobile ? 5 : 12
-  const monthlyTickValues = monthlyLine.length > maxXLabels
-    ? (() => {
-        const stride = Math.ceil(monthlyLine.length / maxXLabels)
-        return monthlyLine
-          .filter((_, i) => (monthlyLine.length - 1 - i) % stride === 0)
-          .map(d => d.x)
-      })()
-    : undefined
+  // Weekly buckets — jobs span ~a month, so weeks are the readable resolution.
+  // Phones fit fewer x labels; thin from the end so the most recent week always
+  // keeps its label.
+  const weeks = computeWeeklySpend(dailySpend)
+  const maxXLabels = isMobile ? 5 : 8
+  const spentToDate = weeks.length ? weeks[weeks.length - 1].cumulative : 0
+  const budgetLeft = totalBudget - spentToDate
 
   // Invoice totals (exclude void)
   const activeInvoices = invoices.filter(i => i.status !== 5)
@@ -171,11 +165,89 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const totalPaid = activeInvoices.reduce((s, i) => s + (i.amountPaid || 0), 0)
   const totalOutstanding = activeInvoices.reduce((s, i) => s + (i.amountRemaining || 0), 0)
 
+  // ── Cost & Billing Trajectory ──
+  // One chart that answers all three "how is this job tracking" questions at
+  // once: cumulative cost (are we burning fast?), the budget ceiling (will we
+  // blow the budget?), and cumulative billed (are we collecting cash as fast as
+  // we spend it?). Cost + billed share ONE weekly axis spanning the union of
+  // both streams (computeCostVsBilled), so a job that bills before/after its
+  // costs still lines up. `Cost` is series[0] → brand-orange; `Billed` next.
+  const costVsBilled = computeCostVsBilled(
+    dailySpend,
+    activeInvoices.map(i => ({ day: i.invoiceDate, spending: i.total })),
+  )
+  // Explicit colors (matching CHART_COLORS[0]/[1]) so the slice tooltip tints
+  // each value to its line — Cost orange, Billed green.
+  const trajSeries = [
+    { id: "Cost", color: "#c27c3e", data: costVsBilled.map(p => ({ x: p.label, y: p.cost })) },
+    { id: "Billed", color: "#22c55e", data: costVsBilled.map(p => ({ x: p.label, y: p.billed })) },
+  ]
+  const trajTickValues = thinLabels(costVsBilled.map(p => p.label), maxXLabels)
+  const cvbLast = costVsBilled[costVsBilled.length - 1] ?? null
+  const maxBilled = cvbLast?.billed ?? 0
+  // The budget ceiling ALWAYS renders, so the axis always extends to it (plus a
+  // little headroom). Early in a job the budget can sit well above the plotted
+  // cost + billed lines — that empty space above the data is itself the signal
+  // ("lots of budget left"). The caption carries the exact figure.
+  const trajDataMax = Math.max(spentToDate, maxBilled)
+  const trajMaxValue = totalBudget > 0
+    ? Math.max(trajDataMax, totalBudget) * 1.04
+    : trajDataMax > 0 ? trajDataMax * 1.1 : "auto"
+  // Horizontal dashed budget ceiling — the cost line crossing it = over budget.
+  const trajMarkers: LineMarker[] = totalBudget > 0
+    ? [{
+        axis: "y",
+        value: totalBudget,
+        legend: "Budget",
+        legendPosition: "top-right",
+        lineStyle: { stroke: "var(--secondary-text)", strokeWidth: 1, strokeDasharray: "4 4", strokeOpacity: 0.7 },
+        textStyle: { fill: "var(--secondary-text)", fontSize: 11, fontWeight: 600 },
+        // Render the label as a pill sitting atop the line with the card's
+        // surface color behind it, so it stays legible over the dashed line.
+        labelBackground: "var(--card-color)",
+      }]
+    : []
+  // Caption: budget burn % (+ $ left/over).
+  const trajDesc = totalBudget > 0
+    ? `${Math.round((spentToDate / totalBudget) * 100)}% of budget · ${
+        budgetLeft >= 0 ? `${formatMoneyFull(budgetLeft)} left` : `${formatMoneyFull(-budgetLeft)} over`
+      }`
+    : undefined
+
+  // ── Budget vs Actual by cost type ──
+  // Where, specifically, is the money going off-plan? Grouped bars per cost
+  // type (Material / Labor / Sub / WTPM): revised budget beside actual spend.
+  // Reuses the same `groups` rollup as the Cost Breakdown table, so the two
+  // reconcile exactly. Drop types with neither budget nor spend (e.g. WTPM).
+  const budgetVsActual = groups
+    .filter(g => g.budget > 0 || g.actual > 0)
+    .map(g => ({ type: g.key, Budget: g.budget, Actual: g.actual }))
+  // One-line caption — mirrors the trajectory's description so both widget
+  // headers are the same height (and their plots/axes/legends line up). Reports
+  // how many cost types have run past their budget.
+  const overCount = budgetVsActual.filter(g => g.Actual > g.Budget).length
+  const bvaDesc = budgetVsActual.length === 0
+    ? undefined
+    : overCount === 0
+      ? "All cost types within budget"
+      : `${overCount} of ${budgetVsActual.length} types over budget`
+
 
   const pm = project?.phases?.find(p => p.pmName?.trim())?.pmName?.trim()
   const margin = project && project.totalContract > 0
     ? ((project.totalContract - project.totalCost) / project.totalContract) * 100
     : project?.totalMargin ?? null
+  // Budget Variance = revised budget − spend to date. POSITIVE = under budget
+  // (good, green); NEGATIVE = over budget (bad, red). Colored by its own sign —
+  // NOT by `margin` (a different metric on a percentage scale), which is what
+  // made an over-budget job read green.
+  const budgetVariance = project ? totalBudget - project.totalCost : null
+  const budgetVarianceColor =
+    budgetVariance == null || budgetVariance === 0
+      ? undefined
+      : budgetVariance > 0
+        ? "#22c55e" // under budget — green (matches marginTextColor)
+        : "#ef4444" // over budget — red (matches marginTextColor)
   const originalContract = project?.originalContract ?? 0
   const revisedContract = project?.totalContract ?? 0
   const invoicePct = revisedContract > 0 ? (totalInvoiced / revisedContract) * 100 : 0
@@ -274,7 +346,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                 </div>
                 <div className="inv-metric-divider" />
                 <div className="inv-metric">
-                  <span className="inv-metric-value" style={!marginColorsOn || margin == null ? undefined : { color: marginTextColor(margin) }}>
+                  <span className="inv-metric-value" style={!marginColorsOn || budgetVarianceColor == null ? undefined : { color: budgetVarianceColor }}>
                     {formatMoneyFull(totalBudget - project.totalCost)}
                   </span>
                   <span className="inv-metric-label">Budget Variance</span>
@@ -546,28 +618,87 @@ function JobcostDetail({ recnum }: { recnum: string }) {
             )}
         </MotionItem>
 
-        {/* ── Monthly Spend ── */}
-        <MotionItem className="col-span-full">
+        {/* ── Cost & Billing Trajectory + Budget vs Actual by Type ── */}
+        <MotionItem>
           <Widget
-            title="Monthly Spend"
+            title="Cost & Billing Trajectory"
+            description={trajDesc}
             loading={isLoading}
-            noData={!isLoading && monthlyLine.length === 0}
+            noData={!isLoading && costVsBilled.length === 0}
             className="jcd-chart-widget"
+            // Custom HTML legend in the header's top-right corner (colors match
+            // the series: Cost = CHART_COLORS[0], Billed = CHART_COLORS[1]).
+            actions={
+              <ChartLegend items={[
+                { label: "Cost", color: "#c27c3e" },
+                { label: "Billed", color: "#22c55e" },
+              ]} />
+            }
           >
             <Chart config={{
               type: "line",
-              // Series omits `color` so it falls through to CHART_COLORS[0]
-              // (brand orange) — same line color the home page revenue +
-              // directory history charts use.
-              series: [{ id: "Spend", data: monthlyLine }],
-              enableArea: true,
+              // `Cost` omits `color` so it falls through to CHART_COLORS[0]
+              // (brand orange) — same line the home page revenue + directory
+              // history charts use; `Billed` takes the next palette color.
+              series: trajSeries,
+              // Two cumulative lines plus a budget marker — no area fill (it
+              // would muddy the overlap). Legend is rendered in the header
+              // (actions) instead of nivo's in-plot legend.
+              enableArea: false,
+              legend: false,
+              compactTop: true,
               disableGrowthTooltip: true,
-              axisBottomTickValues: monthlyTickValues,
+              yFormat: formatMoneyFull,
+              // Scaled to the plotted data, extended to the budget ceiling only
+              // when that ceiling is actually in view (see trajMaxValue).
+              maxValue: trajMaxValue,
+              axisBottomTickValues: trajTickValues,
+              markers: trajMarkers,
+            }} />
+          </Widget>
+        </MotionItem>
+        <MotionItem>
+          <Widget
+            title="Budget vs Actual by Type"
+            description={bvaDesc}
+            loading={isLoading}
+            noData={!isLoading && budgetVsActual.length === 0}
+            className="jcd-chart-widget"
+            // Custom HTML legend in the header's top-right corner (colors match
+            // the bar `colors` below).
+            actions={
+              <ChartLegend items={[
+                { label: "Budget", color: "#94a3b8" },
+                { label: "Actual", color: "#c27c3e" },
+              ]} />
+            }
+          >
+            <Chart config={{
+              type: "bar",
+              data: budgetVsActual,
+              keys: ["Budget", "Actual"],
+              indexBy: "type",
+              groupMode: "grouped",
+              // Align the plot with the trajectory line chart beside it.
+              compactTop: true,
+              // Legend is rendered in the header (actions) instead of nivo's.
+              hideLegend: true,
+              // Hovering a category shows one card with both Budget and Actual
+              // plus the variance (budget − actual) for that cost type.
+              groupTooltip: true,
+              tooltipTotalLabel: "Variance",
+              // Thin the y-axis to ~5 ticks so its label density matches the
+              // line chart's (which uses everyOtherYTicks) instead of ~11.
+              axisLeftTickValues: 5,
+              // Budget reads as a neutral reference bar; actual takes brand
+              // orange so an over-budget trade pops against its budget peer.
+              colors: ["#94a3b8", "#c27c3e"],
+              yFormat: formatMoneyFull,
             }} />
           </Widget>
         </MotionItem>
 
-        {/* ── Spending by Type + Top Vendors ── */}
+        {/* ── Spending by Type + Spending by Vendor ── */}
         <MotionItem>
           <Widget title="Spending by Type" loading={isLoading} noData={!isLoading && typeSpend.length === 0}>
             <Chart config={{
@@ -581,7 +712,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
           </Widget>
         </MotionItem>
         <MotionItem>
-          <Widget title="Top Vendors" loading={isLoading} noData={!isLoading && vendorSpend.length === 0}>
+          <Widget title="Spending by Vendor" loading={isLoading} noData={!isLoading && vendorSpend.length === 0}>
             <Chart config={{
               type: "pie-with-list",
               items: vendorSpend,

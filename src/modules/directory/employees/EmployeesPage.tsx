@@ -26,10 +26,17 @@ interface EmployeeRow {
   employeeNum: number
   totalIncome: number // "Work Completed"
   totalCost: number
+  totalBudget: number // year-allocated budget across their jobs
   margin: number // already a whole percentage (0–100)
 }
 
-type SortKey = "name" | "totalIncome" | "totalCost" | "margin"
+// Budget − Cost across the employee's jobs. Positive = under budget, negative
+// = over (mirrors EmployeeDetailPage / Jobcost's per-job variance convention).
+function budgetVariance(e: EmployeeRow): number {
+  return (e.totalBudget ?? 0) - e.totalCost
+}
+
+type SortKey = "name" | "totalIncome" | "totalCost" | "totalBudget" | "variance" | "margin"
 type SortDir = "asc" | "desc"
 
 function SortTh({ col, label, align = "left", sortKey, sortDir, onSort }: {
@@ -100,6 +107,8 @@ function EmployeesContent({ year, onYearChange }: { year: number | null; onYearC
       if (sortKey === "name") return fullName(a).localeCompare(fullName(b)) * dir
       if (sortKey === "totalIncome") return (a.totalIncome - b.totalIncome) * dir
       if (sortKey === "totalCost") return (a.totalCost - b.totalCost) * dir
+      if (sortKey === "totalBudget") return ((a.totalBudget ?? 0) - (b.totalBudget ?? 0)) * dir
+      if (sortKey === "variance") return (budgetVariance(a) - budgetVariance(b)) * dir
       return (a.margin - b.margin) * dir
     })
   }, [employees, search, sortKey, sortDir])
@@ -136,7 +145,9 @@ function EmployeesContent({ year, onYearChange }: { year: number | null; onYearC
                   <tr>
                     <SortTh col="name" label="Employee" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="totalIncome" label={isMobile ? "WIP" : "Work Completed"} align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="totalBudget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="variance" label={isMobile ? "Variance" : "Budget Variance"} align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                   </tr>
                 </thead>
@@ -165,7 +176,16 @@ function EmployeesContent({ year, onYearChange }: { year: number | null; onYearC
                           </div>
                         </td>
                         <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(emp.totalIncome)}</td>
-                        <td className="spend-rank-table-value subheadline text-secondary">{formatMoneyFull(emp.totalCost)}</td>
+                        <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(emp.totalBudget ?? 0)}</td>
+                        <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(emp.totalCost)}</td>
+                        {(() => {
+                          const variance = budgetVariance(emp)
+                          return (
+                            <td className={`spend-rank-table-value body-text emphasized ${variance < 0 ? "jc-variance-over" : variance > 0 ? "jc-variance-under" : ""}`}>
+                              {variance > 0 ? "+" : ""}{formatMoneyFull(variance)}
+                            </td>
+                          )
+                        })()}
                         <td
                           className="spend-rank-table-value body-text emphasized"
                           style={{ color: marginColorsOn ? marginTextColor(emp.margin) : undefined }}

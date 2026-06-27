@@ -3874,8 +3874,10 @@ body{
 .jcd-invoice-drop {
   position: relative;
   z-index: 0;
-  margin-top: -12px;
-  margin-bottom: 12px;
+  /* Vertical tuck (-12 to slide behind the card) + its compensating bottom
+     margin live on `.open` ONLY — see below. A COLLAPSED drop must have zero
+     vertical footprint so the row gap under Billing Position stays uniform with
+     every other widget row. */
   /* Bleed the wrapper 12px wider on each side (negative margin) and pad it back
      in by the same amount, so the card stays full-width/aligned but there's room
      inside the clip region for its box-shadow to show on the left & right. */
@@ -3895,13 +3897,20 @@ body{
 }
 .jcd-invoice-drop.open {
   opacity: 1;
+  /* Tuck 12px behind the billing card (it sits on top via z-index, casting its
+     shadow over the seam). Only applied while open. */
+  margin-top: -12px;
 }
 /* Let the card's shadow escape the inner; min-height:0 lets the 0fr row still
-   collapse with overflow visible. The padding-bottom is the bottom-shadow room,
-   clipped to nothing by the wrapper when closed. */
+   collapse with overflow visible. */
 .jcd-invoice-drop .det-section-body-inner {
   overflow: visible;
   min-height: 0;
+}
+/* Bottom-shadow room only WHILE OPEN. With `overflow: visible` the 0fr row
+   doesn't clip this padding, so applying it when collapsed left a ~10px sliver
+   below Billing Position that broke the uniform row gap. */
+.jcd-invoice-drop.open .det-section-body-inner {
   padding-bottom: 10px;
 }
 .jcd-invoice-card {
@@ -4192,17 +4201,56 @@ body{
 /* Chart widget: tighter padding, space between header and chart */
 .jcd-chart-widget.card {
   padding: 1.25rem 0 0 0;
+  /* Tighten the header→chart gap (default .widget gap is 0.75rem) so the
+     description caption sits close to the plot and the graph gets the height. */
+  gap: 0.35rem;
 }
 .jcd-chart-widget .widget-header {
   padding: 0 1.25rem;
 }
 .jcd-chart-widget .widget-body {
-  padding-top: 0.75rem;
+  /* Inset the plot from the card edges (the SVG's own margins sit inside this)
+     and give the x-axis labels breathing room above the card's bottom edge. */
+  padding: 0 1rem 1rem;
 }
 .jcd-chart-widget .widget-skeleton {
-  min-height: 200px;
+  min-height: 280px;
   margin: 0.75rem 1.25rem 1.25rem;
   border-radius: 8px;
+}
+/* Taller plot area — at half width the burn-up / cost-vs-billed charts read
+   squat at the shared 220px default; give them more vertical room. */
+.jcd-chart-widget .chart-container {
+  min-height: 320px;
+}
+/* Custom HTML legend pinned to the widget's top-right corner (replaces nivo's
+   in-plot legend on these two charts). align-self overrides the header's
+   center alignment so it hugs the top edge alongside the title. */
+.jcd-chart-widget .widget-header-actions {
+  align-self: flex-start;
+}
+
+/* Plain-HTML chart legend (ChartLegend.tsx) */
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.chart-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.chart-legend-label {
+  font-size: 0.7rem;
+  color: var(--secondary-text);
+  white-space: nowrap;
 }
 
 /* Cost breakdown widget: table flush to card edges */
@@ -4223,6 +4271,89 @@ body{
   min-height: 160px;
   margin: 0.75rem 1.25rem 1.25rem;
   border-radius: 8px;
+}
+
+/* On the detail page the breakdown gets its own full-width card, so let it
+   breathe: the table stretches to fill the widget body (rows distribute the
+   spare height rather than leaving dead space below the Total), gets airier
+   row spacing, and its outer columns align to the card's 1.25rem gutter so the
+   header row lines up with the widget title. Scoped to .jcd-cost-widget so the
+   compact copy embedded in the Job Costing list rows is unaffected. */
+.jcd-cost-widget .jc-cost-breakdown {
+  flex: 1 1 auto;
+}
+
+.jcd-cost-widget .jc-cost-breakdown thead th {
+  padding-top: 0.875rem;
+  padding-bottom: 0.875rem;
+}
+
+.jcd-cost-widget .jc-cost-breakdown .spend-rank-table-row td,
+.jcd-cost-widget .jc-cost-breakdown .jc-total-row td {
+  padding-top: 1.05rem;
+  padding-bottom: 1.05rem;
+}
+
+.jcd-cost-widget .jc-cost-breakdown thead th:first-child,
+.jcd-cost-widget .jc-cost-breakdown .spend-rank-table-row td:first-child,
+.jcd-cost-widget .jc-cost-breakdown .jc-total-row td:first-child {
+  padding-left: 1.25rem;
+}
+
+.jcd-cost-widget .jc-cost-breakdown thead th:last-child,
+.jcd-cost-widget .jc-cost-breakdown .spend-rank-table-row td:last-child,
+.jcd-cost-widget .jc-cost-breakdown .jc-total-row td:last-child {
+  padding-right: 1.25rem;
+}
+
+/* Expanded line-item sub-table: give it the same airy treatment so it reads as
+   a calmer, roomier extension of its parent row rather than a dense block.
+   Headers and cells gain vertical breathing room and align to the card's
+   1.25rem gutter (matching the outer grid). Same .jcd-cost-widget scope. */
+/* Match the outer grid's header type: sentence-case, subheadline size,
+   semibold, secondary text — dropping the tiny uppercase tracked caps so the
+   two header rows read as one family. */
+.jcd-cost-widget .jc-txn-th {
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+/* The sub-table is nested inside the outer .spend-rank-table, so its generic
+   `th { text-align: left }` (specificity 0,1,1) leaks onto these inner amount
+   headers and beats `.jc-txn-amount-col` (0,1,0) — dragging "Committed" /
+   "Posted" left while their values stay right. Re-assert right with enough
+   specificity to win so the headers sit over their numbers. */
+.jcd-cost-widget .jc-txn-th.jc-txn-amount-col {
+  text-align: right;
+}
+
+.jcd-cost-widget .jc-txn-row td {
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.jcd-cost-widget .jc-txn-empty {
+  padding-top: 1.75rem;
+  padding-bottom: 1.75rem;
+}
+
+/* Recessed fill: the sub-table reads as inset into the card, using the same
+   subtle wash as the Total row (primary-text 3% over the card) so the two
+   tinted surfaces in the breakdown match. */
+.jcd-cost-widget .jc-txn-table {
+  background: color-mix(in srgb, var(--primary-text) 3%, var(--card-color));
+}
+
+.jcd-cost-widget .jc-txn-th {
+  background: transparent;
 }
 
 
@@ -9193,9 +9324,33 @@ svg.placeholder-illustration {
   gap: 0.75rem;
 }
 
-/* A little breathing room between each title and its number. */
+/* Lay each card out so the big number sits bottom-left and the YoY pill
+   bottom-right on the same baseline — using the card's width instead of
+   stacking everything in a left column. */
+.estp-scorecard-grid .stat-widget {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    "title title"
+    "value yoy";
+  align-items: end;
+  column-gap: 0.75rem;
+  row-gap: 0.4rem;
+}
+
 .estp-scorecard-grid .stat-widget-title {
-  margin-bottom: 0.35rem;
+  grid-area: title;
+  margin-bottom: 0;
+}
+
+.estp-scorecard-grid .stat-widget-value,
+.estp-scorecard-grid .stat-widget-skeleton {
+  grid-area: value;
+}
+
+.estp-scorecard-grid .estp-yoy {
+  grid-area: yoy;
+  justify-self: end;
 }
 
 /* Match the large dollar figure in the Banking "Cash in Bank" widget. */
@@ -9214,6 +9369,54 @@ svg.placeholder-illustration {
   line-height: 1.3;
 }
 
+/* Year-over-year comparison under a scorecard value: a soft-tinted pill
+   (green = better, red = worse) stacked over a muted "vs {year}" caption. The
+   tint carries the meaning; the card surface stays calm. */
+.estp-yoy {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.estp-yoy-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.26rem;
+  padding: 0.13rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* Diagonal trend arrow (↗ / ↘) — matches the dashboard's house trend glyph.
+   Slightly larger than the body text and nudged to sit on the optical center. */
+.estp-yoy-tri {
+  font-size: 0.82rem;
+  line-height: 1;
+  margin-right: -0.04rem;
+}
+
+.estp-yoy-pill--better {
+  color: light-dark(#15803d, #5ee08a);
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+}
+
+.estp-yoy-pill--worse {
+  color: light-dark(#c0392b, #f8857a);
+  background: color-mix(in srgb, #ef4444 14%, transparent);
+}
+
+.estp-yoy-pill--flat,
+.estp-yoy-pill--none {
+  color: var(--secondary-text);
+  background: color-mix(in srgb, var(--secondary-text) 12%, transparent);
+  font-weight: var(--font-weight-medium, 500);
+}
+
 /* Anchor the tooltip to the whole stat card so it can sit centered below it. */
 .stat-widget.card:has(.estp-tooltip) {
   position: relative;
@@ -9229,7 +9432,7 @@ svg.placeholder-illustration {
   transform: translateX(-50%) translateY(-4px);
   z-index: 50;
   width: max-content;
-  max-width: 300px;
+  max-width: 360px;
   padding: 14px 18px;
   background: var(--card-color);
   color: var(--primary-text);
@@ -9293,6 +9496,28 @@ svg.placeholder-illustration {
   color: var(--secondary-text);
 }
 
+/* Year-over-year sentence: same color as the rest of the tooltip body (its
+   delta number keeps the green/red via an inline style). */
+.estp-tooltip-yoy {
+  margin-top: 0.4rem;
+}
+
+/* The "rule of thumb" closing line is set off by a faint divider so it reads as
+   a separate footer. */
+.estp-tooltip-note--footer {
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 65%, transparent);
+}
+
+/* The category bar's split-rule footer is supporting detail, not the headline.
+   Shrink and mute it so the eye lands on the over/under sentence above first. */
+.estp-bar-tooltip-split {
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--secondary-text) 80%, transparent);
+}
+
 /* Segmented control in the segmentation widget header (By PM / By Size).
    Mirrors the period-selector pill so it sits naturally among the dashboard's
    other header controls. */
@@ -9350,6 +9575,32 @@ svg.placeholder-illustration {
   font-size: 0.85rem;
 }
 
+/* Biggest-variance table: full-bleed across the card (rows highlight edge to
+   edge). Card padding is moved onto the header, and the outer columns pad to
+   1.25rem so they line up with the widget title. */
+.estp-worst-widget {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.estp-worst-widget .widget-header {
+  padding: 1.25rem 1.25rem 0.75rem;
+}
+
+.estp-worst-widget .widget-body {
+  padding: 0;
+}
+
+.estp-worst-widget .estp-table th:first-child,
+.estp-worst-widget .estp-table td:first-child {
+  padding-left: 1.25rem;
+}
+
+.estp-worst-widget .estp-table th:last-child,
+.estp-worst-widget .estp-table td:last-child {
+  padding-right: 1.25rem;
+}
+
 .estp-table th {
   position: sticky;
   top: 0;
@@ -9364,6 +9615,12 @@ svg.placeholder-illustration {
   border-bottom: 1px solid var(--border-color);
 }
 
+/* Numeric headers right-align over their right-aligned data cells (the base
+   `.estp-table th` left-align would otherwise win over `.estp-num`). */
+.estp-table th.estp-num {
+  text-align: right;
+}
+
 .estp-table td {
   padding: 0.45rem 0.5rem;
   border-bottom: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent);
@@ -9373,6 +9630,15 @@ svg.placeholder-illustration {
 
 .estp-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+/* Aggregate total row: net over/under across every measured job. */
+.estp-table tfoot td {
+  border-top: 1px solid var(--border-color);
+  border-bottom: none;
+  padding-top: 0.55rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--secondary-text);
 }
 
 .estp-num {
@@ -9422,6 +9688,62 @@ svg.placeholder-illustration {
   letter-spacing: 0.03em;
   color: var(--primary-color);
   background: color-mix(in srgb, var(--primary-color) 14%, transparent);
+}
+
+/* Variance-driver pill: the budget line that drove a job's miss. Neutral
+   rounded pill, colored by over/under direction (meaning, not decoration) —
+   category name in a muted weight, the line's own variance % emphasized. */
+/* Driver column: variable-width badges read cleanest with a flush LEFT edge
+   (all pills start at the same x), so the column is left-aligned even though
+   the numeric columns to its left are right-aligned. A min-width keeps the
+   header off the variance numbers. */
+.estp-table th.estp-driver-head,
+.estp-driver-cell {
+  text-align: left;
+  white-space: nowrap;
+}
+
+.estp-driver-cell {
+  width: 1%;
+}
+
+.estp-driver-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.34rem;
+  padding: 0.13rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.estp-driver-cat {
+  font-weight: 700;
+}
+
+.estp-driver-val {
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.estp-driver-pill--over {
+  color: light-dark(#c0392b, #f8857a);
+  background: color-mix(in srgb, #ef4444 14%, transparent);
+}
+
+.estp-driver-pill--under {
+  color: light-dark(#15803d, #5ee08a);
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+}
+
+.estp-driver-pill--within {
+  color: light-dark(#a16207, #e3b341);
+  background: color-mix(in srgb, #eab308 16%, transparent);
+}
+
+.estp-driver-empty {
+  color: var(--secondary-text);
 }
 
 /* Mobile: scorecard stacks to a single column in the stacked section flow. */
