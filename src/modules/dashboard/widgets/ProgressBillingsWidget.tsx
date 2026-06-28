@@ -245,7 +245,11 @@ export function ProgressBillingsWidget({ colSpan }: DashboardWidgetProps) {
         onClick={() => setNetOpen(true)}
         title="View all billing positions"
       >
-        <span className="pb-net-hero-label">{netLabel}</span>
+        <span
+          className={`pb-net-hero-label${net > 0 ? " pb-net-hero-label--under" : net < 0 ? " pb-net-hero-label--over" : ""}`}
+        >
+          {netLabel}
+        </span>
         <span className={`pb-net-hero-value large-title emphasized${net < 0 ? " pb-net-hero-value--over" : ""}`}>
           {formatMoneyFull(Math.abs(net))}
         </span>
@@ -303,11 +307,14 @@ export function ProgressBillingsWidget({ colSpan }: DashboardWidgetProps) {
             </td>
             <td className="pb-overunder-cell">
               <div className="pb-overunder-inner">
-                <span className="pb-amt">{money(Math.abs(p.variance))}</span>
                 {p.variance < 0 ? (
-                  <span className="pb-dir-pill pb-dir-pill--over">over</span>
+                  <span className="pb-dir-pill pb-dir-pill--over">
+                    {money(Math.abs(p.variance))} over
+                  </span>
                 ) : p.variance > 0 ? (
-                  <span className="pb-dir-pill pb-dir-pill--under">under</span>
+                  <span className="pb-dir-pill pb-dir-pill--under">
+                    {money(Math.abs(p.variance))} under
+                  </span>
                 ) : (
                   <span className="pb-dir-pill pb-dir-pill--even">even</span>
                 )}

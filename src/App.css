@@ -2904,7 +2904,7 @@ body{
 }
 
 .spend-rank-table-row:hover {
-  background: color-mix(in srgb, var(--primary-color) 8%, transparent);
+  background: var(--hover-bg);
 }
 
 .spend-rank-table-row:active {
@@ -9070,6 +9070,9 @@ svg.placeholder-illustration {
   letter-spacing: 0.03em;
   color: var(--secondary-text);
 }
+/* Color the headline label to match the net position — green under, red over. */
+.pb-net-hero-label--under { color: #22c55e; }
+.pb-net-hero-label--over { color: #ef4444; }
 .pb-net-hero-value {
   line-height: 1.05;
   font-variant-numeric: tabular-nums;
@@ -9079,7 +9082,8 @@ svg.placeholder-illustration {
 .pb-net-hero-value--over {
   color: #ef4444;
 }
-/* Under/over split: two quiet supporting figures under a hairline. */
+/* Under/over split: two quiet supporting figures under a hairline. Kept at low
+   opacity so the eye lands on the net hero first, not these. */
 .pb-net-split {
   flex: 0 0 auto;
   display: flex;
@@ -9098,6 +9102,7 @@ svg.placeholder-illustration {
   font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  opacity: 0.8;
 }
 .pb-net-split-label--under { color: #22c55e; }
 .pb-net-split-label--over { color: #ef4444; }
@@ -9253,21 +9258,16 @@ svg.placeholder-illustration {
 .pb-dir-pill {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.65rem;
-  border-radius: 99px;
-  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
   font-weight: var(--font-weight-medium);
 }
 .pb-dir-pill--under {
-  background: rgba(34, 197, 94, 0.12);
   color: #22c55e;
 }
 .pb-dir-pill--over {
-  background: rgba(239, 68, 68, 0.12);
   color: #ef4444;
 }
 .pb-dir-pill--even {
-  background: var(--hover-bg);
   color: var(--secondary-text);
 }
 

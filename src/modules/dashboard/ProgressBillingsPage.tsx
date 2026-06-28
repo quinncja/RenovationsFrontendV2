@@ -270,11 +270,14 @@ function ProgressBillingsContent() {
                           </td>
                           <td className="spend-rank-table-value body-text pb-overunder-cell">
                             <div className="pb-overunder-inner">
-                              <span>{formatMoneyFull(Math.abs(p.variance))}</span>
                               {isOver ? (
-                                <span className="pb-dir-pill pb-dir-pill--over">over</span>
+                                <span className="pb-dir-pill pb-dir-pill--over">
+                                  {formatMoneyFull(Math.abs(p.variance))} over
+                                </span>
                               ) : isUnder ? (
-                                <span className="pb-dir-pill pb-dir-pill--under">under</span>
+                                <span className="pb-dir-pill pb-dir-pill--under">
+                                  {formatMoneyFull(Math.abs(p.variance))} under
+                                </span>
                               ) : (
                                 <span className="pb-dir-pill pb-dir-pill--even">even</span>
                               )}
@@ -314,11 +317,14 @@ function ProgressBillingsContent() {
                       </td>
                       <td className="spend-rank-table-value body-text emphasized pb-overunder-cell">
                         <div className="pb-overunder-inner">
-                          <span>{formatMoneyFull(Math.abs(footer.variance))}</span>
                           {footer.variance < 0 ? (
-                            <span className="pb-dir-pill pb-dir-pill--over">over</span>
+                            <span className="pb-dir-pill pb-dir-pill--over">
+                              {formatMoneyFull(Math.abs(footer.variance))} over
+                            </span>
                           ) : footer.variance > 0 ? (
-                            <span className="pb-dir-pill pb-dir-pill--under">under</span>
+                            <span className="pb-dir-pill pb-dir-pill--under">
+                              {formatMoneyFull(Math.abs(footer.variance))} under
+                            </span>
                           ) : (
                             <span className="pb-dir-pill pb-dir-pill--even">even</span>
                           )}
