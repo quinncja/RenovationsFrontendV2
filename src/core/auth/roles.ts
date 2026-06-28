@@ -87,20 +87,34 @@ const chartsGroup: NavGroup = {
   items: [navItems.orgChart, navItems.cashFlow, navItems.revenueMap],
 }
 
+// Shared by executive and the two top-tier roles (owner, tech) — identical nav.
+const executiveNav: NavEntry[] = [
+  navItems.home,
+  navItems.jobcost,
+  NAV_DIVIDER,
+  navItems.changeOrders,
+  financesGroup,
+  NAV_DIVIDER,
+  chartsGroup,
+  directoryGroup,
+  navItems.users,
+]
+
 export const roles = {
   executive: {
     appRole: "executive" as const,
-    nav: [
-      navItems.home,
-      navItems.jobcost,
-      NAV_DIVIDER,
-      navItems.changeOrders,
-      financesGroup,
-      NAV_DIVIDER,
-      chartsGroup,
-      directoryGroup,
-      navItems.users,
-    ] as NavEntry[],
+    nav: executiveNav,
+  },
+  // Top-tier roles with full (executive-equivalent) access + engagement
+  // analytics. `owner` is badged with a crown on the Users page; `tech` is
+  // deliberately invisible there (displayed as a plain executive).
+  owner: {
+    appRole: "owner" as const,
+    nav: executiveNav,
+  },
+  tech: {
+    appRole: "tech" as const,
+    nav: executiveNav,
   },
   admin: {
     appRole: "admin" as const,
@@ -128,3 +142,27 @@ export const roles = {
 
 export type AppRole = keyof typeof roles
 export const allRoles = Object.keys(roles) as AppRole[]
+
+// ─── Role helpers ───────────────────────────────────────────────────────────
+// owner/tech are top-tier: full access + engagement analytics. For ACCESS checks
+// they collapse to "executive"; the raw claim is kept for display + analytics.
+
+/** Collapse owner/tech → executive for route/permission checks. */
+export function effectiveRole(role: string | undefined | null): AppRole | undefined {
+  if (role === "owner" || role === "tech") return "executive"
+  return role && role in roles ? (role as AppRole) : undefined
+}
+
+/** Only owner/tech may see the engagement-analytics surfaces. */
+export function hasAnalyticsAccess(role: string | undefined | null): boolean {
+  return role === "owner" || role === "tech"
+}
+
+export function isOwnerRole(role: string | undefined | null): boolean {
+  return role === "owner"
+}
+
+/** Display role on the Users page: tech blends in as a plain admin (its column). */
+export function displayRole(role: string | undefined | null): string {
+  return role === "tech" ? "admin" : role ?? "waiting"
+}
