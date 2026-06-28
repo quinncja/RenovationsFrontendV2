@@ -5,7 +5,7 @@ import { PAGE_QUERIES } from "../../shared/config/pageQueries"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { useAuth } from "../../core/auth/AuthProvider"
-import type { AppRole } from "../../core/auth/roles"
+import { effectiveRole, type AppRole } from "../../core/auth/roles"
 import { DashboardLayoutProvider, useDashboardLayout } from "./context/DashboardLayoutContext"
 import { SectionPager } from "./components/SectionPager"
 import { SectionEditor } from "./components/SectionEditor"
@@ -18,7 +18,11 @@ import { EmployeeDetail } from "./EmployeeDetailPage"
 export default function Dashboard() {
   const { claims } = useAuth()
   const role = claims["role"] as AppRole | undefined
-  const isAdmin = role === "executive" || role === "admin"
+  // owner/tech are top-tier and collapse to executive; effectiveRole keeps this
+  // home-page decision in lockstep with the route guards (see roles.ts), so new
+  // top-tier roles don't silently land on the manager EmployeeDetail view.
+  const effRole = effectiveRole(role)
+  const isAdmin = effRole === "executive" || effRole === "admin"
   const [year, setYear] = useLocalStorage("dashboardYear", new Date().getFullYear())
 
   // A manager's home is the exact per-employee view admins see at
