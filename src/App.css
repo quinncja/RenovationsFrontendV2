@@ -5220,106 +5220,156 @@ body{
 
 /* ─── Waiting Room Page ────────────────────────────────────────────────────── */
 
-.waiting-room {
-  min-height: 100dvh;
+/* ─── Waiting room ───────────────────────────────────────────────────────
+   Shares the LoginPage shell (.login-page / .login-background / .auth-card)
+   so an unapproved user stays inside the same atmosphere they just signed in
+   through, rather than landing on a separate modal-style card. */
+
+.wr-card {
+  width: 100%;
+  max-width: 26rem;
+  gap: 1.75rem;
+}
+
+.wr-card .body-text {
+  max-width: 30ch;
+  line-height: 1.55;
+}
+
+.wr-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.wr-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding-bottom: 1.25rem;
+}
+
+.wr-step:last-child {
+  padding-bottom: 0;
+}
+
+/* Connector line running through the markers. */
+.wr-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 0.6875rem; /* center of the 1.375rem marker */
+  top: 1.5rem;
+  bottom: 0.25rem;
+  width: 1.5px;
+  background: rgba(200, 180, 160, 0.16);
+}
+
+.wr-step--done:not(:last-child)::before {
+  background: rgba(200, 180, 160, 0.32);
+}
+
+.wr-step-marker {
+  position: relative;
+  flex-shrink: 0;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--background-color);
-  padding: 2rem;
+  border: 1.5px solid rgba(200, 180, 160, 0.22);
+  background: rgba(26, 23, 20, 0.5);
+  color: rgba(232, 224, 216, 0.85);
+  margin-top: 0.0625rem;
 }
 
-.waiting-room-card {
-  background: var(--card-color);
-  border: 1px solid var(--border-color);
-  border-radius: 1.25rem;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-  padding: 3rem 2.5rem;
-  max-width: 26rem;
-  width: 100%;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
+.wr-step--done .wr-step-marker {
+  border-color: transparent;
+  background: rgba(200, 180, 160, 0.2);
+  color: #e8e0d8;
 }
 
-.waiting-room-icon {
-  font-size: 2.5rem;
-  line-height: 1;
+/* Copper reserved for the single live step — the thing actually happening. */
+.wr-step--active .wr-step-marker {
+  border-color: var(--primary-color);
+  background: rgb(from var(--primary-color) r g b / 0.14);
 }
 
-.waiting-room-title {
-  font-size: var(--title1-size);
-  font-weight: var(--font-weight-bold);
-  color: var(--primary-text);
-  margin: 0;
+.wr-step--error .wr-step-marker {
+  border-color: rgba(248, 113, 113, 0.6);
+  background: rgba(248, 113, 113, 0.12);
 }
 
-.waiting-room-body {
-  font-size: 0.9375rem;
-  color: var(--secondary-text);
-  line-height: 1.5;
-  margin: 0;
-}
-
-.waiting-room-status {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--secondary-text);
-}
-
-.wr-dot {
+.wr-step-ping {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
-  flex-shrink: 0;
+  background: var(--primary-color);
 }
 
-.wr-dot--connecting {
-  background: var(--secondary-text);
-  animation: wr-pulse 1.2s ease-in-out infinite;
+.wr-step--active .wr-step-ping {
+  animation: wr-ping 1.8s ease-out infinite;
 }
 
-.wr-dot--waiting {
-  background: #f59e0b;
-  animation: wr-pulse 2s ease-in-out infinite;
+@keyframes wr-ping {
+  0% { box-shadow: 0 0 0 0 rgb(from var(--primary-color) r g b / 0.45); }
+  70%, 100% { box-shadow: 0 0 0 0.45rem rgb(from var(--primary-color) r g b / 0); }
 }
 
-.wr-dot--admitted {
-  background: #16a34a;
+.wr-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding-top: 0.0625rem;
 }
 
-.wr-dot--rejected {
-  background: #ef4444;
-}
-
-@keyframes wr-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-
-.waiting-room-status-label {
+.wr-step-title {
+  font-size: 0.875rem;
   font-weight: var(--font-weight-medium);
+  color: rgba(232, 224, 216, 0.55);
+  letter-spacing: 0.01em;
 }
 
-.waiting-room-refresh-btn {
-  margin-top: 0.5rem;
-  padding: 0.5rem 1.25rem;
-  border-radius: 999px;
-  border: 1.5px solid var(--border-color);
-  background: transparent;
-  color: var(--secondary-text);
+.wr-step--done .wr-step-title,
+.wr-step--active .wr-step-title,
+.wr-step--error .wr-step-title {
+  color: #e8e0d8;
+}
+
+.wr-step-detail {
+  font-size: 0.78125rem;
+  color: rgba(232, 224, 216, 0.5);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.wr-refresh {
+  align-self: center;
+  padding: 0.4375rem 1.125rem;
+  border-radius: 6px;
+  border: 1px solid rgba(200, 180, 160, 0.2);
+  background: rgba(26, 23, 20, 0.4);
+  color: rgba(232, 224, 216, 0.7);
   font-size: 0.8125rem;
+  font-family: var(--font-family);
   cursor: pointer;
-  transition: border-color 0.12s ease, color 0.12s ease;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.waiting-room-refresh-btn:hover {
+.wr-refresh:hover {
   border-color: var(--primary-color);
-  color: var(--primary-color);
+  color: #e8e0d8;
+  background: rgba(26, 23, 20, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wr-step--active .wr-step-ping {
+    animation: none;
+  }
 }
 
 
