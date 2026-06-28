@@ -1,10 +1,14 @@
 import { useEffect, useState, useRef } from "react"
-import { Wifi, WifiOff, X } from "lucide-react"
+import { Wifi, WifiOff, X, BarChart3, Crown } from "lucide-react"
 import { auth } from "../../core/auth/firebase"
 import { useAuth } from "../../core/auth/AuthProvider"
+import { effectiveRole, isOwnerRole } from "../../core/auth/roles"
 import Page from "../../shared/components/Page"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { UserActivityModal } from "../../shared/components/UserActivityModal/UserActivityModal"
+import useIsMobile from "../../shared/hooks/useIsMobile"
+import { fetchAnalyticsAccess } from "../../shared/analytics/engagementApi"
+import { CompanyEngagementModal } from "../../shared/analytics/CompanyEngagementModal"
 
 // Trim trailing slash so `${API_BASE_URL}/users/...` never produces "//".
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "")
@@ -49,7 +53,10 @@ function UserCard({
           <div className="usr-avatar usr-avatar-initials">{avatarInitials(user.name)}</div>
         )}
         <div className="usr-card-info">
-          <span className="usr-card-name">{user.name}</span>
+          <span className="usr-card-name">
+            {user.name}
+            {isOwnerRole(user.role) && <Crown size={14} className="usr-crown" aria-label="Owner" />}
+          </span>
           <span className="usr-card-email">{user.email}</span>
         </div>
       </div>
@@ -59,9 +66,9 @@ function UserCard({
             <button
               className="usr-assign-btn usr-assign-executive"
               disabled={assigning}
-              onClick={(e) => { e.stopPropagation(); onAssignRole(user.uid, "executive") }}
+              onClick={(e) => { e.stopPropagation(); onAssignRole(user.uid, "owner") }}
             >
-              Executive
+              Owner
             </button>
           )}
           <button
@@ -118,15 +125,27 @@ function Column({
 
 export default function Users() {
   const { user, claims } = useAuth()
-  const userRole = claims["role"] as string | undefined
-  const isExecutive = userRole === "executive"
-  const isAdmin = userRole === "admin" || isExecutive
+  const isMobile = useIsMobile()
+  const rawRole = claims["role"] as string | undefined
+  const effRole = effectiveRole(rawRole)
+  const isExecutive = effRole === "executive"   // true for executive/owner/tech
+  const isAdmin = effRole === "executive" || effRole === "admin"
 
   const [users, setUsers] = useState<UserRecord[]>([])
   const [connected, setConnected] = useState(false)
   const [assigning, setAssigning] = useState<string | null>(null)
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null)
+  const [isAnalyticsAdmin, setIsAnalyticsAdmin] = useState(false)
+  const [engOpen, setEngOpen] = useState(false)
   const esRef = useRef<EventSource | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchAnalyticsAccess()
+      .then((r) => { if (!cancelled) setIsAnalyticsAdmin(r.isAnalyticsAdmin) })
+      .catch(() => { if (!cancelled) setIsAnalyticsAdmin(false) })
+    return () => { cancelled = true }
+  }, [user])
 
   useEffect(() => {
     let es: EventSource | null = null
@@ -208,38 +227,37 @@ export default function Users() {
     }
   }
 
-  const executives = isExecutive ? users.filter((u) => u.role === "executive") : []
-  const admins = users.filter((u) => u.role === "admin")
+  // No separate Executives column: owner/tech (and any executive) all live in the
+  // Admins column — owner shows a crown, tech blends in as a plain admin card.
+  // Anything not admin-or-above / manager falls into the waiting room.
+  const isExecLike = (r: string) => effectiveRole(r) === "executive"
+  const admins = users.filter((u) => isExecLike(u.role) || u.role === "admin")
   const managers = users.filter((u) => u.role === "manager")
-  const waiting = users.filter((u) => u.role === "waiting" || !["executive", "admin", "manager"].includes(u.role))
+  const waiting = users.filter((u) => !isExecLike(u.role) && u.role !== "admin" && u.role !== "manager")
 
   return (
     <>
     <Page
       title="Users"
       actions={
-        <div className={`usr-connection-status${connected ? " usr-connection-status--connected" : ""}`}>
-          {connected
-            ? <><Wifi size={13} /><span>Live</span></>
-            : <><WifiOff size={13} /><span>Connecting…</span></>
-          }
-        </div>
+        <>
+          {isAnalyticsAdmin && !isMobile && (
+            <button className="usr-eng-trigger" onClick={() => setEngOpen(true)}>
+              <BarChart3 size={14} />
+              <span>Company Engagement</span>
+            </button>
+          )}
+          <div className={`usr-connection-status${connected ? " usr-connection-status--connected" : ""}`}>
+            {connected
+              ? <><Wifi size={13} /><span>Live</span></>
+              : <><WifiOff size={13} /><span>Connecting…</span></>
+            }
+          </div>
+        </>
       }
     >
       <MotionList><MotionItem>
       <div className="usr-board">
-        {isExecutive && (
-          <Column title="Executives" badge={executives.length}>
-            {executives.length === 0 ? (
-              <p className="usr-empty">No executives</p>
-            ) : (
-              executives.map((u) => (
-                <UserCard key={u.uid} user={u} isAdmin={isAdmin} assigning={assigning === u.uid} onClick={() => setSelectedUser(u)} />
-              ))
-            )}
-          </Column>
-        )}
-
         <Column title="Admins" badge={admins.length}>
           {admins.length === 0 ? (
             <p className="usr-empty">No admins</p>
@@ -286,9 +304,14 @@ export default function Users() {
       user={selectedUser}
       isAdmin={isAdmin}
       isExecutive={isExecutive}
+      showEngagement={isAnalyticsAdmin}
       onClose={() => setSelectedUser(null)}
       onRoleChange={handleAssignRole}
     />
+
+    {isAnalyticsAdmin && (
+      <CompanyEngagementModal open={engOpen} onClose={() => setEngOpen(false)} />
+    )}
     </>
   )
 }

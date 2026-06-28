@@ -8,6 +8,7 @@ import useIsInitialized from "./core/auth/hooks/useIsInitialized"
 import useNeedsSupervisor from "./core/auth/hooks/useNeedsSupervisor"
 import useIsMobile from "./shared/hooks/useIsMobile"
 import { useAuth } from "./core/auth/AuthProvider"
+import AnalyticsTracker from "./shared/analytics/AnalyticsTracker"
 import "./App.css"
 
 export default function App() {
@@ -42,6 +43,7 @@ export default function App() {
 
   return (
     <div className="app">
+      <AnalyticsTracker />
       {!isMobile && <Navbar />}
       <Outlet />
       {isMobile && <MobileNav />}
