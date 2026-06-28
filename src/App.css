@@ -4526,6 +4526,16 @@ body{
   cursor: not-allowed;
 }
 
+.usr-assign-executive {
+  color: #b45309;
+  border-color: rgba(217, 119, 6, 0.55);
+}
+
+.usr-assign-executive:not(:disabled):hover {
+  background: #d97706;
+  color: #fff;
+}
+
 .usr-assign-admin {
   color: var(--primary-color);
   border-color: var(--primary-color);
@@ -4572,12 +4582,306 @@ body{
   width: min(560px, 94vw);
 }
 
+/* Full-context variant (analytics admin, desktop): a wide two-column layout so
+   activity and engagement breathe instead of stacking in a cramped column. */
+.usr-activity-modal--full {
+  width: min(1200px, 96vw);
+  max-width: min(1200px, 96vw);
+  max-height: 92vh;
+  gap: 0;
+}
+
+/* Overview: metrics grouped into labeled cards (Requests, Sessions, Focus).
+   Each card pairs two related sub-stats split by a hairline — e.g. Total vs.
+   Last 30 days — so the eye reads a group, not five loose numbers. Cards size
+   evenly across the row. */
+.usr-overview {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.usr-stat-group {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.9rem 1.15rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--card-color);
+}
+
+.usr-stat-group-label {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--secondary-text);
+}
+
+.usr-stat-group-body {
+  display: flex;
+}
+
+.usr-substat {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+/* Hairline + gutter between the two sub-stats. */
+.usr-substat + .usr-substat {
+  margin-left: 1rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--border-color);
+}
+
+/* Fixed value-row height so labels line up across cards regardless of whether
+   the value is a big number or a smaller text label. */
+.usr-substat-value {
+  min-height: calc(1.5rem * 1.05);
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-text);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.usr-substat-value--accent { color: var(--primary-color); }
+
+.usr-substat-value--text {
+  font-size: 1rem;
+  font-weight: var(--font-weight-semibold);
+  align-self: stretch;
+}
+
+.usr-substat-label {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--secondary-text);
+}
+
+/* Full-width engagement detail — the two ranked lists, side by side. No rule
+   under the chart; whitespace carries the separation. */
+.usr-activity-eng-lists {
+  margin-top: 2.25rem;
+}
+
+/* ─── Modal section pager (overview / engagement, dot-navigated) ───────────── */
+
+/* Relative host so the dot rail can anchor to the body's right edge. Fills the
+   modal's flex column below the header. */
+.usr-msec {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The snap scroller. A fixed height gives the panels a viewport to snap to; the
+   modal's max-height (92vh) leaves room for it below the header. */
+.usr-msec-scroll {
+  height: min(70vh, 600px);
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scroll-behavior: smooth;
+  /* Dots are the affordance — hide the native scrollbar (Firefox/IE first,
+     WebKit via the pseudo-element below). Scrolling still works. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.usr-msec-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* Each section is content-sized and snaps to the TOP of the scroller, so a short
+   section (the overview) leaves the next one peeking in below. Top-aligned, not
+   centred. Taller content (the engagement lists) scrolls internally and chains
+   to the next. Opacity is driven per-frame from scroll position (see
+   ModalSectionPager) — this is just the initial dim. Extra right padding clears
+   the dot rail. */
+.usr-msec-panel {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  box-sizing: border-box;
+  max-height: 100%;
+  /* Inactive panels clip (no internal scroll) so a peeking section can't be
+     scrolled before it's snapped into view — the wheel advances the pager
+     instead. The active panel opens up for internal scroll below. */
+  overflow: hidden;
+  scrollbar-width: none;
+  padding: 1.5rem 2.5rem 2rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  opacity: 0.3;
+}
+
+/* Only the in-view section scrolls its own (taller-than-viewport) content. */
+.usr-msec-panel--active {
+  overflow-y: auto;
+}
+
+.usr-msec-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* The last section gets the scroller's full height so it can settle at the top
+   (nothing below it to scroll against). */
+.usr-msec-panel:last-child {
+  min-height: 100%;
+}
+
+/* The panel gap already separates the cards from the chart; drop the cards'
+   standalone bottom margin inside the pager so the chart sits close beneath. */
+.usr-msec-panel .usr-overview {
+  margin-bottom: 0;
+}
+
+/* The engagement panel owns its top spacing via the pager; drop the standalone
+   margin it carries in the non-paged layout. */
+.usr-msec-panel .usr-activity-eng-lists {
+  margin-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usr-msec-scroll { scroll-behavior: auto; }
+}
+
+/* Right-edge dot rail — purely an indicator/jump control (no hover-expand). */
+.usr-msec-dots {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 2;
+}
+
+.usr-msec-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--border-color);
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.usr-msec-dot:hover {
+  background: var(--secondary-text);
+}
+
+.usr-msec-dot--active {
+  background: var(--primary-color);
+  transform: scale(1.3);
+}
+
+.usr-msec-dot--active:hover {
+  background: var(--primary-color);
+}
+
+/* ─── Header actions: Role popover trigger + close ────────────────────────── */
+
+.usr-activity-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.usr-role-menu { position: relative; }
+
+.usr-role-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.usr-role-trigger svg { color: var(--primary-color); }
+
+.usr-role-trigger:hover,
+.usr-role-trigger--open {
+  border-color: color-mix(in srgb, var(--primary-color) 55%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-color) 7%, var(--card-color));
+}
+
+/* Invisible click-catcher so clicking anywhere outside dismisses the popover. */
+.usr-role-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+}
+
+.usr-role-popover {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  right: 0;
+  z-index: 2;
+  width: 17rem;
+  padding: 1.1rem 1.2rem 1.25rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
+}
+
+.usr-role-popover-title {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--secondary-text);
+  margin: 0 0 0.85rem;
+}
+
+.usr-role-popover .usr-activity-admin-lock { margin-top: 0; }
+
+.usr-role-popover-hint {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  margin-bottom: 0.65rem;
+}
+
+.usr-role-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.usr-role-options .usr-assign-btn {
+  padding: 0.5rem 0;
+}
+
 .usr-activity-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.5rem 1.75rem 1.375rem;
+  padding: 0 1.75rem 1.375rem;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -4635,81 +4939,30 @@ body{
 .usr-role-badge--manager { background: color-mix(in srgb, #16a34a 13%, transparent); color: #15803d; }
 .usr-role-badge--waiting { background: color-mix(in srgb, var(--secondary-text) 12%, transparent); color: var(--secondary-text); }
 
-/* Stats strip */
-.usr-activity-stats {
-  display: flex;
-  align-items: center;
-  background: color-mix(in srgb, var(--primary-text) 3%, var(--card-color));
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  margin-bottom: 1.75rem;
-  overflow: hidden;
-}
-
-.usr-activity-stat {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 1rem 1.25rem;
-  gap: 0.3rem;
-}
-
-.usr-activity-stat-divider {
-  width: 1px;
-  align-self: stretch;
-  background: var(--border-color);
-}
-
-.usr-activity-stat-value {
-  font-size: 1.5rem;
-  font-weight: var(--font-weight-bold);
-  color: var(--primary-text);
-  line-height: 1;
-}
-
-.usr-activity-stat-value--month {
-  color: var(--primary-color);
-}
-
-.usr-activity-stat-label {
-  font-size: 0.6875rem;
-  font-weight: var(--font-weight-medium);
-  color: var(--secondary-text);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* Chart */
+/* Chart — same bordered "widget" card as the overview stat groups. */
 .usr-activity-chart-section {
-  margin-bottom: 2.25rem;
+  margin-bottom: 0;
+  padding: 0.9rem 1.15rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--card-color);
+}
+
+/* No rule under the chart's section label — it reads as a caption, not a divider. */
+.usr-activity-chart-section .invoice-modal-section-label {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0.5rem;
 }
 
 .usr-activity-chart {
-  height: 13rem;
+  height: 16rem;
   display: flex;
   overflow-x: clip;
   margin-top: 0.25rem;
 }
 
-/* Role section */
-.usr-activity-role-section {
-  padding-top: 0;
-}
-
-.usr-activity-role-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-top: 0.75rem;
-}
-
-.usr-activity-role-hint {
-  font-size: 0.875rem;
-  color: var(--secondary-text);
-}
-
+/* Role-management lock notice (shown in the header role popover) */
 .usr-activity-admin-lock {
   display: flex;
   align-items: center;
@@ -4727,108 +4980,396 @@ body{
   color: var(--secondary-text);
 }
 
-/* ─── Waiting Room Page ────────────────────────────────────────────────────── */
+/* ─── Engagement Insights (ranked lists, shared by both modals) ───────────── */
 
-.waiting-room {
-  min-height: 100dvh;
+/* Owner crown next to a user's name (Users board + modal header) */
+.usr-crown {
+  color: var(--primary-color);
+  margin-left: 0.4rem;
+  vertical-align: -2px;
+}
+
+.eng-empty {
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  padding: 0.75rem 0;
+}
+
+.eng-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.eng-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+/* Rank medallion — copper leader, graduated tint for the podium, plain tail */
+.eng-rank {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--background-color);
-  padding: 2rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+  background: color-mix(in srgb, var(--secondary-text) 10%, transparent);
+  margin-top: 0.05rem;
 }
 
-.waiting-room-card {
-  background: var(--card-color);
-  border: 1px solid var(--border-color);
-  border-radius: 1.25rem;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-  padding: 3rem 2.5rem;
-  max-width: 26rem;
-  width: 100%;
-  text-align: center;
+.eng-rank--1 {
+  color: #fff;
+  background: var(--primary-color);
+  box-shadow: 0 1px 5px color-mix(in srgb, var(--primary-color) 45%, transparent);
+}
+
+.eng-rank--2 {
+  color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 18%, transparent);
+}
+
+.eng-rank--3 {
+  color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+}
+
+.eng-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.eng-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.eng-row-titles {
   display: flex;
   flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+}
+
+.eng-row-label {
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eng-row-section {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--secondary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eng-row-metric {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.eng-row-metric-unit {
+  font-weight: var(--font-weight-medium);
+  color: var(--secondary-text);
+  font-size: 0.6875rem;
+}
+
+.eng-bar-track {
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--secondary-text) 10%, transparent);
+  margin: 0.4rem 0 0.45rem;
+  overflow: hidden;
+}
+
+.eng-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--primary-color) 70%, transparent),
+    var(--primary-color)
+  );
+}
+
+.eng-row-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+}
+
+.eng-chip {
+  display: inline-flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
 }
 
-.waiting-room-icon {
-  font-size: 2.5rem;
-  line-height: 1;
+.eng-chip svg {
+  color: color-mix(in srgb, var(--primary-color) 65%, var(--secondary-text));
 }
 
-.waiting-room-title {
-  font-size: var(--title1-size);
+.eng-chip--users {
+  color: var(--primary-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Trigger button in the Users page header (left of the Live pill) */
+.usr-eng-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.usr-eng-trigger svg {
+  color: var(--primary-color);
+  transition: color 0.15s ease;
+}
+
+.usr-eng-trigger:hover {
+  border-color: color-mix(in srgb, var(--primary-color) 55%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-color) 7%, var(--card-color));
+}
+
+/* ─── Engagement ranked-list columns (shared by both modals) ──────────────── */
+
+.ceng-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+/* Three-up variant (sections · widgets · pages). */
+.ceng-cols--3 {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+/* Each list is a bordered "widget" card, matching the overview stat groups and
+   the API chart above. */
+.ceng-col {
+  padding: 1.1rem 1.25rem 1.25rem;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--card-color);
+}
+
+.ceng-col-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-bottom: 0.85rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ceng-col-title {
+  font-size: 0.9375rem;
   font-weight: var(--font-weight-bold);
   color: var(--primary-text);
   margin: 0;
 }
 
-.waiting-room-body {
-  font-size: 0.9375rem;
+.ceng-col-sub {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--secondary-text);
-  line-height: 1.5;
-  margin: 0;
 }
 
-.waiting-room-status {
+@media (max-width: 820px) {
+  .ceng-cols,
+  .ceng-cols--3 {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+}
+
+/* ─── Waiting Room Page ────────────────────────────────────────────────────── */
+
+/* ─── Waiting room ───────────────────────────────────────────────────────
+   Shares the LoginPage shell (.login-page / .login-background / .auth-card)
+   so an unapproved user stays inside the same atmosphere they just signed in
+   through, rather than landing on a separate modal-style card. */
+
+.wr-card {
+  width: 100%;
+  max-width: 26rem;
+  gap: 1.75rem;
+}
+
+.wr-card .body-text {
+  max-width: 30ch;
+  line-height: 1.55;
+}
+
+.wr-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.wr-step {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.875rem;
+  padding-bottom: 1.25rem;
+}
+
+.wr-step:last-child {
+  padding-bottom: 0;
+}
+
+/* Connector line running through the markers. */
+.wr-step:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 0.6875rem; /* center of the 1.375rem marker */
+  top: 1.5rem;
+  bottom: 0.25rem;
+  width: 1.5px;
+  background: rgba(200, 180, 160, 0.16);
+}
+
+.wr-step--done:not(:last-child)::before {
+  background: rgba(200, 180, 160, 0.32);
+}
+
+.wr-step-marker {
+  position: relative;
+  flex-shrink: 0;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 50%;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--secondary-text);
+  justify-content: center;
+  border: 1.5px solid rgba(200, 180, 160, 0.22);
+  background: rgba(26, 23, 20, 0.5);
+  color: rgba(232, 224, 216, 0.85);
+  margin-top: 0.0625rem;
 }
 
-.wr-dot {
+.wr-step--done .wr-step-marker {
+  border-color: transparent;
+  background: rgba(200, 180, 160, 0.2);
+  color: #e8e0d8;
+}
+
+/* Copper reserved for the single live step — the thing actually happening. */
+.wr-step--active .wr-step-marker {
+  border-color: var(--primary-color);
+  background: rgb(from var(--primary-color) r g b / 0.14);
+}
+
+.wr-step--error .wr-step-marker {
+  border-color: rgba(248, 113, 113, 0.6);
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.wr-step-ping {
   width: 0.5rem;
   height: 0.5rem;
   border-radius: 50%;
-  flex-shrink: 0;
+  background: var(--primary-color);
 }
 
-.wr-dot--connecting {
-  background: var(--secondary-text);
-  animation: wr-pulse 1.2s ease-in-out infinite;
+.wr-step--active .wr-step-ping {
+  animation: wr-ping 1.8s ease-out infinite;
 }
 
-.wr-dot--waiting {
-  background: #f59e0b;
-  animation: wr-pulse 2s ease-in-out infinite;
+@keyframes wr-ping {
+  0% { box-shadow: 0 0 0 0 rgb(from var(--primary-color) r g b / 0.45); }
+  70%, 100% { box-shadow: 0 0 0 0.45rem rgb(from var(--primary-color) r g b / 0); }
 }
 
-.wr-dot--admitted {
-  background: #16a34a;
+.wr-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding-top: 0.0625rem;
 }
 
-.wr-dot--rejected {
-  background: #ef4444;
-}
-
-@keyframes wr-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-
-.waiting-room-status-label {
+.wr-step-title {
+  font-size: 0.875rem;
   font-weight: var(--font-weight-medium);
+  color: rgba(232, 224, 216, 0.55);
+  letter-spacing: 0.01em;
 }
 
-.waiting-room-refresh-btn {
-  margin-top: 0.5rem;
-  padding: 0.5rem 1.25rem;
-  border-radius: 999px;
-  border: 1.5px solid var(--border-color);
-  background: transparent;
-  color: var(--secondary-text);
+.wr-step--done .wr-step-title,
+.wr-step--active .wr-step-title,
+.wr-step--error .wr-step-title {
+  color: #e8e0d8;
+}
+
+.wr-step-detail {
+  font-size: 0.78125rem;
+  color: rgba(232, 224, 216, 0.5);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.wr-refresh {
+  align-self: center;
+  padding: 0.4375rem 1.125rem;
+  border-radius: 6px;
+  border: 1px solid rgba(200, 180, 160, 0.2);
+  background: rgba(26, 23, 20, 0.4);
+  color: rgba(232, 224, 216, 0.7);
   font-size: 0.8125rem;
+  font-family: var(--font-family);
   cursor: pointer;
-  transition: border-color 0.12s ease, color 0.12s ease;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
 }
 
-.waiting-room-refresh-btn:hover {
+.wr-refresh:hover {
   border-color: var(--primary-color);
-  color: var(--primary-color);
+  color: #e8e0d8;
+  background: rgba(26, 23, 20, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wr-step--active .wr-step-ping {
+    animation: none;
+  }
 }
 
 

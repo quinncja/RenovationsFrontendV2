@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { X, ShieldCheck } from "lucide-react"
+import { X, ShieldCheck, Crown } from "lucide-react"
+import { displayRole, isOwnerRole } from "../../../core/auth/roles"
 import { motion, AnimatePresence } from "framer-motion"
 import { auth } from "../../../core/auth/firebase"
 import { Chart } from "../Chart/Chart"
 import type { LineSeries } from "../Chart/chart.types"
+import useIsMobile from "../../hooks/useIsMobile"
+import { fetchUserEngagement, type UserEngagement } from "../../analytics/engagementApi"
+import { SectionEngagementList, WidgetEngagementList, PageEngagementList } from "../../analytics/EngagementInsights"
+import { sectionLabel, pageLabel, formatCompactNumber } from "../../analytics/labels"
+import { ModalSectionPager } from "./ModalSectionPager"
 
 // Trim trailing slash so `${API_BASE_URL}/users/...` never produces "//".
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "")
@@ -29,6 +35,8 @@ interface UserActivityModalProps {
   user: UserRecord | null
   isAdmin: boolean
   isExecutive?: boolean
+  /** When true (analytics admin only), exposes the engagement insights section. */
+  showEngagement?: boolean
   onClose: () => void
   onRoleChange: (uid: string, role: string) => Promise<void>
 }
@@ -42,6 +50,7 @@ function avatarInitials(name: string): string {
 }
 
 const ROLE_LABEL: Record<string, string> = {
+  owner:     "Owner",
   executive: "Executive",
   admin:     "Admin",
   manager:   "Manager",
@@ -49,6 +58,7 @@ const ROLE_LABEL: Record<string, string> = {
 }
 
 const ROLE_CLASS: Record<string, string> = {
+  owner:     "usr-role-badge--executive",
   executive: "usr-role-badge--executive",
   admin:     "usr-role-badge--admin",
   manager:   "usr-role-badge--manager",
@@ -57,15 +67,32 @@ const ROLE_CLASS: Record<string, string> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function UserActivityModal({ user, isAdmin, isExecutive = false, onClose, onRoleChange }: UserActivityModalProps) {
+export function UserActivityModal({ user, isAdmin, isExecutive = false, showEngagement = false, onClose, onRoleChange }: UserActivityModalProps) {
+  const isMobile = useIsMobile()
+  // The engagement analytics are desktop-only context: on mobile we keep the
+  // compact modal and skip them entirely (no fetch, no render).
+  const engagementVisible = showEngagement && !isMobile
+
   const [activity, setActivity]     = useState<ActivityData | null>(null)
   const [isLoading, setIsLoading]   = useState(false)
+  const [engagement, setEngagement] = useState<UserEngagement | null>(null)
+  const [engLoading, setEngLoading] = useState(false)
   const [changingRole, setChangingRole] = useState(false)
   const [currentRole, setCurrentRole]   = useState<string>(user?.role ?? "waiting")
+  const [roleOpen, setRoleOpen]         = useState(false)
 
   useEffect(() => {
     setCurrentRole(user?.role ?? "waiting")
+    setRoleOpen(false)
   }, [user?.uid])
+
+  // Close the role popover on Escape (the modal itself closes via overlay click).
+  useEffect(() => {
+    if (!roleOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setRoleOpen(false) }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [roleOpen])
 
   useEffect(() => {
     if (!user) { setActivity(null); return }
@@ -90,22 +117,38 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, onClose,
     return () => { cancelled = true }
   }, [user?.uid])
 
+  useEffect(() => {
+    if (!user || !engagementVisible) { setEngagement(null); return }
+
+    let cancelled = false
+    setEngLoading(true)
+    setEngagement(null)
+
+    fetchUserEngagement(user.uid, 30)
+      .then((data) => { if (!cancelled) { setEngagement(data); setEngLoading(false) } })
+      .catch(() => { if (!cancelled) setEngLoading(false) })
+
+    return () => { cancelled = true }
+  }, [user?.uid, engagementVisible])
+
   async function handleRoleChange(role: string) {
     if (!user || changingRole || role === currentRole) return
     setChangingRole(true)
     try {
       await onRoleChange(user.uid, role)
       setCurrentRole(role)
+      setRoleOpen(false)
     } finally {
       setChangingRole(false)
     }
   }
 
-  const isTargetExecutive = currentRole === "executive"
+  // Top-tier targets (executive/owner/tech) aren't editable from the UI.
+  const isTargetTop = ["executive", "owner", "tech"].includes(currentRole)
   const isTargetAdmin = currentRole === "admin"
   const canChangeRole = isExecutive
-    ? !isTargetExecutive
-    : isAdmin && !isTargetAdmin && !isTargetExecutive
+    ? !isTargetTop
+    : isAdmin && !isTargetAdmin && !isTargetTop
 
   const series: LineSeries[] = activity
     ? [{
@@ -125,6 +168,23 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, onClose,
     .filter((_, i, arr) => i % 6 === 0 || i === arr.length - 1)
     .map((p) => p.x as string)
 
+  // Headline takeaway for the overview strip.
+  const engTopPage = engagement?.topPages[0]
+
+  // Most-used *section*, rolled up from the user's top widgets by dwell time.
+  const engTopSection = (() => {
+    if (!engagement) return null
+    const totals = new Map<string, number>()
+    for (const w of engagement.topWidgets) {
+      if (!w.section) continue
+      totals.set(w.section, (totals.get(w.section) ?? 0) + w.totalDwellMs)
+    }
+    let best: string | null = null
+    let bestMs = -1
+    for (const [s, ms] of totals) if (ms > bestMs) { best = s; bestMs = ms }
+    return best
+  })()
+
   return createPortal(
     <AnimatePresence>
       {user && (
@@ -138,7 +198,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, onClose,
           />
           <div className="modal-positioner">
             <motion.div
-              className="modal usr-activity-modal"
+              className={`modal usr-activity-modal${engagementVisible ? " usr-activity-modal--full" : ""}`}
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 16 }}
@@ -156,40 +216,167 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, onClose,
                   )}
                   <div className="usr-activity-user-info">
                     <div className="usr-activity-name-row">
-                      <span className="usr-activity-name">{user.name}</span>
-                      <span className={`usr-role-badge ${ROLE_CLASS[currentRole] ?? ""}`}>
-                        {ROLE_LABEL[currentRole] ?? currentRole}
+                      <span className="usr-activity-name">
+                        {user.name}
+                        {isOwnerRole(currentRole) && <Crown size={15} className="usr-crown" aria-label="Owner" />}
+                      </span>
+                      <span className={`usr-role-badge ${ROLE_CLASS[displayRole(currentRole)] ?? ""}`}>
+                        {ROLE_LABEL[displayRole(currentRole)] ?? displayRole(currentRole)}
                       </span>
                     </div>
                     <span className="usr-activity-email">{user.email}</span>
                   </div>
                 </div>
-                <button className="button modal-close" onClick={onClose}><X size={16} /></button>
+
+                <div className="usr-activity-header-actions">
+                  {isAdmin && (
+                    <div className="usr-role-menu">
+                      <button
+                        className={`usr-role-trigger${roleOpen ? " usr-role-trigger--open" : ""}`}
+                        onClick={() => setRoleOpen((o) => !o)}
+                        aria-expanded={roleOpen}
+                      >
+                        <ShieldCheck size={14} />
+                        <span>Role</span>
+                      </button>
+
+                      {roleOpen && (
+                        <>
+                          <div className="usr-role-backdrop" onClick={() => setRoleOpen(false)} />
+                          <div className="usr-role-popover">
+                            <p className="usr-role-popover-title">Role Management</p>
+                            {!canChangeRole ? (
+                              <div className="usr-activity-admin-lock">
+                                <ShieldCheck size={14} className="usr-activity-admin-lock-icon" />
+                                <span>
+                                  {isTargetTop
+                                    ? "Top-level roles cannot be modified here."
+                                    : "Admin roles cannot be modified by another admin."}
+                                </span>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="usr-role-popover-hint">Change role to</span>
+                                <div className="usr-role-options">
+                                  {isExecutive && (
+                                    <button
+                                      className={`usr-assign-btn usr-assign-executive${currentRole === "owner" ? " usr-assign-btn--active" : ""}`}
+                                      disabled={changingRole || currentRole === "owner"}
+                                      onClick={() => handleRoleChange("owner")}
+                                    >
+                                      Owner
+                                    </button>
+                                  )}
+                                  <button
+                                    className={`usr-assign-btn usr-assign-admin${currentRole === "admin" ? " usr-assign-btn--active" : ""}`}
+                                    disabled={changingRole || currentRole === "admin"}
+                                    onClick={() => handleRoleChange("admin")}
+                                  >
+                                    Admin
+                                  </button>
+                                  <button
+                                    className={`usr-assign-btn usr-assign-manager${currentRole === "manager" ? " usr-assign-btn--active" : ""}`}
+                                    disabled={changingRole || currentRole === "manager"}
+                                    onClick={() => handleRoleChange("manager")}
+                                  >
+                                    Manager
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <button className="button modal-close" onClick={onClose}><X size={16} /></button>
+                </div>
               </div>
 
               {/* ── Body ── */}
-              <div className="invoice-modal-body">
+              {(() => {
+                // Overview: the KPI strip + activity chart. Always shown; it's the
+                // first paged section when engagement is available, and the whole
+                // body otherwise.
+                const overviewContent = (
+                  <>
+                {/* Overview: metrics grouped into labeled cards (Requests,
+                    Sessions, Focus) so each reads as a unit — total vs. last-30. */}
+                <div className="usr-overview">
+                  <div className="usr-stat-group">
+                    <span className="usr-stat-group-label">Requests</span>
+                    <div className="usr-stat-group-body">
+                      <div className="usr-substat">
+                        <span
+                          className="usr-substat-value"
+                          title={isLoading ? undefined : (activity?.total ?? 0).toLocaleString()}
+                        >
+                          {isLoading ? "—" : formatCompactNumber(activity?.total ?? 0)}
+                        </span>
+                        <span className="usr-substat-label">Total</span>
+                      </div>
+                      <div className="usr-substat">
+                        <span
+                          className="usr-substat-value usr-substat-value--accent"
+                          title={isLoading ? undefined : (activity?.thisMonth ?? 0).toLocaleString()}
+                        >
+                          {isLoading ? "—" : formatCompactNumber(activity?.thisMonth ?? 0)}
+                        </span>
+                        <span className="usr-substat-label">Last 30 days</span>
+                      </div>
+                    </div>
+                  </div>
 
-                {/* Stats */}
-                <div className="usr-activity-stats">
-                  <div className="usr-activity-stat">
-                    <span className="usr-activity-stat-value">
-                      {isLoading ? "—" : (activity?.total ?? 0).toLocaleString()}
-                    </span>
-                    <span className="usr-activity-stat-label">Total Requests</span>
-                  </div>
-                  <div className="usr-activity-stat-divider" />
-                  <div className="usr-activity-stat">
-                    <span className="usr-activity-stat-value usr-activity-stat-value--month">
-                      {isLoading ? "—" : (activity?.thisMonth ?? 0).toLocaleString()}
-                    </span>
-                    <span className="usr-activity-stat-label">Last 30 Days</span>
-                  </div>
+                  {engagementVisible && (
+                    <div className="usr-stat-group">
+                      <span className="usr-stat-group-label">Sessions</span>
+                      <div className="usr-stat-group-body">
+                        <div className="usr-substat">
+                          <span className="usr-substat-value">
+                            {engLoading || engagement?.totalSessionCount == null ? "—" : formatCompactNumber(engagement.totalSessionCount)}
+                          </span>
+                          <span className="usr-substat-label">Total</span>
+                        </div>
+                        <div className="usr-substat">
+                          <span className="usr-substat-value usr-substat-value--accent">
+                            {engLoading || !engagement ? "—" : formatCompactNumber(engagement.sessionCount)}
+                          </span>
+                          <span className="usr-substat-label">Last 30 days</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {engagementVisible && (
+                    <div className="usr-stat-group">
+                      <span className="usr-stat-group-label">Focus · Last 30 days</span>
+                      <div className="usr-stat-group-body">
+                        <div className="usr-substat">
+                          <span
+                            className="usr-substat-value usr-substat-value--text"
+                            title={engTopSection ? sectionLabel(engTopSection) : undefined}
+                          >
+                            {engTopSection ? sectionLabel(engTopSection) : "—"}
+                          </span>
+                          <span className="usr-substat-label">Top section</span>
+                        </div>
+                        <div className="usr-substat">
+                          <span
+                            className="usr-substat-value usr-substat-value--text"
+                            title={engTopPage ? pageLabel(engTopPage.page) : undefined}
+                          >
+                            {engTopPage ? pageLabel(engTopPage.page) : "—"}
+                          </span>
+                          <span className="usr-substat-label">Most visited</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Chart */}
                 <div className="usr-activity-chart-section">
-                  <p className="invoice-modal-section-label">Last 30 Days</p>
+                  <p className="invoice-modal-section-label">API Activity · Last 30 Days</p>
                   {isLoading ? (
                     <div className="widget-skeleton" style={{ height: "10rem" }} />
                   ) : (
@@ -208,55 +395,57 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, onClose,
                     </div>
                   )}
                 </div>
+                  </>
+                )
 
-                {/* Role */}
-                {isAdmin && (
-                  <div className="usr-activity-role-section">
-                    <p className="invoice-modal-section-label">Role Management</p>
-
-                    {!canChangeRole ? (
-                      <div className="usr-activity-admin-lock">
-                        <ShieldCheck size={14} className="usr-activity-admin-lock-icon" />
-                        <span>
-                          {isTargetExecutive
-                            ? "Executive roles cannot be modified."
-                            : "Admin roles cannot be modified by another admin."}
-                        </span>
-                      </div>
+                // Engagement detail: most-used sections, widgets and pages. Only
+                // built when engagement is visible — it's the second paged section.
+                const engagementContent = (
+                  <div className="usr-activity-eng-lists">
+                    {engLoading ? (
+                      <div className="widget-skeleton" style={{ height: "16rem" }} />
                     ) : (
-                      <div className="usr-activity-role-row">
-                        <span className="usr-activity-role-hint">Change role to:</span>
-                        <div className="usr-assign-row" style={{ width: isExecutive ? "20rem" : "14rem" }}>
-                          {isExecutive && (
-                            <button
-                              className={`usr-assign-btn usr-assign-executive${currentRole === "executive" ? " usr-assign-btn--active" : ""}`}
-                              disabled={changingRole || currentRole === "executive"}
-                              onClick={() => handleRoleChange("executive")}
-                            >
-                              Executive
-                            </button>
-                          )}
-                          <button
-                            className={`usr-assign-btn usr-assign-admin${currentRole === "admin" ? " usr-assign-btn--active" : ""}`}
-                            disabled={changingRole || currentRole === "admin"}
-                            onClick={() => handleRoleChange("admin")}
-                          >
-                            Admin
-                          </button>
-                          <button
-                            className={`usr-assign-btn usr-assign-manager${currentRole === "manager" ? " usr-assign-btn--active" : ""}`}
-                            disabled={changingRole || currentRole === "manager"}
-                            onClick={() => handleRoleChange("manager")}
-                          >
-                            Manager
-                          </button>
-                        </div>
+                      <div className="ceng-cols ceng-cols--3">
+                        <section className="ceng-col">
+                          <header className="ceng-col-head">
+                            <h3 className="ceng-col-title">Most-used sections</h3>
+                            <span className="ceng-col-sub">By time spent</span>
+                          </header>
+                          <SectionEngagementList widgets={engagement?.topWidgets ?? []} />
+                        </section>
+                        <section className="ceng-col">
+                          <header className="ceng-col-head">
+                            <h3 className="ceng-col-title">Most-used widgets</h3>
+                            <span className="ceng-col-sub">By time spent</span>
+                          </header>
+                          <WidgetEngagementList widgets={engagement?.topWidgets ?? []} />
+                        </section>
+                        <section className="ceng-col">
+                          <header className="ceng-col-head">
+                            <h3 className="ceng-col-title">Most-visited pages</h3>
+                            <span className="ceng-col-sub">By visits</span>
+                          </header>
+                          <PageEngagementList pages={engagement?.topPages ?? []} />
+                        </section>
                       </div>
                     )}
                   </div>
-                )}
+                )
 
-              </div>
+                // With engagement: split into two snap sections (overview /
+                // engagement) navigated by the right-edge dot rail. Without it,
+                // the overview alone is the body.
+                return engagementVisible ? (
+                  <ModalSectionPager
+                    sections={[
+                      { id: "overview", label: "Overview", content: overviewContent },
+                      { id: "engagement", label: "Engagement", content: engagementContent },
+                    ]}
+                  />
+                ) : (
+                  <div className="invoice-modal-body">{overviewContent}</div>
+                )
+              })()}
             </motion.div>
           </div>
         </>
