@@ -187,12 +187,10 @@ function EngListCard({
     <section className="ceng-col">
       <header className="ceng-col-head">
         <h3 className="ceng-col-title">{title}</h3>
-        {canExpand ? (
+        {canExpand && (
           <button type="button" className="ceng-see-all" onClick={() => setOpen(true)}>
             See all {total.toLocaleString()}
           </button>
-        ) : (
-          <span className="ceng-col-sub">{subtitle}</span>
         )}
       </header>
       {children(TOP_N)}

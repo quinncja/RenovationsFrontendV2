@@ -5302,9 +5302,8 @@ body{
   overflow: hidden;
 }
 
-/* "See all" — top-right action that opens the full list in its own modal. Copper
-   marks it as the interactive element; it slots where the subtitle would sit so
-   the header height stays put. */
+/* "See all" — top-right action that opens the full list in its own modal. Muted
+   gray (matching the home-screen widget "view all" links), brightening on hover. */
 .ceng-see-all {
   border: none;
   background: none;
@@ -5314,12 +5313,12 @@ body{
   font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--primary-color);
-  transition: opacity 0.15s ease;
+  color: var(--secondary-text);
+  transition: color 0.15s ease;
 }
 
 .ceng-see-all:hover {
-  opacity: 0.72;
+  color: var(--primary-text);
 }
 
 /* ── "See all" modal — the full scrollable list, layered above the engagement
