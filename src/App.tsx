@@ -9,6 +9,7 @@ import useNeedsSupervisor from "./core/auth/hooks/useNeedsSupervisor"
 import useIsMobile from "./shared/hooks/useIsMobile"
 import { useAuth } from "./core/auth/AuthProvider"
 import AnalyticsTracker from "./shared/analytics/AnalyticsTracker"
+import IdleRefreshOverlay from "./core/components/IdleRefreshOverlay"
 import "./App.css"
 
 export default function App() {
@@ -44,6 +45,7 @@ export default function App() {
   return (
     <div className="app">
       <AnalyticsTracker />
+      <IdleRefreshOverlay />
       {!isMobile && <Navbar />}
       <Outlet />
       {isMobile && <MobileNav />}

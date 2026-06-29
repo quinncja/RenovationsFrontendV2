@@ -10293,3 +10293,94 @@ svg.placeholder-illustration {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ─── Idle refresh overlay ───────────────────────────────────────────────────
+   Shown after a long idle so the user never acts on stale data. Covers the app
+   entirely; a refresh is the only way forward (and rotates the analytics
+   session). Uses the theme tokens so it reads correctly in light and dark. */
+
+.idle-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgb(from var(--background-color) r g b / 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: idle-overlay-in 0.28s ease both;
+}
+
+.idle-overlay-card {
+  width: 100%;
+  max-width: 24rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+  padding: 2.5rem 2rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.18);
+  animation: idle-card-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.idle-overlay-title {
+  margin: 0;
+  font-size: var(--title1-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+
+.idle-overlay-body {
+  margin: 0;
+  max-width: 32ch;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--secondary-text);
+}
+
+/* Copper reserved for the one meaningful action on this screen. */
+.idle-overlay-btn {
+  margin-top: 0.5rem;
+  padding: 0.5625rem 1.375rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: #fff;
+  font-family: var(--font-family);
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.idle-overlay-btn:hover {
+  background: var(--primary-color-hover);
+}
+
+.idle-overlay-btn:active {
+  background: var(--primary-color-active);
+}
+
+@keyframes idle-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes idle-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .idle-overlay,
+  .idle-overlay-card {
+    animation: none;
+  }
+}
