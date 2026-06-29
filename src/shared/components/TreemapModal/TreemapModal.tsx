@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Treemap, type TreemapItem } from "../Treemap/Treemap"
 import { Metric, MetricDivider } from "../CollapsibleSection/CollapsibleSection"
 import { formatMoney } from "../../utils/format"
+import { useModalLayer } from "../../hooks/useModalLayer"
 
 // Modal host for the directory treemap. The header reuses the same Metric /
 // MetricDivider chips the directory detail pages use for their Projects /
@@ -35,6 +36,7 @@ export function TreemapModal({
   year,
   onItemClick,
 }: TreemapModalProps) {
+  const { overlayZ, contentZ } = useModalLayer(open)
   const total = items.reduce((s, i) => s + (i.value ?? 0), 0)
   const count = items.length
   const periodLabel = year != null ? String(year) : "Since 2018"
@@ -48,6 +50,7 @@ export function TreemapModal({
         <>
           <motion.div
             className="modal-overlay"
+            style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -56,7 +59,7 @@ export function TreemapModal({
           {/* `.modal-positioner` centers via flexbox so framer-motion's
               scale/y animation doesn't clobber the base `.modal` rule's
               `transform: translate(-50%, -50%)`. */}
-          <div className="modal-positioner">
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
             <motion.div
               className="modal treemap-modal"
               initial={{ opacity: 0, scale: 0.96, y: 16 }}

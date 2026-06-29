@@ -16,6 +16,7 @@ import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { formatMoneyFull, formatPercent, marginTextColor, shortMonth } from "../../shared/utils/format"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
+import { useModalLayer } from "../../shared/hooks/useModalLayer"
 import { SortableHeader } from "../../shared/components/SortableHeader"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { useAuth } from "../../core/auth/AuthProvider"
@@ -247,18 +248,20 @@ function ProjectsModal({
   projects: ProjectRow[]
   onRowClick: (jobNumber: string) => void
 }) {
+  const { overlayZ, contentZ } = useModalLayer(open)
   return createPortal(
     <AnimatePresence>
       {open && (
         <>
           <motion.div
             className="modal-overlay"
+            style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          <div className="modal-positioner">
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
             <motion.div
               className="modal modal--wide"
               role="dialog"

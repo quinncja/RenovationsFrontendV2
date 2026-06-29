@@ -8,9 +8,10 @@ import { Chart } from "../Chart/Chart"
 import type { LineSeries } from "../Chart/chart.types"
 import useIsMobile from "../../hooks/useIsMobile"
 import { fetchUserEngagement, type UserEngagement } from "../../analytics/engagementApi"
-import { SectionEngagementList, WidgetEngagementList, PageEngagementList } from "../../analytics/EngagementInsights"
+import { SectionEngagementList, WidgetEngagementList, PageEngagementList, ProjectEngagementList } from "../../analytics/EngagementInsights"
 import { sectionLabel, pageLabel, formatCompactNumber } from "../../analytics/labels"
 import { ModalSectionPager } from "./ModalSectionPager"
+import { useModalLayer } from "../../hooks/useModalLayer"
 
 // Trim trailing slash so `${API_BASE_URL}/users/...` never produces "//".
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "")
@@ -69,6 +70,7 @@ const ROLE_CLASS: Record<string, string> = {
 
 export function UserActivityModal({ user, isAdmin, isExecutive = false, showEngagement = false, onClose, onRoleChange }: UserActivityModalProps) {
   const isMobile = useIsMobile()
+  const { overlayZ, contentZ } = useModalLayer(!!user)
   // The engagement analytics are desktop-only context: on mobile we keep the
   // compact modal and skip them entirely (no fetch, no render).
   const engagementVisible = showEngagement && !isMobile
@@ -191,12 +193,13 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, showEnga
         <>
           <motion.div
             className="modal-overlay"
+            style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          <div className="modal-positioner">
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
             <motion.div
               className={`modal usr-activity-modal${engagementVisible ? " usr-activity-modal--full" : ""}`}
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
@@ -398,48 +401,43 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, showEnga
                   </>
                 )
 
-                // Engagement detail: most-used sections, widgets and pages. Only
-                // built when engagement is visible — it's the second paged section.
-                const engagementContent = (
+                // Reach (page 2): most-visited pages (left) + most-viewed projects (right).
+                const reachContent = (
                   <div className="usr-activity-eng-lists">
                     {engLoading ? (
                       <div className="widget-skeleton" style={{ height: "16rem" }} />
                     ) : (
-                      <div className="ceng-cols ceng-cols--3">
-                        <section className="ceng-col">
-                          <header className="ceng-col-head">
-                            <h3 className="ceng-col-title">Most-used sections</h3>
-                            <span className="ceng-col-sub">By time spent</span>
-                          </header>
-                          <SectionEngagementList widgets={engagement?.topWidgets ?? []} />
-                        </section>
-                        <section className="ceng-col">
-                          <header className="ceng-col-head">
-                            <h3 className="ceng-col-title">Most-used widgets</h3>
-                            <span className="ceng-col-sub">By time spent</span>
-                          </header>
-                          <WidgetEngagementList widgets={engagement?.topWidgets ?? []} />
-                        </section>
-                        <section className="ceng-col">
-                          <header className="ceng-col-head">
-                            <h3 className="ceng-col-title">Most-visited pages</h3>
-                            <span className="ceng-col-sub">By visits</span>
-                          </header>
-                          <PageEngagementList pages={engagement?.topPages ?? []} />
-                        </section>
+                      <div className="ceng-cols">
+                        <PageEngagementList pages={engagement?.topPages ?? []} title="Most-visited pages" subtitle="By visits" />
+                        <ProjectEngagementList projects={engagement?.topProjects ?? []} title="Most-viewed projects" subtitle="By views" />
                       </div>
                     )}
                   </div>
                 )
 
-                // With engagement: split into two snap sections (overview /
-                // engagement) navigated by the right-edge dot rail. Without it,
-                // the overview alone is the body.
+                // Usage (page 3): most-used sections + most-used widgets together.
+                const usageContent = (
+                  <div className="usr-activity-eng-lists">
+                    {engLoading ? (
+                      <div className="widget-skeleton" style={{ height: "16rem" }} />
+                    ) : (
+                      <div className="ceng-cols">
+                        <SectionEngagementList widgets={engagement?.topWidgets ?? []} title="Most-used sections" subtitle="By time spent" />
+                        <WidgetEngagementList widgets={engagement?.topWidgets ?? []} title="Most-used widgets" subtitle="By time spent" />
+                      </div>
+                    )}
+                  </div>
+                )
+
+                // With engagement: three snap sections (overview / pages+projects /
+                // sections+widgets) navigated by the right-edge dot rail. Without
+                // it, the overview alone is the body.
                 return engagementVisible ? (
                   <ModalSectionPager
                     sections={[
                       { id: "overview", label: "Overview", content: overviewContent },
-                      { id: "engagement", label: "Engagement", content: engagementContent },
+                      { id: "reach", label: "Pages & Projects", content: reachContent },
+                      { id: "usage", label: "Sections & Widgets", content: usageContent },
                     ]}
                   />
                 ) : (

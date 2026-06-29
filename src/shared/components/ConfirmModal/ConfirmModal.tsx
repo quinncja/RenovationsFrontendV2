@@ -1,6 +1,7 @@
 import { type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
+import { useModalLayer } from "../../hooks/useModalLayer"
 
 interface ConfirmModalProps {
   open: boolean
@@ -30,18 +31,20 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const { overlayZ, contentZ } = useModalLayer(open)
   return createPortal(
     <AnimatePresence>
       {open && (
         <>
           <motion.div
             className="modal-overlay"
+            style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={loading ? undefined : onCancel}
           />
-          <div className="modal-positioner">
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
             <motion.div
               className="modal confirm-modal"
               role="alertdialog"

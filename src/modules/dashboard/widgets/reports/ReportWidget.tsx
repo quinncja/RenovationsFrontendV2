@@ -4,6 +4,7 @@ import { useJobcostNav } from "../../../jobcost/useJobcostNav"
 import { X, TriangleAlert, Calculator } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useWidgetData, usePageDisconnected } from "../../../../shared/context/PageContext"
+import { useModalLayer } from "../../../../shared/hooks/useModalLayer"
 import { formatNumber } from "../../../../shared/utils/format"
 
 // Summary counts come from the `dataValidation` query (a single-row recordset),
@@ -90,6 +91,7 @@ function ReportWidget({ reportId }: { reportId: ReportWidgetId }) {
   const { goToJobcost } = useJobcostNav()
 
   const [open, setOpen] = useState(false)
+  const { overlayZ, contentZ } = useModalLayer(open)
 
   // Rows in this modal correspond to jobs flagged by the data-validation
   // queries; clicking the Job / Job # cells jumps to the job detail page so
@@ -134,12 +136,13 @@ function ReportWidget({ reportId }: { reportId: ReportWidgetId }) {
             <>
               <motion.div
                 className="modal-overlay"
+                style={{ zIndex: overlayZ }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setOpen(false)}
               />
-              <div className="modal-positioner">
+              <div className="modal-positioner" style={{ zIndex: contentZ }}>
                 <motion.div
                   className="modal reports-modal"
                   initial={{ opacity: 0, scale: 0.96, y: 16 }}

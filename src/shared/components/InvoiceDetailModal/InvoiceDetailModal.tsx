@@ -5,6 +5,7 @@ import { X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { fetchPageData } from "../../api/pageApi"
 import { formatMoneyFull, formatDate } from "../../utils/format"
+import { useModalLayer } from "../../hooks/useModalLayer"
 
 // ─── Status labels & classes ──────────────────────────────────────────────────
 
@@ -124,6 +125,7 @@ export function InvoiceDetailModal({ invoiceId, module, onClose }: InvoiceDetail
   const [detail, setDetail] = useState<InvoiceDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const { overlayZ, contentZ } = useModalLayer(!!invoiceId)
 
   useEffect(() => {
     if (!invoiceId) { setDetail(null); setError(null); return }
@@ -180,12 +182,13 @@ export function InvoiceDetailModal({ invoiceId, module, onClose }: InvoiceDetail
         <>
           <motion.div
             className="modal-overlay"
+            style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          <div className="modal-positioner">
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
             <motion.div
               className="modal invoice-modal"
               initial={{ opacity: 0, scale: 0.96, y: 16 }}

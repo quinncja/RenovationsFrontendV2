@@ -6,6 +6,7 @@ import { useWidgetData } from "../../../../shared/context/PageContext"
 import { StatPairCard } from "../StatPairCard"
 import { SortableHeader } from "../../../../shared/components/SortableHeader"
 import { useTableSort, applySort } from "../../../../shared/hooks/useTableSort"
+import { useModalLayer } from "../../../../shared/hooks/useModalLayer"
 import { fetchPageData } from "../../../../shared/api/pageApi"
 import { formatMoneyFull, formatDate } from "../../../../shared/utils/format"
 import { AR_COLOR, AP_COLOR } from "../billings/billingsShared"
@@ -55,6 +56,7 @@ type TxnSortKey = "date" | "type" | "description" | "amount"
  */
 function BankTransactionsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const sort = useTableSort<TxnSortKey>("date", "desc")
+  const { overlayZ, contentZ } = useModalLayer(open)
   const [rows, setRows] = useState<BankTransactionRow[] | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -102,12 +104,13 @@ function BankTransactionsModal({ open, onClose }: { open: boolean; onClose: () =
         <>
           <motion.div
             className="modal-overlay"
+            style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          <div className="modal-positioner">
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
             <motion.div
               className="modal reports-modal"
               initial={{ opacity: 0, scale: 0.96, y: 16 }}

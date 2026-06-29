@@ -5,6 +5,7 @@ import { useAuth } from "../../../core/auth/AuthProvider"
 import { fetchSqlStatus, connectSql, disconnectSql } from "../../api/sqlApi"
 import useLocalStorage from "../../hooks/useLocalStorage"
 import { HASHED_RELATION_COLORS_KEY } from "../../hooks/useHashedRelationColors"
+import { useModalLayer } from "../../hooks/useModalLayer"
 
 interface SettingsModalProps {
   open: boolean
@@ -21,6 +22,7 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
   const [hashedRelationColors, setHashedRelationColors] = useLocalStorage(HASHED_RELATION_COLORS_KEY, false)
   const [sqlConnected, setSqlConnected] = useState<boolean | null>(null)
   const [sqlLoading, setSqlLoading] = useState(false)
+  const { overlayZ, contentZ } = useModalLayer(open)
 
   // Fetch SQL status when modal opens (admin only)
   useEffect(() => {
@@ -57,12 +59,13 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
         <>
           <motion.div
             className="modal-overlay"
+            style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          <div className="modal-positioner">
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
             <motion.div
               className="modal settings-modal"
               initial={{ opacity: 0, scale: 0.96, y: 16 }}

@@ -8,6 +8,7 @@ import { Widget } from "../../../shared/components/Widget/Widget"
 import { useWidgetData } from "../../../shared/context/PageContext"
 import { SortableHeader } from "../../../shared/components/SortableHeader"
 import { useTableSort, applySort } from "../../../shared/hooks/useTableSort"
+import { useModalLayer } from "../../../shared/hooks/useModalLayer"
 import { formatMoney, formatMoneyFull } from "../../../shared/utils/format"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
 import type { DashboardWidgetProps } from "../config/widgetRegistry"
@@ -68,6 +69,7 @@ function ProgressBillingsModal({
 }) {
   // Default to the most under-billed at the top (largest positive variance).
   const sort = useTableSort<PbSortKey>("variance", "desc")
+  const { overlayZ, contentZ } = useModalLayer(open)
   const sorted = useMemo(
     () =>
       applySort(projects, sort, (p, key) =>
@@ -91,12 +93,13 @@ function ProgressBillingsModal({
         <>
           <motion.div
             className="modal-overlay"
+            style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          <div className="modal-positioner">
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
             <motion.div
               className="modal reports-modal"
               initial={{ opacity: 0, scale: 0.96, y: 16 }}

@@ -3,11 +3,12 @@ import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, BarChart3 } from "lucide-react"
 import { fetchCompanyEngagement, type CompanyEngagement } from "./engagementApi"
-import { SectionEngagementList, WidgetEngagementList, PageEngagementList } from "./EngagementInsights"
+import { SectionEngagementList, WidgetEngagementList, PageEngagementList, ProjectEngagementList } from "./EngagementInsights"
 import { sectionLabel, pageLabel, formatCompactNumber } from "./labels"
 import { Chart } from "../components/Chart/Chart"
 import type { LineSeries } from "../components/Chart/chart.types"
 import { ModalSectionPager } from "../components/UserActivityModal/ModalSectionPager"
+import { useModalLayer } from "../hooks/useModalLayer"
 
 /**
  * Company-wide engagement. Deliberately mirrors UserActivityModal's full layout
@@ -18,6 +19,7 @@ import { ModalSectionPager } from "../components/UserActivityModal/ModalSectionP
 export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [data, setData] = useState<CompanyEngagement | null>(null)
   const [loading, setLoading] = useState(true)
+  const { overlayZ, contentZ } = useModalLayer(open)
 
   // Fetch fresh each open — engagement drifts day to day.
   useEffect(() => {
@@ -155,33 +157,29 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
     </>
   )
 
-  const engagementContent = (
+  // Reach (page 2): most-visited pages (left) + most-viewed projects (right).
+  const reachContent = (
     <div className="usr-activity-eng-lists">
       {loading ? (
         <div className="widget-skeleton" style={{ height: "16rem" }} />
       ) : (
-        <div className="ceng-cols ceng-cols--3">
-          <section className="ceng-col">
-            <header className="ceng-col-head">
-              <h3 className="ceng-col-title">Most-used sections</h3>
-              <span className="ceng-col-sub">By time spent</span>
-            </header>
-            <SectionEngagementList widgets={data?.topWidgets ?? []} />
-          </section>
-          <section className="ceng-col">
-            <header className="ceng-col-head">
-              <h3 className="ceng-col-title">Most-used widgets</h3>
-              <span className="ceng-col-sub">By time spent</span>
-            </header>
-            <WidgetEngagementList widgets={data?.topWidgets ?? []} showUsers />
-          </section>
-          <section className="ceng-col">
-            <header className="ceng-col-head">
-              <h3 className="ceng-col-title">Most-visited pages</h3>
-              <span className="ceng-col-sub">By visits</span>
-            </header>
-            <PageEngagementList pages={data?.topPages ?? []} showUsers />
-          </section>
+        <div className="ceng-cols">
+          <PageEngagementList pages={data?.topPages ?? []} title="Most-visited pages" subtitle="By visits" showUsers />
+          <ProjectEngagementList projects={data?.topProjects ?? []} title="Most-viewed projects" subtitle="By views" showUsers />
+        </div>
+      )}
+    </div>
+  )
+
+  // Usage (page 3): most-used sections + most-used widgets, side by side.
+  const usageContent = (
+    <div className="usr-activity-eng-lists">
+      {loading ? (
+        <div className="widget-skeleton" style={{ height: "16rem" }} />
+      ) : (
+        <div className="ceng-cols">
+          <SectionEngagementList widgets={data?.topWidgets ?? []} title="Most-used sections" subtitle="By time spent" />
+          <WidgetEngagementList widgets={data?.topWidgets ?? []} title="Most-used widgets" subtitle="By time spent" showUsers />
         </div>
       )}
     </div>
@@ -193,12 +191,13 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
         <>
           <motion.div
             className="modal-overlay"
+            style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
           />
-          <div className="modal-positioner">
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
             <motion.div
               className="modal usr-activity-modal usr-activity-modal--full"
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
@@ -229,7 +228,8 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
               <ModalSectionPager
                 sections={[
                   { id: "overview", label: "Overview", content: overviewContent },
-                  { id: "engagement", label: "Engagement", content: engagementContent },
+                  { id: "reach", label: "Pages & Projects", content: reachContent },
+                  { id: "usage", label: "Sections & Widgets", content: usageContent },
                 ]}
               />
             </motion.div>
