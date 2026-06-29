@@ -17,13 +17,20 @@ export type EngagementType =
   | "widget_hover"
   | "widget_click"
   | "tooltip_open"
+  | "project_view"
   | "session_start"
+
+/** How a project was opened: full job-detail page vs inline table expand. */
+export type ProjectViewSource = "page" | "widget"
 
 export interface TrackInput {
   type: EngagementType
   page?: string | null
   widgetId?: string | null
   section?: string | null
+  projectRecnum?: string | null
+  projectName?: string | null
+  source?: ProjectViewSource | null
   durationMs?: number | null
 }
 
@@ -58,6 +65,21 @@ export function track(ev: TrackInput) {
 
 export function trackPageView(page: string) {
   track({ type: "page_view", page })
+}
+
+/**
+ * Record that a user opened a specific job. `source` distinguishes a full
+ * job-detail page open ("page", the default) from an inline expand in the Job
+ * Costing table ("widget").
+ */
+export function trackProjectView(recnum: string, name: string, source: ProjectViewSource = "page") {
+  track({
+    type: "project_view",
+    projectRecnum: recnum,
+    projectName: name,
+    source,
+    page: window.location.pathname,
+  })
 }
 
 /** Mount once (after auth). Idempotent. */

@@ -23,10 +23,23 @@ export interface PageEngagement {
   userCount?: number // company view only
 }
 
+export interface ProjectEngagement {
+  recnum: string
+  name: string | null
+  views: number
+  /** Full job-detail page opens. Absent until the backend split ships. */
+  pageViews?: number
+  /** Inline expands from the Job Costing table. Absent until the backend split ships. */
+  widgetViews?: number
+  lastViewed?: string
+  userCount?: number // company view only
+}
+
 export interface UserEngagement {
   rangeDays: number
   topWidgets: WidgetEngagement[]
   topPages: PageEngagement[]
+  topProjects: ProjectEngagement[]
   sessionCount: number
   /** All-time sessions (bounded by 180-day raw-event retention). */
   totalSessionCount: number
@@ -37,6 +50,7 @@ export interface CompanyEngagement {
   rangeDays: number
   topWidgets: WidgetEngagement[]
   topPages: PageEngagement[]
+  topProjects: ProjectEngagement[]
   activeUsers: number
   /** Company-wide API requests (mirrors the per-user activity shape). */
   activity: {

@@ -30,6 +30,14 @@ export function ModalSectionPager({ sections }: { sections: PagerSection[] }) {
   const panelRefs = useRef<(HTMLElement | null)[]>([])
   const [active, setActive] = useState(0)
 
+  // Always open to the first (top) section. The pager mounts fresh with the modal,
+  // but reset explicitly so async content height shifts or browser scroll
+  // restoration can never leave it parked mid-list on (re)open.
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: 0 })
+    setActive(0)
+  }, [])
+
   // Mark the active section and fade each one by scroll position: a section is
   // full opacity once its top is within FADE_END of the scroller top, ramping
   // down to FADE_MIN once its top sits past FADE_START down the scroller.

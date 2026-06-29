@@ -19,12 +19,29 @@ interface UserRecord {
   name: string
   role: string
   photoURL: string | null
+  lastSeenAt?: string | null
 }
 
 function avatarInitials(name: string): string {
   const parts = name.trim().split(/\s+/)
   if (parts.length === 1) return parts[0][0]?.toUpperCase() ?? "?"
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+// Soft, compact "last seen" label (e.g. "Just now", "3h", "2d", "Mar 4"). Returns
+// null when we've never seen the user, so the card can drop the chip entirely.
+function lastSeenLabel(iso?: string | null): string | null {
+  if (!iso) return null
+  const then = new Date(iso).getTime()
+  if (isNaN(then)) return null
+  const mins = Math.floor((Date.now() - then) / 60000)
+  if (mins < 1) return "Just now"
+  if (mins < 60) return `${mins}m`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h`
+  const days = Math.floor(hrs / 24)
+  if (days < 7) return `${days}d`
+  return new Date(then).toLocaleDateString("en-US", { month: "short", day: "numeric" })
 }
 
 function UserCard({
@@ -44,6 +61,7 @@ function UserCard({
   assigning: boolean
   onClick: () => void
 }) {
+  const lastSeen = lastSeenLabel(user.lastSeenAt)
   return (
     <div className="usr-card" onClick={onClick} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && onClick()}>
       <div className="usr-card-header">
@@ -59,6 +77,11 @@ function UserCard({
           </span>
           <span className="usr-card-email">{user.email}</span>
         </div>
+        {lastSeen && (
+          <span className="usr-card-lastseen" title={`Last seen ${new Date(user.lastSeenAt as string).toLocaleString()}`}>
+            {lastSeen}
+          </span>
+        )}
       </div>
       {isAdmin && user.role === "waiting" && onAssignRole && (
         <div className="usr-assign-row">
