@@ -1,6 +1,7 @@
 import fetchWithRetry from "../utils/fetchWithRetry"
 import fetchWithTimeout from "../utils/fetchWithTimeout"
 import { auth } from "../../core/auth/firebase"
+import { sessionTrackingHeaders } from "../analytics/analytics"
 import type { DashboardLayout } from "../../modules/dashboard/types/dashboardLayout"
 
 // Trim any trailing slash so the leading-slash paths below don't produce "//".
@@ -14,6 +15,7 @@ export async function fetchDashboardLayout(): Promise<DashboardLayout | null> {
       method: "GET",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...sessionTrackingHeaders(),
       },
     })
 
@@ -38,6 +40,7 @@ export async function saveDashboardLayout(layout: DashboardLayout): Promise<void
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...sessionTrackingHeaders(),
       },
       body: JSON.stringify(layout),
     })

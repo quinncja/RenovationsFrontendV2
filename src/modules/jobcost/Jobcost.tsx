@@ -6,6 +6,7 @@ import { MotionList, MotionItem } from "../../shared/components/MotionList/Motio
 import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { fetchPageData } from "../../shared/api/pageApi"
+import { trackProjectView } from "../../shared/analytics/analytics"
 import { formatMoneyFull, marginTextColor } from "../../shared/utils/format"
 import useIsMobile from "../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
@@ -301,6 +302,11 @@ export default function Jobcost() {
   }
 
   function toggleExpand(job: Job) {
+    const willOpen = !expanded.has(job.recnum)
+    // Count an inline expand as a "widget"-source project view (distinct from a
+    // full job-detail page open). Only on open, and use jobNumber so it groups
+    // with page opens under the same recnum.
+    if (willOpen) trackProjectView(job.jobNumber, job.name, "widget")
     setExpanded((prev) => {
       const next = new Set(prev)
       if (next.has(job.recnum)) {

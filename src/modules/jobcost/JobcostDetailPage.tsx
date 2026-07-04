@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams, useNavigate, useLocation } from "react-router-dom"
 import { ArrowLeft, ChevronDown, Download } from "lucide-react"
 import { downloadXlsx } from "../../shared/utils/exportXlsx"
@@ -24,6 +24,7 @@ import { computeWeeklySpend, computeCostVsBilled, thinLabels, type DailySpend } 
 import { colorRamp, hashColor, RAMP_SCHEMES } from "../../shared/config/chartColors"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { JOBCOST_BACK_FALLBACK, type JobcostBackState } from "./useJobcostNav"
+import { trackProjectView } from "../../shared/analytics/analytics"
 
 const INV_STATUS_LABEL: Record<number, string> = { 1: "Open", 2: "Review", 3: "Dispute", 4: "Paid", 5: "Void" }
 const INV_STATUS_CLASS: Record<number, string> = { 1: "open", 2: "review", 3: "dispute", 4: "paid", 5: "void" }
@@ -111,6 +112,17 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   }>(["getPhases", "getBudgetByRecnum", "getAllCostItems", "getJobMonthlySpend", "getJobDailySpend", "getJobInvoices", "getProgressBilling"])
 
   const project = data?.getPhases?.[0] ?? null
+
+  // Record a project_view once the job's name has resolved — one event per job
+  // opened (the ref guards against re-fires on unrelated re-renders / data
+  // refreshes while staying on the same job).
+  const trackedRecnum = useRef<string | null>(null)
+  useEffect(() => {
+    if (!project?.name) return
+    if (trackedRecnum.current === recnum) return
+    trackedRecnum.current = recnum
+    trackProjectView(recnum, project.name)
+  }, [recnum, project?.name])
   const budget = data?.getBudgetByRecnum ?? null
   const costItems = Array.isArray(data?.getAllCostItems) ? data.getAllCostItems : []
   const monthlyCosts = Array.isArray(data?.getJobMonthlySpend) ? data.getJobMonthlySpend : []

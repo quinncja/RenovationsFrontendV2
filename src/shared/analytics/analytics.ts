@@ -40,7 +40,9 @@ interface QueuedEvent extends TrackInput {
 
 // ─── Tunables ───────────────────────────────────────────────────────────────
 const FLUSH_INTERVAL_MS = 15_000
-const MAX_QUEUE = 200          // hard cap so a failing backend can't grow memory
+const MAX_QUEUE = 200          // hard cap; also the backend's per-batch limit and
+                               // keeps keepalive bodies under the browser's 64KB cap
+const RETRY_BACKOFF_MS = 10_000 // after a failed flush, wait before retrying
 const ENGAGE_MS = 1_000        // dwell must exceed this to count as engagement
 const MAX_DWELL_MS = 120_000   // cap a single hover (idle-away / forgotten tab)
 const SCROLL_IDLE_MS = 150     // scrolling "ends" this long after the last event
@@ -55,12 +57,55 @@ let queue: QueuedEvent[] = []
 let cachedToken: string | null = null
 let started = false
 
+// ─── Session "begun" gate ─────────────────────────────────────────────────────
+// A session has "begun" once the user does anything real: a tracked interaction,
+// navigation past the landing page (>1 page_view), or ANY raw gesture
+// (pointerdown/keydown — see initAnalytics). The automatic session_start + first
+// page_view of a bare page load do NOT begin a session. Until a session begins,
+// API requests are NOT counted toward the user's activity (see
+// sessionTrackingHeaders), so the initial-page-load request burst never inflates
+// the api count. The gesture path exists for touch users: they never produce
+// mouse hovers, and a phone user who scrolls and reads is still "using the app"
+// for last-seen purposes. The backend's countEngagedSessions() stays stricter —
+// it needs a tracked interaction event or a second page_view.
+const SESSION_BEGIN_TYPES: EngagementType[] = [
+  "widget_hover",
+  "widget_click",
+  "tooltip_open",
+  "project_view",
+]
+let pageViewCount = 0
+let sessionActive = false
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export function track(ev: TrackInput) {
   if (!started) return
+  if (!sessionActive) {
+    if (ev.type === "page_view") {
+      if (++pageViewCount > 1) sessionActive = true
+    } else if (SESSION_BEGIN_TYPES.includes(ev.type)) {
+      sessionActive = true
+    }
+  }
   queue.push({ ...ev, ts: new Date().toISOString() })
+  // Enforce the cap even while flushing is blocked (no token yet / backend
+  // down): drop the OLDEST events so the queue can't grow unboundedly and a
+  // late flush never exceeds the backend's per-batch limit.
+  if (queue.length > MAX_QUEUE) queue.splice(0, queue.length - MAX_QUEUE)
   if (queue.length >= MAX_QUEUE) void flush()
+}
+
+/**
+ * Header attached to backend API requests once the analytics session has begun
+ * (see the gate above). The backend only records a request toward the user's
+ * activity count when this header is present, so the automatic burst fired by the
+ * initial page load — before any real interaction — never inflates the count.
+ * Returns an empty object until the session begins. Synchronous so it can be
+ * spread directly into a request's header object.
+ */
+export function sessionTrackingHeaders(): Record<string, string> {
+  return sessionActive ? { "X-RD-Session-Active": "1" } : {}
 }
 
 export function trackPageView(page: string) {
@@ -98,6 +143,12 @@ export function initAnalytics() {
 
   setInterval(() => { void flush() }, FLUSH_INTERVAL_MS)
 
+  // Any real user gesture begins the session for API-call counting — the only
+  // signal touch users reliably produce (see the session-gate comment above).
+  const markActive = () => { sessionActive = true }
+  window.addEventListener("pointerdown", markActive, { once: true, capture: true })
+  window.addEventListener("keydown", markActive, { once: true, capture: true })
+
   // Flush on tab-hide / unload — these are the reliable "user is leaving" signals.
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") { endHover(); void flush(true) }
@@ -110,27 +161,59 @@ export function initAnalytics() {
 
 // ─── Flush ──────────────────────────────────────────────────────────────────
 
+// Posted to /usage/events (alias of /analytics/events) because ad-blocker
+// filter lists commonly match "/analytics/" URLs and would silently kill the
+// whole pipeline for anyone running one.
+let lastFailureAt = 0
+
+function requeue(batch: QueuedEvent[]) {
+  lastFailureAt = Date.now()
+  // Batch goes back at the front (it's the oldest); trim from the front so the
+  // newest events always survive the cap.
+  queue = [...batch, ...queue].slice(-MAX_QUEUE)
+}
+
 async function flush(keepalive = false) {
   if (queue.length === 0) return
+  if (!keepalive && Date.now() - lastFailureAt < RETRY_BACKOFF_MS) return
+
+  // Prefer a fresh token — cachedToken can be stale after a long-idle tab
+  // (Firebase only refreshes when something calls getIdToken()). During
+  // pagehide (keepalive) async token fetches may never resolve, so use the
+  // cache as-is there.
+  let token = cachedToken
+  if (!DEV_BYPASS && !keepalive) {
+    try {
+      token = (await auth.currentUser?.getIdToken()) ?? cachedToken
+      if (token) cachedToken = token
+    } catch { /* fall back to cached */ }
+  }
 
   // No identity yet (token not loaded, not dev) — keep events queued (capped).
-  if (!DEV_BYPASS && !cachedToken) return
+  if (!DEV_BYPASS && !token) return
 
   const batch = queue
   queue = []
 
   const headers: Record<string, string> = { "Content-Type": "application/json" }
-  if (!DEV_BYPASS && cachedToken) headers.Authorization = `Bearer ${cachedToken}`
+  if (!DEV_BYPASS && token) headers.Authorization = `Bearer ${token}`
 
   try {
-    await fetch(`${API_BASE_URL}analytics/events`, {
+    const res = await fetch(`${API_BASE_URL}usage/events`, {
       method: "POST",
       headers,
       body: JSON.stringify({ sessionId, events: batch }),
       keepalive,
     })
+    if (res.ok) {
+      lastFailureAt = 0
+      return
+    }
+    // Auth failures (stale token) and server errors are retryable next cycle;
+    // any other 4xx means the payload itself was rejected — drop it.
+    if (res.status === 401 || res.status === 403 || res.status >= 500) requeue(batch)
   } catch {
-    // Best-effort telemetry — drop on failure rather than retry-storm or leak.
+    requeue(batch) // network failure — retry next interval, never retry-storm
   }
 }
 
@@ -145,7 +228,24 @@ interface HoverState {
   section: string | null
   enterTime: number
   engaged: boolean
+  tooltipFired: boolean
   timer: ReturnType<typeof setTimeout>
+}
+
+/**
+ * Called by chart components whenever a data tooltip renders. Attributed to the
+ * widget currently under the cursor and deduped to ONE event per hover-visit,
+ * so slice-to-slice cursor movement inside a chart doesn't spam events.
+ */
+export function notifyTooltipOpen() {
+  if (!hover || hover.tooltipFired) return
+  hover.tooltipFired = true
+  track({
+    type: "tooltip_open",
+    widgetId: hover.widgetId,
+    section: hover.section,
+    page: window.location.pathname,
+  })
 }
 
 let hover: HoverState | null = null
@@ -163,7 +263,7 @@ function beginHover(el: HTMLElement) {
   const section = el.dataset.sectionId ?? null
   const enterTime = performance.now()
   const timer = setTimeout(() => { if (hover) hover.engaged = true }, ENGAGE_MS)
-  hover = { el, widgetId, section, enterTime, engaged: false, timer }
+  hover = { el, widgetId, section, enterTime, engaged: false, tooltipFired: false, timer }
 }
 
 function endHover() {

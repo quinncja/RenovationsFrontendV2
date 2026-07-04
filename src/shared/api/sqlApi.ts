@@ -1,6 +1,7 @@
 import fetchWithRetry from "../utils/fetchWithRetry"
 import fetchWithTimeout, { type TimeoutOptions } from "../utils/fetchWithTimeout"
 import { auth } from "../../core/auth/firebase"
+import { sessionTrackingHeaders } from "../analytics/analytics"
 
 // Trim any trailing slash so leading-slash paths below don't produce "//".
 const API_BASE_URL = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "")
@@ -25,6 +26,7 @@ async function authedFetch(
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...sessionTrackingHeaders(),
         },
       },
       timeout

@@ -8,6 +8,7 @@ import { MotionList, MotionItem } from "../../shared/components/MotionList/Motio
 import { UserActivityModal } from "../../shared/components/UserActivityModal/UserActivityModal"
 import useIsMobile from "../../shared/hooks/useIsMobile"
 import { fetchAnalyticsAccess } from "../../shared/analytics/engagementApi"
+import { sessionTrackingHeaders } from "../../shared/analytics/analytics"
 import { CompanyEngagementModal } from "../../shared/analytics/CompanyEngagementModal"
 
 // Trim trailing slash so `${API_BASE_URL}/users/...` never produces "//".
@@ -225,6 +226,7 @@ export default function Users() {
         method: "DELETE",
         headers: {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...sessionTrackingHeaders(),
         },
       })
     } finally {
@@ -242,6 +244,7 @@ export default function Users() {
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...sessionTrackingHeaders(),
         },
         body: JSON.stringify({ role }),
       })

@@ -1,6 +1,7 @@
 import fetchWithRetry from "../utils/fetchWithRetry"
 import fetchWithTimeout from "../utils/fetchWithTimeout"
 import { auth } from "../../core/auth/firebase"
+import { sessionTrackingHeaders } from "../analytics/analytics"
 
 export type ModuleName =
   | "dashboard"
@@ -64,12 +65,13 @@ const DEV_BYPASS = import.meta.env.VITE_DEV_BYPASS_AUTH === 'true'
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   if (DEV_BYPASS) {
-    return { "Content-Type": "application/json" }
+    return { "Content-Type": "application/json", ...sessionTrackingHeaders() }
   }
   const token = await auth.currentUser?.getIdToken()
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...sessionTrackingHeaders(),
   }
 }
 

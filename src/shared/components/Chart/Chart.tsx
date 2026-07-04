@@ -8,6 +8,16 @@ import type { ChartConfig, LineSeries, LineMarker } from "./chart.types"
 import { formatMoney, formatMoneyFull } from "../../utils/format"
 import { useDarkMode } from "../../hooks/useDarkMode"
 import useIsMobile from "../../hooks/useIsMobile"
+import { notifyTooltipOpen } from "../../analytics/analytics"
+
+// Pings the analytics module when a chart tooltip actually renders — the module
+// attributes it to the widget under the cursor and dedupes to one tooltip_open
+// per hover-visit, so re-renders and slice-to-slice movement don't spam events.
+// Rendered as the first child of every custom tooltip in this file.
+function TooltipPing() {
+  useEffect(() => { notifyTooltipOpen() }, [])
+  return null
+}
 
 // ─── Zoom-safe sizing ─────────────────────────────────────────────────────────
 // nivo's Responsive* components measure their container with
@@ -164,6 +174,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
 
     return (
       <div className="chart-line-tooltip">
+        <TooltipPing />
         <div className="chart-line-tooltip-header">{headerLabel}</div>
         <div className="chart-line-tooltip-single-value">{fmt(currVal)}</div>
         {growth != null && (
@@ -206,6 +217,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
 
   return (
     <div className="chart-line-tooltip">
+      <TooltipPing />
       <div className="chart-line-tooltip-header">{headerLabel}</div>
       {orderedRows.map((row) => {
         const isCurrent = row.id === currentRow.id
@@ -402,6 +414,7 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
     const diffColor = diff >= 0 ? "#22c55e" : "#ef4444"
     return (
       <div className="chart-line-tooltip">
+        <TooltipPing />
         <div className="chart-line-tooltip-header">{indexValue}</div>
         {barKeys.map((k, i) => (
           <div key={k} className="chart-line-tooltip-row">
@@ -543,8 +556,8 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
               fontWeight={800}
               pointerEvents={tip ? "all" : "none"}
               style={tip ? { cursor: "default" } : undefined}
-              onMouseEnter={tip ? (e) => showTooltipFromEvent(<>{tip}</>, e) : undefined}
-              onMouseMove={tip ? (e) => showTooltipFromEvent(<>{tip}</>, e) : undefined}
+              onMouseEnter={tip ? (e) => showTooltipFromEvent(<><TooltipPing />{tip}</>, e) : undefined}
+              onMouseMove={tip ? (e) => showTooltipFromEvent(<><TooltipPing />{tip}</>, e) : undefined}
               onMouseLeave={tip ? () => hideTooltip() : undefined}
             >
               {fmt(value)}
@@ -644,7 +657,7 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
         // Caller-supplied tooltip for simple bars (e.g. a plain-language
         // explainer) takes precedence over the default label + value card.
         if (barTooltip && !stacked) {
-          return <>{barTooltip(String(indexValue), value as number)}</>
+          return <><TooltipPing />{barTooltip(String(indexValue), value as number)}</>
         }
         // The open month's bar has WIP folded in — flag it so the figure isn't
         // misread as billed-only. Other bars keep just their category label.
@@ -654,6 +667,7 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
             : String(indexValue)
         return (
           <div className="chart-tooltip">
+            <TooltipPing />
             <span>{stacked ? `${label} · ${String(id)}` : label}</span>
             <strong>{tooltipFormat(value as number)}</strong>
           </div>
@@ -708,6 +722,7 @@ function RadialBarChart({ config }: { config: Extract<ChartConfig, { type: "radi
       ]}
       tooltip={({ bar }) => (
         <div className="chart-tooltip">
+          <TooltipPing />
           <span className="chart-tooltip-dot" style={{ background: bar.color }} />
           <span>{bar.groupId} — {bar.category}</span>
           <strong>{fmt(bar.value)}</strong>
@@ -1098,6 +1113,7 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
             const pct = total > 0 ? ((datum.value as number) / total) * 100 : 0
             return (
               <div className="chart-tooltip">
+                <TooltipPing />
                 <span className="chart-tooltip-dot" style={{ background: datum.color }} />
                 <span>{datum.label}</span>
                 <strong>{valueFormat(datum.value as number)}</strong>

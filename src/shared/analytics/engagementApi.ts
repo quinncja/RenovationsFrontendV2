@@ -82,7 +82,11 @@ export function fetchAnalyticsAccess(): Promise<{ isAnalyticsAdmin: boolean }> {
 }
 
 export function fetchUserEngagement(userId: string, range = 30): Promise<UserEngagement> {
-  return authGet(`/analytics/user/${userId}?range=${range}`)
+  // Timezone matters: the daily trend renders next to the API-activity chart
+  // (also viewer-timezone) — bucketing one in UTC made evening activity land on
+  // different days in the two charts.
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+  return authGet(`/analytics/user/${userId}?range=${range}&timezone=${encodeURIComponent(tz)}`)
 }
 
 export function fetchCompanyEngagement(range = 30): Promise<CompanyEngagement> {

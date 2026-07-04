@@ -25,7 +25,7 @@ function scrollBehavior(): ScrollBehavior {
 
 /** Build the grid children for a section — mirrors the home flat-map: an
  *  invisible spacer fills the left column when a half-width widget is offset. */
-function renderSectionWidgets(widgets: WidgetLayoutItem[]): ReactNode[] {
+function renderSectionWidgets(widgets: WidgetLayoutItem[], sectionId: string): ReactNode[] {
   return widgets.flatMap((item) => {
     const elements: ReactNode[] = []
     if (item.offset && item.offset > 0 && item.colSpan === 1) {
@@ -35,6 +35,8 @@ function renderSectionWidgets(widgets: WidgetLayoutItem[]): ReactNode[] {
     elements.push(
       <div
         key={item.id}
+        data-widget-id={item.id}
+        data-section-id={sectionId}
         className={`widget-slot widget-slot-${item.id}${item.colSpan === 2 ? " col-span-full" : ""}`}
       >
         <Component colSpan={item.colSpan} />
@@ -359,7 +361,12 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
                 {section.widgets.map((item) => {
                   const Component = WIDGET_REGISTRY[item.id].component
                   return (
-                    <div key={item.id} className={`widget-slot widget-slot-${item.id}`}>
+                    <div
+                      key={item.id}
+                      data-widget-id={item.id}
+                      data-section-id={section.id}
+                      className={`widget-slot widget-slot-${item.id}`}
+                    >
                       <Component colSpan={item.colSpan} />
                     </div>
                   )
@@ -407,7 +414,7 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
                   <div
                     className={`widget-grid widget-grid-${SECTION_REGISTRY[section.id].columns ?? 2} dashboard-home-grid`}
                   >
-                    {renderSectionWidgets(section.widgets)}
+                    {renderSectionWidgets(section.widgets, section.id)}
                   </div>
                 )}
               </div>

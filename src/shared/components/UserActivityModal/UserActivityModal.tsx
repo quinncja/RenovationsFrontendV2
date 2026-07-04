@@ -8,6 +8,7 @@ import { Chart } from "../Chart/Chart"
 import type { LineSeries } from "../Chart/chart.types"
 import useIsMobile from "../../hooks/useIsMobile"
 import { fetchUserEngagement, type UserEngagement } from "../../analytics/engagementApi"
+import { sessionTrackingHeaders } from "../../analytics/analytics"
 import { SectionEngagementList, WidgetEngagementList, PageEngagementList, ProjectEngagementList } from "../../analytics/EngagementInsights"
 import { sectionLabel, pageLabel, formatCompactNumber } from "../../analytics/labels"
 import { ModalSectionPager } from "./ModalSectionPager"
@@ -109,7 +110,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, showEnga
       .then((token) =>
         fetch(
           `${API_BASE_URL}/users/${user.uid}/activity?timezone=${encodeURIComponent(timezone)}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}`, ...sessionTrackingHeaders() } }
         )
       )
       .then((r) => r.json())
