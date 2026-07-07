@@ -58,7 +58,7 @@ function rowParts(item: RecentChangeItem) {
 
 // ─── Categories ──────────────────────────────────────────────────────────────
 
-type CategoryKey = "projects" | "committed" | "costs" | "billed" | "collected"
+type CategoryKey = "projects" | "committed" | "costs" | "billed" | "payables" | "collected"
 
 interface Category {
   key: CategoryKey
@@ -69,11 +69,15 @@ interface Category {
 const ACTIVITY_CATEGORIES: Category[] = [
   { key: "projects", label: "New Projects", kinds: ["project"] },
   { key: "committed", label: "Committed", kinds: ["purchaseOrder", "subcontract"] },
-  { key: "costs", label: "Costs Posted", kinds: ["cost", "apInvoice"] },
+  { key: "costs", label: "Costs Posted", kinds: ["cost"] },
 ]
 
+// AP invoices live with the money widgets, not project activity — both sides
+// of the ledger in one place: what we billed, what vendors billed us, what
+// cash arrived.
 const BILLING_CATEGORIES: Category[] = [
   { key: "billed", label: "Billed", kinds: ["arInvoice"] },
+  { key: "payables", label: "AP Invoices", kinds: ["apInvoice"] },
   { key: "collected", label: "Collected", kinds: ["payment"] },
 ]
 
@@ -100,6 +104,7 @@ function tileSub(key: CategoryKey, items: RecentChangeItem[]): string {
     case "costs":
       return `${items.length} ${plural(items.length, "entry", "entries")}`
     case "billed":
+    case "payables":
       return `${items.length} ${plural(items.length, "invoice", "invoices")}`
     case "collected":
       return `${items.length} ${plural(items.length, "payment", "payments")}`
