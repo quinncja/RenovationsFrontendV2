@@ -43,6 +43,7 @@ export const SECTION_ORDER: SectionId[] = [
 export const WIDGET_HOME_SECTION: Record<WidgetId, SectionId> = {
   // Recent Changes
   recentActivity: "recentChanges",
+  recentBilling: "recentChanges",
   // Reports
   reconciliation: "reports",
   dataQuality: "reports",
@@ -83,8 +84,9 @@ export const WIDGET_HOME_SECTION: Record<WidgetId, SectionId> = {
  * by defaultLayout and as the "append missing widgets" order in reconcile.
  */
 export const WIDGET_DEFAULT_ORDER: WidgetId[] = [
-  // Recent Changes — one full-width panel.
+  // Recent Changes — Project Activity and Billing & Payments side by side.
   "recentActivity",
+  "recentBilling",
   // Reports
   "reconciliation",
   "dataQuality",

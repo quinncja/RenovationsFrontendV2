@@ -10485,43 +10485,18 @@ svg.placeholder-illustration {
 }
 
 
-/* ─── Recent Changes panel ──────────────────────────────────────────────────
-   One full-width panel: an eyebrow header, a strip of hairline-separated
-   summary tiles (the important information — big tabular figures), then only
-   the largest movements as rows. Everything deeper lives in the modal.
-   Neutral surfaces throughout; copper appears only on active states (the
-   modal's selected filter chip). */
+/* ─── Recent Changes widgets ────────────────────────────────────────────────
+   Two table widgets (Project Activity / Billing & Payments): a strip of
+   hairline-separated summary tiles, then the largest items as a full-bleed
+   .data-table (the shared `.widget:has(.data-table)` treatment gives the same
+   edge alignment as Employee Performance). Neutral surfaces; copper appears
+   only on active states (the modal's selected filter chip, the detail
+   modal's primary action). */
 
-.rcnt-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.35rem;
-}
-
-.rcnt-eyebrow {
-  font-size: 0.68rem;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--secondary-text);
-}
-
-.rcnt-view-all {
-  border: none;
-  background: none;
-  padding: 0;
-  font-family: var(--font-family);
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--secondary-text);
-  cursor: pointer;
-  transition: color 0.12s ease;
-}
-
-.rcnt-view-all:hover {
-  color: var(--primary-text);
+/* The :has(.data-table) rule zeroes the card padding — re-inset the tile
+   strip so it lines up with the widget title and the table's outer columns. */
+.rcnt-widget .rcnt-tiles {
+  padding: 0 1.25rem;
 }
 
 /* Summary tiles — equal columns divided by hairlines, no boxes. */
@@ -10529,7 +10504,7 @@ svg.placeholder-illustration {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
-  margin: 0.4rem 0 0.9rem;
+  margin: 0.85rem 0 0.6rem;
 }
 
 .rcnt-tile {
@@ -10550,7 +10525,7 @@ svg.placeholder-illustration {
 
 .rcnt-tile:first-child {
   border-left: none;
-  padding-left: 0.1rem;
+  padding-left: 0;
 }
 
 .rcnt-tile:hover:not(:disabled) {
@@ -10571,7 +10546,7 @@ svg.placeholder-illustration {
 }
 
 .rcnt-tile-value {
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   line-height: 1.15;
   font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
@@ -10595,18 +10570,50 @@ svg.placeholder-illustration {
   text-overflow: ellipsis;
 }
 
-/* Rows — shared by the highlights list and the modal. */
+/* Table cells (widget top-N table) */
+.rcnt-item-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.rcnt-td-amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  font-weight: var(--font-weight-semibold);
+}
+
+.rcnt-td-when {
+  text-align: right;
+  white-space: nowrap;
+  color: var(--secondary-text);
+  font-size: 0.78rem;
+}
+
+/* Keep long item titles from stretching the table past the card. */
+.rcnt-table {
+  table-layout: fixed;
+}
+
+.rcnt-table th:nth-child(2),
+.rcnt-table td:nth-child(2) {
+  width: 6.5rem;
+}
+
+.rcnt-table th:nth-child(3),
+.rcnt-table td:nth-child(3) {
+  width: 6rem;
+}
+
+/* Rows — the view-all modal's list. */
 .rcnt-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-}
-
-.rcnt-highlights {
-  border-top: 1px solid var(--border-color);
-  padding-top: 0.25rem;
 }
 
 .rcnt-row {
@@ -10767,6 +10774,86 @@ svg.placeholder-illustration {
 .rcnt-empty {
   padding: 1.5rem 0;
   text-align: center;
+}
+
+/* Item detail modal — one change, all its fields, and the jump to the project. */
+.rcnt-detail-modal {
+  max-width: 30rem;
+}
+
+.rcnt-detail-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.rcnt-detail-heading h2 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rcnt-detail-grid {
+  margin: 0.75rem 0 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rcnt-detail-field {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr;
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.55rem 0;
+}
+
+.rcnt-detail-field + .rcnt-detail-field {
+  border-top: 1px solid var(--border-color);
+}
+
+.rcnt-detail-field dt {
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+}
+
+.rcnt-detail-field dd {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.rcnt-detail-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+
+/* Copper — the one meaningful action in this modal. */
+.rcnt-btn-primary {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: #fff;
+  font-family: var(--font-family);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.rcnt-btn-primary:hover {
+  background: var(--primary-color-hover);
+}
+
+.rcnt-btn-primary:active {
+  background: var(--primary-color-active);
 }
 
 /* Mobile: tiles become a two-column grid with hairlines between rows. */
