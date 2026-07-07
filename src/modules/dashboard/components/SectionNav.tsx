@@ -199,7 +199,10 @@ export function SectionNav({
               // here — the box sizes via real width/height, never a transform
               // scale, so there's no distortion to trigger.
               borderRadius: expanded ? 12 : 22,
-              backgroundColor: expanded ? "var(--card-color)" : "rgba(0, 0, 0, 0)",
+              // Fill fades white (open menu) → app background (rest), so the
+              // resting pill reads as a filled capsule sitting on the page rather
+              // than a see-through outline.
+              backgroundColor: expanded ? "var(--card-color)" : "var(--background-color)",
               boxShadow: expanded
                 ? "0 1px 4px rgba(0, 0, 0, 0.16)"
                 : "0 1px 4px rgba(0, 0, 0, 0)",
