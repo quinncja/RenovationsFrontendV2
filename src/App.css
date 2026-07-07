@@ -10643,7 +10643,6 @@ svg.placeholder-illustration {
   flex: none;
   display: inline-flex;
   justify-content: center;
-  min-width: 3.6rem;
   padding: 0.14rem 0.55rem;
   border-radius: 999px;
   border: 1px solid var(--border-color);
@@ -10653,6 +10652,51 @@ svg.placeholder-illustration {
   line-height: 1.3;
   white-space: nowrap;
   color: var(--secondary-text);
+}
+
+/* Per-kind tints — same soft color-mix chip pattern as the estimation
+   driver pills. Ledger logic: green = money in / new work, red = money
+   owed out, amber = cost hitting the job, blue/violet = commitments. */
+.rcnt-pill--project {
+  color: light-dark(#15803d, #5ee08a);
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+  border-color: transparent;
+}
+
+.rcnt-pill--purchaseOrder {
+  color: light-dark(#1d4ed8, #8ab6ff);
+  background: color-mix(in srgb, #3b82f6 14%, transparent);
+  border-color: transparent;
+}
+
+.rcnt-pill--subcontract {
+  color: light-dark(#6d28d9, #c4a7f8);
+  background: color-mix(in srgb, #8b5cf6 14%, transparent);
+  border-color: transparent;
+}
+
+.rcnt-pill--cost {
+  color: light-dark(#a16207, #e3b341);
+  background: color-mix(in srgb, #eab308 16%, transparent);
+  border-color: transparent;
+}
+
+.rcnt-pill--apInvoice {
+  color: light-dark(#c0392b, #f8857a);
+  background: color-mix(in srgb, #ef4444 14%, transparent);
+  border-color: transparent;
+}
+
+.rcnt-pill--arInvoice {
+  color: light-dark(#0f766e, #5eead4);
+  background: color-mix(in srgb, #14b8a6 14%, transparent);
+  border-color: transparent;
+}
+
+.rcnt-pill--payment {
+  color: light-dark(#15803d, #5ee08a);
+  background: color-mix(in srgb, #22c55e 14%, transparent);
+  border-color: transparent;
 }
 
 .rcnt-main {
@@ -10776,86 +10820,6 @@ svg.placeholder-illustration {
 .rcnt-empty {
   padding: 1.5rem 0;
   text-align: center;
-}
-
-/* Item detail modal — one change, all its fields, and the jump to the project. */
-.rcnt-detail-modal {
-  max-width: 30rem;
-}
-
-.rcnt-detail-heading {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  min-width: 0;
-}
-
-.rcnt-detail-heading h2 {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rcnt-detail-grid {
-  margin: 0.75rem 0 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.rcnt-detail-field {
-  display: grid;
-  grid-template-columns: 8.5rem 1fr;
-  gap: 1rem;
-  align-items: baseline;
-  padding: 0.55rem 0;
-}
-
-.rcnt-detail-field + .rcnt-detail-field {
-  border-top: 1px solid var(--border-color);
-}
-
-.rcnt-detail-field dt {
-  font-size: 0.72rem;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--secondary-text);
-}
-
-.rcnt-detail-field dd {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--primary-text);
-  font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
-}
-
-.rcnt-detail-footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 1.25rem;
-}
-
-/* Copper — the one meaningful action in this modal. */
-.rcnt-btn-primary {
-  padding: 0.5rem 1.25rem;
-  border: none;
-  border-radius: 8px;
-  background: var(--primary-color);
-  color: #fff;
-  font-family: var(--font-family);
-  font-size: 0.875rem;
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-
-.rcnt-btn-primary:hover {
-  background: var(--primary-color-hover);
-}
-
-.rcnt-btn-primary:active {
-  background: var(--primary-color-active);
 }
 
 /* Mobile: tiles become a two-column grid with hairlines between rows. */

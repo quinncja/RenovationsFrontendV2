@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, ChevronRight } from "lucide-react"
@@ -9,6 +9,7 @@ import {
 } from "../../../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { useJobcostNav } from "../../../jobcost/useJobcostNav"
 import { useModalLayer } from "../../../../shared/hooks/useModalLayer"
+import { fetchPageData } from "../../../../shared/api/pageApi"
 import { formatDate, formatMoneyFull, formatRelativeTime } from "../../../../shared/utils/format"
 import type { RecentChangeItem, RecentKind } from "./recentTypes"
 import { useRecentChanges, type RecentSource } from "./useRecentChanges"
@@ -105,6 +106,48 @@ function tileSub(key: CategoryKey, items: RecentChangeItem[]): string {
   }
 }
 
+// ─── Cost line drill-down ────────────────────────────────────────────────────
+// A cost item is an aggregate (job × cost type); its modal lists the actual
+// jobcst lines behind the total, fetched on open via recentCostLines.
+
+interface CostLine {
+  description: string | null
+  vendorName: string | null
+  amount: number
+  enteredAt: string
+}
+
+function useCostLines(item: RecentChangeItem | null) {
+  const isCost = item !== null && item.kind === "cost" && item.jobId
+  // The aggregate's id is "<jobnum>-<csttyp>".
+  const jobnum = isCost ? item.jobId : null
+  const csttyp = isCost ? item.id.split("-")[1] : null
+  const [lines, setLines] = useState<CostLine[] | null>(null)
+
+  useEffect(() => {
+    if (!jobnum || !csttyp) {
+      setLines(null)
+      return
+    }
+    const ctrl = new AbortController()
+    setLines(null)
+    fetchPageData({
+      module: "dashboard",
+      queries: ["recentCostLines"],
+      params: { jobnum, csttyp },
+      signal: ctrl.signal,
+    })
+      .then((data) => setLines((data.recentCostLines as CostLine[] | null) ?? []))
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return
+        setLines([])
+      })
+    return () => ctrl.abort()
+  }, [jobnum, csttyp])
+
+  return { lines, loading: Boolean(isCost) && lines === null }
+}
+
 // ─── Item detail modal ───────────────────────────────────────────────────────
 // The deeper look at one non-invoice change (project, PO, subcontract, cost
 // posting). Built from the invoice modal's structure and classes — header,
@@ -129,6 +172,8 @@ function ItemDetailModal({
   const [shown, setShown] = useState(item)
   if (item !== null && item !== shown) setShown(item)
   const meta = shown ? KIND_LABEL[shown.kind] : null
+  // `item` (not `shown`) so the fetch cancels when the modal closes.
+  const { lines, loading: linesLoading } = useCostLines(item)
 
   return createPortal(
     <AnimatePresence>
@@ -216,6 +261,42 @@ function ItemDetailModal({
                       />
                     </div>
                   </section>
+
+                  {shown.kind === "cost" && (
+                    <section className="invoice-modal-section">
+                      <p className="invoice-modal-section-label">Lines</p>
+                      {linesLoading ? (
+                        <div className="widget-skeleton" style={{ height: "4rem" }} />
+                      ) : lines && lines.length > 0 ? (
+                        <table className="spend-rank-table">
+                          <thead>
+                            <tr>
+                              <th className="spend-rank-table-name">Description</th>
+                              <th className="spend-rank-table-name">Vendor</th>
+                              <th className="spend-rank-table-value">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {lines.map((line, i) => (
+                              <tr key={i} className="spend-rank-table-row-plain">
+                                <td className="spend-rank-table-name body-text">
+                                  {line.description || "—"}
+                                </td>
+                                <td className="spend-rank-table-name body-text text-secondary">
+                                  {line.vendorName || "—"}
+                                </td>
+                                <td className="spend-rank-table-value body-text emphasized">
+                                  {formatMoneyFull(line.amount)}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      ) : (
+                        <p className="body-text text-secondary">No line detail available.</p>
+                      )}
+                    </section>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -331,7 +412,7 @@ function ViewAllModal({
                               onClick={() => onSelect(item)}
                               onKeyDown={(e) => e.key === "Enter" && onSelect(item)}
                             >
-                              <span className="rcnt-pill">{pill}</span>
+                              <span className={`rcnt-pill rcnt-pill--${item.kind}`}>{pill}</span>
                               <div className="rcnt-main">
                                 <span className="rcnt-title">{primary}</span>
                                 {secondary && <span className="rcnt-sub">{secondary}</span>}
@@ -502,7 +583,7 @@ export function RecentChangesWidget({
                   >
                     <td>
                       <div className="rcnt-item-cell">
-                        <span className="rcnt-pill">{pill}</span>
+                        <span className={`rcnt-pill rcnt-pill--${item.kind}`}>{pill}</span>
                         <div className="rcnt-main">
                           <span className="rcnt-title">{primary}</span>
                           {secondary && <span className="rcnt-sub">{secondary}</span>}

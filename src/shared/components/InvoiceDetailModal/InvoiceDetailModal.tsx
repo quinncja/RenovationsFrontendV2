@@ -172,10 +172,20 @@ export function InvoiceDetailModal({ invoiceId, module, onClose }: InvoiceDetail
 
   const invoiceNum = detail?.header.invoiceNum
   const statusNum  = detail?.header.status
-  const subtitle   = detail
+  // The description is what the invoice is FOR, so it leads; the invoice
+  // number moves to the subtitle next to the client/vendor.
+  const title = detail
+    ? detail.header.description || `Invoice ${invoiceNum}`
+    : isLoading ? "Loading…" : "Invoice"
+  const party = detail
     ? detail.module === "clients"
       ? detail.header.clientName
       : detail.header.vendorName
+    : null
+  const subtitle = detail
+    ? [detail.header.description ? `Invoice ${invoiceNum}` : null, party]
+        .filter(Boolean)
+        .join(" · ")
     : null
 
   return createPortal(
@@ -202,9 +212,7 @@ export function InvoiceDetailModal({ invoiceId, module, onClose }: InvoiceDetail
               <div className="invoice-modal-header">
                 <div className="invoice-modal-header-left">
                   <div className="invoice-modal-title-row">
-                    <h2 className="invoice-modal-title">
-                      {invoiceNum ? `Invoice ${invoiceNum}` : isLoading ? "Loading…" : "Invoice"}
-                    </h2>
+                    <h2 className="invoice-modal-title">{title}</h2>
                     {statusNum != null && (
                       <span className={`invoice-status-badge invoice-status-badge--${invoiceStatusClass(statusNum)}`}>
                         {invoiceStatus(statusNum)}
@@ -269,7 +277,6 @@ function ClientInvoiceBody({ header: h }: { header: ClientInvoiceDetail }) {
         <p className="invoice-modal-section-label">Details</p>
         <div className="invoice-modal-info">
           <InfoRow label="Invoice #"   value={h.invoiceNum} />
-          <InfoRow label="Description" value={h.description} />
           <InfoRow label="Year"        value={h.postYear} />
           <InfoRow label="Date"        value={formatDate(h.invoiceDate)} />
           <InfoRow label="Due Date"    value={formatDate(h.dueDate)} />
@@ -312,7 +319,6 @@ function APInvoiceBody({ header: h, lines }: { header: APInvoiceDetail; lines: I
         <p className="invoice-modal-section-label">Details</p>
         <div className="invoice-modal-info">
           <InfoRow label="Invoice #"   value={h.invoiceNum} />
-          <InfoRow label="Description" value={h.description} />
           <InfoRow label="Year"        value={h.postYear} />
           <InfoRow label="Date"        value={formatDate(h.invoiceDate)} />
           <InfoRow label="Due Date"    value={formatDate(h.dueDate)} />
