@@ -10485,11 +10485,117 @@ svg.placeholder-illustration {
 }
 
 
-/* ─── Recent Changes cards ──────────────────────────────────────────────────
-   "Since last business day" activity feed — compact rows: neutral kind pill,
-   title/party over a muted job sub-line, amount + relative time on the right.
-   Neutral surfaces throughout; copper stays reserved for active states. */
+/* ─── Recent Changes panel ──────────────────────────────────────────────────
+   One full-width panel: an eyebrow header, a strip of hairline-separated
+   summary tiles (the important information — big tabular figures), then only
+   the largest movements as rows. Everything deeper lives in the modal.
+   Neutral surfaces throughout; copper appears only on active states (the
+   modal's selected filter chip). */
 
+.rcnt-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.rcnt-eyebrow {
+  font-size: 0.68rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+}
+
+.rcnt-view-all {
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: var(--font-family);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--secondary-text);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.rcnt-view-all:hover {
+  color: var(--primary-text);
+}
+
+/* Summary tiles — equal columns divided by hairlines, no boxes. */
+.rcnt-tiles {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  margin: 0.4rem 0 0.9rem;
+}
+
+.rcnt-tile {
+  appearance: none;
+  border: none;
+  background: none;
+  text-align: left;
+  font-family: var(--font-family);
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  padding: 0.55rem 1.1rem;
+  border-left: 1px solid var(--border-color);
+  border-radius: 0;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.rcnt-tile:first-child {
+  border-left: none;
+  padding-left: 0.1rem;
+}
+
+.rcnt-tile:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--primary-color) 6%, transparent);
+}
+
+.rcnt-tile:disabled {
+  cursor: default;
+}
+
+.rcnt-tile-label {
+  font-size: 0.66rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+  white-space: nowrap;
+}
+
+.rcnt-tile-value {
+  font-size: 1.4rem;
+  line-height: 1.15;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+  white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rcnt-tile-value--zero {
+  color: var(--secondary-text);
+  font-weight: 400;
+}
+
+.rcnt-tile-sub {
+  font-size: 0.72rem;
+  color: var(--secondary-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Rows — shared by the highlights list and the modal. */
 .rcnt-list {
   list-style: none;
   margin: 0;
@@ -10498,10 +10604,15 @@ svg.placeholder-illustration {
   flex-direction: column;
 }
 
+.rcnt-highlights {
+  border-top: 1px solid var(--border-color);
+  padding-top: 0.25rem;
+}
+
 .rcnt-row {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.7rem;
   padding: 0.5rem 0.35rem;
   border-radius: 8px;
 }
@@ -10523,12 +10634,13 @@ svg.placeholder-illustration {
   flex: none;
   display: inline-flex;
   justify-content: center;
-  min-width: 3.4rem;
-  padding: 0.13rem 0.5rem;
+  min-width: 3.6rem;
+  padding: 0.14rem 0.55rem;
   border-radius: 999px;
   border: 1px solid var(--border-color);
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
   line-height: 1.3;
   white-space: nowrap;
   color: var(--secondary-text);
@@ -10539,21 +10651,16 @@ svg.placeholder-illustration {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.05rem;
+  gap: 0.06rem;
 }
 
 .rcnt-title {
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: 500;
   color: var(--primary-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.rcnt-party {
-  font-weight: 400;
-  color: var(--secondary-text);
 }
 
 .rcnt-sub {
@@ -10569,11 +10676,11 @@ svg.placeholder-illustration {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.05rem;
+  gap: 0.06rem;
 }
 
 .rcnt-amount {
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
   color: var(--primary-text);
@@ -10585,12 +10692,106 @@ svg.placeholder-illustration {
   white-space: nowrap;
 }
 
-.rcnt-more {
-  padding: 0.45rem 0.35rem 0.1rem;
-  border-top: 1px solid var(--border-color);
-  font-size: 0.72rem;
+/* Detail modal */
+.rcnt-modal .modal-header {
+  margin-bottom: 0.6rem;
+}
+
+.rcnt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.rcnt-chip {
+  appearance: none;
+  border: 1px solid var(--border-color);
+  background: none;
+  border-radius: 999px;
+  padding: 0.28rem 0.8rem;
+  font-family: var(--font-family);
+  font-size: 0.76rem;
+  font-weight: 500;
   color: var(--secondary-text);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.rcnt-chip:hover {
+  color: var(--primary-text);
+}
+
+/* Active filter — the one copper moment in this surface. */
+.rcnt-chip--active {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  color: #fff;
+}
+
+.rcnt-chip--active:hover {
+  color: #fff;
+}
+
+.rcnt-modal-body {
+  overflow-y: auto;
+  max-height: min(60vh, 34rem);
+  padding-top: 0.25rem;
+}
+
+.rcnt-group + .rcnt-group {
+  margin-top: 1rem;
+}
+
+.rcnt-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.35rem 0.35rem 0.3rem;
+  font-size: 0.68rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+}
+
+.rcnt-group-total {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 0.78rem;
+}
+
+.rcnt-empty {
+  padding: 1.5rem 0;
   text-align: center;
+}
+
+/* Mobile: tiles become a two-column grid with hairlines between rows. */
+@media (max-width: 768px) {
+  .rcnt-tiles {
+    grid-auto-flow: row;
+    grid-auto-columns: unset;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .rcnt-tile,
+  .rcnt-tile:first-child {
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    padding: 0.6rem 0.35rem;
+  }
+
+  .rcnt-tile:nth-child(-n + 2) {
+    border-top: none;
+  }
+
+  .rcnt-tile:nth-child(2n) {
+    border-left: 1px solid var(--border-color);
+    padding-left: 1rem;
+  }
 }
 
 

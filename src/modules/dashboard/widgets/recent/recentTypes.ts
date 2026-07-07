@@ -39,15 +39,3 @@ export interface RecentChangesPayload {
   items: RecentChangeItem[]
 }
 
-/** Short pill label per kind. Neutral pills — copper stays reserved for
- *  active states per the app's design conventions. */
-export const KIND_META: Record<RecentKind, { label: string }> = {
-  project: { label: "New Job" },
-  purchaseOrder: { label: "PO" },
-  subcontract: { label: "Sub" },
-  cost: { label: "Cost" },
-  apInvoice: { label: "AP Inv" },
-  changeOrder: { label: "CO" },
-  arInvoice: { label: "Billing" },
-  payment: { label: "Payment" },
-}

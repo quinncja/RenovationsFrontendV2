@@ -48,13 +48,10 @@ export type WidgetId =
   | "estimationCategory"
   | "estimationWorstJobs"
   // ── Recent Changes ──────────────────────────────────────────────────────
-  // "Since last business day" activity feed, one card per category. Backed by
+  // "Since last business day" activity panel: summary tiles per category,
+  // largest movements, and a detail modal. One full-width widget backed by
   // the recentChangesAdmin query (company-wide, with PM attribution).
-  | "recentProjects"
-  | "recentCommitments"
-  | "recentCosts"
-  | "recentChangeOrders"
-  | "recentBilling"
+  | "recentActivity"
 
 export type SectionId =
   | "recentChanges"
