@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { SECTION_REGISTRY } from "../config/sectionRegistry"
 import type { SectionLayout } from "../types/dashboardLayout"
@@ -24,11 +24,18 @@ const LABEL_CLOSE_S = 0.28
 const SELECT_CLOSE_MS = 850
 
 /**
- * Right-edge section navigator. At rest it's an iOS-style column of dots; on
- * hover/focus the same element animates — via Motion `layout` — into a labeled
- * card: it grows in size, the dots travel from the column into their rows, and
- * the surface (background + ring + elevation shadow) fades up off the page so it
- * lifts with the dots. One always-mounted card (no duplicate layoutId ghosting).
+ * Right-edge section navigator. At rest it's a bordered capsule (year-selector
+ * style) around a column of dots; on hover/focus it morphs into a labeled menu.
+ * Three layers cooperate so the border stays pixel-crisp through the morph:
+ *   1. Surface layer — the ONLY visible chrome (border + radius + fill + shadow).
+ *      Morphs by animating real width/height to the card's measured rest/open box
+ *      (NOT transform-scale, which distorts a crisp radius under this extreme
+ *      aspect-ratio change). Constant CSS radius → no distortion, no end-snap.
+ *   2. Card — Motion `layout`, but fully transparent: it only carries the dot/
+ *      label layout and is the box the surface measures. Its messy transform
+ *      morph (and label-collapse snap) is invisible because nothing paints on it.
+ *   3. Dotrail — the visible dots, travelling on their own `layout`.
+ * All three share one spring, so surface + dots morph in lockstep.
  * Copper marks only the active row — state, not decoration.
  */
 export function SectionNav({
@@ -58,6 +65,37 @@ export function SectionNav({
   const navRef = useRef<HTMLDivElement>(null)
   const reduce = useReducedMotion()
   const transition = reduce ? { duration: 0.15 } : expanding ? SPRING_GROW : SPRING_SETTLE
+
+  // The visible surface (fill + crisp border + shadow) is a SEPARATE layer that
+  // morphs by animating its width/height DIRECTLY — not via the card's transform
+  // `layout`, whose extreme non-uniform scale distorts a crisp border-radius and
+  // snaps (that was the whole saga). We drive it to the card's measured rest/open
+  // box sizes on the same spring, so it tracks the (now transparent) card while
+  // staying pixel-crisp. Measured via offset* (layout size, ignores transform).
+  const cardRef = useRef<HTMLDivElement>(null)
+  const [restSize, setRestSize] = useState<{ w: number; h: number } | null>(null)
+  const [openSize, setOpenSize] = useState<{ w: number; h: number } | null>(null)
+  useLayoutEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    if (expanded) {
+      // Open: labels mounted → the box is at its full open size. Cache it.
+      setOpenSize({ w: el.offsetWidth, h: el.offsetHeight })
+    } else if (!el.querySelector(".section-nav-label")) {
+      // Rest: measure ONLY when the label DOM is truly gone. On close the
+      // `labels` STATE flips false immediately but AnimatePresence keeps the
+      // label elements mounted through their exit — measuring then would cache a
+      // label-inflated "rest" width and the surface would animate to the wrong
+      // (wide) size, lagging the dots. Checking the DOM (not the state) gives the
+      // real resting box; measured on mount, it stays valid until sections change.
+      setRestSize({ w: el.offsetWidth, h: el.offsetHeight })
+    }
+  }, [expanded, labels, sections.length])
+
+  // Where the surface morphs TO. On close we target the cached resting box
+  // immediately (not the label-inflated live card), so the border shrinks cleanly
+  // instead of waiting on the label unmount.
+  const surfaceSize = expanded ? openSize ?? restSize : restSize
 
   const clearTimers = () => {
     window.clearTimeout(closeTimer.current)
@@ -143,29 +181,45 @@ export function SectionNav({
       onFocusCapture={openNav}
       onBlurCapture={scheduleClose}
     >
+      {/* Surface + border layer — the ONLY visible chrome. It morphs by animating
+          real width/height (crisp radius, no scale distortion) to the card's
+          measured rest/open box, on the same spring as the card, so it tracks the
+          (transparent) card. Border + radius are constant CSS; fill + elevation
+          fade in on open. Behind the card content (z:-1), non-interactive. */}
+      {surfaceSize && (
+        <div className="section-nav-surface" aria-hidden="true">
+          <motion.div
+            className="section-nav-surface-box"
+            initial={false}
+            animate={{
+              width: surfaceSize.w,
+              height: surfaceSize.h,
+              // Rest 22 clamps to a full capsule (past half the ~43px box); open
+              // 12 reads as a tighter rounded card. Safe to animate the radius
+              // here — the box sizes via real width/height, never a transform
+              // scale, so there's no distortion to trigger.
+              borderRadius: expanded ? 12 : 22,
+              backgroundColor: expanded ? "var(--card-color)" : "rgba(0, 0, 0, 0)",
+              boxShadow: expanded
+                ? "0 1px 4px rgba(0, 0, 0, 0.16)"
+                : "0 1px 4px rgba(0, 0, 0, 0)",
+            }}
+            transition={transition}
+          />
+        </div>
+      )}
       <motion.div
         layout
+        ref={cardRef}
         className={`section-nav-card${expanded ? " section-nav-card-open" : ""}`}
         role="tablist"
         aria-label="Sections"
         initial={false}
-        // The surface "appears from the background and lifts off the page": its
-        // fill and elevation shadow fade up as it grows. Set via animate (not
-        // CSS) so Motion scale-corrects them mid-layout. Two shadow layers in
-        // both states (matching layer counts so Motion interpolates cleanly): a
-        // hairline ring + a soft elevation shadow.
-        animate={{
-          backgroundColor: expanded ? "var(--card-color)" : "rgba(0, 0, 0, 0)",
-          // At REST the ring is already present but faint — a subtle hairline
-          // pill around the dot column that reads as "interactable" without a
-          // fill or elevation. On open it strengthens to the full ring and the
-          // soft elevation shadow (--button-shadow: a tight 0 1px 4px drop) fades
-          // up. Constant offset/blur so only the alpha deepens.
-          boxShadow: expanded
-            ? "0 0 0 1px rgba(128, 128, 128, 0.18), 0 1px 4px rgba(0, 0, 0, 0.16)"
-            : "0 0 0 1px rgba(128, 128, 128, 0.14), 0 1px 4px rgba(0, 0, 0, 0)",
-        }}
-        style={{ borderRadius: 12 }}
+        // Fully transparent now: the card only owns LAYOUT (dot/label positions +
+        // the box the surface layer measures). Its transform `layout` morph — and
+        // the label-collapse snap that used to plague a border drawn here — are
+        // invisible because nothing on the card paints. The visible morph is the
+        // surface layer (above) + the dots on the dotrail (below).
         transition={transition}
       >
         {sections.map((section, i) => (

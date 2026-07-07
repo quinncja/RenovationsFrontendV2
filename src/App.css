@@ -7600,12 +7600,47 @@ svg.placeholder-illustration {
   z-index: -1;
 }
 
-/* The card. At rest: a transparent-fill capsule with a faint hairline ring
-   around the dot column (a subtle "interactable" affordance — ring animated in
-   JS, see SectionNav). Open: a labeled menu. Size, position and the dots' travel
-   are all Motion
-   `layout` animations; the surface (bg + ring + shadow) is animated in JS so
-   Motion scale-corrects it (see SectionNav). Right-anchored via margin-left. */
+/* Surface + border layer. The ONLY visible chrome: a crisp bordered capsule at
+   rest (the year-selector-style "interactable" pill) that morphs into the open
+   menu's filled/elevated card. It morphs by animating real width/height (see
+   SectionNav) — NOT the card's transform-scale layout — so the border-radius
+   stays pixel-crisp through the extreme width change instead of distorting and
+   snapping. Overlay mirrors the dotrail's anchoring so the inner box tracks the
+   card's right edge; the box itself is JS-sized to the card's rest/open box. */
+.section-nav-surface {
+  position: absolute;
+  inset: 0;
+  /* Behind the card content + dots, above the page. Non-interactive. */
+  z-index: -1;
+  pointer-events: none;
+  /* Explicitly center vertically + right-align the box. The box's animated
+     width/height differ from the card's content size, so we can't rely on the
+     card's margin tricks — flex alignment pins the right edge and the vertical
+     center no matter the box's animated size (the card's dots also center-spread,
+     not top-anchor, so justify-center matches them through the morph). */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+}
+.section-nav-surface-box {
+  /* -1.1rem lands the box's right edge on the card's right edge (= the dots' fixed
+     x + 1.1rem inset). Right edge stays put; width grows leftward. */
+  margin-right: -1.1rem;
+  flex: none;
+  box-sizing: border-box;
+  border: 1.5px solid var(--border-color);
+  /* Base/rest radius (also the initial paint before Motion applies). Rest 22px
+     clamps to a full pill at the narrow resting width; the open state animates it
+     down to 12px (see SectionNav's animate). Crisp in both — the box is sized by
+     width/height, never transform-scaled. */
+  border-radius: 22px;
+}
+
+/* The card. Now fully transparent — it owns only LAYOUT (dot/label positions and
+   the box the surface layer measures). Its transform `layout` morph is invisible
+   (nothing paints), which is what lets the visible surface morph cleanly without
+   inheriting the card's label-collapse snap. Right-anchored via margin-left. */
 .section-nav-card {
   display: flex;
   flex-direction: column;
@@ -7626,19 +7661,21 @@ svg.placeholder-illustration {
      of these toggle with state, the card's right edge never sweeps sideways and
      the dots can only travel vertically. (Previously margin-right lived only on
      the open card, so it snapped -1.1rem→0 on close and dragged the dots left.)
-     Closed the surface is transparent, so the constant padding/margin is
-     invisible — it only fixes where the dots sit. Vertical padding, gap, height
-     and the surface still animate (see .section-nav-card-open). */
+     Closed the surface shows a faint hairline pill (see SectionNav), so the
+     constant padding/margin also sets the pill's breathing room. Gap, height and
+     the surface still animate (see .section-nav-card-open). */
   margin-right: -1.1rem;
-  padding: 0 0.4rem;
+  /* Block padding is CONSTANT 0.4rem (matches the year selector's pill and the
+     open state) so the resting pill has room above/below the dots and the top
+     dot doesn't shift vertically on open. */
+  padding: 0.4rem;
 }
 .section-nav-card-open {
-  /* align-items, horizontal padding and margin-right are inherited constant from
-     .section-nav-card (so the dots' x stays locked). Only the VERTICAL padding,
-     gap and min-width change here — none of them shift the dots horizontally. */
+  /* align-items, padding and margin-right are inherited constant from
+     .section-nav-card (so the dots' x stays locked and the pill's block padding
+     doesn't jump). Only the gap and min-width change here — neither shifts the
+     dots horizontally. */
   gap: 2px;
-  padding-top: 0.4rem;
-  padding-bottom: 0.4rem;
   min-width: 12rem;
 }
 
