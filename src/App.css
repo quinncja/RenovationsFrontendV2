@@ -7580,8 +7580,10 @@ svg.placeholder-illustration {
   z-index: -1;
 }
 
-/* The card. At rest: a transparent, right-aligned column of dots (no surface).
-   Open: a labeled menu. Size, position and the dots' travel are all Motion
+/* The card. At rest: a transparent-fill capsule with a faint hairline ring
+   around the dot column (a subtle "interactable" affordance — ring animated in
+   JS, see SectionNav). Open: a labeled menu. Size, position and the dots' travel
+   are all Motion
    `layout` animations; the surface (bg + ring + shadow) is animated in JS so
    Motion scale-corrects it (see SectionNav). Right-anchored via margin-left. */
 .section-nav-card {

@@ -3,6 +3,7 @@ import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, ChevronRight } from "lucide-react"
 import { Widget } from "../../../../shared/components/Widget/Widget"
+import { InvoiceDetailModal } from "../../../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { useJobcostNav } from "../../../jobcost/useJobcostNav"
 import { useModalLayer } from "../../../../shared/hooks/useModalLayer"
 import { formatDate, formatMoneyFull, formatRelativeTime } from "../../../../shared/utils/format"
@@ -380,6 +381,21 @@ export function RecentChangesWidget({
 
   const [viewAll, setViewAll] = useState<CategoryKey | "all" | null>(null)
   const [selected, setSelected] = useState<RecentChangeItem | null>(null)
+  const [invoice, setInvoice] = useState<{ id: string; module: "clients" | "suppliers" } | null>(
+    null
+  )
+
+  // Invoice-shaped items open the app's existing invoice modal (amounts strip,
+  // status, cost distribution, job link) — it self-fetches by recnum. A
+  // payment's deeper look is the AR invoice it paid (its id is
+  // "<invoice recnum>-<timestamp>"). Everything else (projects, POs, subs,
+  // cost postings) has no richer surface, so it gets the generic detail modal.
+  const openItem = (item: RecentChangeItem) => {
+    if (item.kind === "arInvoice") setInvoice({ id: item.id, module: "clients" })
+    else if (item.kind === "payment") setInvoice({ id: item.id.split("-")[0], module: "clients" })
+    else if (item.kind === "apInvoice") setInvoice({ id: item.id, module: "suppliers" })
+    else setSelected(item)
+  }
 
   const title =
     source === "pm" ? "Recent Changes" : group === "activity" ? "Project Activity" : "Billing & Payments"
@@ -452,7 +468,7 @@ export function RecentChangesWidget({
                   <tr
                     key={`${item.kind}-${item.id}`}
                     className="clickable-row"
-                    onClick={() => setSelected(item)}
+                    onClick={() => openItem(item)}
                   >
                     <td>
                       <div className="rcnt-item-cell">
@@ -482,13 +498,18 @@ export function RecentChangesWidget({
         byCategory={byCategory}
         initialFilter={viewAll}
         since={sinceLabel}
-        onSelect={setSelected}
+        onSelect={openItem}
       />
       <ItemDetailModal
         item={selected}
         showPm={showPm}
         onClose={() => setSelected(null)}
         onViewProject={(jobId) => goToJobcost(jobId, { backLabel: "Dashboard" })}
+      />
+      <InvoiceDetailModal
+        invoiceId={invoice?.id ?? null}
+        module={invoice?.module ?? "clients"}
+        onClose={() => setInvoice(null)}
       />
     </Widget>
   )

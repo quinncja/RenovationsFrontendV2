@@ -59,6 +59,8 @@ interface APInvoiceDetail {
   status: number
   vendorName: string
   description: string | null
+  jobNum: string | null
+  jobName: string | null
 }
 
 interface InvoiceLine {
@@ -280,6 +282,7 @@ function ClientInvoiceBody({ header: h }: { header: ClientInvoiceDetail }) {
 // ─── AP invoice body ──────────────────────────────────────────────────────────
 
 function APInvoiceBody({ header: h, lines }: { header: APInvoiceDetail; lines: InvoiceLine[] }) {
+  const { goToJobcost } = useJobcostNav()
   return (
     <div className="invoice-modal-sections">
       <AmountsStrip
@@ -288,6 +291,22 @@ function APInvoiceBody({ header: h, lines }: { header: APInvoiceDetail; lines: I
         remaining={h.amountRemaining}
         retainage={h.retainage}
       />
+
+      {h.jobNum && (
+        <section
+          className="invoice-modal-section invoice-modal-section-link"
+          onClick={() => goToJobcost(h.jobNum!)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Enter" && goToJobcost(h.jobNum!)}
+        >
+          <p className="invoice-modal-section-label">Job</p>
+          <div className="invoice-modal-info">
+            <InfoRow label="Job #"     value={h.jobNum} />
+            <InfoRow label="Job Name"  value={h.jobName} />
+          </div>
+        </section>
+      )}
 
       <section className="invoice-modal-section">
         <p className="invoice-modal-section-label">Details</p>

@@ -150,18 +150,20 @@ export function SectionNav({
         aria-label="Sections"
         initial={false}
         // The surface "appears from the background and lifts off the page": its
-        // fill, hairline ring and elevation shadow all fade up as it grows.
-        // Set via animate (not CSS) so Motion scale-corrects them mid-layout.
-        // Two shadow layers in both states (matching layer counts so Motion
-        // interpolates cleanly): a hairline ring + a soft elevation shadow.
+        // fill and elevation shadow fade up as it grows. Set via animate (not
+        // CSS) so Motion scale-corrects them mid-layout. Two shadow layers in
+        // both states (matching layer counts so Motion interpolates cleanly): a
+        // hairline ring + a soft elevation shadow.
         animate={{
           backgroundColor: expanded ? "var(--card-color)" : "rgba(0, 0, 0, 0)",
-          // Match the widgets' resting card shadow (--button-shadow: a soft,
-          // tight 0 1px 4px drop) plus a hairline ring standing in for their 1px
-          // border. Constant offset/blur so only the alpha + ring fade up.
+          // At REST the ring is already present but faint — a subtle hairline
+          // pill around the dot column that reads as "interactable" without a
+          // fill or elevation. On open it strengthens to the full ring and the
+          // soft elevation shadow (--button-shadow: a tight 0 1px 4px drop) fades
+          // up. Constant offset/blur so only the alpha deepens.
           boxShadow: expanded
             ? "0 0 0 1px rgba(128, 128, 128, 0.18), 0 1px 4px rgba(0, 0, 0, 0.16)"
-            : "0 0 0 0px rgba(128, 128, 128, 0), 0 1px 4px rgba(0, 0, 0, 0)",
+            : "0 0 0 1px rgba(128, 128, 128, 0.14), 0 1px 4px rgba(0, 0, 0, 0)",
         }}
         style={{ borderRadius: 12 }}
         transition={transition}
