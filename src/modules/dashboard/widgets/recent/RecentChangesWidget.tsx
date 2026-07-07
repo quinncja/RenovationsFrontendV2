@@ -208,7 +208,10 @@ function ItemDetailModal({
                     <h2 className="invoice-modal-title">{rowParts(shown).primary}</h2>
                   </div>
                   <p className="invoice-modal-subtitle">
-                    {[meta.full, shown.party].filter(Boolean).join(" · ")}
+                    {/* Costs have no party; the job is their context. */}
+                    {[meta.full, shown.party ?? (shown.kind === "cost" ? shown.jobName : null)]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 </div>
                 <button className="button modal-close" onClick={onClose}>
@@ -235,38 +238,9 @@ function ItemDetailModal({
                     </div>
                   </div>
 
-                  {shown.jobId && (
-                    <section
-                      className="invoice-modal-section invoice-modal-section-link"
-                      onClick={() => onViewProject(shown.jobId!)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => e.key === "Enter" && onViewProject(shown.jobId!)}
-                    >
-                      <p className="invoice-modal-section-label">Job</p>
-                      <div className="invoice-modal-info">
-                        <InfoRow label="Job #" value={shown.jobId} />
-                        <InfoRow label="Job Name" value={shown.jobName} />
-                      </div>
-                    </section>
-                  )}
-
-                  <section className="invoice-modal-section">
-                    <p className="invoice-modal-section-label">Details</p>
-                    <div className="invoice-modal-info">
-                      <InfoRow label="Type" value={meta.full} />
-                      {shown.kind === "cost" && (
-                        <InfoRow label="Posting" value={shown.title.replace(/\sposted$/, "")} />
-                      )}
-                      {showPm && <InfoRow label="Project Manager" value={shown.pmName} />}
-                      <InfoRow label="Entered By" value={shown.enteredBy} />
-                      <InfoRow
-                        label="Entered"
-                        value={`${formatDate(shown.occurredAt)} · ${formatRelativeTime(shown.occurredAt)}`}
-                      />
-                    </div>
-                  </section>
-
+                  {/* For a cost aggregate the lines ARE the item — they sit
+                      directly under the total, like the AP invoice modal's
+                      cost distribution. Job and Details follow. */}
                   {shown.kind === "cost" && (
                     <section className="invoice-modal-section">
                       <p className="invoice-modal-section-label">Lines</p>
@@ -302,6 +276,35 @@ function ItemDetailModal({
                       )}
                     </section>
                   )}
+
+                  {shown.jobId && (
+                    <section
+                      className="invoice-modal-section invoice-modal-section-link"
+                      onClick={() => onViewProject(shown.jobId!)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === "Enter" && onViewProject(shown.jobId!)}
+                    >
+                      <p className="invoice-modal-section-label">Job</p>
+                      <div className="invoice-modal-info">
+                        <InfoRow label="Job #" value={shown.jobId} />
+                        <InfoRow label="Job Name" value={shown.jobName} />
+                      </div>
+                    </section>
+                  )}
+
+                  <section className="invoice-modal-section">
+                    <p className="invoice-modal-section-label">Details</p>
+                    <div className="invoice-modal-info">
+                      <InfoRow label="Type" value={meta.full} />
+                      {showPm && <InfoRow label="Project Manager" value={shown.pmName} />}
+                      <InfoRow label="Entered By" value={shown.enteredBy} />
+                      <InfoRow
+                        label="Entered"
+                        value={`${formatDate(shown.occurredAt)} · ${formatRelativeTime(shown.occurredAt)}`}
+                      />
+                    </div>
+                  </section>
                 </div>
               </div>
             </motion.div>
