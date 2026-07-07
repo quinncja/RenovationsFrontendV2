@@ -2860,6 +2860,26 @@ body{
   border-collapse: collapse;
 }
 
+/* Full-bleed tables inside the invoice/item detail modal — counter the body's
+   1.5rem/1.75rem padding and re-inset the outer columns, mirroring the
+   .modal--wide .data-table pattern so modal tables span edge to edge
+   everywhere in the app. */
+.invoice-modal-body .spend-rank-table {
+  width: calc(100% + 3.5rem);
+  margin-left: -1.75rem;
+  margin-right: -1.75rem;
+}
+
+.invoice-modal-body .spend-rank-table th:first-child,
+.invoice-modal-body .spend-rank-table td:first-child {
+  padding-left: 1.75rem;
+}
+
+.invoice-modal-body .spend-rank-table th:last-child,
+.invoice-modal-body .spend-rank-table td:last-child {
+  padding-right: 1.75rem;
+}
+
 .spend-rank-table thead tr {
   border-bottom: 1px solid var(--border-color);
 }
