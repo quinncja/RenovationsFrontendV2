@@ -11,22 +11,27 @@ export interface SectionRegistryEntry {
 }
 
 export const SECTION_REGISTRY: Record<SectionId, SectionRegistryEntry> = {
+  recentChanges: { id: "recentChanges", title: "Recent Changes" },
   reports: { id: "reports", title: "Reports", columns: 3 },
   businessDevelopment: { id: "businessDevelopment", title: "Business Development" },
   businessPerformance: { id: "businessPerformance", title: "Business Performance" },
   financialTrends: { id: "financialTrends", title: "P&L Trends" },
   businessFinancials: { id: "businessFinancials", title: "Cash & Billing" },
   businessRelations: { id: "businessRelations", title: "Business Relations" },
+  estimationPerformance: { id: "estimationPerformance", title: "Budget Estimation & Performance" },
 }
 
 /** Default top-to-bottom order of sections on the home page. */
 export const SECTION_ORDER: SectionId[] = [
+  // Recent Changes leads — time-sensitive content loses its value below the fold.
+  "recentChanges",
   "reports",
   "businessDevelopment",
   "businessPerformance",
   "financialTrends",
   "businessFinancials",
   "businessRelations",
+  "estimationPerformance",
 ]
 
 /**
@@ -36,6 +41,12 @@ export const SECTION_ORDER: SectionId[] = [
  * Within a section, widget order below is the default render order.
  */
 export const WIDGET_HOME_SECTION: Record<WidgetId, SectionId> = {
+  // Recent Changes
+  recentProjects: "recentChanges",
+  recentCommitments: "recentChanges",
+  recentCosts: "recentChanges",
+  recentChangeOrders: "recentChanges",
+  recentBilling: "recentChanges",
   // Reports
   reconciliation: "reports",
   dataQuality: "reports",
@@ -63,6 +74,10 @@ export const WIDGET_HOME_SECTION: Record<WidgetId, SectionId> = {
   clientInsights: "businessRelations",
   subcontractorInsights: "businessRelations",
   vendorInsights: "businessRelations",
+  // Estimation Performance
+  estimationScorecard: "estimationPerformance",
+  estimationCategory: "estimationPerformance",
+  estimationWorstJobs: "estimationPerformance",
 }
 
 /**
@@ -72,6 +87,13 @@ export const WIDGET_HOME_SECTION: Record<WidgetId, SectionId> = {
  * by defaultLayout and as the "append missing widgets" order in reconcile.
  */
 export const WIDGET_DEFAULT_ORDER: WidgetId[] = [
+  // Recent Changes — four half-width category cards (2×2), then Billing &
+  // Payments full width on its own row.
+  "recentProjects",
+  "recentCommitments",
+  "recentCosts",
+  "recentChangeOrders",
+  "recentBilling",
   // Reports
   "reconciliation",
   "dataQuality",
@@ -100,4 +122,9 @@ export const WIDGET_DEFAULT_ORDER: WidgetId[] = [
   "clientInsights",
   "vendorInsights",
   "subcontractorInsights",
+  // Budget Estimation & Performance — scorecard (full), category breakdown
+  // (full), biggest-variance jobs table (full).
+  "estimationScorecard",
+  "estimationCategory",
+  "estimationWorstJobs",
 ]

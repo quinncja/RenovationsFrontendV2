@@ -6,7 +6,13 @@ import { WIDGET_REGISTRY } from "./widgetRegistry"
 // existing saved layouts; reconcileLayout runs the matching one-time migration.
 //   v3 — Business Financials reflow: Banking & Overdue full width, then Progress
 //        Billings + Upcoming Billings half width on the next row.
-export const LAYOUT_VERSION = 3
+//   v4 — New "Estimation Performance" section appended after Business Relations.
+//        No forced migration: reconcileLayout auto-appends the missing section
+//        (from SECTION_ORDER) and its widgets to any older saved layout.
+//   v5 — New "Recent Changes" section. Migration hoists it to the FRONT of
+//        saved section orders (auto-append would park time-sensitive content
+//        last for existing users).
+export const LAYOUT_VERSION = 5
 
 // Default sectioned home layout. Derived from the section registry so it
 // can never drift from WIDGET_HOME_SECTION / WIDGET_REGISTRY:

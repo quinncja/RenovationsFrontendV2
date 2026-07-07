@@ -65,12 +65,14 @@ function assembleSections(
   sectionOrder: SectionId[]
 ): SectionLayout[] {
   const bucket: Record<SectionId, WidgetLayoutItem[]> = {
+    recentChanges: [],
     reports: [],
     businessDevelopment: [],
     businessPerformance: [],
     financialTrends: [],
     businessFinancials: [],
     businessRelations: [],
+    estimationPerformance: [],
   }
   const seen = new Set<WidgetId>()
 
@@ -118,6 +120,16 @@ function migrateSections(sections: SectionLayout[], savedVersion: number): Secti
       sections = sections.map((s) =>
         s.id === "businessFinancials" ? { ...s, widgets: structuredClone(canonical.widgets) } : s
       )
+    }
+  }
+  // v5 — Recent Changes must lead the home page even for users with a saved
+  // section order (assembleSections appends unknown sections last, which would
+  // bury the new time-sensitive section below the fold).
+  if (savedVersion < 5) {
+    const idx = sections.findIndex((s) => s.id === "recentChanges")
+    if (idx > 0) {
+      const [recentChanges] = sections.splice(idx, 1)
+      sections = [recentChanges, ...sections]
     }
   }
   return sections

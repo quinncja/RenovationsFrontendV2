@@ -21,6 +21,7 @@ import { SortableHeader } from "../../shared/components/SortableHeader"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { useAuth } from "../../core/auth/AuthProvider"
 import { EmployeePeriodAndYearSummary } from "./widgets/EmployeePeriodAndYearSummary"
+import { PmRecentChangesSection } from "./widgets/recent/RecentChangesWidgets"
 
 // ───── Breakdown shape (page-level fetch) ────────────────────────────────
 // `breakdown.projects[]` comes from the backend's `getProjectGridData`
@@ -343,7 +344,20 @@ type ProjectsMode = "currentYear" | "allTime"
 // Exported so the manager home (`/dashboard` for role "manager") can render the
 // exact same per-employee view, scoped to their own supervisor id. Must be
 // wrapped in a PageDataProvider supplying PAGE_QUERIES.employeeDetail.
-export function EmployeeDetail({ employeeId, year, onYearChange }: { employeeId: number; year: number; onYearChange: (y: number) => void }) {
+export function EmployeeDetail({
+  employeeId,
+  year,
+  onYearChange,
+  showRecentChanges,
+}: {
+  employeeId: number
+  year: number
+  onYearChange: (y: number) => void
+  /** Manager home only — renders the token-scoped Recent Changes cards. The
+   *  admin /employees/:id route never sets this (its page fetch doesn't
+   *  include recentChangesPm). */
+  showRecentChanges?: boolean
+}) {
   const { goToJobcost } = useJobcostNav()
   const marginColorsOn = useMarginColorsEnabled()
   // On mobile match the WIP toggle's label rather than spelling out "Work
@@ -575,6 +589,12 @@ export function EmployeeDetail({ employeeId, year, onYearChange }: { employeeId:
             />
           </div>
         </MotionItem>
+
+        {showRecentChanges && (
+          <MotionItem className="col-span-full">
+            <PmRecentChangesSection />
+          </MotionItem>
+        )}
 
         <MotionItem className="col-span-full">
           <EmployeePeriodAndYearSummary monthly={monthly} yearly={yearly} loading={isLoading} />

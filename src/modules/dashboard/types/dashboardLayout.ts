@@ -39,14 +39,32 @@ export type WidgetId =
   // Net over/under billings (WIP) headline + ranked list of the most
   // under-billed active projects.
   | "progressBillings"
+  // ── Budget Estimation & Performance ────────────────────────────────────
+  // Budget-vs-actual estimation accuracy on completed jobs (revised/post-CO
+  // baseline). Headline accuracy/bias scorecard with year-over-year badges, the
+  // category breakdown (Production = Labor+Sub, Material, MISC), and the
+  // biggest-variance jobs table.
+  | "estimationScorecard"
+  | "estimationCategory"
+  | "estimationWorstJobs"
+  // ── Recent Changes ──────────────────────────────────────────────────────
+  // "Since last business day" activity feed, one card per category. Backed by
+  // the recentChangesAdmin query (company-wide, with PM attribution).
+  | "recentProjects"
+  | "recentCommitments"
+  | "recentCosts"
+  | "recentChangeOrders"
+  | "recentBilling"
 
 export type SectionId =
+  | "recentChanges"
   | "reports"
   | "businessDevelopment"
   | "businessPerformance"
   | "financialTrends"
   | "businessFinancials"
   | "businessRelations"
+  | "estimationPerformance"
 
 export interface WidgetLayoutItem {
   id: WidgetId

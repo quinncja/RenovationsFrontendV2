@@ -71,6 +71,57 @@ export function formatNumber(value: number): string {
   return new Intl.NumberFormat("en-US").format(value)
 }
 
+// Parse a backend datetime into a Date treated as LOCAL wall-clock time.
+// Sage timestamps come back as naive server-local (Central) datetimes that
+// mssql serializes with a Z/offset; stripping the zone and reading the parts
+// as local keeps "3h ago" labels sane for users in the company's timezone.
+function parseWallClock(raw: unknown): Date | null {
+  if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw
+  if (typeof raw !== "string") return null
+  const m = raw.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?/)
+  if (m) {
+    return new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] ?? 0))
+  }
+  const dateOnly = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (dateOnly) return new Date(+dateOnly[1], +dateOnly[2] - 1, +dateOnly[3])
+  const d = new Date(raw)
+  return isNaN(d.getTime()) ? null : d
+}
+
+// Coarse relative label for activity feeds: "just now", "35m ago", "3h ago",
+// "Yesterday", a weekday name inside the last week, then falls back to
+// formatDate. Timestamps are wall-clock (see parseWallClock) so precision is
+// deliberately coarse.
+export function formatRelativeTime(raw: unknown): string {
+  const d = parseWallClock(raw)
+  if (!d) return formatDate(raw)
+  const now = new Date()
+  const diffMs = now.getTime() - d.getTime()
+  if (diffMs < 60_000) return "just now"
+  if (diffMs < 3_600_000) return `${Math.floor(diffMs / 60_000)}m ago`
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  if (d >= startOfToday) return `${Math.floor(diffMs / 3_600_000)}h ago`
+  const startOfYesterday = new Date(startOfToday)
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1)
+  if (d >= startOfYesterday) return "Yesterday"
+  const weekAgo = new Date(startOfToday)
+  weekAgo.setDate(weekAgo.getDate() - 6)
+  if (d >= weekAgo) return d.toLocaleDateString("en-US", { weekday: "long" })
+  return formatDate(raw)
+}
+
+// Label for a "since …" window cutoff: "yesterday" when the cutoff is the
+// previous calendar day, else the cutoff's weekday name ("Friday" on a
+// Monday). Used by the Recent Changes cards' subtitle and empty state.
+export function sinceLabel(cutoffIso: string): string {
+  const d = parseWallClock(cutoffIso)
+  if (!d) return "yesterday"
+  const now = new Date()
+  const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1)
+  if (d >= startOfYesterday) return "yesterday"
+  return d.toLocaleDateString("en-US", { weekday: "long" })
+}
+
 // Color for a margin percentage (0–100 scale): green at/above 20%, red below.
 export function marginTextColor(pct: number): string {
   if (pct >= 20) return "#22c55e" // green

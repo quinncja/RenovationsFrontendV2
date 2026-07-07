@@ -31,6 +31,16 @@ import {
 import { BankingOverdueWidget } from "../widgets/banking/BankingOverdueWidget"
 import { UpcomingBillingsWidget } from "../widgets/billings/UpcomingBillingsWidget"
 import { ProgressBillingsWidget } from "../widgets/ProgressBillingsWidget"
+import {
+  RecentProjectsWidget,
+  RecentCommitmentsWidget,
+  RecentCostsWidget,
+  RecentChangeOrdersWidget,
+  RecentBillingWidget,
+} from "../widgets/recent/RecentChangesWidgets"
+import { EstimationScorecardWidget } from "../widgets/estimation/EstimationScorecardWidget"
+import { EstimationCategoryWidget } from "../widgets/estimation/EstimationCategoryWidget"
+import { EstimationWorstJobsWidget } from "../widgets/estimation/EstimationWorstJobsWidget"
 
 // Drives the placeholder illustration shown in edit mode. The last three are
 // bespoke shapes for the Business Financials widgets so their edit-mode
@@ -56,6 +66,42 @@ export interface WidgetRegistryEntry {
 }
 
 export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
+  // ── Recent Changes ───────────────────────────────────────────────────
+  recentProjects: {
+    id: "recentProjects",
+    component: RecentProjectsWidget,
+    label: "New Projects",
+    visualType: "table",
+    defaultColSpan: 1,
+  },
+  recentCommitments: {
+    id: "recentCommitments",
+    component: RecentCommitmentsWidget,
+    label: "New POs & Subcontracts",
+    visualType: "table",
+    defaultColSpan: 1,
+  },
+  recentCosts: {
+    id: "recentCosts",
+    component: RecentCostsWidget,
+    label: "Costs & Vendor Invoices",
+    visualType: "table",
+    defaultColSpan: 1,
+  },
+  recentChangeOrders: {
+    id: "recentChangeOrders",
+    component: RecentChangeOrdersWidget,
+    label: "Change Orders",
+    visualType: "table",
+    defaultColSpan: 1,
+  },
+  recentBilling: {
+    id: "recentBilling",
+    component: RecentBillingWidget,
+    label: "Billing & Payments",
+    visualType: "table",
+    defaultColSpan: 2,
+  },
   // ── Reports ──────────────────────────────────────────────────────────
   reconciliation: {
     id: "reconciliation",
@@ -211,5 +257,27 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
     label: "Top Material Suppliers by Spend",
     visualType: "pie",
     defaultColSpan: 1,
+  },
+  // ── Estimation Performance ───────────────────────────────────────────
+  estimationScorecard: {
+    id: "estimationScorecard",
+    component: EstimationScorecardWidget,
+    label: "Estimation Scorecard",
+    visualType: "stat",
+    defaultColSpan: 2,
+  },
+  estimationCategory: {
+    id: "estimationCategory",
+    component: EstimationCategoryWidget,
+    label: "Bias by Category",
+    visualType: "bar",
+    defaultColSpan: 2,
+  },
+  estimationWorstJobs: {
+    id: "estimationWorstJobs",
+    component: EstimationWorstJobsWidget,
+    label: "Biggest Budget Variance",
+    visualType: "table",
+    defaultColSpan: 2,
   },
 }

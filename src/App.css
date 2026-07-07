@@ -10485,6 +10485,115 @@ svg.placeholder-illustration {
 }
 
 
+/* ─── Recent Changes cards ──────────────────────────────────────────────────
+   "Since last business day" activity feed — compact rows: neutral kind pill,
+   title/party over a muted job sub-line, amount + relative time on the right.
+   Neutral surfaces throughout; copper stays reserved for active states. */
+
+.rcnt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rcnt-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0.35rem;
+  border-radius: 8px;
+}
+
+.rcnt-row + .rcnt-row {
+  border-top: 1px solid var(--border-color);
+}
+
+.rcnt-row-clickable {
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.rcnt-row-clickable:hover {
+  background-color: color-mix(in srgb, var(--primary-color) 7%, transparent);
+}
+
+.rcnt-pill {
+  flex: none;
+  display: inline-flex;
+  justify-content: center;
+  min-width: 3.4rem;
+  padding: 0.13rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  font-size: 0.68rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--secondary-text);
+}
+
+.rcnt-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.rcnt-title {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--primary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rcnt-party {
+  font-weight: 400;
+  color: var(--secondary-text);
+}
+
+.rcnt-sub {
+  font-size: 0.72rem;
+  color: var(--secondary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rcnt-right {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.05rem;
+}
+
+.rcnt-amount {
+  font-size: 0.82rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+
+.rcnt-when {
+  font-size: 0.7rem;
+  color: var(--secondary-text);
+  white-space: nowrap;
+}
+
+.rcnt-more {
+  padding: 0.45rem 0.35rem 0.1rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.72rem;
+  color: var(--secondary-text);
+  text-align: center;
+}
+
+
 /* ─── Idle refresh overlay ───────────────────────────────────────────────────
    Shown after a long idle so the user never acts on stale data. Covers the app
    entirely; a refresh is the only way forward (and rotates the analytics

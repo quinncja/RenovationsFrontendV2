@@ -25,19 +25,24 @@ export default function Dashboard() {
   const isAdmin = effRole === "executive" || effRole === "admin"
   const [year, setYear] = useLocalStorage("dashboardYear", new Date().getFullYear())
 
-  // A manager's home is the exact per-employee view admins see at
-  // /employees/:id, scoped to their own supervisor id. The backend auto-scopes
-  // managers from the verified token (client detailId is ignored for them), so
-  // this always shows their own numbers.
+  // A manager's home is the per-employee view admins see at /employees/:id,
+  // scoped to their own supervisor id (the breakdown queries still honor the
+  // client-sent detailId), plus their Recent Changes feed — which the backend
+  // scopes from the verified token's employeeId claim, ignoring client params.
   if (!isAdmin) {
     const employeeId = Number(claims["employeeId"])
     return (
       <PageDataProvider
         module="dashboard"
-        queries={PAGE_QUERIES.employeeDetail}
+        queries={PAGE_QUERIES.managerHome}
         params={{ detailId: employeeId, year }}
       >
-        <EmployeeDetail employeeId={employeeId} year={year} onYearChange={setYear} />
+        <EmployeeDetail
+          employeeId={employeeId}
+          year={year}
+          onYearChange={setYear}
+          showRecentChanges
+        />
       </PageDataProvider>
     )
   }
