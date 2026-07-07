@@ -3,7 +3,10 @@ import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, ChevronRight } from "lucide-react"
 import { Widget } from "../../../../shared/components/Widget/Widget"
-import { InvoiceDetailModal } from "../../../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
+import {
+  InvoiceDetailModal,
+  InfoRow,
+} from "../../../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { useJobcostNav } from "../../../jobcost/useJobcostNav"
 import { useModalLayer } from "../../../../shared/hooks/useModalLayer"
 import { formatDate, formatMoneyFull, formatRelativeTime } from "../../../../shared/utils/format"
@@ -14,18 +17,17 @@ const TOP_N = 6
 
 // ─── Kind presentation ──────────────────────────────────────────────────────
 
-const KIND_LABEL: Record<
-  RecentKind,
-  { pill: string; full: string; partyLabel?: string }
-> = {
-  project: { pill: "New Job", full: "New project", partyLabel: "Client" },
-  purchaseOrder: { pill: "PO", full: "Purchase order", partyLabel: "Vendor" },
-  subcontract: { pill: "Sub", full: "Subcontract", partyLabel: "Vendor" },
+// AR/AP naming matches the rest of the dashboard (aging, overdue, cash
+// widgets) — "Billing"/"Invoice" alone didn't say which side of the ledger.
+const KIND_LABEL: Record<RecentKind, { pill: string; full: string }> = {
+  project: { pill: "New Job", full: "New project" },
+  purchaseOrder: { pill: "PO", full: "Purchase order" },
+  subcontract: { pill: "Sub", full: "Subcontract" },
   cost: { pill: "Cost", full: "Posted cost" },
-  apInvoice: { pill: "Invoice", full: "Vendor invoice", partyLabel: "Vendor" },
+  apInvoice: { pill: "AP", full: "AP invoice" },
   changeOrder: { pill: "CO", full: "Change order" },
-  arInvoice: { pill: "Billing", full: "Client billing", partyLabel: "Client" },
-  payment: { pill: "Payment", full: "Payment received", partyLabel: "Client" },
+  arInvoice: { pill: "AR", full: "AR invoice" },
+  payment: { pill: "Payment", full: "Payment received" },
 }
 
 /** The item is the story; the project is supporting context. Primary text is
@@ -104,8 +106,11 @@ function tileSub(key: CategoryKey, items: RecentChangeItem[]): string {
 }
 
 // ─── Item detail modal ───────────────────────────────────────────────────────
-// The deeper look at one change: every field the feed knows about, plus the
-// jump into the project's Job Costing page.
+// The deeper look at one non-invoice change (project, PO, subcontract, cost
+// posting). Built from the invoice modal's structure and classes — header,
+// amounts strip, clickable Job section, info rows — so every detail modal in
+// the app reads as the same surface. Invoice-shaped items don't come here;
+// they open the real InvoiceDetailModal.
 
 function ItemDetailModal({
   item,
@@ -125,23 +130,9 @@ function ItemDetailModal({
   if (item !== null && item !== shown) setShown(item)
   const meta = shown ? KIND_LABEL[shown.kind] : null
 
-  const fields: Array<[string, string]> = []
-  if (shown && meta) {
-    fields.push(["Type", meta.full])
-    fields.push(["Amount", shown.amount ? formatMoneyFull(shown.amount) : "—"])
-    if (shown.party && meta.partyLabel) fields.push([meta.partyLabel, shown.party])
-    if (shown.jobName) fields.push(["Project", shown.jobName])
-    if (showPm && shown.pmName) fields.push(["Project manager", shown.pmName])
-    if (shown.enteredBy) fields.push(["Entered by", shown.enteredBy])
-    fields.push([
-      "Entered",
-      `${formatDate(shown.occurredAt)} · ${formatRelativeTime(shown.occurredAt)}`,
-    ])
-  }
-
   return createPortal(
     <AnimatePresence>
-      {open && shown && (
+      {open && shown && meta && (
         <>
           <motion.div
             className="modal-overlay"
@@ -153,7 +144,7 @@ function ItemDetailModal({
           />
           <div className="modal-positioner" style={{ zIndex: contentZ }}>
             <motion.div
-              className="modal rcnt-detail-modal"
+              className="modal invoice-modal"
               role="dialog"
               aria-modal="true"
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
@@ -161,33 +152,72 @@ function ItemDetailModal({
               exit={{ opacity: 0, scale: 0.96, y: 16 }}
               transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
             >
-              <div className="modal-header">
-                <div className="rcnt-detail-heading">
-                  <span className="rcnt-pill">{KIND_LABEL[shown.kind].pill}</span>
-                  <h2 className="title2 emphasized">{rowParts(shown).primary}</h2>
+              <div className="invoice-modal-header">
+                <div className="invoice-modal-header-left">
+                  <div className="invoice-modal-title-row">
+                    <h2 className="invoice-modal-title">{rowParts(shown).primary}</h2>
+                  </div>
+                  <p className="invoice-modal-subtitle">
+                    {[meta.full, shown.party].filter(Boolean).join(" · ")}
+                  </p>
                 </div>
                 <button className="button modal-close" onClick={onClose}>
                   <X size={16} />
                 </button>
               </div>
-              <dl className="rcnt-detail-grid">
-                {fields.map(([label, value]) => (
-                  <div key={label} className="rcnt-detail-field">
-                    <dt>{label}</dt>
-                    <dd>{value}</dd>
+              <div className="invoice-modal-body">
+                <div className="invoice-modal-sections">
+                  <div className="invoice-amounts-strip" style={{ gridTemplateColumns: "1fr" }}>
+                    <div className="invoice-amount-cell">
+                      <span className="invoice-amount-label">
+                        {/* Committed vs posted matters in job costing — a PO or
+                            subcontract is a commitment; a jobcst entry is money
+                            already posted against the job. */}
+                        {shown.kind === "project"
+                          ? "Contract"
+                          : shown.kind === "cost"
+                            ? "Amount Posted"
+                            : "Amount Committed"}
+                      </span>
+                      <span className="invoice-amount-value">
+                        {shown.amount ? formatMoneyFull(shown.amount) : "—"}
+                      </span>
+                    </div>
                   </div>
-                ))}
-              </dl>
-              {shown.jobId && (
-                <div className="rcnt-detail-footer">
-                  <button
-                    className="rcnt-btn-primary"
-                    onClick={() => onViewProject(shown.jobId!)}
-                  >
-                    View project
-                  </button>
+
+                  {shown.jobId && (
+                    <section
+                      className="invoice-modal-section invoice-modal-section-link"
+                      onClick={() => onViewProject(shown.jobId!)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === "Enter" && onViewProject(shown.jobId!)}
+                    >
+                      <p className="invoice-modal-section-label">Job</p>
+                      <div className="invoice-modal-info">
+                        <InfoRow label="Job #" value={shown.jobId} />
+                        <InfoRow label="Job Name" value={shown.jobName} />
+                      </div>
+                    </section>
+                  )}
+
+                  <section className="invoice-modal-section">
+                    <p className="invoice-modal-section-label">Details</p>
+                    <div className="invoice-modal-info">
+                      <InfoRow label="Type" value={meta.full} />
+                      {shown.kind === "cost" && (
+                        <InfoRow label="Posting" value={shown.title.replace(/\sposted$/, "")} />
+                      )}
+                      {showPm && <InfoRow label="Project Manager" value={shown.pmName} />}
+                      <InfoRow label="Entered By" value={shown.enteredBy} />
+                      <InfoRow
+                        label="Entered"
+                        value={`${formatDate(shown.occurredAt)} · ${formatRelativeTime(shown.occurredAt)}`}
+                      />
+                    </div>
+                  </section>
                 </div>
-              )}
+              </div>
             </motion.div>
           </div>
         </>

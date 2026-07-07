@@ -83,7 +83,7 @@ interface InvoiceDetailModalProps {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function InfoRow({ label, value }: { label: string; value: string | number | null | undefined }) {
+export function InfoRow({ label, value }: { label: string; value: string | number | null | undefined }) {
   if (value === null || value === undefined || value === "" || value === "—") return null
   return (
     <div className="invoice-modal-row">
