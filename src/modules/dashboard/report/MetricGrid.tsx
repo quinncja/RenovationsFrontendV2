@@ -21,8 +21,13 @@ export function MetricGrid({
     tiles: metrics.filter((m) => m.section === s.key),
   })).filter((s) => s.tiles.length > 0)
 
+  // A four-tile section (PM Job Activity) needs a wider column cap than the
+  // three-up default so its tiles keep the three-up per-tile width instead of
+  // being squeezed — same intent as the recap modal's --wide variant.
+  const wide = sections.some((s) => s.tiles.length >= 4)
+
   return (
-    <div className="rpt-sections">
+    <div className={`rpt-sections${wide ? " rpt-sections--wide" : ""}`}>
       {sections.map((section) => (
         <div key={section.key} className="rpt-section">
           {/* Section titles only earn their place when there's more than one
@@ -55,8 +60,12 @@ export function MetricGridSkeleton({ pmScoped = false }: { pmScoped?: boolean })
     tiles: metrics.filter((m) => m.section === s.key),
   })).filter((s) => s.tiles.length > 0)
 
+  // Match MetricGrid: a four-tile section widens the column so the skeleton
+  // doesn't reflow when the real four-up grid lands.
+  const wide = sections.some((s) => s.tiles.length >= 4)
+
   return (
-    <div className="rpt-sections" aria-hidden="true">
+    <div className={`rpt-sections${wide ? " rpt-sections--wide" : ""}`} aria-hidden="true">
       {sections.map((section) => (
         <div key={section.key} className="rpt-section">
           {sections.length > 1 && <span className="rpt-section-title">{section.title}</span>}

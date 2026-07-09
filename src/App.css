@@ -11675,6 +11675,14 @@ svg.placeholder-illustration {
   max-width: 640px;
 }
 
+/* PM Job Activity is a single four-tile section. The 640px cap above is sized
+   for the three-up grid, so four tiles would squeeze to a smaller per-tile
+   width. Widen to the recap modal's --wide content (844px) so the four tiles
+   render at the SAME per-tile size as the three-up admin grid. */
+.rpt-sections--wide {
+  max-width: 844px;
+}
+
 /* On a wide page the two logs sit side by side — each keeping its 3-up row of
    tiles — split by a divider. Each section still caps at the 640px modal width so
    the tiles stay modal-sized. The recap modal is narrow, so it's reset back to
@@ -11690,6 +11698,11 @@ svg.placeholder-illustration {
     flex: 1 1 0;
     min-width: 0;
     max-width: 640px;
+  }
+  /* PM's single four-tile section keeps the four-up width (844px) rather than
+     the three-up 640px cap, so its tiles don't shrink on the wide Activity page. */
+  .rpt-sections--wide .rpt-section {
+    max-width: 844px;
   }
   .rpt-section + .rpt-section {
     border-left: 1px solid var(--border-color);
