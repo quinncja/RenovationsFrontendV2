@@ -11,27 +11,26 @@ export interface SectionRegistryEntry {
 }
 
 export const SECTION_REGISTRY: Record<SectionId, SectionRegistryEntry> = {
-  recentChanges: { id: "recentChanges", title: "Recent Changes" },
   reports: { id: "reports", title: "Reports", columns: 3 },
   businessDevelopment: { id: "businessDevelopment", title: "Business Development" },
   businessPerformance: { id: "businessPerformance", title: "Business Performance" },
   financialTrends: { id: "financialTrends", title: "P&L Trends" },
   businessFinancials: { id: "businessFinancials", title: "Cash & Billing" },
   businessRelations: { id: "businessRelations", title: "Business Relations" },
-  estimationPerformance: { id: "estimationPerformance", title: "Budget Estimation & Performance" },
+  estimationPerformance: { id: "estimationPerformance", title: "Budget Performance" },
 }
 
 /** Default top-to-bottom order of sections on the home page. */
 export const SECTION_ORDER: SectionId[] = [
-  // Recent Changes leads — time-sensitive content loses its value below the fold.
-  "recentChanges",
   "reports",
   "businessDevelopment",
   "businessPerformance",
   "financialTrends",
   "businessFinancials",
   "businessRelations",
-  "estimationPerformance",
+  // "estimationPerformance" — Budget Performance is not yet ready for prod, so
+  // it's omitted from the section order (hidden from the dashboard). The widget
+  // code and registry entries stay dormant; re-add this line to ship it.
 ]
 
 /**
@@ -41,9 +40,6 @@ export const SECTION_ORDER: SectionId[] = [
  * Within a section, widget order below is the default render order.
  */
 export const WIDGET_HOME_SECTION: Record<WidgetId, SectionId> = {
-  // Recent Changes
-  recentActivity: "recentChanges",
-  recentBilling: "recentChanges",
   // Reports
   reconciliation: "reports",
   dataQuality: "reports",
@@ -84,9 +80,6 @@ export const WIDGET_HOME_SECTION: Record<WidgetId, SectionId> = {
  * by defaultLayout and as the "append missing widgets" order in reconcile.
  */
 export const WIDGET_DEFAULT_ORDER: WidgetId[] = [
-  // Recent Changes — Project Activity and Billing & Payments side by side.
-  "recentActivity",
-  "recentBilling",
   // Reports
   "reconciliation",
   "dataQuality",

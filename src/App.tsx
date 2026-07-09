@@ -10,6 +10,7 @@ import useIsMobile from "./shared/hooks/useIsMobile"
 import { useAuth } from "./core/auth/AuthProvider"
 import AnalyticsTracker from "./shared/analytics/AnalyticsTracker"
 import IdleRefreshOverlay from "./core/components/IdleRefreshOverlay"
+import { DailyReportProvider } from "./modules/dashboard/report/DailyReportContext"
 import "./App.css"
 
 export default function App() {
@@ -43,12 +44,20 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <AnalyticsTracker />
-      <IdleRefreshOverlay />
-      {!isMobile && <Navbar />}
-      <Outlet />
-      {isMobile && <MobileNav />}
-    </div>
+    // DailyReportProvider hosts the once-a-day greeting: when its gate passes
+    // it withholds everything below (Navbar, trackers, the routed page) and
+    // renders the full-screen DailyArrival instead, so the report query wins
+    // the wire while the entry pages preload behind it — the app mounts when
+    // the user picks a destination (analytics page-view fires on reveal). It
+    // also serves the header clock button's manual re-opens (compact modal).
+    <DailyReportProvider>
+      <div className="app">
+        <AnalyticsTracker />
+        <IdleRefreshOverlay />
+        {!isMobile && <Navbar />}
+        <Outlet />
+        {isMobile && <MobileNav />}
+      </div>
+    </DailyReportProvider>
   )
 }

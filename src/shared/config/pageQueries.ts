@@ -27,7 +27,6 @@ export const PAGE_QUERIES = {
     "progressBillings",
     "estimationPerformance",
     "estimationPerformancePrevYear",
-    "recentChangesAdmin",
   ],
 
   // Dashboard "View" breakdown pages — each pulls its corresponding
@@ -48,11 +47,11 @@ export const PAGE_QUERIES = {
   // from the breakdown's monthly[] rows, not from openMonthFinances itself.
   employeeDetail: ["employeePerformanceBreakdown", "openMonthFinances"],
 
-  // A manager's home (/dashboard) — the employee-detail view plus their
-  // Recent Changes feed. recentChangesPm is scoped server-side from the
-  // token's employeeId claim, so the admin /employees/:id page (which uses
-  // `employeeDetail` above) never fetches it.
-  managerHome: ["employeePerformanceBreakdown", "openMonthFinances", "recentChangesPm"],
+  // A manager's home (/dashboard) — the employee-detail view scoped to their
+  // own supervisor id. Their activity feed now lives in the daily report
+  // modal / the Reports page (dailyReportPm / activityReportPm, fetched
+  // outside the page provider).
+  managerHome: ["employeePerformanceBreakdown", "openMonthFinances"],
 
   // Dashboard drill-down queries
   open: {

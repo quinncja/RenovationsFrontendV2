@@ -5,6 +5,7 @@ import { buildTemplateLayout, type LayoutTemplate } from "../config/layoutTempla
 import { reconcileLayout } from "../config/reconcileLayout"
 import { fetchDashboardLayout, saveDashboardLayout } from "../../../shared/api/layoutApi"
 import { useAuth } from "../../../core/auth/AuthProvider"
+import { stampOnboardedAt } from "../report/DailyReportContext"
 
 interface DashboardLayoutContextValue {
   layout: DashboardLayout
@@ -249,6 +250,8 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
       setHasChosenLayout(true)
       if (userId) {
         saveToLocalStorage(userId, next)
+        // Onboarding just completed — the daily report first greets tomorrow.
+        stampOnboardedAt(userId)
         void saveDashboardLayout(next).catch(() => {
           // Save failed — layout is still applied locally for this session.
         })

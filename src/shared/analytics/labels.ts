@@ -35,7 +35,7 @@ const SECTION_LABELS: Record<string, string> = {
   financialTrends: "P&L Trends",
   businessFinancials: "Cash & Billing",
   businessRelations: "Business Relations",
-  estimationPerformance: "Budget Estimation & Performance",
+  estimationPerformance: "Budget Performance",
 }
 
 // Route → friendly page name. Dynamic detail routes collapse to their section.
@@ -46,6 +46,7 @@ const PAGE_LABELS: Array<[string, string]> = [
   ["/dashboard", "Dashboard"],
   ["/company", "Company Summary"],
   ["/jobcost", "Job Costing"],
+  ["/reports", "Activity"],
   ["/change-orders", "Change Orders"],
   ["/invoices", "Invoices"],
   ["/upcoming-billings", "Upcoming Billings"],

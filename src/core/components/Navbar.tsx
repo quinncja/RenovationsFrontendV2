@@ -6,6 +6,8 @@ import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import useNavItems from "../auth/hooks/useNavItems"
 import { isNavGroup, isNavDivider, type NavGroup } from "../auth/roles"
 import { SettingsModal } from "../../shared/components/SettingsModal/SettingsModal"
+import { useDailyReport } from "../../modules/dashboard/report/DailyReportContext"
+import { NavReportsHint } from "../../modules/dashboard/report/NavReportsHint"
 import Logo from "./Logo"
 import LogoText from "./LogoText"
 
@@ -53,6 +55,8 @@ function Navbar() {
   const navItems = useNavItems()
   const [tooltip, setTooltip] = useState<TooltipState>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Intro coachmark for the Reports nav item (step 2; see DailyReportContext).
+  const { introStep } = useDailyReport()
 
   // Flyout panel for nav groups: hover/click a group → its children float out to
   // the right, anchored to the group row. Works the same open or collapsed.
@@ -136,7 +140,8 @@ function Navbar() {
             ) : (
               <button
                 key={item.path}
-                className={`button nav-button${location.pathname === item.path || location.pathname.startsWith(`${item.path}/`) ? " nav-button-active" : ""}`}
+                data-nav={item.path}
+                className={`button nav-button${location.pathname === item.path || location.pathname.startsWith(`${item.path}/`) ? " nav-button-active" : ""}${introStep === 2 && item.path === "/reports" ? " nav-button-attention" : ""}`}
                 onClick={() => {
                   // Home button → reset the section pager to the top; other routes navigate as-is.
                   navigate(item.path, item.path === "/dashboard" ? { state: { resetHome: true } } : {})
@@ -203,6 +208,8 @@ function Navbar() {
         </div>,
         document.body
       )}
+
+      <NavReportsHint />
 
       <SettingsModal
         open={settingsOpen}

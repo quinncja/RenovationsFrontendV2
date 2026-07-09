@@ -75,12 +75,31 @@ export function SectionNav({
   const cardRef = useRef<HTMLDivElement>(null)
   const [restSize, setRestSize] = useState<{ w: number; h: number } | null>(null)
   const [openSize, setOpenSize] = useState<{ w: number; h: number } | null>(null)
+  // The row count the cached openSize belongs to. The open box is measured just
+  // ONCE per count (see below), so we remember which count that reading was for.
+  const openSizeFor = useRef<number | null>(null)
   useLayoutEffect(() => {
     const el = cardRef.current
     if (!el) return
     if (expanded) {
-      // Open: labels mounted → the box is at its full open size. Cache it.
-      setOpenSize({ w: el.offsetWidth, h: el.offsetHeight })
+      // Cache the open box ONCE per section count — and only from a CLEAN open.
+      // Re-measuring on every open was the bug: a reopen that interrupts a still-
+      // running close reuses the label elements, which still carry the exit's
+      // partially-collapsed inline `width` (framer only restores it ~300ms later).
+      // Measuring then cached a too-narrow (~85%) box, so the surface stalled short
+      // and then lurched out to full once the width came back — a visible two-step.
+      // (Hovering onto the dots reproduces it: the card's layout box jumps to full
+      // size on open, the vertically-centered container recenters and briefly slips
+      // out from under the pointer, and that mouseleave→reopen is the interrupt.)
+      // The first open from full rest is always clean (labels freshly mounted at
+      // their CSS width), so cache THAT and never let a later interrupted open
+      // overwrite it. The open WIDTH is data-independent (fixed-width labels + the
+      // card's min-width); only the HEIGHT scales with the count — so re-measure
+      // solely when the count changes.
+      if (openSizeFor.current !== sections.length) {
+        openSizeFor.current = sections.length
+        setOpenSize({ w: el.offsetWidth, h: el.offsetHeight })
+      }
     } else if (!el.querySelector(".section-nav-label")) {
       // Rest: measure ONLY when the label DOM is truly gone. On close the
       // `labels` STATE flips false immediately but AnimatePresence keeps the
@@ -199,7 +218,10 @@ export function SectionNav({
               // here — the box sizes via real width/height, never a transform
               // scale, so there's no distortion to trigger.
               borderRadius: expanded ? 12 : 22,
-              backgroundColor: expanded ? "var(--card-color)" : "rgba(0, 0, 0, 0)",
+              // Fill fades white (open menu) → app background (rest), so the
+              // resting pill reads as a filled capsule sitting on the page rather
+              // than a see-through outline.
+              backgroundColor: expanded ? "var(--card-color)" : "var(--background-color)",
               boxShadow: expanded
                 ? "0 1px 4px rgba(0, 0, 0, 0.16)"
                 : "0 1px 4px rgba(0, 0, 0, 0)",

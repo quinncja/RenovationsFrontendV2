@@ -19,6 +19,7 @@ import {
   Landmark,
   CalendarClock,
   Receipt,
+  Clock,
 } from "lucide-react"
 
 export interface NavItem {
@@ -54,6 +55,9 @@ const navItems = {
   home: { label: "Home", path: "/dashboard", icon: Home },
   businessSummary: { label: "Company", path: "/company", icon: Building2 },
   jobcost: { label: "Job Costing", path: "/jobcost", icon: JobcostIcon as unknown as LucideIcon },
+  // "Reports" the page (daily/weekly/monthly activity reports) — distinct from
+  // the dashboard's `reports` home section (reconciliation/data quality).
+  dailyReports: { label: "Activity", path: "/reports", icon: Clock },
   changeOrders: { label: "Change Orders", path: "/change-orders", icon: ChangeOrderIcon as unknown as LucideIcon },
   invoices: { label: "Invoices", path: "/invoices", icon: FileText },
   upcomingBillings: { label: "Upcoming Billings", path: "/upcoming-billings", icon: CalendarClock },
@@ -91,6 +95,7 @@ const chartsGroup: NavGroup = {
 const executiveNav: NavEntry[] = [
   navItems.home,
   navItems.jobcost,
+  navItems.dailyReports,
   NAV_DIVIDER,
   navItems.changeOrders,
   financesGroup,
@@ -121,6 +126,7 @@ export const roles = {
     nav: [
       navItems.home,
       navItems.jobcost,
+      navItems.dailyReports,
       NAV_DIVIDER,
       navItems.changeOrders,
       financesGroup,
@@ -136,6 +142,7 @@ export const roles = {
       navItems.home,
       navItems.businessSummary,
       navItems.jobcost,
+      navItems.dailyReports,
     ] as NavEntry[],
   },
 }

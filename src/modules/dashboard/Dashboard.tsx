@@ -2,16 +2,14 @@ import { useState } from "react"
 import Page from "../../shared/components/Page"
 import { PageDataProvider } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
-import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { useAuth } from "../../core/auth/AuthProvider"
 import { effectiveRole, type AppRole } from "../../core/auth/roles"
 import { DashboardLayoutProvider, useDashboardLayout } from "./context/DashboardLayoutContext"
 import { SectionPager } from "./components/SectionPager"
 import { SectionEditor } from "./components/SectionEditor"
-import { EditModeToggle } from "./components/EditModeToggle"
-import { OverUnderToggle } from "./components/OverUnderToggle"
 import { EditModeToolbar } from "./components/EditModeToolbar"
+import { DashboardHeaderActions } from "./components/DashboardHeaderActions"
 import { WelcomeWalkthrough, GearHintPopover } from "./components/WelcomeWalkthrough"
 import { EmployeeDetail } from "./EmployeeDetailPage"
 
@@ -27,8 +25,8 @@ export default function Dashboard() {
 
   // A manager's home is the per-employee view admins see at /employees/:id,
   // scoped to their own supervisor id (the breakdown queries still honor the
-  // client-sent detailId), plus their Recent Changes feed — which the backend
-  // scopes from the verified token's employeeId claim, ignoring client params.
+  // client-sent detailId). Their activity feed lives in the daily report
+  // modal / Reports page, scoped server-side from the token's employeeId.
   if (!isAdmin) {
     const employeeId = Number(claims["employeeId"])
     return (
@@ -41,7 +39,7 @@ export default function Dashboard() {
           employeeId={employeeId}
           year={year}
           onYearChange={setYear}
-          showRecentChanges
+          isManagerHome
         />
       </PageDataProvider>
     )
@@ -89,11 +87,12 @@ function AdminDashboard({ year, onYearChange }: { year: number; onYearChange: (y
         isEditing ? (
           <EditModeToolbar />
         ) : showWelcome ? undefined : (
-          <>
-            <OverUnderToggle />
-            <YearSelector value={year} onChange={onYearChange} />
-            <EditModeToggle highlight={gearHint} onActivate={() => setGearHint(false)} />
-          </>
+          <DashboardHeaderActions
+            year={year}
+            onYearChange={onYearChange}
+            gearHint={gearHint}
+            onGearActivate={() => setGearHint(false)}
+          />
         )
       }
     >

@@ -6,6 +6,7 @@ import { MotionList, MotionItem } from "../../shared/components/MotionList/Motio
 import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { fetchPageData } from "../../shared/api/pageApi"
+import { takePreloadedPageData } from "../../shared/api/pageDataCache"
 import { trackProjectView } from "../../shared/analytics/analytics"
 import { formatMoneyFull, marginTextColor } from "../../shared/utils/format"
 import useIsMobile from "../../shared/hooks/useIsMobile"
@@ -259,15 +260,21 @@ export default function Jobcost() {
     // A new year reloads the list, so drop any open rows + cached detail.
     setExpanded(new Set())
     setDetails({})
-    fetchPageData({
-      module: "jobcost",
-      queries: ["getPhases"],
-      // allProjects is a manager-only hint: when on, the backend drops the
-      // PM scoping and returns the whole company list. Ignored for other roles.
-      params: { year, allProjects: isManager ? showAllProjects : null },
-      signal: controller.signal,
-    })
+    // allProjects is a manager-only hint: when on, the backend drops the
+    // PM scoping and returns the whole company list. Ignored for other roles.
+    // Params must keep this exact shape/order so a daily-arrival preload's
+    // cache key matches (see pageDataCache).
+    const params = { year, allProjects: isManager ? showAllProjects : null }
+    const preloaded = takePreloadedPageData("jobcost", ["getPhases"], params)
+    const request = preloaded
+      ? // A failed preload shouldn't strand the page — fall back to a real fetch.
+        preloaded.catch(() =>
+          fetchPageData({ module: "jobcost", queries: ["getPhases"], params, signal: controller.signal })
+        )
+      : fetchPageData({ module: "jobcost", queries: ["getPhases"], params, signal: controller.signal })
+    request
       .then((result) => {
+        if (controller.signal.aborted) return
         const data = result.getPhases
         if (Array.isArray(data)) setJobs((data as RawProject[]).map(normalizeProject))
         setLoading(false)

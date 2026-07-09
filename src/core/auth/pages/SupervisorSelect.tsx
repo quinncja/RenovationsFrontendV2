@@ -3,6 +3,7 @@ import { useAuth } from "../AuthProvider"
 import { auth } from "../firebase"
 import { fetchPageData } from "../../../shared/api/pageApi"
 import { selectSupervisor } from "../../../shared/api/mutationApi"
+import { stampOnboardedAt } from "../../../modules/dashboard/report/DailyReportContext"
 import { EmployeeAvatar } from "../../../shared/components/EmployeeAvatar/EmployeeAvatar"
 import { ConfirmModal } from "../../../shared/components/ConfirmModal/ConfirmModal"
 
@@ -112,6 +113,8 @@ export default function SupervisorSelect({ preview = false }: { preview?: boolea
     setSubmitError("")
     try {
       await selectSupervisor(candidate.id)
+      // Onboarding just completed — the daily report first greets tomorrow.
+      if (user?.uid) stampOnboardedAt(user.uid)
       // Force-refresh the ID token so AuthProvider's onIdTokenChanged picks up
       // the new employeeId claim → the App gate clears and this unmounts. No
       // manual navigation needed.

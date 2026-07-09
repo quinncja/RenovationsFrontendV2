@@ -25,7 +25,6 @@ export const LAYOUT_TEMPLATES: LayoutTemplate[] = [
     name: "Operations",
     description: "Growth & performance first",
     sectionOrder: [
-      "recentChanges",
       "businessDevelopment",
       "businessPerformance",
       "businessRelations",
@@ -39,7 +38,6 @@ export const LAYOUT_TEMPLATES: LayoutTemplate[] = [
     name: "Procurement",
     description: "Reports & relations first",
     sectionOrder: [
-      "recentChanges",
       "reports",
       "businessRelations",
       "businessFinancials",
@@ -61,7 +59,6 @@ export const LAYOUT_TEMPLATES: LayoutTemplate[] = [
     name: "Financial",
     description: "Financials & trends first",
     sectionOrder: [
-      "recentChanges",
       "businessFinancials",
       "financialTrends",
       "businessPerformance",

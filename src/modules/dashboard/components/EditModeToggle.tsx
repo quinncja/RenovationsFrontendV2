@@ -17,7 +17,7 @@ export function EditModeToggle({
 
   return (
     <button
-      className={`btn btn-icon${highlight ? " btn-icon-attention" : ""}`}
+      className={`btn-icon rpt-btn${highlight ? " btn-icon-attention" : ""}`}
       onClick={() => {
         onActivate?.()
         enterEditMode()

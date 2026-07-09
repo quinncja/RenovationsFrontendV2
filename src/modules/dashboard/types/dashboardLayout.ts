@@ -47,15 +47,8 @@ export type WidgetId =
   | "estimationScorecard"
   | "estimationCategory"
   | "estimationWorstJobs"
-  // ── Recent Changes ──────────────────────────────────────────────────────
-  // "Since last business day" feed as two side-by-side widgets: project
-  // activity (new jobs, POs & subs, costs) and billing (AR invoices,
-  // payments). Both read the recentChangesAdmin query.
-  | "recentActivity"
-  | "recentBilling"
 
 export type SectionId =
-  | "recentChanges"
   | "reports"
   | "businessDevelopment"
   | "businessPerformance"

@@ -9,10 +9,14 @@ import { WIDGET_REGISTRY } from "./widgetRegistry"
 //   v4 — New "Estimation Performance" section appended after Business Relations.
 //        No forced migration: reconcileLayout auto-appends the missing section
 //        (from SECTION_ORDER) and its widgets to any older saved layout.
-//   v5 — New "Recent Changes" section. Migration hoists it to the FRONT of
+//   v5 — New "Recent Changes" section. Migration hoisted it to the FRONT of
 //        saved section orders (auto-append would park time-sensitive content
 //        last for existing users).
-export const LAYOUT_VERSION = 5
+//   v6 — Recent Changes retired (replaced by the daily report modal and the
+//        /reports page). No migration body: reconcileLayout's unknown-id
+//        stripping removes the section/widgets from saved docs; the version
+//        bump just re-persists them clean.
+export const LAYOUT_VERSION = 6
 
 // Default sectioned home layout. Derived from the section registry so it
 // can never drift from WIDGET_HOME_SECTION / WIDGET_REGISTRY:

@@ -15,6 +15,7 @@ export const JOBCOST_BACK_FALLBACK = { to: "/jobcost", label: "Job Costing" } as
 // path (e.g. /dashboard/employees) wins over a broader catch-all (/dashboard).
 const BACK_LABELS: Array<[string, string]> = [
   ["/jobcost", "Job Costing"],
+  ["/reports", "Activity"],
   ["/clients", "Clients"],
   ["/vendors", "Vendors"],
   ["/subcontractors", "Subcontractors"],

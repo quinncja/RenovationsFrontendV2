@@ -21,7 +21,7 @@ import { SortableHeader } from "../../shared/components/SortableHeader"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { useAuth } from "../../core/auth/AuthProvider"
 import { EmployeePeriodAndYearSummary } from "./widgets/EmployeePeriodAndYearSummary"
-import { PmRecentChangesSection } from "./widgets/recent/RecentChangesWidgets"
+import { DailyReportButton } from "./report/DailyReportButton"
 
 // ───── Breakdown shape (page-level fetch) ────────────────────────────────
 // `breakdown.projects[]` comes from the backend's `getProjectGridData`
@@ -348,15 +348,14 @@ export function EmployeeDetail({
   employeeId,
   year,
   onYearChange,
-  showRecentChanges,
+  isManagerHome,
 }: {
   employeeId: number
   year: number
   onYearChange: (y: number) => void
-  /** Manager home only — renders the token-scoped Recent Changes cards. The
-   *  admin /employees/:id route never sets this (its page fetch doesn't
-   *  include recentChangesPm). */
-  showRecentChanges?: boolean
+  /** Manager home only — shows the daily-report clock button in the header.
+   *  The admin /employees/:id route never sets this. */
+  isManagerHome?: boolean
 }) {
   const { goToJobcost } = useJobcostNav()
   const marginColorsOn = useMarginColorsEnabled()
@@ -564,7 +563,15 @@ export function EmployeeDetail({
   const openJob = (jobNumber: string) => goToJobcost(jobNumber)
 
   return (
-    <Page title={name} actions={<YearSelector value={year} onChange={onYearChange} />}>
+    <Page
+      title={name}
+      actions={
+        <>
+          {isManagerHome && <DailyReportButton />}
+          <YearSelector value={year} onChange={onYearChange} />
+        </>
+      }
+    >
       <MotionList className="widget-grid widget-grid-2 dashboard-home-grid">
         <MotionItem className="col-span-full">
           <div className="employee-stat-row">
@@ -589,12 +596,6 @@ export function EmployeeDetail({
             />
           </div>
         </MotionItem>
-
-        {showRecentChanges && (
-          <MotionItem className="col-span-full">
-            <PmRecentChangesSection />
-          </MotionItem>
-        )}
 
         <MotionItem className="col-span-full">
           <EmployeePeriodAndYearSummary monthly={monthly} yearly={yearly} loading={isLoading} />

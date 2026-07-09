@@ -14,6 +14,7 @@ const BusinessSummary = lazy(() => import("../../modules/business-summary/Busine
 const Jobcost = lazy(() => import("../../modules/jobcost/Jobcost.tsx"))
 const JobcostDetailPage = lazy(() => import("../../modules/jobcost/JobcostDetailPage.tsx"))
 const ChangeOrders = lazy(() => import("../../modules/change-orders/ChangeOrdersPage.tsx"))
+const ReportsPage = lazy(() => import("../../modules/dashboard/report/ReportsPage.tsx"))
 const NewChangeOrder = lazy(() => import("../../modules/change-orders/components/NewChangeOrder.tsx"))
 const CashFlow = lazy(() => import("../../modules/cash-flow/CashFlowPage.tsx"))
 const RevenueMap = lazy(() => import("../../modules/revenue-map/RevenueMapPage.tsx"))
@@ -68,6 +69,14 @@ export default function Router() {
             {/* Job Costing — all roles */}
             <Route path="/jobcost" element={<SuspenseWrapper><Jobcost /></SuspenseWrapper>} />
             <Route path="/jobcost/:recnum" element={<SuspenseWrapper><JobcostDetailPage /></SuspenseWrapper>} />
+
+            {/* Reports — daily/weekly/monthly activity; all roles (managers
+                get the token-scoped variant) */}
+            <Route path="/reports" element={
+              <RequireRole allowed={["executive", "admin", "manager"]}>
+                <SuspenseWrapper><ReportsPage /></SuspenseWrapper>
+              </RequireRole>
+            } />
 
             {/* Change Orders — admin/executive */}
             <Route path="/change-orders" element={

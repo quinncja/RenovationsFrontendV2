@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react"
-import { createPortal } from "react-dom"
 import { useJobcostNav } from "../../../modules/jobcost/useJobcostNav"
-import { X } from "lucide-react"
-import { motion, AnimatePresence } from "framer-motion"
 import { fetchPageData } from "../../api/pageApi"
 import { formatMoneyFull, formatDate } from "../../utils/format"
-import { useModalLayer } from "../../hooks/useModalLayer"
+import {
+  DetailModal,
+  DetailModalContent,
+  type DetailStat,
+} from "../DetailModal/DetailModal"
 
 // ─── Status labels & classes ──────────────────────────────────────────────────
 
@@ -31,7 +32,9 @@ function formatAmount(v: number | null | undefined) {
 
 // ─── Data shapes ─────────────────────────────────────────────────────────────
 
-interface ClientInvoiceDetail {
+// AR (client) and AP (vendor/sub) headers share every field the modal renders;
+// only the party name differs. Kept as one shape with both party fields optional.
+interface InvoiceHeader {
   invoiceNum: string
   total: number
   retainage: number
@@ -43,35 +46,36 @@ interface ClientInvoiceDetail {
   status: number
   jobName: string | null
   jobNum: string | null
-  clientName: string | null
   description: string | null
+  clientName?: string | null
+  vendorName?: string | null
 }
 
-interface APInvoiceDetail {
-  invoiceNum: string
-  total: number
-  retainage: number
-  amountPaid: number
-  amountRemaining: number
-  postYear: number
-  invoiceDate: unknown
-  dueDate: unknown
-  status: number
-  vendorName: string
-  description: string | null
-  jobNum: string | null
-  jobName: string | null
-}
-
-interface InvoiceLine {
+// AP lines carry an account; AR lines carry qty/unit/price.
+interface APInvoiceLine {
   accountNum: string
   description: string | null
   amount: number
 }
+interface ARInvoiceLine {
+  lineNum: number
+  description: string | null
+  quantity: number
+  unit: string | null
+  unitPrice: number
+  amount: number
+}
 
-type InvoiceDetail =
-  | { module: "clients"; header: ClientInvoiceDetail }
-  | { module: "suppliers" | "subcontractors"; header: APInvoiceDetail; lines: InvoiceLine[] }
+export interface LedgerItem {
+  primary: string
+  meta?: string | null
+  amount: number
+}
+
+interface InvoiceDetail {
+  header: InvoiceHeader
+  lines: LedgerItem[]
+}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -79,55 +83,66 @@ interface InvoiceDetailModalProps {
   invoiceId: string | null
   module: "clients" | "suppliers" | "subcontractors"
   onClose: () => void
+  /** When set, the project link is inert and surfaces this as a tooltip instead
+   *  of navigating (the daily-recap intro blocks leaving until it's finished). */
+  projectBlockedReason?: string | null
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-export function InfoRow({ label, value }: { label: string; value: string | number | null | undefined }) {
-  if (value === null || value === undefined || value === "" || value === "—") return null
-  return (
-    <div className="invoice-modal-row">
-      <span className="invoice-modal-label">{label}</span>
-      <span className="invoice-modal-value">{value}</span>
-    </div>
-  )
+// The eyebrow says which ledger this invoice lives on — AR (client, we billed
+// them) vs AP (vendor/subcontractor, they billed us). The party name in the meta
+// line already says whether it's a vendor or a subcontractor.
+const MODULE_KIND: Record<InvoiceDetailModalProps["module"], string> = {
+  clients: "AR invoice",
+  suppliers: "AP invoice",
+  subcontractors: "AP invoice",
 }
 
-function AmountsStrip({ total, paid, remaining, retainage }: {
-  total: number; paid: number; remaining: number; retainage: number
-}) {
-  const cols = retainage > 0 ? 4 : 3
-  return (
-    <div className="invoice-amounts-strip" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
-      <div className="invoice-amount-cell">
-        <span className="invoice-amount-label">Total</span>
-        <span className="invoice-amount-value">{formatAmount(total)}</span>
-      </div>
-      <div className="invoice-amount-cell">
-        <span className="invoice-amount-label">Paid</span>
-        <span className="invoice-amount-value invoice-amount-value--paid">{formatAmount(paid)}</span>
-      </div>
-      <div className="invoice-amount-cell">
-        <span className="invoice-amount-label">Remaining</span>
-        <span className="invoice-amount-value invoice-amount-value--remaining">{formatAmount(remaining)}</span>
-      </div>
-      {retainage > 0 && (
-        <div className="invoice-amount-cell">
-          <span className="invoice-amount-label">Retainage</span>
-          <span className="invoice-amount-value">{formatAmount(retainage)}</span>
-        </div>
-      )}
-    </div>
-  )
+// ─── Line normalization ───────────────────────────────────────────────────────
+
+function formatQty(q: number) {
+  return q % 1 === 0 ? String(q) : q.toLocaleString("en-US", { maximumFractionDigits: 4 })
+}
+
+function apLinesToLedger(lines: APInvoiceLine[]): LedgerItem[] {
+  return lines.map((l) => ({
+    primary: l.description || `Account ${l.accountNum}`,
+    meta: l.description ? `Account ${l.accountNum}` : null,
+    amount: l.amount,
+  }))
+}
+
+function arLinesToLedger(lines: ARInvoiceLine[]): LedgerItem[] {
+  return lines.map((l) => {
+    // qty × price only adds information beyond the amount when it's a real
+    // multiple; a 1 × total line would just restate the number.
+    const showQty = l.quantity > 0 && l.quantity !== 1 && l.unitPrice > 0
+    const meta = showQty
+      ? `${formatQty(l.quantity)} × ${formatMoneyFull(l.unitPrice)}${l.unit ? ` / ${l.unit}` : ""}`
+      : null
+    return {
+      primary: l.description || `Line ${l.lineNum}`,
+      meta,
+      amount: l.amount,
+    }
+  })
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
+// The invoice detail surface shares the name-led layout of the dashboard's
+// cost/item modal (the `.cost-detail-*` family): the description leads as the
+// name, the party (client/vendor) sits emphasized beneath it, and the amount
+// follows — firm but no longer the hero. Invoice-specific data — status,
+// paid/remaining, due date — folds into that same structure.
 
-export function InvoiceDetailModal({ invoiceId, module, onClose }: InvoiceDetailModalProps) {
+export function InvoiceDetailModal({
+  invoiceId,
+  module,
+  onClose,
+  projectBlockedReason,
+}: InvoiceDetailModalProps) {
   const [detail, setDetail] = useState<InvoiceDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { overlayZ, contentZ } = useModalLayer(!!invoiceId)
 
   useEffect(() => {
     if (!invoiceId) { setDetail(null); setError(null); return }
@@ -144,20 +159,20 @@ export function InvoiceDetailModal({ invoiceId, module, onClose }: InvoiceDetail
     // Subcontractors are AP vendors, so they reuse the supplier (AP) queries.
     const queries =
       module === "clients"
-        ? ["clientInvoiceDetail"]
+        ? ["clientInvoiceDetail", "clientInvoiceLines"]
         : ["supplierInvoiceDetail", "supplierInvoiceLines"]
 
     fetchPageData({ module: "invoices", queries, params: { invoiceRecnum: recnum } })
       .then((data) => {
         if (cancelled) return
         if (module === "clients") {
-          const header = data.clientInvoiceDetail as ClientInvoiceDetail | null
+          const header = data.clientInvoiceDetail as InvoiceHeader | null
           if (!header) { setError("Invoice not found."); setIsLoading(false); return }
-          setDetail({ module: "clients", header })
+          setDetail({ header, lines: arLinesToLedger((data.clientInvoiceLines as ARInvoiceLine[]) ?? []) })
         } else {
-          const header = data.supplierInvoiceDetail as APInvoiceDetail | null
+          const header = data.supplierInvoiceDetail as InvoiceHeader | null
           if (!header) { setError("Invoice not found."); setIsLoading(false); return }
-          setDetail({ module, header, lines: (data.supplierInvoiceLines as InvoiceLine[]) ?? [] })
+          setDetail({ header, lines: apLinesToLedger((data.supplierInvoiceLines as APInvoiceLine[]) ?? []) })
         }
         setIsLoading(false)
       })
@@ -170,184 +185,76 @@ export function InvoiceDetailModal({ invoiceId, module, onClose }: InvoiceDetail
     return () => { cancelled = true }
   }, [invoiceId, module])
 
-  const invoiceNum = detail?.header.invoiceNum
-  const statusNum  = detail?.header.status
-  // The description is what the invoice is FOR, so it leads; the invoice
-  // number moves to the subtitle next to the client/vendor.
-  const title = detail
-    ? detail.header.description || `Invoice ${invoiceNum}`
-    : isLoading ? "Loading…" : "Invoice"
-  const party = detail
-    ? detail.module === "clients"
-      ? detail.header.clientName
-      : detail.header.vendorName
-    : null
-  const subtitle = detail
-    ? [detail.header.description ? `Invoice ${invoiceNum}` : null, party]
-        .filter(Boolean)
-        .join(" · ")
-    : null
-
-  return createPortal(
-    <AnimatePresence>
-      {invoiceId && (
-        <>
-          <motion.div
-            className="modal-overlay"
-            style={{ zIndex: overlayZ }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-          <div className="modal-positioner" style={{ zIndex: contentZ }}>
-            <motion.div
-              className="modal invoice-modal"
-              initial={{ opacity: 0, scale: 0.96, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-            >
-              {/* Header */}
-              <div className="invoice-modal-header">
-                <div className="invoice-modal-header-left">
-                  <div className="invoice-modal-title-row">
-                    <h2 className="invoice-modal-title">{title}</h2>
-                    {statusNum != null && (
-                      <span className={`invoice-status-badge invoice-status-badge--${invoiceStatusClass(statusNum)}`}>
-                        {invoiceStatus(statusNum)}
-                      </span>
-                    )}
-                  </div>
-                  {subtitle && <p className="invoice-modal-subtitle">{subtitle}</p>}
-                </div>
-                <button className="button modal-close" onClick={onClose}><X size={16} /></button>
-              </div>
-
-              {/* Body */}
-              <div className="invoice-modal-body">
-                {isLoading && <div className="widget-skeleton" style={{ height: "9rem" }} />}
-                {error && <p className="body-text text-secondary">{error}</p>}
-
-                {!isLoading && !error && detail && (
-                  detail.module === "clients"
-                    ? <ClientInvoiceBody header={detail.header} />
-                    : <APInvoiceBody header={detail.header} lines={detail.lines} />
-                )}
-              </div>
-            </motion.div>
-          </div>
-        </>
+  return (
+    <DetailModal open={!!invoiceId} onClose={onClose}>
+      {isLoading && <div className="widget-skeleton" style={{ height: "9rem" }} />}
+      {!isLoading && error && <p className="body-text text-secondary">{error}</p>}
+      {!isLoading && !error && detail && (
+        <InvoiceContent detail={detail} module={module} projectBlockedReason={projectBlockedReason} />
       )}
-    </AnimatePresence>,
-    document.body
+    </DetailModal>
   )
 }
 
-// ─── AR invoice body ──────────────────────────────────────────────────────────
+// ─── Content ──────────────────────────────────────────────────────────────────
+// Composes the invoice's view model and renders it through the shared detail
+// body: the description leads as the name (invoice # beside the eyebrow, party
+// beneath), the amount follows with its status badge, then the
+// Paid/Remaining/[Retainage] strip, the project, and the line items.
 
-function ClientInvoiceBody({ header: h }: { header: ClientInvoiceDetail }) {
+function InvoiceContent({
+  detail,
+  module,
+  projectBlockedReason,
+}: {
+  detail: InvoiceDetail
+  module: InvoiceDetailModalProps["module"]
+  projectBlockedReason?: string | null
+}) {
   const { goToJobcost } = useJobcostNav()
+  const h = detail.header
+  const party = module === "clients" ? h.clientName : h.vendorName
+  const hasDesc = Boolean(h.description)
+  // The description is what the invoice is FOR, so it leads as the name; the
+  // invoice number rides small beside the eyebrow. When there's no description
+  // the number becomes the name, so we don't repeat it in the caption.
+  const title = hasDesc ? h.description! : `Invoice ${h.invoiceNum}`
+  const caption = hasDesc ? `#${h.invoiceNum}` : null
+
+  const stats: DetailStat[] = [
+    { label: "Paid", value: formatAmount(h.amountPaid), valueClass: "cost-detail-stat-value--paid" },
+    { label: "Remaining", value: formatAmount(h.amountRemaining) },
+    ...(h.retainage > 0 ? [{ label: "Retainage", value: formatAmount(h.retainage) }] : []),
+    ...(h.dueDate ? [{ label: "Due", value: formatDate(h.dueDate) }] : []),
+  ]
+
   return (
-    <div className="invoice-modal-sections">
-      <AmountsStrip
-        total={h.total}
-        paid={h.amountPaid}
-        remaining={h.amountRemaining}
-        retainage={h.retainage}
-      />
-
-      {h.jobNum && (
-        <section
-          className="invoice-modal-section invoice-modal-section-link"
-          onClick={() => goToJobcost(h.jobNum!)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === "Enter" && goToJobcost(h.jobNum!)}
-        >
-          <p className="invoice-modal-section-label">Job</p>
-          <div className="invoice-modal-info">
-            <InfoRow label="Job #"     value={h.jobNum} />
-            <InfoRow label="Job Name"  value={h.jobName} />
-          </div>
-        </section>
-      )}
-
-      <section className="invoice-modal-section">
-        <p className="invoice-modal-section-label">Details</p>
-        <div className="invoice-modal-info">
-          <InfoRow label="Invoice #"   value={h.invoiceNum} />
-          <InfoRow label="Year"        value={h.postYear} />
-          <InfoRow label="Date"        value={formatDate(h.invoiceDate)} />
-          <InfoRow label="Due Date"    value={formatDate(h.dueDate)} />
-        </div>
-      </section>
-    </div>
-  )
-}
-
-// ─── AP invoice body ──────────────────────────────────────────────────────────
-
-function APInvoiceBody({ header: h, lines }: { header: APInvoiceDetail; lines: InvoiceLine[] }) {
-  const { goToJobcost } = useJobcostNav()
-  return (
-    <div className="invoice-modal-sections">
-      <AmountsStrip
-        total={h.total}
-        paid={h.amountPaid}
-        remaining={h.amountRemaining}
-        retainage={h.retainage}
-      />
-
-      {h.jobNum && (
-        <section
-          className="invoice-modal-section invoice-modal-section-link"
-          onClick={() => goToJobcost(h.jobNum!)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => e.key === "Enter" && goToJobcost(h.jobNum!)}
-        >
-          <p className="invoice-modal-section-label">Job</p>
-          <div className="invoice-modal-info">
-            <InfoRow label="Job #"     value={h.jobNum} />
-            <InfoRow label="Job Name"  value={h.jobName} />
-          </div>
-        </section>
-      )}
-
-      <section className="invoice-modal-section">
-        <p className="invoice-modal-section-label">Details</p>
-        <div className="invoice-modal-info">
-          <InfoRow label="Invoice #"   value={h.invoiceNum} />
-          <InfoRow label="Year"        value={h.postYear} />
-          <InfoRow label="Date"        value={formatDate(h.invoiceDate)} />
-          <InfoRow label="Due Date"    value={formatDate(h.dueDate)} />
-        </div>
-      </section>
-
-      {lines.length > 0 && (
-        <section className="invoice-modal-section">
-          <p className="invoice-modal-section-label">Cost Distribution</p>
-          <table className="spend-rank-table">
-            <thead>
-              <tr>
-                <th className="spend-rank-table-name">Account</th>
-                <th className="spend-rank-table-name">Description</th>
-                <th className="spend-rank-table-value">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lines.map((line, i) => (
-                <tr key={i} className="spend-rank-table-row-plain">
-                  <td className="spend-rank-table-name body-text">{line.accountNum}</td>
-                  <td className="spend-rank-table-name body-text text-secondary">{line.description || "—"}</td>
-                  <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(line.amount)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
-    </div>
+    <DetailModalContent
+      eyebrow={MODULE_KIND[module]}
+      figure={h.total ? formatMoneyFull(h.total) : null}
+      badge={
+        h.status != null
+          ? {
+              label: invoiceStatus(h.status),
+              className: `invoice-status-badge invoice-status-badge--${invoiceStatusClass(h.status)}`,
+            }
+          : null
+      }
+      stats={stats}
+      title={title}
+      caption={caption}
+      party={party || null}
+      project={
+        h.jobNum
+          ? {
+              jobId: h.jobNum,
+              jobName: h.jobName,
+              onOpen: () => goToJobcost(h.jobNum!),
+              blockedReason: projectBlockedReason,
+            }
+          : null
+      }
+      ledger={detail.lines.length > 0 ? { heading: "Line items", lines: detail.lines } : null}
+    />
   )
 }

@@ -31,10 +31,6 @@ import {
 import { BankingOverdueWidget } from "../widgets/banking/BankingOverdueWidget"
 import { UpcomingBillingsWidget } from "../widgets/billings/UpcomingBillingsWidget"
 import { ProgressBillingsWidget } from "../widgets/ProgressBillingsWidget"
-import {
-  RecentActivityWidget,
-  RecentBillingWidget,
-} from "../widgets/recent/RecentChangesWidgets"
 import { EstimationScorecardWidget } from "../widgets/estimation/EstimationScorecardWidget"
 import { EstimationCategoryWidget } from "../widgets/estimation/EstimationCategoryWidget"
 import { EstimationWorstJobsWidget } from "../widgets/estimation/EstimationWorstJobsWidget"
@@ -63,21 +59,6 @@ export interface WidgetRegistryEntry {
 }
 
 export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
-  // ── Recent Changes ───────────────────────────────────────────────────
-  recentActivity: {
-    id: "recentActivity",
-    component: RecentActivityWidget,
-    label: "Project Activity",
-    visualType: "table",
-    defaultColSpan: 1,
-  },
-  recentBilling: {
-    id: "recentBilling",
-    component: RecentBillingWidget,
-    label: "Billing & Payments",
-    visualType: "table",
-    defaultColSpan: 1,
-  },
   // ── Reports ──────────────────────────────────────────────────────────
   reconciliation: {
     id: "reconciliation",

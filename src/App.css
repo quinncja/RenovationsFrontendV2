@@ -699,11 +699,13 @@ body{
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23d8d2cc' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.6rem center;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
 .year-selector:hover {
-  border-color: var(--primary-color);
+  /* A quiet gray fill on hover (not a copper edge) — set background-color, NOT
+     the `background` shorthand, so the chevron background-image survives. */
+  background-color: var(--hover-bg);
 }
 
 .year-selector:focus {
@@ -2537,17 +2539,22 @@ body{
   justify-content: space-between;
 }
 
+/* Shared close button for every modal — a contained pill in the dashboard's
+   filter-chip language (bordered neutral surface, no fill until hover) rather
+   than the old filled square. One class, so all modals stay in step. */
 .modal-close {
   width: 2rem;
   height: 2rem;
-  background: var(--hover-bg);
+  background: transparent;
   color: var(--secondary-text);
-  border-radius: 8px;
-  transition: background 0.15s;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  transition: background 0.15s, color 0.15s;
 }
 
 .modal-close:hover {
-  background: var(--border-color);
+  background: var(--hover-bg);
+  color: var(--primary-text);
 }
 
 .modal-spend-list {
@@ -2696,12 +2703,22 @@ body{
 
 /* ─── Invoice Detail Modal ──────────────────────────────────────────────────── */
 
+/* ─── Detail modal ────────────────────────────────────────────────────────────
+   Shared surface behind InvoiceDetailModal and RecentChanges' ItemDetailModal.
+   A clean, neutral document: one focal figure, a proper line-item table, then a
+   two-column footer (details | project) split by a faint rule. Color stays out
+   of it — the money and the type do the work. */
 .invoice-modal {
   min-width: 460px;
   max-width: 560px;
   padding: 0;
   gap: 0;
   overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid var(--border-color);
+  box-shadow:
+    0 1px 2px light-dark(rgba(25, 55, 90, 0.06), rgba(0, 0, 0, 0.4)),
+    0 24px 64px light-dark(rgba(25, 55, 90, 0.16), rgba(0, 0, 0, 0.55));
 }
 
 .invoice-modal-header {
@@ -2709,14 +2726,14 @@ body{
   align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.5rem 1.75rem 1.375rem;
+  padding: 1.5rem 1.875rem 1.375rem;
   border-bottom: 1px solid var(--border-color);
 }
 
 .invoice-modal-header-left {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.3125rem;
   min-width: 0;
 }
 
@@ -2728,23 +2745,25 @@ body{
 }
 
 .invoice-modal-title {
-  font-size: var(--title2-size);
+  font-size: 1.1875rem;
+  line-height: 1.3;
   font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
   color: var(--primary-text);
   margin: 0;
 }
 
 .invoice-modal-subtitle {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--secondary-text);
   margin: 0;
 }
 
-/* Status badge */
+/* Status badge — soft-tinted semantic pill. */
 .invoice-status-badge {
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
-  padding: 0.2rem 0.5rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 999px;
   letter-spacing: 0.02em;
   white-space: nowrap;
@@ -2757,85 +2776,441 @@ body{
 
 .invoice-modal-body {
   overflow-y: auto;
-  padding: 1.5rem 1.75rem;
+  padding: 1.5rem 1.875rem 1.75rem;
 }
 
 .invoice-modal-sections {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
-/* Amounts strip */
+/* ─── Amount panel / hero figure ──────────────────────────────────────────────
+   The focal surface. A clean bordered panel on a faint neutral tint. Multiple
+   cells (invoice Total/Paid/Remaining) segment inside it; a lone cell (a posted
+   cost) blooms into a full hero figure. */
 .invoice-amounts-strip {
   display: grid;
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: 12px;
   overflow: hidden;
+  background: color-mix(in srgb, var(--primary-text) 3%, var(--card-color));
 }
 
 .invoice-amount-cell {
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  padding: 0.875rem 1rem;
+  gap: 0.375rem;
+  padding: 1rem 1.125rem;
   border-right: 1px solid var(--border-color);
 }
 .invoice-amount-cell:last-child { border-right: none; }
 
 .invoice-amount-label {
-  font-size: 0.6875rem;
+  font-size: 0.625rem;
   font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   color: var(--secondary-text);
 }
 
 .invoice-amount-value {
-  font-size: 1rem;
-  font-weight: var(--font-weight-semibold);
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-bold);
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
   color: var(--primary-text);
 }
 .invoice-amount-value--paid      { color: #16a34a; }
 .invoice-amount-value--remaining { color: var(--primary-text); }
 
-/* Info sections */
-.invoice-modal-section {
+/* ─── Cost / item detail modal ────────────────────────────────────────────────
+   A separate, amount-led layout for non-invoice changes (posted cost, PO,
+   subcontract, new project). The amount is the hero; the title is the item's
+   own name; a cost's lines are its substance, shown without a redundant total
+   row; the project is the one way out. Its own class family so the shared
+   invoice modal is untouched. */
+.cost-detail-modal {
+  position: relative;
+  overflow-y: auto; /* .invoice-modal sets overflow:hidden; this modal scrolls itself */
+  min-width: 460px;
+  max-width: 560px; /* a focused single column — bands stack top to bottom */
+}
+
+.cost-detail {
+  padding: 2.5rem 2.5rem 2.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem; /* uniform air between bands; each band is tight within itself */
+}
+
+.cost-detail-close {
+  position: absolute;
+  top: 1.125rem;
+  right: 1.125rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--secondary-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.cost-detail-close:hover {
+  background: var(--hover-bg);
+  color: var(--primary-text);
+  border-color: var(--secondary-text);
+}
+.cost-detail-close:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+/* Head band: kind + number sit small above the name; the name leads big; the
+   party it's with sits emphasized just below. */
+.cost-detail-head {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
-.invoice-modal-section-link {
-  cursor: pointer;
-  border-radius: 8px;
-  padding: 0.625rem;
-  margin: -0.625rem;
-  transition: background 0.15s ease;
-}
-.invoice-modal-section-link:hover {
-  background: light-dark(rgba(0,0,0,0.04), rgba(255,255,255,0.05));
+
+.cost-detail-eyebrow-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  padding-right: 2.5rem; /* clear the close button */
+  margin-bottom: 0.125rem;
 }
 
-.invoice-modal-section-label {
+.cost-detail-eyebrow {
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.11em;
   color: var(--secondary-text);
-  padding-bottom: 0.3rem;
+}
+
+.cost-detail-dot {
+  color: color-mix(in srgb, var(--secondary-text) 55%, transparent);
+  font-size: 0.6875rem;
+}
+
+.cost-detail-caption {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+}
+
+/* Name + party on the left, amount right-aligned in line with them. */
+.cost-detail-headline {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1.5rem;
+}
+.cost-detail-headline-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.cost-detail-figure-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  text-align: right;
+}
+
+/* The name — the hero of the card, leading above the amount. */
+.cost-detail-title {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.25;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+  color: var(--primary-text);
+  word-break: break-word;
+}
+
+/* The party — client / vendor / subcontractor — emphasized under the name. */
+.cost-detail-party {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  font-weight: var(--font-weight-semibold);
+  color: var(--secondary-text);
+  word-break: break-word;
+}
+
+.cost-detail-figure {
+  margin: 0;
+  font-size: 1.375rem;
+  line-height: 1;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+/* No amount entered — a muted caption in place of the hero figure, not a giant
+   dash — for an item with no dollar amount (e.g. an unpriced PO). */
+.cost-detail-figure--empty {
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+  color: var(--secondary-text);
+}
+
+/* Secondary amounts — paid / remaining / retainage — grouped as one panel with
+   divided cells so the money's state reads as a unit (invoice modal). */
+.cost-detail-stats {
+  display: flex;
+  padding: 1.125rem 1.375rem;
+  background: var(--hover-bg);
+  border-radius: 14px;
+}
+.cost-detail-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding-left: 1.375rem;
+  border-left: 1px solid var(--border-color);
+}
+.cost-detail-stat:first-child {
+  padding-left: 0;
+  border-left: none;
+}
+.cost-detail-stat-label {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--secondary-text);
+}
+.cost-detail-stat-value {
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  color: var(--primary-text);
+}
+.cost-detail-stat-value--paid { color: #16a34a; }
+
+/* Ledger — the line items behind the figure, set off by a top rule. */
+.cost-detail-ledger {
+  border-top: 1px solid var(--border-color);
+}
+.cost-detail-ledger-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 1.125rem 0 0.375rem;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--secondary-text);
+}
+
+.cost-detail-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.cost-detail-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 1.5rem;
+  padding: 0.9375rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 55%, transparent);
+}
+.cost-detail-line:last-child { border-bottom: none; }
+
+.cost-detail-line-desc {
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--primary-text);
+  word-break: break-word;
+}
+.cost-detail-line-desc small {
+  display: block;
+  margin-top: 0.1875rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--secondary-text);
+}
+
+.cost-detail-line-amt {
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--primary-text);
+}
+
+/* Project — the item's home, a full-width card and the one way out. Copper is
+   reserved for its arrow on hover. */
+.cost-detail-project {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.875rem 1.125rem;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.cost-detail-project:hover {
+  background: var(--hover-bg);
+  border-color: color-mix(in srgb, var(--secondary-text) 45%, transparent);
+}
+.cost-detail-project:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+}
+
+.cost-detail-project-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+  min-width: 0;
+}
+.cost-detail-project-eyebrow {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--secondary-text);
+}
+.cost-detail-project-name {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  word-break: break-word;
+}
+.cost-detail-project-num {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+}
+.cost-detail-project-icon {
+  flex-shrink: 0;
+  color: var(--secondary-text);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+.cost-detail-project:hover .cost-detail-project-icon,
+.cost-detail-project:focus-visible .cost-detail-project-icon {
+  color: var(--primary-color);
+  transform: translate(2px, -2px);
+}
+
+/* Blocked project (daily-recap intro): the link is inert — no copper lift, a
+   muted "not-allowed" cursor, and a tooltip explaining why. It stays legible
+   (the item still tells you its project) but reads as unavailable. */
+.cost-detail-project-wrap {
+  position: relative;
+}
+.cost-detail-project--blocked {
+  cursor: not-allowed;
+}
+.cost-detail-project--blocked:hover {
+  background: var(--hover-bg);
+  border-color: var(--border-color);
+}
+.cost-detail-project--blocked .cost-detail-project-name,
+.cost-detail-project--blocked .cost-detail-project-icon {
+  color: var(--secondary-text);
+}
+.cost-detail-project--blocked:hover .cost-detail-project-icon,
+.cost-detail-project--blocked:focus-visible .cost-detail-project-icon {
+  color: var(--secondary-text);
+  transform: none;
+}
+.cost-detail-project-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  /* Horizontal centering is applied by framer (x:-50%) so it doesn't fight the
+     animated transform; the ::after arrow keeps its own translateX below. */
+  z-index: 2;
+  width: max-content;
+  max-width: min(20rem, calc(100% - 0.5rem));
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  background: var(--primary-text);
+  color: var(--background-color);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-align: center;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+  pointer-events: none;
+}
+.cost-detail-project-tip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--primary-text);
+}
+
+/* Provenance footer — who entered it and when, split to the two edges and set
+   off by a top rule. Deliberately the quietest thing on the card. */
+.cost-detail-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+}
+.cost-detail-footer span:last-child {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Info sections */
+.invoice-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.invoice-modal-section-label {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--secondary-text);
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border-color);
 }
 
 .invoice-modal-info {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: 0.5rem;
 }
 
 .invoice-modal-row {
   display: grid;
-  grid-template-columns: 7rem 1fr;
+  grid-template-columns: minmax(0, 7rem) 1fr;
   align-items: baseline;
   gap: 0.75rem;
 }
@@ -2847,10 +3222,182 @@ body{
 }
 
 .invoice-modal-value {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: var(--primary-text);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   word-break: break-word;
+}
+
+/* ─── Line-item table ─────────────────────────────────────────────────────────
+   A real table: a light column header, ruled rows, right-aligned tabular
+   amounts, and a total row in the footer when there's more than one line. */
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.invoice-table thead th {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--secondary-text);
+  text-align: left;
+  padding: 0 0 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.invoice-table-num { text-align: right; white-space: nowrap; }
+
+.invoice-table tbody td {
+  padding: 0.625rem 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 55%, transparent);
+  vertical-align: top;
+}
+.invoice-table tbody tr:last-child td { border-bottom: none; }
+
+.invoice-table-desc {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--primary-text);
+  word-break: break-word;
+}
+
+.invoice-table-meta {
+  display: block;
+  margin-top: 0.1875rem;
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+}
+
+.invoice-table tbody td.invoice-table-num {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+
+.invoice-table tfoot th,
+.invoice-table tfoot td {
+  padding: 0.6875rem 0 0;
+  border-top: 1px solid var(--border-color);
+}
+.invoice-table tfoot th {
+  text-align: left;
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--secondary-text);
+}
+.invoice-table tfoot td.invoice-table-num {
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-text);
+}
+
+/* ─── Footer: details | project ───────────────────────────────────────────────
+   The two sit side by side, separated by a faint vertical rule. The project is
+   borderless — just text with its arrow held to the right margin. */
+.invoice-modal-footer {
+  display: flex;
+  align-items: stretch;
+  gap: 1.5rem;
+}
+
+.invoice-modal-footer-col {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.invoice-modal-footer-sep {
+  flex: 0 0 1px;
+  align-self: stretch;
+  background: var(--border-color);
+}
+
+/* Project — the one element that navigates away. Borderless, whole block is the
+   hit target, arrow pinned to the right and nudged on hover. */
+.invoice-project-card {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.invoice-project-card:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 3px;
+}
+
+.invoice-project-card-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+  min-width: 0;
+}
+
+.invoice-project-card-eyebrow {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--secondary-text);
+}
+
+.invoice-project-card-name {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  word-break: break-word;
+}
+
+.invoice-project-card-num {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+}
+
+.invoice-project-card-icon {
+  flex-shrink: 0;
+  color: var(--secondary-text);
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.invoice-project-card:hover .invoice-project-card-icon,
+.invoice-project-card:focus-visible .invoice-project-card-icon {
+  color: var(--primary-text);
+  transform: translate(1px, -1px);
+}
+
+/* Phones: let the modal shrink, and stack the footer columns. */
+@media (max-width: 520px) {
+  .invoice-modal {
+    min-width: 0;
+  }
+  .invoice-modal-header { padding: 1.375rem 1.375rem 1.125rem; }
+  .invoice-modal-body { padding: 1.375rem 1.375rem 1.5rem; }
+  .invoice-modal-footer { flex-direction: column; gap: 1.25rem; }
+  .invoice-modal-footer-sep { display: none; }
+  .cost-detail-modal { min-width: 0; }
+  .cost-detail { padding: 1.75rem 1.5rem 1.5rem; gap: 1.5rem; }
+  .cost-detail-title { font-size: 1.3125rem; }
+  .cost-detail-figure { font-size: 1.25rem; }
+  /* Stack the amount under the name when the row is too narrow to share. */
+  .cost-detail-headline { flex-direction: column; align-items: stretch; gap: 0.75rem; }
+  .cost-detail-figure-block { align-items: flex-start; text-align: left; }
+  /* Stacked cells with top dividers when the panel is too narrow to divide. */
+  .cost-detail-stats { flex-direction: column; padding: 1rem 1.125rem; }
+  .cost-detail-stat {
+    padding: 0.875rem 0 0;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+  }
+  .cost-detail-stat:first-child { padding-top: 0; border-top: none; }
 }
 
 /* ─── Spend Rank Table ──────────────────────────────────────────────────────── */
@@ -2858,26 +3405,6 @@ body{
 .spend-rank-table {
   width: 100%;
   border-collapse: collapse;
-}
-
-/* Full-bleed tables inside the invoice/item detail modal — counter the body's
-   1.5rem/1.75rem padding and re-inset the outer columns, mirroring the
-   .modal--wide .data-table pattern so modal tables span edge to edge
-   everywhere in the app. */
-.invoice-modal-body .spend-rank-table {
-  width: calc(100% + 3.5rem);
-  margin-left: -1.75rem;
-  margin-right: -1.75rem;
-}
-
-.invoice-modal-body .spend-rank-table th:first-child,
-.invoice-modal-body .spend-rank-table td:first-child {
-  padding-left: 1.75rem;
-}
-
-.invoice-modal-body .spend-rank-table th:last-child,
-.invoice-modal-body .spend-rank-table td:last-child {
-  padding-right: 1.75rem;
 }
 
 .spend-rank-table thead tr {
@@ -5301,8 +5828,8 @@ body{
 }
 
 .usr-eng-trigger:hover {
-  border-color: color-mix(in srgb, var(--primary-color) 55%, var(--border-color));
-  background: color-mix(in srgb, var(--primary-color) 7%, var(--card-color));
+  border-color: var(--border-color);
+  background: var(--hover-bg);
 }
 
 /* ─── Engagement ranked-list columns (shared by both modals) ──────────────── */
@@ -6865,7 +7392,9 @@ body{
 .gear-hint {
   position: absolute;
   top: 3.75rem;
-  right: 2.5rem;
+  /* Popover right edge aligns with the gear's right edge (both 4rem, the widget
+     cutoff edge — see the section-pager header right pad). */
+  right: 4rem;
   z-index: 30;
   width: 270px;
   padding: 0.95rem 1rem 1rem;
@@ -7452,7 +7981,10 @@ svg.placeholder-illustration {
   inset: 0 0 auto 0;
   z-index: 10;
   margin: 0;
-  padding: 1rem 2.5rem;
+  /* Right pad = 4rem so the whole actions cluster ends at the widget cutoff edge
+     (matches .section-slide-content's 4rem right pad); left stays 2.5rem to keep
+     the title aligned with the widgets. */
+  padding: 1rem 4rem 1rem 2.5rem;
   background: transparent;
   pointer-events: none;
 }
@@ -7697,7 +8229,7 @@ svg.placeholder-illustration {
   color: var(--secondary-text);
 }
 .section-nav-card-open .section-nav-row {
-  height: 2.2rem;
+  height: 1.9rem;
   gap: 0.7rem;
   transition: color 0.18s, background-color 0.18s;
 }
@@ -8882,6 +9414,15 @@ svg.placeholder-illustration {
 .mdt-total-col { width: 60%; text-align: right; }
 .mdt-table th.mdt-total-col { text-align: right; }
 
+/* In this drill-down popup the row hover reads neutral, not copper. The base
+   .jc-group-row / .jc-txn-row hovers tint with --primary-color (kept for the
+   Job Cost page), so scope a gray override to the mdt- tables only. The extra
+   class here outranks the base single-class hover rules. */
+.mdt-table .jc-group-row:hover,
+.mdt-line-table .jc-txn-row:hover {
+  background: var(--hover-bg);
+}
+
 .mdt-loading,
 .mdt-empty {
   padding: 1rem 1.125rem;
@@ -8982,6 +9523,7 @@ svg.placeholder-illustration {
   font-weight: var(--font-weight-semibold);
   font-size: 0.875rem;
   padding: 0.4rem 0.875rem;
+  border: none;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -10545,155 +11087,224 @@ svg.placeholder-illustration {
 
 
 /* ─── Recent Changes widgets ────────────────────────────────────────────────
-   Two table widgets (Project Activity / Billing & Payments): a strip of
-   hairline-separated summary tiles, then the largest items as a full-bleed
-   .data-table (the shared `.widget:has(.data-table)` treatment gives the same
-   edge alignment as Employee Performance). Neutral surfaces; copper appears
-   only on active states (the modal's selected filter chip, the detail
-   modal's primary action). */
+   Two report widgets (Project Activity / Billing & Payments). Each reads as a
+   written brief: a spoken summary paragraph whose figures drill into their
+   category, then an itemized event log of the latest changes. Neutral surfaces;
+   copper appears only on active states (a called-out figure on hover, the
+   modal's selected filter chip, the detail modal's primary action). */
 
-/* The :has(.data-table) rule zeroes the card padding — re-inset the tile
-   strip so it lines up with the widget title and the table's outer columns. */
-.rcnt-widget .rcnt-tiles {
-  padding: 0 1.25rem;
+/* Full-bleed: there's no data-table here to trigger the shared treatment, so
+   zero the card padding and inset content to the 1.25rem of the widget title. */
+.rcnt-widget {
+  padding: 0;
+  overflow: hidden;
+  min-height: 340px;
 }
 
-/* Summary tiles — equal columns divided by hairlines, no boxes. */
-.rcnt-tiles {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 1fr;
-  margin: 0.85rem 0 0.6rem;
+.rcnt-widget > .widget-header {
+  padding: 1.25rem 1.25rem 0;
+  align-items: flex-start;
 }
 
-.rcnt-tile {
+/* Pin "View all" to the title line (the header has a two-line title block). */
+.rcnt-widget > .widget-header > .widget-header-actions {
+  margin-top: 0.1rem;
+}
+
+.rcnt-widget > .widget-body {
+  padding: 0;
+}
+
+/* Summary — the widget's report voice: one flowing line, clauses separated by
+   middots, each leading with an emphasized figure that drills into its
+   category. Uses the full width and reads as a spoken recap. */
+.rcnt-brief {
+  padding-bottom: 1.9rem;
+}
+
+.rcnt-brief-line {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 1rem 1.25rem 0;
+  /* Reserve two lines so a summary that wraps doesn't offset the log beneath it
+     — keeps the two side-by-side cards' rows aligned. */
+  min-height: calc(1rem + 2lh);
+  font-size: 0.95rem;
+  line-height: 2;
+  color: var(--secondary-text);
+  text-wrap: pretty;
+}
+
+/* Two deliberate rows: the first clause leads on its own line, the rest flow on
+   the second. Each clause stays whole (breaks only at a middot separator). */
+.rcnt-brief-row {
+  display: block;
+}
+
+/* The whole clause is the click target — opens its category in the view-all
+   modal. Copper on hover/focus is the one active-state accent on this surface. */
+.rcnt-brief-clause {
   appearance: none;
   border: none;
   background: none;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
   text-align: left;
-  font-family: var(--font-family);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.rcnt-brief-clause:hover {
+  color: var(--primary-text);
+}
+
+.rcnt-brief-clause:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.rcnt-brief-sep {
+  color: var(--secondary-text);
+  opacity: 0.4;
+  margin: 0 0.5rem;
+}
+
+/* The headline figure — emphasized text within the clickable clause. */
+.rcnt-figure {
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+  border-bottom: 1px solid transparent;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.rcnt-brief-clause:hover .rcnt-figure {
+  color: var(--primary-color);
+  border-bottom-color: color-mix(in srgb, var(--primary-color) 40%, transparent);
+}
+
+/* The log — an itemized ledger of the latest changes, divided from the brief
+   by a full-width hairline. */
+.rcnt-log {
+  border-top: 1px solid var(--border-color);
+  padding: 0.55rem 0 0.4rem;
+}
+
+.rcnt-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Each entry is a ledger line: a badge, a two-line left block (item + who /
+   where), and a two-line right block (amount + when). Full-bleed hover. */
+.rcnt-event {
   display: flex;
-  flex-direction: column;
-  gap: 0.18rem;
-  padding: 0.55rem 1.1rem;
-  border-left: 1px solid var(--border-color);
-  border-radius: 0;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.62rem 1.25rem;
   cursor: pointer;
   transition: background-color 0.12s ease;
 }
 
-.rcnt-tile:first-child {
-  border-left: none;
-  padding-left: 0;
+.rcnt-event + .rcnt-event {
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 55%, transparent);
 }
 
-.rcnt-tile:hover:not(:disabled) {
+.rcnt-event:hover {
   background-color: color-mix(in srgb, var(--primary-color) 6%, transparent);
 }
 
-.rcnt-tile:disabled {
-  cursor: default;
+/* In the drill-down popup and the activity timeline the rows hover neutral gray,
+   matching the tables — not the copper tint. */
+.rcnt-event--modal:hover,
+.rpt-timeline .rcnt-event:hover {
+  background-color: var(--hover-bg);
 }
 
-.rcnt-tile-label {
-  font-size: 0.66rem;
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--secondary-text);
+.rcnt-event:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
+}
+
+/* Kind badge — the .rcnt-pill color language shared with the view-all list
+   (green = money in / new work, red = owed out, amber = cost, blue/violet =
+   commitments). The pill hugs its text; a fixed-width column holds it so the
+   headlines still line up. */
+.rcnt-event-badge {
+  flex: none;
+  width: 3.4rem;
+  display: flex;
+}
+
+.rcnt-event-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.rcnt-event-title {
+  min-width: 0;
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--primary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rcnt-tile-value {
-  font-size: 1.25rem;
-  line-height: 1.15;
+.rcnt-event-meta {
+  font-size: 0.76rem;
+  color: var(--secondary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Right block — the money column, with a quiet timestamp beneath it. */
+.rcnt-event-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.12rem;
+  text-align: right;
+}
+
+.rcnt-event-amt {
+  font-size: 0.9rem;
   font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
   color: var(--primary-text);
   white-space: nowrap;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.rcnt-tile-value--zero {
-  color: var(--secondary-text);
-  font-weight: 400;
-}
-
-.rcnt-tile-sub {
-  font-size: 0.72rem;
-  color: var(--secondary-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Table cells (widget top-N table) */
-.rcnt-item-cell {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  min-width: 0;
-}
-
-.rcnt-td-amount {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  font-weight: var(--font-weight-semibold);
-}
-
-.rcnt-td-when {
-  text-align: right;
-  white-space: nowrap;
-  color: var(--secondary-text);
+/* No captured value (e.g. an open PO) — a quiet status, not a broken figure. */
+.rcnt-event-amt--none {
   font-size: 0.78rem;
+  font-weight: var(--font-weight-regular);
+  color: var(--secondary-text);
+  opacity: 0.75;
 }
 
-/* Keep long item titles from stretching the table past the card. */
-.rcnt-table {
-  table-layout: fixed;
+.rcnt-event-time {
+  font-size: 0.7rem;
+  color: var(--secondary-text);
+  opacity: 0.8;
+  white-space: nowrap;
 }
 
-.rcnt-table th:nth-child(2),
-.rcnt-table td:nth-child(2) {
-  width: 6.5rem;
-}
-
-.rcnt-table th:nth-child(3),
-.rcnt-table td:nth-child(3) {
-  width: 6rem;
-}
-
-/* Rows — the view-all modal's list. */
-.rcnt-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.rcnt-row {
-  display: flex;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.5rem 0.35rem;
-  border-radius: 8px;
-}
-
-.rcnt-row + .rcnt-row {
-  border-top: 1px solid var(--border-color);
-}
-
-.rcnt-row-clickable {
-  cursor: pointer;
-  transition: background-color 0.12s ease;
-}
-
-.rcnt-row-clickable:hover {
-  background-color: color-mix(in srgb, var(--primary-color) 7%, transparent);
+/* The view-all modal reuses the log's ledger rows (.rcnt-event), run full-bleed
+   to the modal edges with content re-inset to the modal's 1.5rem gutter. */
+.rcnt-event--modal {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
 }
 
 .rcnt-pill {
@@ -10712,29 +11323,24 @@ svg.placeholder-illustration {
 }
 
 /* Per-kind tints — same soft color-mix chip pattern as the estimation
-   driver pills. Ledger logic: green = money in / new work, red = money
-   owed out, amber = cost hitting the job, blue/violet = commitments. */
+   driver pills. Ledger logic: green = money in / new work, red = money out
+   (costs & AP), amber = commitments (PO/sub). */
 .rcnt-pill--project {
   color: light-dark(#15803d, #5ee08a);
   background: color-mix(in srgb, #22c55e 14%, transparent);
   border-color: transparent;
 }
 
-.rcnt-pill--purchaseOrder {
-  color: light-dark(#1d4ed8, #8ab6ff);
-  background: color-mix(in srgb, #3b82f6 14%, transparent);
-  border-color: transparent;
-}
-
+.rcnt-pill--purchaseOrder,
 .rcnt-pill--subcontract {
-  color: light-dark(#6d28d9, #c4a7f8);
-  background: color-mix(in srgb, #8b5cf6 14%, transparent);
+  color: light-dark(#a16207, #e3b341);
+  background: color-mix(in srgb, #eab308 16%, transparent);
   border-color: transparent;
 }
 
 .rcnt-pill--cost {
-  color: light-dark(#a16207, #e3b341);
-  background: color-mix(in srgb, #eab308 16%, transparent);
+  color: light-dark(#c0392b, #f8857a);
+  background: color-mix(in srgb, #ef4444 14%, transparent);
   border-color: transparent;
 }
 
@@ -10745,8 +11351,8 @@ svg.placeholder-illustration {
 }
 
 .rcnt-pill--arInvoice {
-  color: light-dark(#0f766e, #5eead4);
-  background: color-mix(in srgb, #14b8a6 14%, transparent);
+  color: light-dark(#15803d, #5ee08a);
+  background: color-mix(in srgb, #22c55e 14%, transparent);
   border-color: transparent;
 }
 
@@ -10756,55 +11362,27 @@ svg.placeholder-illustration {
   border-color: transparent;
 }
 
-.rcnt-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.06rem;
-}
-
-.rcnt-title {
-  font-size: 0.84rem;
-  font-weight: 500;
-  color: var(--primary-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rcnt-sub {
-  font-size: 0.72rem;
-  color: var(--secondary-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rcnt-right {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.06rem;
-}
-
-.rcnt-amount {
-  font-size: 0.84rem;
-  font-weight: var(--font-weight-semibold);
-  font-variant-numeric: tabular-nums;
-  color: var(--primary-text);
-}
-
-.rcnt-when {
-  font-size: 0.7rem;
-  color: var(--secondary-text);
-  white-space: nowrap;
-}
-
 /* Detail modal */
-.rcnt-modal .modal-header {
-  margin-bottom: 0.6rem;
+.rcnt-modal {
+  max-width: 640px;
+}
+
+/* Header mirrors the widget it opened from: title over a "Since …" subtitle. */
+.rcnt-modal-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.rcnt-modal-heading h2 {
+  margin: 0;
+}
+
+.rcnt-modal-subtitle {
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-regular);
+  color: var(--secondary-text);
 }
 
 .rcnt-chips {
@@ -10844,10 +11422,35 @@ svg.placeholder-illustration {
   color: #fff;
 }
 
+/* Full-bleed the scrolling list to the modal's edges (the modal's 1.5rem
+   padding would otherwise inset it); rows re-inset their own content. */
 .rcnt-modal-body {
   overflow-y: auto;
   max-height: min(60vh, 34rem);
+  margin: 0 -1.5rem;
   padding-top: 0.25rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+.rcnt-modal-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.rcnt-modal-body::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.rcnt-modal-body::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary-text);
+  background-clip: padding-box;
+}
+
+.rcnt-modal-body::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .rcnt-group + .rcnt-group {
@@ -10859,7 +11462,7 @@ svg.placeholder-illustration {
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.35rem 0.35rem 0.3rem;
+  padding: 0.35rem 1.5rem 0.3rem;
   font-size: 0.68rem;
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.07em;
@@ -10879,30 +11482,6 @@ svg.placeholder-illustration {
   text-align: center;
 }
 
-/* Mobile: tiles become a two-column grid with hairlines between rows. */
-@media (max-width: 768px) {
-  .rcnt-tiles {
-    grid-auto-flow: row;
-    grid-auto-columns: unset;
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .rcnt-tile,
-  .rcnt-tile:first-child {
-    border-left: none;
-    border-top: 1px solid var(--border-color);
-    padding: 0.6rem 0.35rem;
-  }
-
-  .rcnt-tile:nth-child(-n + 2) {
-    border-top: none;
-  }
-
-  .rcnt-tile:nth-child(2n) {
-    border-left: 1px solid var(--border-color);
-    padding-left: 1rem;
-  }
-}
 
 
 /* ─── Idle refresh overlay ───────────────────────────────────────────────────
@@ -10992,5 +11571,1127 @@ svg.placeholder-illustration {
   .idle-overlay,
   .idle-overlay-card {
     animation: none;
+  }
+}
+
+/* ═══ Daily Report & Reports page ══════════════════════════════════════════
+   The once-a-day welcome modal (.rpt-modal), its metric tiles (.rpt-grid /
+   .rpt-tile — shared with the Reports page), the intro coachmarks
+   (.report-hint on the header clock, .nav-hint on the nav item), and the
+   Reports page controls (.rpt-controls, .rpt-cal mini-calendar). Feed rows
+   reuse the .rcnt-* classes. */
+
+.rpt-modal {
+  max-width: 880px;
+  width: min(880px, 94vw);
+}
+
+/* The daily-recap re-open (header clock button) mirrors the full-screen arrival:
+   a centered column — R logo → "here's what happened yesterday" — above the same
+   sectioned metric grid. .modal is content-box, so this width IS the content/grid
+   width: matched to the arrival's inner column (44rem − 2rem padding = 640px) so
+   the 3-up tiles render at the exact same size. */
+.rpt-modal--recap {
+  max-width: 640px;
+  width: min(640px, 94vw);
+  text-align: center;
+}
+
+/* PM recap: Job Activity is four tiles (Costs Committed split into Orders Placed
+   + Subcontracts), so widen the modal to fit them at the same per-tile width the
+   three-up admin grid uses (640px content 592 → four-up needs ≈843px). Same
+   intent as .arr-intro-shell--wide for the full-screen arrival. */
+.rpt-modal--recap.rpt-modal--wide {
+  max-width: 844px;
+  width: min(844px, 94vw);
+}
+
+/* .modal is position:fixed, so this anchors to the modal corner. */
+.rpt-recap-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+
+.rpt-recap-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.rpt-recap-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+/* Matches the arrival intro's subtitle (.arr-intro-sub); spacing is handled by
+   the head's flex gap, so no top margin here. */
+.rpt-recap-sub {
+  max-width: 34rem;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--secondary-text);
+}
+
+/* Center the section titles too, echoing the arrival. The title span already
+   stretches full-width, so text-align centers it without shrinking the grid
+   (which, unlike .arr-grid, has no explicit width). */
+.rpt-modal--recap .rpt-section-title {
+  text-align: center;
+}
+
+.rpt-modal-body {
+  min-width: 0;
+}
+
+.rpt-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.rpt-dismiss {
+  padding: 0.45rem 1.25rem;
+  cursor: pointer;
+}
+
+/* ── Metric tiles ── */
+
+/* The two logs (Job Activity, Billing & Cash) stack with clear air between
+   them; each carries its own little title above a row of tiles. */
+.rpt-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  /* Cap the grid to the recap modal's content width (640px) so the 3-up tiles
+     render at the same size on the full-width Activity page as they do in the
+     modal, instead of stretching across the whole page. No-op inside the modal,
+     whose content box is already 640px. */
+  max-width: 640px;
+}
+
+/* On a wide page the two logs sit side by side — each keeping its 3-up row of
+   tiles — split by a divider. Each section still caps at the 640px modal width so
+   the tiles stay modal-sized. The recap modal is narrow, so it's reset back to
+   the stacked column below. */
+@media (min-width: 1160px) {
+  .rpt-sections {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 2.75rem;
+    max-width: none;
+  }
+  .rpt-section {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 640px;
+  }
+  .rpt-section + .rpt-section {
+    border-left: 1px solid var(--border-color);
+    padding-left: 2.75rem;
+  }
+  /* Keep the recap modal's two logs stacked in its narrow 640px column. */
+  .rpt-modal .rpt-sections {
+    flex-direction: column;
+    gap: 2rem;
+  }
+  .rpt-modal .rpt-section {
+    max-width: none;
+  }
+  .rpt-modal .rpt-section + .rpt-section {
+    border-left: none;
+    padding-left: 0;
+  }
+}
+
+.rpt-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.rpt-section-title {
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+}
+
+.rpt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.rpt-grid--six,
+.rpt-grid--four {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.rpt-grid--four {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* PM Job Activity splits "Costs Committed" into Orders Placed + Subcontracts,
+   so its operations section carries four tiles in a single row. On the wide
+   Reports page these fill the width; the space-constrained recap column widens
+   itself (see .arr-intro-shell--wide) so each tile keeps its three-up width. */
+.rpt-grid--cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.rpt-tile {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  padding: 1.5rem 1.4rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  /* Same drop shadow the timeline's .card wrapper carries, for consistency. */
+  box-shadow: var(--button-shadow);
+  font-family: var(--font-family);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+/* One hover for every activity-report tile (recap modal, Reports page, arrival):
+   a subtle tinted fill layered over the card so it stays opaque, border held. */
+.rpt-tile:hover {
+  background: color-mix(in srgb, var(--card-color), var(--primary-text) 4%);
+}
+
+/* The category badge leads the tile — same color language as the feed rows, so
+   a glance ties the figure to the kind of activity behind it. */
+.rpt-tile-pill {
+  align-self: flex-start;
+  margin-bottom: 0.6rem;
+}
+
+.rpt-tile-label {
+  font-size: 0.82rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--primary-text);
+}
+
+.rpt-tile-value {
+  font-size: 1.55rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.rpt-tile-meta {
+  font-size: 0.76rem;
+  color: var(--secondary-text);
+}
+
+/* Skeleton tile keeps the real .rpt-tile box; its invisible line copies fix the
+   exact height, and one shimmer overlay reads as a single solid block — using the
+   shared dashboard shimmer (same keyframe + gradient as .widget-skeleton /
+   .skel-line) so it matches every other loading state. */
+.rpt-tile--skeleton {
+  position: relative;
+  overflow: hidden;
+  pointer-events: none;
+  cursor: default;
+}
+
+.rpt-tile--skeleton > * {
+  visibility: hidden;
+}
+
+.rpt-tile--skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 20%,
+    color-mix(in srgb, var(--primary-text) 2%, var(--card-color)) 50%,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 80%
+  );
+  background-size: 900px 100%;
+  animation: shimmer 3.2s linear infinite;
+}
+
+/* Page context: tiles sit on the page background, feed widget below — held on
+   the same 2rem rhythm as the controls and the summary's inter-log gap. */
+.rpt-feed-widget {
+  margin-top: 2rem;
+}
+
+.rpt-feed-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+/* ── Activity timeline (Reports page feed) ──
+   The metric tiles are the tally; this is the play-by-play — one chronological
+   stream, narrowable by category. Reuses the feed rows (.rcnt-*) and the
+   drill-down chips (.rcnt-chip) so it reads as the same surface. */
+
+/* Filter row atop the stream — the tiles' categories as chips, so a chip lines
+   up with its tile. Divided from the list by the same hairline the group heads
+   use. Chips wrap on narrow widths. */
+.rpt-timeline-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* The count rides quietly at the end of each chip — tabular so the digits don't
+   jitter as the active chip swaps. */
+.rpt-chip-count {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.55;
+  margin-left: 0.1rem;
+}
+
+/* On the active (copper-filled) chip the count sits on the fill, so lift it. */
+.rcnt-chip--active .rpt-chip-count {
+  opacity: 0.85;
+}
+
+.rpt-timeline > .rpt-feed-groups {
+  padding: 0.5rem 0 0.3rem;
+}
+
+/* Single-day windows render one flat feed with no day headers — give it the
+   same little breathing room the grouped variant gets. */
+.rpt-timeline > .rcnt-feed {
+  padding: 0.35rem 0 0.2rem;
+}
+
+/* Day divider — the .rcnt-group-head look, but a readable date (normal case,
+   not the uppercase category eyebrow) aligned to the row gutter (1.25rem). */
+.rpt-tl-day {
+  padding-inline: 1.25rem;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.74rem;
+}
+
+.rpt-timeline-empty {
+  padding: 2.5rem 0;
+}
+
+/* ── Header clock button hint (intro coachmark #1) ── */
+
+.rpt-btn-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+/* First-run coachmark: lift the REAL clock (and its hint) above the blurred,
+   dimmed .rpt-coach layer (z 500) so it reads as the one crisp, highlighted
+   control over the page. */
+.rpt-btn-anchor--coach {
+  z-index: 600;
+}
+
+/* Over the blur the clock reads as a solid, self-contained control: an opaque
+   chip on the dashboard background, a NEUTRAL icon (no copper), and a big, smooth
+   copper pulse ring rippling out around it. Hover holds the same look (no shift). */
+.rpt-btn-anchor--coach .rpt-btn {
+  background: var(--background-color);
+  border-color: var(--border-color);
+  color: var(--primary-text);
+  animation: coachPulse 2.2s ease-out infinite;
+}
+.rpt-btn-anchor--coach .rpt-btn:hover {
+  background: var(--background-color);
+  border-color: var(--border-color);
+  color: var(--primary-text);
+}
+
+/* Bigger + smoother than gearPulse: a single continuous ripple (0 → 12px) that
+   fades to nothing, so the loop restart is invisible. Copper, used by both the
+   coach clock and the Reports nav item. */
+@keyframes coachPulse {
+  0% { box-shadow: 0 0 0 0 rgb(from var(--primary-color) r g b / 0.45); }
+  100% { box-shadow: 0 0 0 12px rgb(from var(--primary-color) r g b / 0); }
+}
+
+/* …but the dashboard's paged layout makes .page-header a stacking context
+   (`.page:has(.section-pager) .page-header` sets position:absolute; z-index:10),
+   which would trap the lifted clock below the coach. While coaching, drop that
+   header z-index back to auto — it stays positioned for layout but is no longer
+   a stacking context, so the anchor's z-600 escapes to the root context and
+   clears the z-500 coach, while the rest of the header stays under the blur.
+   (Non-paged headers — the PM home — aren't stacking contexts, so no override
+   is needed there; the anchor already escapes.) */
+.page:has(.section-pager) .page-header:has(.rpt-btn-anchor--coach) {
+  z-index: auto;
+}
+
+
+/* The header icon buttons (clock + gear) borrow the year-selector's quiet
+   outline so they read as sibling header controls rather than bare icons
+   (transparent until hover, then a quiet gray fill; copper edge only on
+   keyboard focus). Overrides .btn-icon's border:none / hover fill. */
+.rpt-btn {
+  /* border-box so the 1.5px outline sits INSIDE the .btn-icon 2.25rem box —
+     without it the border inflates the button past its pill/clock siblings. */
+  box-sizing: border-box;
+  border: 1.5px solid var(--border-color);
+  border-radius: 999px;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.rpt-btn:hover {
+  background: var(--hover-bg);
+  border-color: var(--border-color);
+  color: var(--primary-text);
+}
+
+.rpt-btn:focus-visible {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent);
+}
+
+/* Same card treatment as .gear-hint, but anchored to its button rather than
+   hard-positioned against the page — the clock's spot varies with siblings. */
+.report-hint {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 30;
+  width: 250px;
+  padding: 0.95rem 1rem 1rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: light-dark(0 14px 36px rgba(0, 0, 0, 0.18), 0 14px 36px rgba(0, 0, 0, 0.55));
+  /* Delayed so it lands AFTER the spotlight scrim has blurred in — the page dims
+     first, then the tooltip renders over it. */
+  animation: gearHintIn 0.28s ease 0.4s both;
+}
+
+.report-hint-arrow {
+  position: absolute;
+  top: -7px;
+  /* Button is 2.25rem wide and the hint's right edge aligns with its right
+     edge — center the arrow under it. */
+  right: 11.5px;
+  width: 13px;
+  height: 13px;
+  background: var(--card-color);
+  border-left: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
+  transform: rotate(45deg);
+}
+
+/* ── Reports nav item hint (intro coachmark #2) ── */
+
+.nav-hint {
+  position: fixed;
+  transform: translateY(-50%);
+  z-index: 1000;
+  width: 250px;
+  padding: 0.95rem 1rem 1rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: light-dark(0 14px 36px rgba(0, 0, 0, 0.18), 0 14px 36px rgba(0, 0, 0, 0.55));
+  /* NOT gearHintIn: that ends on `transform: none`, which (with `both`) would
+     wipe the translateY(-50%) this popover uses to center on the nav item and
+     drop it below the item. This keyframe lands on the centered transform. */
+  animation: navHintIn 0.28s ease both;
+}
+
+@keyframes navHintIn {
+  from { opacity: 0; transform: translateY(calc(-50% - 6px)) scale(0.97); }
+  to { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+
+.nav-hint-arrow {
+  position: absolute;
+  left: -7px;
+  top: calc(50% - 6.5px);
+  width: 13px;
+  height: 13px;
+  background: var(--card-color);
+  border-left: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  transform: rotate(45deg);
+}
+
+/* Reuses the gear's pulse; nav buttons take it on their own rounded shape. During
+   the intro this item is the one being taught, so — like the header clock — it
+   lifts above the coach blur (z 500) onto an opaque chip so it reads crisp while
+   the rest of the sidebar stays blurred. (.nav-button is already position:relative.) */
+.nav-button-attention {
+  animation: coachPulse 2.2s ease-out infinite;
+  z-index: 600;
+  background: var(--background-color);
+}
+
+/* No hover shift while the overlay is active — hover matches the resting chip. */
+.nav-button-attention:hover {
+  background: var(--background-color);
+  color: var(--secondary-text);
+}
+
+/* The nav item spans the full sidebar width, so its pulse ring would be clipped
+   left/right by the sidebar's overflow:hidden (leaving only top/bottom showing).
+   While the coach is up, let the sidebar overflow so the ring ripples out to the
+   right over the blurred page. Safe: collapsed labels are opacity:0, so nothing
+   else spills. */
+.navbar:has(.nav-button-attention) {
+  overflow: visible;
+}
+
+/* ── Reports page controls ── */
+
+/* The page stacks on one deliberate 2rem rhythm — controls, the summary grid
+   (whose two logs are also 2rem apart), then the timeline — so every block is
+   evenly separated rather than the summary breathing wider than the gaps around
+   it. */
+.rpt-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.rpt-cal-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.rpt-cal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.rpt-cal {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  width: 252px;
+  padding: 0.75rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: light-dark(0 14px 36px rgba(0, 0, 0, 0.18), 0 14px 36px rgba(0, 0, 0, 0.55));
+  animation: gearHintIn 0.2s ease both;
+}
+
+.rpt-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.rpt-cal-month {
+  font-size: 0.82rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+
+/* Keep the month-nav chevrons visible even where .btn-icon is display:none. */
+.rpt-cal-nav {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.rpt-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.rpt-cal-dow {
+  text-align: center;
+  font-size: 0.66rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--secondary-text);
+  padding-bottom: 0.2rem;
+}
+
+.rpt-cal-day {
+  appearance: none;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  padding: 0.32rem 0;
+  font-family: var(--font-family);
+  font-size: 0.76rem;
+  color: var(--primary-text);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.rpt-cal-day:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+
+.rpt-cal-day:disabled {
+  color: var(--secondary-text);
+  opacity: 0.4;
+  cursor: default;
+}
+
+.rpt-cal-day--today {
+  font-weight: var(--font-weight-semibold);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+}
+
+/* Selected day — the calendar's one copper moment. */
+.rpt-cal-day--selected,
+.rpt-cal-day--selected:hover:not(:disabled) {
+  background: var(--primary-color);
+  color: #fff;
+}
+
+/* ── Mobile ── */
+
+@media (max-width: 768px) {
+  .rpt-grid,
+  .rpt-grid--six,
+  .rpt-grid--four,
+  .rpt-grid--cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rpt-tile-value {
+    font-size: 1.2rem;
+  }
+
+  /* The header clock is hidden with the other .btn-icon controls; its hint goes
+     with it (mobile reopen path is the Reports page). */
+  .report-hint { display: none; }
+
+  .rpt-modal-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .rpt-dismiss { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .report-hint,
+  .nav-hint,
+  .rpt-cal,
+  .nav-button-attention,
+  .rpt-btn-anchor--coach .rpt-btn,
+  .rpt-tile--skeleton::after {
+    animation: none;
+  }
+}
+
+/* ═══ Daily Arrival ════════════════════════════════════════════════════════
+   Full-screen entry sequence (.arr-screen) that plays while the dashboard
+   preloads behind it — the promoted successor to the .rpt-modal welcome.
+   Tiles reuse the .rpt-tile inner markup; only the layout around them is
+   arrival-owned. The arrival never shows the skeleton (it lays tiles out from a
+   zero summary and fades the figures in); the .rpt-tile--skeleton shimmer is the
+   modal/Reports loading state only. Motion is framer-driven. */
+
+/* Opaque overlay above the app chrome. z sits JUST BELOW the modal base
+   (useModalLayer BASE_Z = 200) on purpose: the arrival's own tile drill-down is
+   a normal modal (layer 200+), so it must stack ABOVE the arrival. In the
+   blocking case the app children are withheld, so nothing else competes; in the
+   overlay case only transient chrome (flyouts/hints) sits higher, and the
+   arrival covers the nav that would trigger it. Repaints the body's ambient glow
+   with background-attachment: fixed (the --app-bg-glow trick) so the exit blur
+   dissolves into a visually continuous page. */
+.arr-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  background-color: var(--background-color);
+  background-image: var(--app-bg-glow);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+
+/* margin:auto inside the flex root centers the column vertically when it fits
+   and degrades to normal top-aligned scrolling on short viewports. */
+.arr-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  max-width: 44rem;
+  margin: auto;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+/* Date eyebrow stays neutral — unlike the modal's copper .rpt-eyebrow, the
+   arrival screen saves its one copper moment for the primary CTA. */
+.arr-eyebrow {
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+}
+
+.arr-greeting {
+  margin: 0.9rem 0 0;
+  font-size: calc(var(--large-title-size) * 1.3);
+  line-height: 1.2;
+  font-weight: var(--large-title-weight-emphasized);
+  color: var(--primary-text);
+}
+
+.arr-subtitle {
+  margin: 0.6rem 0 0;
+  font-size: 0.9rem;
+  color: var(--secondary-text);
+}
+
+.arr-intro {
+  margin: 1.1rem 0 0;
+  max-width: 36rem;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--secondary-text);
+}
+
+.arr-intro-title {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+
+/* ── Recap tiles ── */
+
+/* The block occupies its full height from first paint — the whole recap is laid
+   out and centered up front, and each element only fades/rises into its already
+   final slot (opacity + transform, no layout change), so nothing above ever
+   reflows or re-centers. */
+.arr-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  width: 100%;
+  margin-top: 2.5rem;
+  /* Extra breathing room above the tiles (on top of the 2.5rem margin) and below
+     them, so the tile block isn't cramped between the welcome text and the CTAs
+     — ~50% more block spacing. */
+  padding-block: 1.25rem;
+}
+
+.arr-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  align-items: center;
+}
+
+/* Timeline arrival centers its section labels (the intro walkthrough keeps its
+   own left-aligned leads). */
+.arr-section .rpt-section-title {
+  text-align: center;
+}
+
+.arr-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  width: 100%;
+}
+
+/* PM first-run recap: the Job Activity section carries four tiles (Orders Placed
+   + Subcontracts split out of Costs Committed) in a single row. The recap column
+   widens for PM (.arr-intro-shell--wide / .arr-content--wide) so these four fill
+   it at the same width the three tiles had — no breakout past the height-clipped
+   .arr-block, which would clip the edge tiles. Responsive blocks reset to 2-up. */
+.arr-grid--cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Non-interactive tiles (timeline arrival, and the intro tiles before the
+   "click any tile…" hint is shown) — strip .rpt-tile's button affordances. */
+.arr-tile,
+.arr-tile:hover {
+  cursor: default;
+  background: var(--card-color);
+}
+
+/* Arrival tiles are clickable once live; the hover itself is the shared
+   .rpt-tile:hover, so they match the modal and Reports tiles exactly. */
+.rpt-tile.arr-tile-live {
+  cursor: pointer;
+}
+
+/* The tile shell owns padding/border; the keyed body wrapper (crossfades
+   skeleton → data) reproduces .rpt-tile's own column layout. */
+.arr-tile-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 0.45rem;
+  min-width: 0;
+}
+
+.arr-failed {
+  margin: 2.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--secondary-text);
+}
+
+/* ── CTAs ── */
+
+.arr-cta-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  margin-top: 4rem;
+}
+
+.arr-ctas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/* Shared sizing bump over the compact in-page .primary-button — these are the
+   screen's destination choices, not toolbar chrome. */
+.arr-cta {
+  padding: 0.55rem 1.4rem;
+  font-size: 0.875rem;
+  border-radius: 999px;
+  font-family: var(--font-family);
+  cursor: pointer;
+}
+
+/* Neutral sibling of the copper primary — card surface, quiet border. */
+.arr-cta--secondary {
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  color: var(--primary-text);
+  font-weight: var(--font-weight-semibold);
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+/* Matches the recap tile hover (.rpt-tile.arr-tile-live:hover) — a subtle tinted
+   fill with the border held steady, rather than darkening it. */
+.arr-cta--secondary:hover {
+  background: color-mix(in srgb, var(--card-color), var(--primary-text) 4%);
+  border-color: var(--border-color);
+}
+
+/* Tertiary deep-link continuation — text-only, no pill chrome. */
+.arr-cta--text {
+  background: none;
+  border: none;
+  padding: 0.55rem 0.5rem;
+  font-family: var(--font-family);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--secondary-text);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.arr-cta--text:hover {
+  color: var(--primary-text);
+}
+
+/* ── First-run guided walkthrough (IntroArrival) ── */
+/* Clones .arr-content's centering: margin:auto keeps the column centered when it
+   fits and degrades to top-aligned scroll on short viewports. Sections and the
+   footer each animate their own height open, so the column grows and re-centers
+   every frame — no layout projection, nothing snaps. Inter-region spacing lives
+   as padding-top INSIDE each height-animated slot so it collapses to zero along
+   with the slot (a margin would leave a gap while the slot is still closed). */
+.arr-intro-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  max-width: 44rem;
+  margin: auto;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+/* PM recap: the Job Activity row is four tiles, not three. Widen the column so
+   the extra tile fits at the SAME per-tile width (three-up content 40rem →
+   four-up 53.67rem, + 4rem padding ≈ 57.7rem) instead of squeezing the tiles.
+   The hero text is capped back to the original width so only the tile row uses
+   the extra space. Applies to both the intro and daily (.arr-content) columns. */
+.arr-intro-shell--wide,
+.arr-content--wide {
+  max-width: 57.7rem;
+}
+
+.arr-intro-shell--wide .arr-greeting,
+.arr-intro-shell--wide .arr-intro-sub,
+.arr-content--wide .arr-greeting,
+.arr-content--wide .arr-intro-sub {
+  max-width: 40rem;
+}
+
+.arr-intro-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* The R logo above the heading — centered, brand-first. */
+.arr-logo {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.4rem;
+}
+
+/* Timeline arrival wants more breathing room between the R and the date than the
+   intro hero does (scoped to .arr-content so the intro stays untouched). */
+.arr-content .arr-logo {
+  margin-bottom: 1.1rem;
+}
+
+/* The secondary hero line — sized like a section lead, not the small timeline
+   subtitle: "Here's what happened yesterday." under the big introduction. */
+.arr-intro-sub {
+  margin: 0.9rem 0 0;
+  max-width: 34rem;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--secondary-text);
+}
+
+/* PM-only affordance revealed just above the tiles, in the subtitle's font.
+   Centered within the full-width block (auto side margins), spaced off the grid. */
+.arr-intro-hint {
+  margin: 0 auto 1.5rem;
+  max-width: 34rem;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--secondary-text);
+  text-align: center;
+}
+
+/* A revealed section — the outer node animates height:0 → auto (overflow hidden
+   via inline style); the inner node holds the content and the top spacing. */
+.arr-block {
+  width: 100%;
+}
+
+.arr-block-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  /* ~50% more block padding than the base 2.3rem, plus room beneath the tiles,
+     so each revealed section sits clear of the welcome text above and the CTAs
+     below (matches the timeline arrival's .arr-sections spacing). */
+  padding-top: 3.45rem;
+  padding-bottom: 1.25rem;
+}
+
+/* A section that follows another (admin's financials under operations) only has
+   to clear the previous section's tiles, not the hero text — so it drops the
+   generous top padding. 0.5rem here + the previous block's 1.25rem bottom gives
+   a ~1.75rem gap, matching the timeline arrival's inter-section spacing. */
+.arr-block + .arr-block .arr-block-inner {
+  padding-top: 0.5rem;
+}
+
+/* Section header on the first run — a walk-through sentence styled to match the
+   hero subtitle (.arr-intro-sub), with room beneath it before the tiles. */
+.arr-block-lead {
+  /* Auto side margins center the box within its full-width wrapper — the lead
+     sits in an overflow:hidden morph slot (width:100%), so margin:0 would pin its
+     34rem box to the left even though its text is centered. */
+  margin: 0 auto 1.5rem;
+  max-width: 34rem;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--secondary-text);
+}
+
+/* The compact recap title the walkthrough sentence morphs into on the final
+   arrow click — reuses .rpt-section-title, spaced above its tile grid. */
+.arr-block-title {
+  display: block;
+  margin-bottom: 1.1rem;
+}
+
+/* Quiet affordance line under the first section's tiles ("Click any tile…") —
+   smaller and more secondary than the section lead. */
+.arr-tile-hint {
+  margin: 1.25rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: var(--secondary-text);
+}
+/* The "Email me" mailto reads as the one live action on the line — copper only
+   on hover (design restraint), quiet otherwise. */
+.arr-tile-hint-mail {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.15s ease;
+}
+.arr-tile-hint-mail:hover {
+  color: var(--primary-color);
+}
+
+/* Sign-off line above the destination buttons — section-lead sentence styling
+   (.arr-block-lead) but smaller and quieter; the mailto reads as the one
+   interactive word (copper on hover). */
+.arr-contact {
+  margin: 0 0 0.3rem;
+  font-size: 0.82rem;
+}
+
+.arr-contact a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.12s ease;
+}
+
+.arr-contact a:hover {
+  color: var(--primary-color);
+}
+
+.arr-failed--inline {
+  margin: 0 0 0.2rem;
+}
+
+/* The advance affordance — the walkthrough's per-step primary action, so it
+   carries the one copper moment on screen (the destination buttons that
+   eventually replace it carry the next one; the two never coexist). */
+.arr-advance {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--primary-color);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 22px -8px rgb(from var(--primary-color) r g b / 0.65);
+  transition: background-color 0.14s ease;
+}
+
+.arr-advance:hover {
+  background: var(--primary-color-hover);
+}
+
+.arr-advance:disabled {
+  cursor: default;
+}
+
+.arr-advance:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 3px;
+}
+
+.arr-advance-chevron,
+.arr-advance-spinner {
+  display: inline-flex;
+}
+
+.arr-foot {
+  width: 100%;
+}
+
+.arr-foot-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Holds the top spacing so it collapses with the slot's height animation; the
+   CTA column reuses .arr-ctas / .arr-cta* from the timeline arrival. */
+/* padding-bottom gives the copper arrow's drop shadow room inside the slot's
+   overflow:hidden (the height animation clip) so it isn't sheared off. */
+.arr-foot-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  width: 100%;
+  padding-top: 2.5rem;
+  padding-bottom: 1.5rem;
+}
+
+/* ── First-run clock coachmark backdrop (DailyReportCoach) ── */
+/* A blurred, dimmed layer over the live dashboard (the arrival fades out to
+   reveal it). Portaled to <body>; the REAL header clock lifts itself above this
+   (.rpt-btn-anchor--coach) so no mock header is needed. */
+.rpt-coach {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2.5px);
+  -webkit-backdrop-filter: blur(2.5px);
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 900px) {
+  .arr-grid,
+  .arr-grid--cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Match .rpt-grid's compact treatment: two columns, smaller headline figure. */
+@media (max-width: 768px) {
+  .arr-content,
+  .arr-intro-shell {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .arr-greeting {
+    font-size: var(--large-title-size);
+  }
+
+  .arr-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .arr-grid .rpt-tile-value {
+    font-size: 1.2rem;
+  }
+
+  .arr-ctas {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
   }
 }

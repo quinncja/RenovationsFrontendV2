@@ -65,7 +65,6 @@ function assembleSections(
   sectionOrder: SectionId[]
 ): SectionLayout[] {
   const bucket: Record<SectionId, WidgetLayoutItem[]> = {
-    recentChanges: [],
     reports: [],
     businessDevelopment: [],
     businessPerformance: [],
@@ -122,16 +121,9 @@ function migrateSections(sections: SectionLayout[], savedVersion: number): Secti
       )
     }
   }
-  // v5 — Recent Changes must lead the home page even for users with a saved
-  // section order (assembleSections appends unknown sections last, which would
-  // bury the new time-sensitive section below the fold).
-  if (savedVersion < 5) {
-    const idx = sections.findIndex((s) => s.id === "recentChanges")
-    if (idx > 0) {
-      const [recentChanges] = sections.splice(idx, 1)
-      sections = [recentChanges, ...sections]
-    }
-  }
+  // v5 hoisted the Recent Changes section to the front; the section was
+  // retired in v6 (unknown-id stripping removes it from saved docs), so the
+  // migration body is gone — only the version bump remains meaningful.
   return sections
 }
 

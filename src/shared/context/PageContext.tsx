@@ -15,6 +15,7 @@ import {
   type PageParams,
   type PageDataResponse,
 } from "../api/pageApi"
+import { takePreloadedPageData } from "../api/pageDataCache"
 
 interface PageContextValue {
   data: PageDataResponse
@@ -117,12 +118,22 @@ export function PageDataProvider({
       setError(null)
 
       try {
-        const result = await fetchPageData({
-          module,
-          queries,
-          params,
-          signal: controller.signal,
-        })
+        // Adopt a daily-arrival preload if one matches; consume-once means a
+        // refetch bump or remount still issues a real request.
+        const preloaded = takePreloadedPageData(module, queries, params)
+        let result: PageDataResponse
+        if (preloaded) {
+          try {
+            result = await preloaded
+          } catch {
+            // A failed preload shouldn't surface as the page's error — retry
+            // with a normal fetch instead.
+            result = await fetchPageData({ module, queries, params, signal: controller.signal })
+          }
+        } else {
+          result = await fetchPageData({ module, queries, params, signal: controller.signal })
+        }
+        if (controller.signal.aborted) return
         setData(result)
         setIsLoading(false)
       } catch (err) {

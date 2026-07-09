@@ -12,7 +12,7 @@ interface OpenMonth {
   openMonthOverUnder?: number
 }
 
-export function AnnualRevenueWidget() {
+export function AnnualRevenueWidget({ colSpan }: { colSpan?: 1 | 2 }) {
   const [includeOverUnder] = useIncludeOverUnder()
   const { data, isLoading } = useWidgetData<{
     annualRevenueTrend: { year: number; revenue: number }[] | null
@@ -60,14 +60,19 @@ export function AnnualRevenueWidget() {
     [currentYear]
   )
 
-  // Mobile: the full run of years crowds the x axis — label every other one,
-  // anchored from the end so the latest year always keeps its label.
+  // When the chart is narrow — on mobile, or laid out at half width (colSpan 1)
+  // — the full run of years crowds the x axis. Label every other one, anchored
+  // from the end so the latest year always keeps its label, and force the first
+  // year to keep its label too so the range stays legible at both ends.
   const isMobile = useIsMobile()
+  const narrow = isMobile || colSpan === 1
   const axisBottomTickValues = useMemo(() => {
-    if (!isMobile || !series) return undefined
+    if (!narrow || !series) return undefined
     const xs = series[0].data.map((p) => String(p.x))
-    return xs.filter((_, i) => (xs.length - 1 - i) % 2 === 0)
-  }, [isMobile, series])
+    const ticks = xs.filter((_, i) => (xs.length - 1 - i) % 2 === 0)
+    if (xs.length > 0 && !ticks.includes(xs[0])) ticks.unshift(xs[0])
+    return ticks
+  }, [narrow, series])
 
   // Flag the title when the toggle is folding the open year's WIP into its
   // trend point (income is always folded; the over/under is the WIP part).
