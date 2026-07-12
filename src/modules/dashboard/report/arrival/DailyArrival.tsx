@@ -36,7 +36,7 @@ export interface DailyArrivalProps {
 // the window spans it.
 function sinceText(payload: ReportPayload): string {
   const range = windowToRange(payload.window)
-  if (payload.window.includesWeekend) return "Friday and over the weekend"
+  if (payload.window.includesWeekend) return "since Friday morning"
   if (range.from === addDays(chicagoToday(), -1)) return "yesterday"
   return dayLabel(range.from).split(",")[0] // weekday name
 }
