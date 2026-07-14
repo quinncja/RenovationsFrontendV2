@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate, useLocation } from "react-router-dom"
 import { Settings, ChevronsRight, ChevronsLeft, ChevronRight } from "lucide-react"
@@ -8,6 +8,8 @@ import { isNavGroup, isNavDivider, type NavGroup } from "../auth/roles"
 import { SettingsModal } from "../../shared/components/SettingsModal/SettingsModal"
 import { useDailyReport } from "../../modules/dashboard/report/DailyReportContext"
 import { NavReportsHint } from "../../modules/dashboard/report/NavReportsHint"
+import { registerCoachTarget } from "../onboarding/coachTargets"
+import type { NavbarVeil } from "../../modules/dashboard/onboarding/AdminOnboarding"
 import Logo from "./Logo"
 import LogoText from "./LogoText"
 
@@ -47,7 +49,7 @@ function NavGroupItem({
   )
 }
 
-function Navbar() {
+function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [isOpen, setIsOpen] = useLocalStorage("navbarOpen", true)
@@ -57,6 +59,11 @@ function Navbar() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   // Intro coachmark for the Reports nav item (step 2; see DailyReportContext).
   const { introStep } = useDailyReport()
+  // Exposes the Job Cost nav button to the onboarding host (coachTargets.ts)
+  // without document.querySelector; only attached to that one leaf item below.
+  const jobcostRef = useCallback((el: HTMLButtonElement | null) => {
+    registerCoachTarget("nav-jobcost", el)
+  }, [])
 
   // Flyout panel for nav groups: hover/click a group → its children float out to
   // the right, anchored to the group row. Works the same open or collapsed.
@@ -117,7 +124,7 @@ function Navbar() {
 
   return (
     <>
-      <div className={`navbar ${isOpen ? "navbar-open" : ""}`}>
+      <div className={`navbar ${isOpen ? "navbar-open" : ""}${veil !== "off" ? " navbar--tour" : ""}${veil === "veiled" ? " navbar--veiled" : ""}`}>
         <div className="logo-wrapper" onClick={() => navigate("/dashboard", { state: { resetHome: true } })}>
           <div className="logo-icon">
             <Logo size={32} />
@@ -140,6 +147,7 @@ function Navbar() {
             ) : (
               <button
                 key={item.path}
+                ref={item.path === "/jobcost" ? jobcostRef : undefined}
                 data-nav={item.path}
                 className={`button nav-button${location.pathname === item.path || location.pathname.startsWith(`${item.path}/`) ? " nav-button-active" : ""}${introStep === 2 && item.path === "/reports" ? " nav-button-attention" : ""}`}
                 onClick={() => {

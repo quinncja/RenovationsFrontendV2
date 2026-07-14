@@ -3,7 +3,7 @@ import { useAuth } from "../AuthProvider"
 import { auth } from "../firebase"
 import { fetchPageData } from "../../../shared/api/pageApi"
 import { selectSupervisor } from "../../../shared/api/mutationApi"
-import { stampOnboardedAt } from "../../../modules/dashboard/report/DailyReportContext"
+import { useOnboarding } from "../../../core/onboarding/OnboardingProvider"
 import { EmployeeAvatar } from "../../../shared/components/EmployeeAvatar/EmployeeAvatar"
 import { ConfirmModal } from "../../../shared/components/ConfirmModal/ConfirmModal"
 
@@ -39,12 +39,14 @@ function splitName(name: string): { firstName: string; lastName: string } {
  * First-run screen for a project manager: pick which supervisor you are. The
  * choice is tied to the account as the `employeeId` custom claim (backend
  * validates it against the live supervisor list), after which the dashboard is
- * scoped to that supervisor's projects. Gated in by useNeedsSupervisor — only
- * a `manager` with no `employeeId` claim reaches this. Mirrors the old app's
- * UserInitializer, streamlined for the Firebase-claims auth model.
+ * scoped to that supervisor's projects. Gated in by App.tsx on the onboarding
+ * step `choose-supervisor` — only a `manager` with no `employeeId` claim reaches
+ * this. Mirrors the old app's UserInitializer, streamlined for the Firebase-
+ * claims auth model.
  */
 export default function SupervisorSelect({ preview = false }: { preview?: boolean }) {
   const { user } = useAuth()
+  const onboarding = useOnboarding()
   const [supervisors, setSupervisors] = useState<Supervisor[]>([])
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading")
   const [candidate, setCandidate] = useState<Supervisor | null>(null)
@@ -114,7 +116,7 @@ export default function SupervisorSelect({ preview = false }: { preview?: boolea
     try {
       await selectSupervisor(candidate.id)
       // Onboarding just completed — the daily report first greets tomorrow.
-      if (user?.uid) stampOnboardedAt(user.uid)
+      onboarding.completeSetup()
       // Force-refresh the ID token so AuthProvider's onIdTokenChanged picks up
       // the new employeeId claim → the App gate clears and this unmounts. No
       // manual navigation needed.

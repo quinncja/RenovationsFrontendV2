@@ -11,7 +11,7 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { AnimatePresence } from "framer-motion"
 import { useAuth } from "../../../core/auth/AuthProvider"
 import { effectiveRole, type AppRole } from "../../../core/auth/roles"
-import { fetchDashboardLayout } from "../../../shared/api/layoutApi"
+import { useOnboarding } from "../../../core/onboarding/OnboardingProvider"
 import { deriveBackLabel } from "../../jobcost/useJobcostNav"
 import type { ReportPayload } from "./reportTypes"
 import { chicagoToday } from "./chicagoDate"
@@ -22,12 +22,12 @@ import { DailyArrival, type ArrivalDestination } from "./arrival/DailyArrival"
 import { preloadEntryPages } from "./arrival/preload"
 
 // ─── Per-user markers ────────────────────────────────────────────────────────
-// Plain strings (not JSON) — these are read/written imperatively, not through
-// useLocalStorage.
+// This one recurring, daily-recap marker stays local (it's a per-day dedupe, not
+// an onboarding flag) — onboarding markers (`onboarded-at`, the `intro-tour`
+// milestone) now live in core/onboarding and are read via useOnboarding().
+// Plain string (not JSON), read/written imperatively, not through useLocalStorage.
 
 const seenKey = (uid: string) => `daily-report-seen:${uid}`
-const introSeenKey = (uid: string) => `daily-report-intro-seen:${uid}`
-const onboardedAtKey = (uid: string) => `onboarded-at:${uid}`
 
 // The synchronous gate reads localStorage during render — a throwing storage
 // (privacy mode) must degrade to "no greeting", never a render crash.
@@ -36,17 +36,6 @@ function readMarker(key: string): string | null {
     return localStorage.getItem(key)
   } catch {
     return null
-  }
-}
-
-/** Record the day onboarding completed (layout chosen / supervisor picked).
- *  The daily report first auto-opens the day AFTER this — a brand-new user
- *  shouldn't be greeted with "here's what happened yesterday" mid-setup. */
-export function stampOnboardedAt(uid: string) {
-  try {
-    localStorage.setItem(onboardedAtKey(uid), chicagoToday())
-  } catch {
-    // localStorage unavailable — the user just sees the report a day early
   }
 }
 
@@ -89,9 +78,10 @@ interface ArrivalState {
   /** Gate passed synchronously — children were never mounted; the arrival IS
    *  the app until navigation reveals them. Cleared when navigation starts. */
   blocking: boolean
-  /** Admin whose layout cache is cold: render the app normally and confirm
-   *  onboarding over the wire; a confirmation activates the arrival late, as
-   *  an overlay on the already-rendered app (the new-device case). */
+  /** User with no local onboarding evidence (cleared browser / new device):
+   *  render the app normally and confirm onboarding over the wire; a
+   *  confirmation activates the arrival late, as an overlay on the
+   *  already-rendered app. */
   pendingLayoutCheck: boolean
   intro: boolean
   /** Dev preview (`?arrival` / `?arrival-intro`) — never stamp markers. */
@@ -136,6 +126,9 @@ const REPORT_TIMEOUT_MS = 8000
  */
 export function DailyReportProvider({ children }: { children: ReactNode }) {
   const { user, claims } = useAuth()
+  // Destructured so the stable members can be listed in hook deps directly (a
+  // whole-object dep would re-run every render — the provider value isn't memoized).
+  const { seen, onboardedAt, phase, resolving, acknowledge } = useOnboarding()
   const location = useLocation()
   const navigate = useNavigate()
   const source = reportSource(claims["role"] as AppRole | undefined, claims["employeeId"])
@@ -166,64 +159,49 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
     if (!forced) {
       if (readMarker(seenKey(uid)) === today) return INERT_ARRIVAL
       // Onboarded the same day → first greeting tomorrow.
-      if (readMarker(onboardedAtKey(uid)) === today) return INERT_ARRIVAL
+      if (onboardedAt === today) return INERT_ARRIVAL
     }
 
     const base: ArrivalState = {
       ...INERT_ARRIVAL,
-      intro: forcedIntro || (!forced && !readMarker(introSeenKey(uid))),
+      intro: forcedIntro || (!forced && !seen("intro-tour")),
       forced,
       continueTo: deriveContinueTo(location.pathname, location.search),
     }
 
     if (forced) return { ...base, active: true, blocking: true }
 
-    // Onboarding gate. Managers passed SupervisorSelect to get here (their
-    // employeeId claim is the onboarded signal, checked in reportSource);
-    // admins are onboarded once a dashboard layout exists — the same
-    // cache-then-404 signal DashboardLayoutContext uses. A cold cache can't
-    // block render on a network check, so it defers to the async fallback.
-    if (source === "admin" && readMarker(`dashboard-layout:${uid}`) == null) {
-      return { ...base, pendingLayoutCheck: true }
-    }
+    // Onboarding gate, delegated to the central provider. App.tsx mounts this
+    // provider only after auth resolves, so `phase` is settled apart from the
+    // cold-local case: `resolving` (no local onboarding evidence — cleared
+    // browser or new device) defers to the async fallback below; anyone not yet
+    // onboarded gets no greeting.
+    if (resolving) return { ...base, pendingLayoutCheck: true }
+    if (phase !== "onboarded") return INERT_ARRIVAL
     return { ...base, active: true, blocking: true }
   })
 
-  // ── Async admin fallback (layout cache cold) ───────────────────────────
-  // One attempt per page load — a failed check retries next session, not on
-  // every route change.
-  const layoutCheckAttemptedRef = useRef(false)
+  // ── Async cold-store fallback ──────────────────────────────────────────
+  // The synchronous gate couldn't tell if a cold-local user (cleared browser /
+  // new device) is onboarded, so it parked the arrival on `pendingLayoutCheck`
+  // and deferred to the onboarding provider's bootstrap. When that settles
+  // (`resolving` flips false), activate the arrival as a late overlay if
+  // onboarded, else drop it. `intro` and the onboarded-today deferral are
+  // re-derived HERE, not taken from the initializer — the server union just
+  // landed, and it's exactly what suppresses an intro-tour replay for an
+  // established user on a fresh browser. The bootstrap is a shared, memoized
+  // fetch, so StrictMode's double mount can't double-fetch here.
   useEffect(() => {
-    if (!arrival.pendingLayoutCheck || layoutCheckAttemptedRef.current) return
-    layoutCheckAttemptedRef.current = true
-
-    let cancelled = false
-    async function check() {
-      let onboarded = false
-      try {
-        onboarded = (await fetchDashboardLayout()) != null
-      } catch {
-        onboarded = false // can't tell → don't greet
-      }
-      if (cancelled) return
-      setArrival((a) =>
-        a.pendingLayoutCheck
-          ? onboarded
-            ? { ...a, pendingLayoutCheck: false, active: true }
-            : { ...a, pendingLayoutCheck: false }
-          : a
-      )
-    }
-    void check()
-    return () => {
-      cancelled = true
-      // Release the one-shot guard so a remount re-attempts cleanly. Without
-      // this, React StrictMode's dev mount→unmount→remount cancels the first
-      // attempt and the guard blocks the second, so the greeting never shows
-      // in dev. The localStorage seen-marker still prevents a real double-greet.
-      layoutCheckAttemptedRef.current = false
-    }
-  }, [arrival.pendingLayoutCheck])
+    if (!arrival.pendingLayoutCheck || resolving) return
+    const greet = phase === "onboarded" && onboardedAt !== chicagoToday()
+    setArrival((a) =>
+      a.pendingLayoutCheck
+        ? greet
+          ? { ...a, pendingLayoutCheck: false, active: true, intro: !seen("intro-tour") }
+          : { ...a, pendingLayoutCheck: false }
+        : a
+    )
+  }, [arrival.pendingLayoutCheck, resolving, phase, onboardedAt, seen])
 
   // ── Report fetch + entry-page preloads, on activation ──────────────────
   useEffect(() => {
@@ -291,10 +269,12 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
           // replay the takeover. (Idempotent with the on-success stamp; a
           // failed recap still retries tomorrow — the marker is per-day.)
           localStorage.setItem(seenKey(uid), chicagoToday())
-          if (arrival.intro) localStorage.setItem(introSeenKey(uid), "1")
         } catch {
           // markers lost → worst case a repeat greeting
         }
+        // Finishing the intro variant acknowledges the intro-tour milestone
+        // (server-backed, so a cleared browser won't replay it).
+        if (arrival.intro) acknowledge("intro-tour")
       }
       navigate(path)
       // The intro coachmark sequence: arm step 1 NOW so the blurred layer
@@ -307,7 +287,7 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
       // out (opacity) to reveal the page it navigated to.
       setArrival((a) => ({ ...a, active: false, blocking: false }))
     },
-    [arrival.forced, uid, navigate, arrival.intro]
+    [arrival.forced, uid, navigate, arrival.intro, acknowledge]
   )
 
   const handleArrivalExited = useCallback(() => {
@@ -339,13 +319,13 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
     if (!arrival.forced && uid) {
       try {
         localStorage.setItem(seenKey(uid), chicagoToday())
-        if (arrival.intro) localStorage.setItem(introSeenKey(uid), "1")
       } catch {
         // markers lost → worst case a repeat greeting
       }
+      if (arrival.intro) acknowledge("intro-tour")
     }
     setArrival((a) => ({ ...a, active: false, blocking: false }))
-  }, [location.pathname, arrival.active, arrival.forced, arrival.intro, uid])
+  }, [location.pathname, arrival.active, arrival.forced, arrival.intro, uid, acknowledge])
 
   // ── Manual open (clock button) ─────────────────────────────────────────
   const [open, setOpen] = useState(false)

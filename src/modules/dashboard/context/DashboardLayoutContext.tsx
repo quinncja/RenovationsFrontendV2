@@ -3,9 +3,9 @@ import type { DashboardLayout, SectionId, WidgetId, WidgetLayoutItem } from "../
 import { DEFAULT_DASHBOARD_LAYOUT } from "../config/defaultLayout"
 import { buildTemplateLayout, type LayoutTemplate } from "../config/layoutTemplates"
 import { reconcileLayout } from "../config/reconcileLayout"
-import { fetchDashboardLayout, saveDashboardLayout } from "../../../shared/api/layoutApi"
+import { saveDashboardLayout } from "../../../shared/api/layoutApi"
 import { useAuth } from "../../../core/auth/AuthProvider"
-import { stampOnboardedAt } from "../report/DailyReportContext"
+import { useOnboarding, loadUserPreferencesOnce } from "../../../core/onboarding/OnboardingProvider"
 
 interface DashboardLayoutContextValue {
   layout: DashboardLayout
@@ -83,6 +83,31 @@ function saveToLocalStorage(userId: string, layout: DashboardLayout) {
   }
 }
 
+// Live chooseTemplate from whichever DashboardLayoutProvider instance is
+// currently mounted (there's only ever one). Lets the app-level onboarding
+// host update React state in place — no remount — when the provider is
+// present; falls back to commitTemplateChoice below when it isn't.
+let liveChooseTemplate: ((template: LayoutTemplate) => void) | null = null
+// eslint-disable-next-line react-refresh/only-export-components
+export function getLiveChooseTemplate() {
+  return liveChooseTemplate
+}
+
+// Commits a template straight to storage for the provider-absent case (user
+// isn't on a dashboard route). This file owns the `dashboard-layout:{uid}` key,
+// which is why the standalone commit lives here rather than in the onboarding
+// host. Does NOT call completeSetup — the caller owns that decision. When the
+// user next lands on /dashboard, the provider mounts and adopts this cache via
+// its existing localStorage bootstrap, same as any other returning user.
+// eslint-disable-next-line react-refresh/only-export-components
+export function commitTemplateChoice(userId: string, template: LayoutTemplate): void {
+  const next = buildTemplateLayout(template)
+  saveToLocalStorage(userId, next)
+  void saveDashboardLayout(next).catch(() => {
+    // Save failed — layout is still applied locally for this session.
+  })
+}
+
 function loadSectionIndex(userId: string): number {
   if (!userId) return 0
   try {
@@ -96,6 +121,7 @@ function loadSectionIndex(userId: string): number {
 
 export function DashboardLayoutProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
+  const { completeSetup } = useOnboarding()
   const userId = user?.uid ?? ""
 
   const cachedLayout = userId ? loadFromLocalStorage(userId) : null
@@ -132,16 +158,18 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
 
     let cancelled = false
 
-    fetchDashboardLayout()
-      .then((serverLayout) => {
+    // Layout data comes from the shared prefs bootstrap (one fetch per load,
+    // deduped with OnboardingProvider) rather than a second dedicated request.
+    loadUserPreferencesOnce()
+      .then(({ dashboardLayout }) => {
         if (cancelled) return
-        if (serverLayout) {
-          const reconciled = reconcileLayout(serverLayout)
+        if (dashboardLayout) {
+          const reconciled = reconcileLayout(dashboardLayout)
           setLayout(reconciled)
           saveToLocalStorage(userId, reconciled)
           setHasChosenLayout(true)
         }
-        // A null (404) response with no cache leaves hasChosenLayout false → the
+        // A null response with no cache leaves hasChosenLayout false → the
         // new-user welcome walkthrough shows once loading settles.
       })
       .catch(() => {
@@ -251,14 +279,25 @@ export function DashboardLayoutProvider({ children }: { children: React.ReactNod
       if (userId) {
         saveToLocalStorage(userId, next)
         // Onboarding just completed — the daily report first greets tomorrow.
-        stampOnboardedAt(userId)
+        completeSetup()
         void saveDashboardLayout(next).catch(() => {
           // Save failed — layout is still applied locally for this session.
         })
       }
     },
-    [userId]
+    [userId, completeSetup]
   )
+
+  // Publish the live chooseTemplate for getLiveChooseTemplate() (onboarding
+  // host reads it when this provider is mounted). Clears on unmount, but only
+  // if nothing newer has already replaced it (guards a stale unmount racing a
+  // fresh mount's effect).
+  useEffect(() => {
+    liveChooseTemplate = chooseTemplate
+    return () => {
+      if (liveChooseTemplate === chooseTemplate) liveChooseTemplate = null
+    }
+  }, [chooseTemplate])
 
   // ── Section-level mutation ─────────────────────────────────────────
   const moveSection = useCallback((activeId: SectionId, overId: SectionId) => {

@@ -1,5 +1,7 @@
+import { useCallback } from "react"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import { useWidgetData } from "../../../shared/context/PageContext"
+import { registerCoachTarget } from "../../../core/onboarding/coachTargets"
 
 interface OpenMonthPayload {
   openMonthYear?: number
@@ -21,8 +23,13 @@ export function OverUnderToggle() {
   const hasOpenPeriod = data?.openMonthFinances?.openMonthYear != null
   const disabled = !isLoading && !hasOpenPeriod
 
+  const pillRef = useCallback((el: HTMLButtonElement | null) => {
+    registerCoachTarget("wip-toggle", el)
+  }, [])
+
   return (
     <button
+      ref={pillRef}
       type="button"
       className={`over-under-toggle${on ? " over-under-toggle--active" : ""}`}
       aria-pressed={on}

@@ -5,19 +5,23 @@ import MobileNav from "./core/components/MobileNav"
 import WaitingRoom from "./core/auth/pages/WaitingRoom"
 import SupervisorSelect from "./core/auth/pages/SupervisorSelect"
 import useIsInitialized from "./core/auth/hooks/useIsInitialized"
-import useNeedsSupervisor from "./core/auth/hooks/useNeedsSupervisor"
 import useIsMobile from "./shared/hooks/useIsMobile"
 import { useAuth } from "./core/auth/AuthProvider"
+import { useOnboarding } from "./core/onboarding/OnboardingProvider"
 import AnalyticsTracker from "./shared/analytics/AnalyticsTracker"
 import IdleRefreshOverlay from "./core/components/IdleRefreshOverlay"
 import { DailyReportProvider } from "./modules/dashboard/report/DailyReportContext"
+import { useAdminOnboardingTour } from "./modules/dashboard/onboarding/AdminOnboarding"
 import "./App.css"
 
 export default function App() {
   const { user, loading } = useAuth()
   const { isInitialized } = useIsInitialized()
-  const { needsSupervisor } = useNeedsSupervisor()
+  const onboarding = useOnboarding()
   const isMobile = useIsMobile()
+  // The admin first-run host renders here (the navbar it veils lives in App,
+  // outside the host's reach). Hook runs before the early returns — hooks rule.
+  const { navbarVeil, tour } = useAdminOnboardingTour()
 
   // Dev-only escape hatch: `?welcome-pm` force-renders the project-manager
   // first-run supervisor picker so it can be previewed/tested without a manager
@@ -38,8 +42,10 @@ export default function App() {
   }
 
   // A manager is "initialized" (has a role) but must still pick which supervisor
-  // they are before the app scopes their data — so this gate comes second.
-  if (user && needsSupervisor) {
+  // they are before the app scopes their data — so this gate comes second. Gate
+  // on the onboarding STEP, not the phase: a future coachmark step must never
+  // strand a supervisor-having manager on a full-screen setup page (§4.12).
+  if (user && onboarding.step === "choose-supervisor") {
     return <SupervisorSelect />
   }
 
@@ -54,9 +60,10 @@ export default function App() {
       <div className="app">
         <AnalyticsTracker />
         <IdleRefreshOverlay />
-        {!isMobile && <Navbar />}
+        {!isMobile && <Navbar veil={navbarVeil} />}
         <Outlet />
         {isMobile && <MobileNav />}
+        {tour}
       </div>
     </DailyReportProvider>
   )

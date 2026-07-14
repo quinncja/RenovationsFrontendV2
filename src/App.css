@@ -12708,3 +12708,769 @@ svg.placeholder-illustration {
     width: 100%;
   }
 }
+
+/* ═══ Admin onboarding — Coachmark primitive (anchor: coachmark-css) ═══ */
+
+/* Anchored coachmark: one persistent blurred backdrop (matches .rpt-coach) with
+   a rounded cutout over the taught element, an invisible shield + pulse over the
+   hole, and a hint card anchored near it. The layer is click-through EXCEPT its
+   own pieces (backdrop, shield, card), so nothing else on the page is reachable
+   while the cutout still passes clicks to the real control. */
+.coach-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  pointer-events: none;
+}
+
+/* Same look as .rpt-coach; the clip-path cutout (set inline from motion values)
+   removes both paint AND hit-testing over the hole — hence the shield below. */
+.coach-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(2.5px);
+  -webkit-backdrop-filter: blur(2.5px);
+  pointer-events: auto;
+}
+
+/* Transparent shield covering the hole (padded target rect): swallows the clicks
+   the cutout would otherwise pass to the real control. Reuses the coachPulse
+   ripple (copper), matching the header-clock / nav-item coachmarks. */
+.coach-ring {
+  position: absolute;
+  border-radius: 10px;
+  pointer-events: auto;
+  box-shadow: 0 0 0 0 rgb(from var(--primary-color) r g b / 0.45);
+  animation: coachPulse 2.2s ease-out infinite;
+}
+
+/* Same card treatment as .gear-hint / .nav-hint (neutral surface, border,
+   rounded). Placed inline near the hole; left/top glide on a within-step move. */
+.coach-card {
+  position: absolute;
+  z-index: 2;
+  box-sizing: border-box; /* placement math assumes width == 280 incl. padding */
+  width: 280px;
+  padding: 0.95rem 1rem 1rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: light-dark(0 14px 36px rgba(0, 0, 0, 0.18), 0 14px 36px rgba(0, 0, 0, 0.55));
+  pointer-events: auto;
+  transition: left 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    top 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.coach-card-title {
+  margin: 0 0 0.4rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--primary-text);
+}
+
+/* Arrow reuses the .gear-hint-arrow / .nav-hint-arrow rotated-square technique;
+   which two borders show decides whether it points up (card below the target)
+   or down (card flipped above). */
+.coach-card-arrow {
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  background: var(--card-color);
+  transform: rotate(45deg);
+}
+.coach-card-arrow--below {
+  top: -7px;
+  border-left: 1px solid var(--border-color);
+  border-top: 1px solid var(--border-color);
+}
+.coach-card-arrow--above {
+  bottom: -7px;
+  border-right: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* Quiet progress: neutral outline dots, copper on the active step (active =
+   meaning, so copper is the correct accent here). */
+.coach-dots {
+  display: flex;
+  gap: 8px;
+  margin-top: 0.85rem;
+}
+.coach-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+}
+.coach-dot--on {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-ring { animation: none; }
+  .coach-card { transition: none; }
+}
+
+/* ═══ Admin onboarding — intro screens, phases 0–2 (anchor: admin-intro-css) ═══ */
+
+/* The full-screen takeover frame — mirrors .arr-screen's fixed/centered/ambient
+   backdrop so this flow and the daily recap read as the same product, without
+   borrowing the recap-owned class. z sits just below the modal base (200), same
+   as .arr-screen. */
+.adm-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  background-color: var(--background-color);
+  background-image: var(--app-bg-glow);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+
+/* Vertically-centered column (like the daily recap): logo, morphing header, body,
+   and the arrow sit together as one centered block. margin:auto centers it when
+   it fits and degrades to top-aligned scrolling on short viewports. */
+.adm-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  max-width: 52rem;
+  margin: auto;
+  padding: 2.5rem 2rem;
+  box-sizing: border-box;
+}
+
+.adm-phase {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* ── Persistent chrome — logo, morphing header, arrow ── */
+
+/* Persistent R logo, top-center; mounts once and rides across all phases. */
+.adm-logo {
+  display: flex;
+  justify-content: center;
+}
+.adm-logo--persist {
+  margin-bottom: 1.1rem;
+}
+
+/* The persistent header slot. Titles swap the recap way: the outgoing h1
+   collapses its height WHILE the incoming opens beneath it (both overflow:
+   hidden, framer-driven), so the change is one continuous vertical move —
+   never a fade-in-place, never an empty slot. */
+.adm-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 1.4rem;
+}
+.adm-header-text {
+  margin: 0;
+  font-size: calc(var(--large-title-size) * 1.12);
+  line-height: 1.3;
+  font-weight: var(--large-title-weight-emphasized);
+  color: var(--primary-text);
+}
+
+/* The middle band — a clip whose height is measured from the live phase and
+   tweened directly old → new on phase swaps (the phases themselves crossfade
+   in place; see AdminIntroScreens). Padding gives card shadows room inside the
+   clip; the negative margins hand the space back so layout is unchanged
+   (content-box — the measured height is unaffected). */
+.adm-body-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0 1.75rem 1.75rem;
+  margin: 0 -1.75rem -1.75rem;
+}
+/* The measured inner wrapper; position:relative anchors exiting phases, which
+   AnimatePresence popLayout pins absolute mid-crossfade. */
+.adm-body-measure {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Secondary line on the welcome phase. */
+.adm-sub {
+  margin: 0;
+  max-width: 34rem;
+  font-size: 1.05rem;
+  line-height: 1.5;
+  color: var(--secondary-text);
+}
+
+/* Persistent footer slot, below the content. Fixed height with the arrow/CTA
+   absolutely stacked inside, so the swap never reflows the column. */
+.adm-foot {
+  position: relative;
+  width: 100%;
+  height: 4.5rem;
+  margin-top: 2.25rem;
+}
+.adm-foot-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The bobbing advance chevron — clone of .arr-advance; the copper advance. */
+.adm-advance {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--primary-color);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 22px -8px rgb(from var(--primary-color) r g b / 0.65);
+  transition: background-color 0.14s ease;
+}
+.adm-advance:hover {
+  background: var(--primary-color-hover);
+}
+.adm-advance:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 3px;
+}
+.adm-advance-chevron {
+  display: inline-flex;
+}
+
+/* ── Phase 1 — how the home page works ── */
+
+/* Centered column: the explainer line over the three side-by-side demos. */
+.adm-explain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1.6rem;
+  width: 100%;
+}
+
+/* The copy slot: beat lines collapse/open through it (recap style). */
+.adm-explain-lines {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+.adm-explain-line {
+  margin: 0;
+  max-width: 34rem;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--secondary-text);
+}
+
+/* The single centered demo — the carousel with the rail floating off its right
+   edge, the input control beneath, and the mode label under that. */
+.adm-demo-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Relative frame: keeps the carousel centered under the copy and anchors the
+   absolutely-placed rail, so the cards never shift as the rail opens. Width is
+   framer-animated (hero → stack) as part of the shrink morph. */
+.adm-demo-frame {
+  position: relative;
+}
+
+/* Rail floats just off the carousel's RIGHT edge, vertically centered — where
+   it lives on the real dashboard. */
+.adm-demo-rail {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 0.5rem;
+}
+
+/* The carousel viewport: exactly one full card centered with half a card peeking
+   above and below (height set inline from the card geometry). The vertical mask
+   that fades the peeking halves is framer-animated (flat during the hero beat,
+   fading once the stack exists) so the crop reads as depth, not a hard clip. */
+.adm-carousel {
+  width: 100%;
+  overflow: hidden;
+}
+.adm-carousel-track {
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* CARD_GAP — must match the geometry constants in AdminIntroScreens */
+  will-change: transform;
+}
+
+/* One skeleton section card. Fixed height (CARD_H) so the track geometry is
+   exact; the card owns only the active/dim opacity (framer-driven) — no CSS
+   opacity transition, or it would fight the inline animation. */
+.adm-skel-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 88px; /* CARD_H */
+  padding: 0.7rem;
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  flex: none;
+}
+
+/* The hero card ("Business Revenue") — same skeleton card, but its title is
+   REAL text whose size morphs numerically with the shrink, and its widget
+   blocks morph their height. Left-aligned like a real section title. */
+.adm-skel-card--hero {
+  align-items: stretch;
+  text-align: left;
+}
+.adm-hero-title {
+  display: block;
+  /* Baseline = the hero (beat 0) size, so the first paint — before framer's
+     inline fontSize lands — already matches; framer then animates 13 → 7 on
+     the shrink. Without this it inherits the body size for a frame and
+     visibly snaps down. */
+  font-size: 13px;
+  line-height: 1.3;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  white-space: nowrap;
+}
+
+/* Opens beneath the stack with the shrink morph; holds the control + label. */
+.adm-demo-below {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+/* Control slot under the carousel — fixed height so the mouse and keycaps swap
+   without nudging the layout (empty during the rail segment). */
+.adm-demo-control {
+  height: 44px;
+  margin-top: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The mode label crossfades in place: fixed-height relative slot, absolute
+   spans — the line never empties or moves. */
+.adm-demo-label-slot {
+  position: relative;
+  width: 100%;
+  height: 1.2rem;
+  margin-top: 0.5rem;
+}
+.adm-demo-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--secondary-text);
+}
+
+.adm-keys {
+  display: flex;
+  gap: 0.4rem;
+}
+
+/* Section rail — a fixed-width lane; the card is RIGHT-anchored so the DOTS stay
+   put on the right (nearest the cards' side) and the LABEL expands to their LEFT
+   on open — exactly like the real SectionNav. Faded at rest, filled white on
+   hover (--awake). Copper marks only the active row. */
+.adm-raildemo {
+  position: relative;
+  width: 92px;
+}
+.adm-railcard {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  box-sizing: border-box;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border-color) 55%, transparent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0);
+  opacity: 0.6;
+  overflow: hidden;
+  transition: opacity 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.adm-railcard--awake {
+  background: var(--card-color);
+  border-color: var(--border-color);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  opacity: 1;
+}
+/* Dots on the right (nearest the cards), label to their left. */
+.adm-railrow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  height: 12px;
+}
+.adm-raildot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  flex: none;
+}
+/* Click ripple over a dot. */
+.adm-raildot-pulse {
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  border: 1.5px solid var(--primary-color);
+  pointer-events: none;
+}
+.adm-railrow--active .adm-raildot {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+}
+.adm-raillabel {
+  height: 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--primary-text) 12%, var(--card-color));
+  overflow: hidden;
+}
+.adm-railrow--active .adm-raillabel {
+  background: color-mix(in srgb, var(--primary-color) 32%, var(--card-color));
+}
+
+/* The scripted pointer that glides onto the rail's dots (right-anchored, over
+   the dots; JS animates its x/y between "parked" and "over a dot"). */
+.adm-cursor {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  color: var(--primary-text);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+/* A little keycap; the pressed one depresses (JS y/scale) and goes copper. */
+.adm-keycap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 0 var(--border-color);
+  color: var(--secondary-text);
+}
+.adm-keycap--pressed {
+  background: var(--primary-color);
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 var(--primary-color);
+  color: #fff;
+}
+/* Minimal mouse outline with a scroll wheel that nudges down (JS) while scrolling. */
+.adm-mouse {
+  position: relative;
+  width: 18px;
+  height: 27px;
+  border-radius: 9px;
+  border: 1.5px solid var(--secondary-text);
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+  box-sizing: border-box;
+}
+.adm-mouse-wheel {
+  display: block;
+  width: 2px;
+  height: 6px;
+  border-radius: 2px;
+  background: var(--primary-color);
+}
+
+/* Scaled-down echo of the dashboard shimmer (.widget-skeleton) — same gradient
+   + keyframe. */
+.adm-skel-block {
+  display: block;
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 20%,
+    color-mix(in srgb, var(--primary-text) 2%, var(--card-color)) 50%,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 80%
+  );
+  background-size: 900px 100%;
+  animation: shimmer 3.2s linear infinite;
+}
+.adm-skel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.4rem;
+}
+.adm-skel-block {
+  height: 20px;
+  border-radius: 6px;
+}
+
+/* Every card carries its real section title, at the size the hero's text lands
+   on after the shrink. */
+.adm-card-title {
+  display: block;
+  font-size: 7px;
+  line-height: 1.3;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  text-align: left;
+  white-space: nowrap;
+}
+
+/* Hero widgets — the shimmer block IS the skeleton resting state; in hero
+   dress it gains the detail layer (title + ghost figure or revenue curve).
+   The detail fades with the shrink so the block returns to a plain skeleton. */
+.adm-widget {
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.adm-widget-detail {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 6px 8px 0;
+  box-sizing: border-box;
+}
+.adm-widget-title {
+  font-size: 8px;
+  line-height: 1.3;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  white-space: nowrap;
+}
+.adm-widget-figure {
+  margin-top: 5px;
+  font-size: 15px;
+  line-height: 1;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--primary-text) 14%, transparent);
+  letter-spacing: 0.02em;
+}
+.adm-widget-curve {
+  width: 100%;
+  height: 30px;
+  margin-top: auto;
+  display: block;
+}
+
+/* ── Phase 2 — choose a layout ── */
+
+/* Sits under the (persistent chrome) "Pick your layout" header. */
+.adm-choose-note {
+  margin: 0 0 1.9rem;
+  max-width: 32rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--secondary-text);
+}
+
+/* The copper closing CTA — sized by .arr-cta (the recap's "Go to Dashboard");
+   this only spaces it inside the persistent foot slot. */
+.adm-enter {
+  margin-top: 0.35rem;
+}
+
+.adm-choose-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  width: 100%;
+}
+
+/* Neutral card. Hover is a quiet surface response: a faint tint and a deeper,
+   soft shadow. No copper, no movement — copper is reserved for the SELECTED
+   state, and travel on hover reads as restless. */
+.adm-choose-card {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.85rem;
+  padding: 1.25rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--button-shadow);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+.adm-choose-card:hover {
+  background: color-mix(in srgb, var(--card-color), var(--primary-text) 3%);
+  box-shadow: light-dark(0 10px 26px rgba(0, 0, 0, 0.09), 0 10px 26px rgba(0, 0, 0, 0.4));
+}
+.adm-choose-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 22%, transparent);
+}
+/* The picked card — a quiet copper border holds so the choice reads at a
+   glance while the CTA fades in below. */
+.adm-choose-card--selected,
+.adm-choose-card--selected:hover {
+  border-color: var(--primary-color);
+}
+.adm-choose-card-name {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--primary-text);
+}
+.adm-choose-card-desc {
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+}
+
+/* Small reassurance line beneath the three cards. */
+.adm-choose-hint {
+  margin: 1.2rem 0 0;
+  font-size: 0.8rem;
+  color: var(--secondary-text);
+  text-align: center;
+}
+
+/* The preview stack — labeled mini bars in the template's own section order,
+   cascading in once (no looping reshuffle). The lead bars carry a soft copper
+   tint, echoing the "…first" descriptions. */
+.adm-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  padding: 0.85rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary-text) 3%, var(--card-color));
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+.adm-preview-bar {
+  display: flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 0.4rem;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--primary-text) 8%, var(--card-color));
+  box-sizing: border-box;
+  min-width: 0;
+}
+.adm-preview-bar--lead {
+  background: color-mix(in srgb, var(--primary-color) 16%, var(--card-color));
+}
+.adm-preview-bar--lead .adm-preview-bar-label {
+  color: color-mix(in srgb, var(--primary-color) 72%, var(--primary-text));
+}
+.adm-preview-bar-label {
+  font-size: 9px;
+  line-height: 1;
+  color: var(--secondary-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Skip ── */
+
+.adm-skip {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.75rem;
+  background: none;
+  border: none;
+  padding: 0.4rem 0.6rem;
+  font-family: var(--font-family);
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--secondary-text);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+.adm-skip:hover {
+  color: var(--primary-text);
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 768px) {
+  .adm-shell {
+    padding: 1.5rem 1.25rem;
+  }
+  .adm-header-text {
+    font-size: var(--large-title-size);
+  }
+  .adm-choose-cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Reduced motion ── */
+/* JS already freezes the demo loops (each rests on its middle card), the bob,
+   and the preview cascade; here we still the CSS shimmer so the skeletons rest
+   on a calm static state. */
+@media (prefers-reduced-motion: reduce) {
+  .adm-skel-block {
+    animation: none;
+  }
+  .adm-skel-card {
+    transition: none;
+  }
+}
+
+/* ═══ Admin onboarding — host & integration (anchor: admin-host-css) ═══ */
+
+/* Navbar veil: space stays reserved (width transitions with the existing
+   collapse), opacity carries the fade. `--veiled` holds it hidden and inert
+   through phases 0–4; dropping the class (unveiling at phase 5) fades it to 1. */
+.navbar--tour {
+  transition: width 0.3s ease-in-out, opacity 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.navbar--veiled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navbar--tour {
+    transition: width 0.3s ease-in-out, opacity 0.2s ease;
+  }
+}

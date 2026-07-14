@@ -1,5 +1,6 @@
 import { useState } from "react"
 import Page from "../../shared/components/Page"
+import useIsMobile from "../../shared/hooks/useIsMobile"
 import { PageDataProvider } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
@@ -58,12 +59,16 @@ export default function Dashboard() {
 
 function AdminDashboard({ year, onYearChange }: { year: number; onYearChange: (y: number) => void }) {
   const { isEditing, isLoading, hasChosenLayout } = useDashboardLayout()
+  const isMobile = useIsMobile()
 
   // Dev-only: `?welcome` forces the walkthrough so it can be previewed even when
   // a layout is already saved server-side. Never active in production builds; in
   // preview, picking a layout is non-destructive (see WelcomeWalkthrough).
+  // Mobile-gated: on desktop `?welcome` previews the AdminOnboarding tour
+  // instead, and forcing the in-page walkthrough there would hide the header
+  // actions the tour's coach phases anchor to.
   const [forceWelcome, setForceWelcome] = useState(
-    () => import.meta.env.DEV && new URLSearchParams(window.location.search).has("welcome")
+    () => import.meta.env.DEV && isMobile && new URLSearchParams(window.location.search).has("welcome")
   )
   // Step two of the walkthrough: point out the gear once they've chosen.
   const [gearHint, setGearHint] = useState(false)
@@ -71,7 +76,9 @@ function AdminDashboard({ year, onYearChange }: { year: number; onYearChange: (y
   const [cameFromWelcome, setCameFromWelcome] = useState(false)
 
   // New user who hasn't picked a layout (or dev preview) → walkthrough, not grid.
-  const showWelcome = !isEditing && (forceWelcome || (!isLoading && !hasChosenLayout))
+  // Constraint: the app-level AdminOnboarding host owns the DESKTOP new-user path
+  // now — the in-page walkthrough only serves mobile (and `?welcome` previews).
+  const showWelcome = !isEditing && (forceWelcome || (isMobile && !isLoading && !hasChosenLayout))
 
   function handleChosen() {
     setForceWelcome(false)
