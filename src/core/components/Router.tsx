@@ -78,14 +78,14 @@ export default function Router() {
               </RequireRole>
             } />
 
-            {/* Change Orders — admin/executive */}
+            {/* Change Orders — admin/executive + GM (company-wide tier) */}
             <Route path="/change-orders" element={
-              <RequireRole allowed={["executive", "admin"]}>
+              <RequireRole allowed={["executive", "admin", "generalManager"]}>
                 <SuspenseWrapper><ChangeOrders /></SuspenseWrapper>
               </RequireRole>
             } />
             <Route path="/change-orders/new" element={
-              <RequireRole allowed={["executive", "admin"]}>
+              <RequireRole allowed={["executive", "admin", "generalManager"]}>
                 <SuspenseWrapper><NewChangeOrder /></SuspenseWrapper>
               </RequireRole>
             } />

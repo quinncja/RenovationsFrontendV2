@@ -115,12 +115,15 @@ const managerNav: NavEntry[] = [
 
 // A General Manager oversees the PMs rather than a single job: same non-admin
 // tier, but Company drops out and Employees comes in (their home + Employees
-// page are how they review the PM roster). Data is company-wide, not job-scoped.
+// page are how they review the PM roster). Change Orders is company-wide work
+// they own too. Data is company-wide, not job-scoped.
 const generalManagerNav: NavEntry[] = [
   navItems.home,
   navItems.jobcost,
-  navItems.employees,
+  NAV_DIVIDER,
   navItems.dailyReports,
+  navItems.changeOrders,
+  navItems.employees,
 ]
 
 export const roles = {
