@@ -5,7 +5,7 @@ import { PageDataProvider } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { useAuth } from "../../core/auth/AuthProvider"
-import { effectiveRole, type AppRole } from "../../core/auth/roles"
+import { effectiveRole, isGeneralManager, ALL_JOBS_DETAIL_ID, type AppRole } from "../../core/auth/roles"
 import { DashboardLayoutProvider, useDashboardLayout } from "./context/DashboardLayoutContext"
 import { SectionPager } from "./components/SectionPager"
 import { SectionEditor } from "./components/SectionEditor"
@@ -23,6 +23,28 @@ export default function Dashboard() {
   const effRole = effectiveRole(role)
   const isAdmin = effRole === "executive" || effRole === "admin"
   const [year, setYear] = useLocalStorage("dashboardYear", new Date().getFullYear())
+
+  // A General Manager oversees every PM rather than a single job, so their home
+  // is the same per-employee breakdown view but scoped to the all-jobs sentinel
+  // (the backend aggregates across all supervisors). This is an interim home —
+  // a GM-specific layout (PM roster / cross-job rollups) is a planned follow-up.
+  if (isGeneralManager(role)) {
+    return (
+      <PageDataProvider
+        module="dashboard"
+        queries={PAGE_QUERIES.generalManagerHome}
+        params={{ detailId: ALL_JOBS_DETAIL_ID, year }}
+      >
+        <EmployeeDetail
+          employeeId={ALL_JOBS_DETAIL_ID}
+          year={year}
+          onYearChange={setYear}
+          isManagerHome
+          gmHome
+        />
+      </PageDataProvider>
+    )
+  }
 
   // A manager's home is the per-employee view admins see at /employees/:id,
   // scoped to their own supervisor id (the breakdown queries still honor the

@@ -21,6 +21,8 @@ import { SortableHeader } from "../../shared/components/SortableHeader"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { useAuth } from "../../core/auth/AuthProvider"
 import { EmployeePeriodAndYearSummary } from "./widgets/EmployeePeriodAndYearSummary"
+import { MarginWidget } from "./widgets/MarginWidget"
+import { EmployeePerformanceWidget } from "./widgets/EmployeePerformanceWidget"
 import { DailyReportButton } from "./report/DailyReportButton"
 
 // ───── Breakdown shape (page-level fetch) ────────────────────────────────
@@ -349,6 +351,7 @@ export function EmployeeDetail({
   year,
   onYearChange,
   isManagerHome,
+  gmHome,
 }: {
   employeeId: number
   year: number
@@ -356,6 +359,11 @@ export function EmployeeDetail({
   /** Manager home only — shows the daily-report clock button in the header.
    *  The admin /employees/:id route never sets this. */
   isManagerHome?: boolean
+  /** General Manager home: company-wide rollup. Keeps the stat cards + period/
+   *  year summary, swaps the four per-employee charts + project table for the
+   *  Monthly Margin Performance and Employee Performance widgets side by side.
+   *  Requires the provider to supply PAGE_QUERIES.generalManagerHome. */
+  gmHome?: boolean
 }) {
   const { goToJobcost } = useJobcostNav()
   const marginColorsOn = useMarginColorsEnabled()
@@ -564,7 +572,7 @@ export function EmployeeDetail({
 
   return (
     <Page
-      title={name}
+      title={gmHome ? "Dashboard" : name}
       actions={
         <>
           {isManagerHome && <DailyReportButton />}
@@ -601,8 +609,26 @@ export function EmployeeDetail({
           <EmployeePeriodAndYearSummary monthly={monthly} yearly={yearly} loading={isLoading} />
         </MotionItem>
 
+        {/* GM home: company-wide Monthly Margin Performance next to the
+            Employee Performance leaderboard (the PM roster the GM oversees).
+            Both pull from the same page provider (generalManagerHome queries).
+            No per-employee charts or project table — the latter lives on Job
+            Costing. */}
+        {gmHome && (
+          <>
+            <MotionItem>
+              <MarginWidget />
+            </MotionItem>
+            <MotionItem>
+              <EmployeePerformanceWidget />
+            </MotionItem>
+          </>
+        )}
+
         {/* Monthly views for the page year — sit above the yearly charts
             since the page year is the user's primary lens. */}
+        {!gmHome && (
+        <>
         <MotionItem>
           <Widget title={`Monthly ${wcLabel} — ${year}`} loading={isLoading} noData={!monthlyWorkCompletedSeries}>
             {monthlyWorkCompletedSeries && (
@@ -694,6 +720,8 @@ export function EmployeeDetail({
             )}
           </Widget>
         </MotionItem>
+        </>
+        )}
       </MotionList>
 
       <ProjectsModal

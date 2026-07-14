@@ -10,7 +10,7 @@ import {
 import { useLocation, useNavigate } from "react-router-dom"
 import { AnimatePresence } from "framer-motion"
 import { useAuth } from "../../../core/auth/AuthProvider"
-import { effectiveRole, type AppRole } from "../../../core/auth/roles"
+import { effectiveRole, isGeneralManager, ALL_JOBS_DETAIL_ID, type AppRole } from "../../../core/auth/roles"
 import { useOnboarding } from "../../../core/onboarding/OnboardingProvider"
 import { deriveBackLabel } from "../../jobcost/useJobcostNav"
 import type { ReportPayload } from "./reportTypes"
@@ -61,11 +61,13 @@ export function useDailyReport(): DailyReportContextValue {
   return ctx
 }
 
-/** Which report the user gets: admin tier company-wide, managers job-scoped.
- *  A manager without an employeeId claim isn't scoped yet — no report. */
+/** Which report the user gets: admin tier + GM company-wide, managers job-scoped.
+ *  A manager without an employeeId claim isn't scoped yet — no report. A general
+ *  manager has no employeeId by design and sees every job, so gets the company-
+ *  wide report like an admin. */
 function reportSource(role: AppRole | undefined, employeeId: unknown): ReportSource | null {
   const eff = effectiveRole(role)
-  if (eff === "executive" || eff === "admin") return "admin"
+  if (eff === "executive" || eff === "admin" || role === "generalManager") return "admin"
   if (role === "manager" && employeeId != null) return "pm"
   return null
 }
@@ -137,7 +139,14 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
   const firstName = user?.displayName?.trim().split(/\s+/)[0] ?? null
   // Dashboard.tsx's manager branch passes Number(claims["employeeId"]) as
   // detailId — the preload must derive it identically or its cache key misses.
-  const employeeId = source === "pm" ? Number(claims["employeeId"]) : null
+  // A GM's home is the same per-employee view scoped to the all-jobs sentinel,
+  // so warm that (managerHome) rather than the admin grid it never renders.
+  const employeeId =
+    source === "pm"
+      ? Number(claims["employeeId"])
+      : isGeneralManager(claims["role"] as string | undefined)
+        ? ALL_JOBS_DETAIL_ID
+        : null
 
   // ── Arrival gate — synchronous, at first render ────────────────────────
   // App.tsx only mounts this provider after auth resolves, so uid/claims are

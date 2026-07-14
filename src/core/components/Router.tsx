@@ -56,10 +56,10 @@ export default function Router() {
             <Route path="/dashboard/breakdown/:category" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><MonthlyBreakdownPage /></SuspenseWrapper></RequireRole>} />
             <Route path="/dashboard/upcoming-billings" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><UpcomingBillingsPage /></SuspenseWrapper></RequireRole>} />
             <Route path="/dashboard/progress-billings" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><ProgressBillingsPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/employees" element={<RequireRole allowed={["executive", "admin", "manager"]}><SuspenseWrapper><EmployeesPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/employees/:employeeNum" element={<RequireRole allowed={["executive", "admin", "manager"]}><SuspenseWrapper><EmployeeDetailPage /></SuspenseWrapper></RequireRole>} />
+            <Route path="/employees" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><SuspenseWrapper><EmployeesPage /></SuspenseWrapper></RequireRole>} />
+            <Route path="/employees/:employeeNum" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><SuspenseWrapper><EmployeeDetailPage /></SuspenseWrapper></RequireRole>} />
 
-            {/* Company — shown in nav for managers (PMs); see roles.ts */}
+            {/* Company — shown in nav for managers (PMs); GMs use Employees instead */}
             <Route path="/company" element={
               <RequireRole allowed={["executive", "admin", "manager"]}>
                 <SuspenseWrapper><BusinessSummary /></SuspenseWrapper>
@@ -71,9 +71,9 @@ export default function Router() {
             <Route path="/jobcost/:recnum" element={<SuspenseWrapper><JobcostDetailPage /></SuspenseWrapper>} />
 
             {/* Reports — daily/weekly/monthly activity; all roles (managers
-                get the token-scoped variant) */}
+                get the token-scoped variant, GMs the company-wide one) */}
             <Route path="/reports" element={
-              <RequireRole allowed={["executive", "admin", "manager"]}>
+              <RequireRole allowed={["executive", "admin", "manager", "generalManager"]}>
                 <SuspenseWrapper><ReportsPage /></SuspenseWrapper>
               </RequireRole>
             } />

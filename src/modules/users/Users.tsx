@@ -103,6 +103,13 @@ function UserCard({
             Admin
           </button>
           <button
+            className="usr-assign-btn usr-assign-gm"
+            disabled={assigning}
+            onClick={(e) => { e.stopPropagation(); onAssignRole(user.uid, "generalManager") }}
+          >
+            General Manager
+          </button>
+          <button
             className="usr-assign-btn usr-assign-manager"
             disabled={assigning}
             onClick={(e) => { e.stopPropagation(); onAssignRole(user.uid, "manager") }}
@@ -258,8 +265,11 @@ export default function Users() {
   // Anything not admin-or-above / manager falls into the waiting room.
   const isExecLike = (r: string) => effectiveRole(r) === "executive"
   const admins = users.filter((u) => isExecLike(u.role) || u.role === "admin")
+  const generalManagers = users.filter((u) => u.role === "generalManager")
   const managers = users.filter((u) => u.role === "manager")
-  const waiting = users.filter((u) => !isExecLike(u.role) && u.role !== "admin" && u.role !== "manager")
+  const waiting = users.filter(
+    (u) => !isExecLike(u.role) && u.role !== "admin" && u.role !== "generalManager" && u.role !== "manager"
+  )
 
   return (
     <>
@@ -289,6 +299,16 @@ export default function Users() {
             <p className="usr-empty">No admins</p>
           ) : (
             admins.map((u) => (
+              <UserCard key={u.uid} user={u} isAdmin={isAdmin} assigning={assigning === u.uid} onClick={() => setSelectedUser(u)} />
+            ))
+          )}
+        </Column>
+
+        <Column title="General Managers" badge={generalManagers.length}>
+          {generalManagers.length === 0 ? (
+            <p className="usr-empty">No general managers</p>
+          ) : (
+            generalManagers.map((u) => (
               <UserCard key={u.uid} user={u} isAdmin={isAdmin} assigning={assigning === u.uid} onClick={() => setSelectedUser(u)} />
             ))
           )}

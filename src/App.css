@@ -4928,7 +4928,9 @@ body{
 
 .usr-board {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* Admins · General Managers · Managers · Waiting Room. auto-fit keeps the
+     columns even when four are present and wraps them on narrower viewports. */
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1.5rem;
   align-items: start;
 }
@@ -5067,14 +5069,20 @@ body{
 .usr-assign-row {
   display: flex;
   gap: 0.5rem;
+  /* Four role options (Owner/Admin/General Manager/Manager) can't share one
+     line in a narrow column — wrap them rather than squish the labels. */
+  flex-wrap: wrap;
 }
 
 .usr-assign-btn {
-  flex: 1;
-  padding: 0.375rem 0;
+  /* Grow to fill the row, but keep a floor wide enough for the longest label
+     ("General Manager") so buttons wrap to a new line instead of clipping. */
+  flex: 1 1 6.25rem;
+  padding: 0.375rem 0.5rem;
   border-radius: 999px;
   font-size: 0.8125rem;
   font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
   cursor: pointer;
   border: 1.5px solid;
   background: transparent;
@@ -5113,6 +5121,18 @@ body{
 
 .usr-assign-manager:not(:disabled):hover {
   background: #16a34a;
+  color: #fff;
+}
+
+/* General Manager — manager-tier but company-wide; a distinct violet so it
+   reads as senior to the green Manager without competing with the copper admin. */
+.usr-assign-gm {
+  color: #7c3aed;
+  border-color: rgba(124, 58, 237, 0.55);
+}
+
+.usr-assign-gm:not(:disabled):hover {
+  background: #7c3aed;
   color: #fff;
 }
 
@@ -5496,6 +5516,7 @@ body{
 }
 .usr-role-badge--executive { background: color-mix(in srgb, #d97706 14%, transparent); color: #b45309; }
 .usr-role-badge--admin   { background: color-mix(in srgb, var(--primary-color) 14%, transparent); color: var(--primary-color); }
+.usr-role-badge--generalManager { background: color-mix(in srgb, #7c3aed 13%, transparent); color: #6d28d9; }
 .usr-role-badge--manager { background: color-mix(in srgb, #16a34a 13%, transparent); color: #15803d; }
 .usr-role-badge--waiting { background: color-mix(in srgb, var(--secondary-text) 12%, transparent); color: var(--secondary-text); }
 

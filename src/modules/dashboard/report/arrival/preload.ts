@@ -1,5 +1,6 @@
 import { preloadPageData } from "../../../../shared/api/pageDataCache"
 import { PAGE_QUERIES } from "../../../../shared/config/pageQueries"
+import { ALL_JOBS_DETAIL_ID } from "../../../../core/auth/roles"
 
 /**
  * Fires the destination pages' data fetches while the daily-arrival welcome
@@ -25,19 +26,29 @@ function readStored<T>(key: string, fallback: T): T {
 export function preloadEntryPages(source: "admin" | "pm", employeeId: number | null): void {
   const currentYear = new Date().getFullYear()
 
-  // Dashboard — mirrors Dashboard.tsx's PageDataProvider props per role.
+  // Dashboard — mirrors Dashboard.tsx's PageDataProvider props per role. A
+  // non-null employeeId means a per-employee home: the all-jobs sentinel is the
+  // GM's company-wide rollup (its own query set), any other value a PM's
+  // supervisor id. Both are checked before the admin grid so a GM (report
+  // source "admin") doesn't warm the grid it never renders.
   const dashboardYear = readStored<number>("dashboardYear", currentYear)
-  if (source === "admin") {
+  if (employeeId === ALL_JOBS_DETAIL_ID) {
     preloadPageData({
       module: "dashboard",
-      queries: PAGE_QUERIES.adminDashboard,
-      params: { year: dashboardYear },
+      queries: PAGE_QUERIES.generalManagerHome,
+      params: { detailId: employeeId, year: dashboardYear },
     })
   } else if (employeeId !== null) {
     preloadPageData({
       module: "dashboard",
       queries: PAGE_QUERIES.managerHome,
       params: { detailId: employeeId, year: dashboardYear },
+    })
+  } else if (source === "admin") {
+    preloadPageData({
+      module: "dashboard",
+      queries: PAGE_QUERIES.adminDashboard,
+      params: { year: dashboardYear },
     })
   }
 

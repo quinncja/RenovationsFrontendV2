@@ -53,6 +53,17 @@ export const PAGE_QUERIES = {
   // outside the page provider).
   managerHome: ["employeePerformanceBreakdown", "openMonthFinances"],
 
+  // A General Manager's home (/dashboard) — company-wide (all-jobs) rollups: the
+  // breakdown drives the stat cards + period/year summary (scoped to the
+  // ALL_JOBS_DETAIL_ID sentinel), plus the shared Monthly Margin Performance and
+  // Employee Performance widgets. No project table (that lives on Job Costing).
+  generalManagerHome: [
+    "employeePerformanceBreakdown",
+    "openMonthFinances",
+    "marginPerformance",
+    "employeePerformance",
+  ],
+
   // Dashboard drill-down queries
   open: {
     phaseCompletion: ["phaseCompletionOpen"],

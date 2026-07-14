@@ -52,19 +52,21 @@ function avatarInitials(name: string): string {
 }
 
 const ROLE_LABEL: Record<string, string> = {
-  owner:     "Owner",
-  executive: "Executive",
-  admin:     "Admin",
-  manager:   "Manager",
-  waiting:   "Waiting Room",
+  owner:          "Owner",
+  executive:      "Executive",
+  admin:          "Admin",
+  generalManager: "General Manager",
+  manager:        "Manager",
+  waiting:        "Waiting Room",
 }
 
 const ROLE_CLASS: Record<string, string> = {
-  owner:     "usr-role-badge--executive",
-  executive: "usr-role-badge--executive",
-  admin:     "usr-role-badge--admin",
-  manager:   "usr-role-badge--manager",
-  waiting:   "usr-role-badge--waiting",
+  owner:          "usr-role-badge--executive",
+  executive:      "usr-role-badge--executive",
+  admin:          "usr-role-badge--admin",
+  generalManager: "usr-role-badge--generalManager",
+  manager:        "usr-role-badge--manager",
+  waiting:        "usr-role-badge--waiting",
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -277,6 +279,13 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, showEnga
                                     onClick={() => handleRoleChange("admin")}
                                   >
                                     Admin
+                                  </button>
+                                  <button
+                                    className={`usr-assign-btn usr-assign-gm${currentRole === "generalManager" ? " usr-assign-btn--active" : ""}`}
+                                    disabled={changingRole || currentRole === "generalManager"}
+                                    onClick={() => handleRoleChange("generalManager")}
+                                  >
+                                    General Manager
                                   </button>
                                   <button
                                     className={`usr-assign-btn usr-assign-manager${currentRole === "manager" ? " usr-assign-btn--active" : ""}`}

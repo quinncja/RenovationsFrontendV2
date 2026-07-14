@@ -45,7 +45,7 @@ export default function MobileNav() {
           onClick={() => navigate("/dashboard")}
         >
           <Home size={22} />
-          <span>Home</span>
+          <span>Dashboard</span>
         </button>
         <button
           className={`mobile-nav-button${isOnProjects ? " mobile-nav-button-active" : ""}`}

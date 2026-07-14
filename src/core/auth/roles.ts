@@ -52,7 +52,7 @@ export function isNavDivider(item: NavEntry): item is NavDivider {
 }
 
 const navItems = {
-  home: { label: "Home", path: "/dashboard", icon: Home },
+  home: { label: "Dashboard", path: "/dashboard", icon: Home },
   businessSummary: { label: "Company", path: "/company", icon: Building2 },
   jobcost: { label: "Job Costing", path: "/jobcost", icon: JobcostIcon as unknown as LucideIcon },
   // "Reports" the page (daily/weekly/monthly activity reports) — distinct from
@@ -105,6 +105,24 @@ const executiveNav: NavEntry[] = [
   navItems.users,
 ]
 
+// A project manager's non-admin layout.
+const managerNav: NavEntry[] = [
+  navItems.home,
+  navItems.businessSummary,
+  navItems.jobcost,
+  navItems.dailyReports,
+]
+
+// A General Manager oversees the PMs rather than a single job: same non-admin
+// tier, but Company drops out and Employees comes in (their home + Employees
+// page are how they review the PM roster). Data is company-wide, not job-scoped.
+const generalManagerNav: NavEntry[] = [
+  navItems.home,
+  navItems.jobcost,
+  navItems.employees,
+  navItems.dailyReports,
+]
+
 export const roles = {
   executive: {
     appRole: "executive" as const,
@@ -138,26 +156,43 @@ export const roles = {
   },
   manager: {
     appRole: "manager" as const,
-    nav: [
-      navItems.home,
-      navItems.businessSummary,
-      navItems.jobcost,
-      navItems.dailyReports,
-    ] as NavEntry[],
+    nav: managerNav,
+  },
+  // A General Manager oversees the project managers rather than a single job:
+  // same non-admin layout as a manager, but their data spans EVERY job (they
+  // have no `employeeId` binding). Distinct from `manager` so the backend's
+  // token-scoped `role === 'manager'` filters never fire — GM falls through to
+  // the unscoped, company-wide data path. Home page is a follow-up (§below).
+  generalManager: {
+    appRole: "generalManager" as const,
+    nav: generalManagerNav,
   },
 }
 
 export type AppRole = keyof typeof roles
 export const allRoles = Object.keys(roles) as AppRole[]
 
+// `detailId` sentinel for a General Manager's home: the per-employee breakdown
+// query treats this as "every job" (no single supervisor). Negative so it can
+// never collide with a real SAGE employee/supervisor id (0 = unassigned).
+export const ALL_JOBS_DETAIL_ID = -1
+
 // ─── Role helpers ───────────────────────────────────────────────────────────
 // owner/tech are top-tier: full access + engagement analytics. For ACCESS checks
 // they collapse to "executive"; the raw claim is kept for display + analytics.
 
-/** Collapse owner/tech → executive for route/permission checks. */
+/** Collapse owner/tech → executive for route/permission checks. `generalManager`
+ *  is deliberately NOT collapsed to `manager`: it needs its own identity so the
+ *  onboarding sequence (no supervisor step) and data scope (all jobs, not one)
+ *  diverge from a plain manager. Routes admit it via explicit allow-lists. */
 export function effectiveRole(role: string | undefined | null): AppRole | undefined {
   if (role === "owner" || role === "tech") return "executive"
   return role && role in roles ? (role as AppRole) : undefined
+}
+
+/** A General Manager: manager-tier layout, company-wide (all-jobs) data. */
+export function isGeneralManager(role: string | undefined | null): boolean {
+  return role === "generalManager"
 }
 
 /** Only owner/tech may see the engagement-analytics surfaces. */
