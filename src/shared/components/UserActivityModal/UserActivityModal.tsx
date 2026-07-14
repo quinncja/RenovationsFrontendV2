@@ -37,6 +37,8 @@ interface UserActivityModalProps {
   user: UserRecord | null
   isAdmin: boolean
   isExecutive?: boolean
+  /** Tech only: exposes the return-to-waiting-room reset in the role popover. */
+  isTech?: boolean
   /** When true (analytics admin only), exposes the engagement insights section. */
   showEngagement?: boolean
   onClose: () => void
@@ -71,7 +73,7 @@ const ROLE_CLASS: Record<string, string> = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function UserActivityModal({ user, isAdmin, isExecutive = false, showEngagement = false, onClose, onRoleChange }: UserActivityModalProps) {
+export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech = false, showEngagement = false, onClose, onRoleChange }: UserActivityModalProps) {
   const isMobile = useIsMobile()
   const { overlayZ, contentZ } = useModalLayer(!!user)
   // The engagement analytics are desktop-only context: on mobile we keep the
@@ -262,7 +264,6 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, showEnga
                               </div>
                             ) : (
                               <>
-                                <span className="usr-role-popover-hint">Change role to</span>
                                 <div className="usr-role-options">
                                   {isExecutive && (
                                     <button
@@ -294,6 +295,21 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, showEnga
                                   >
                                     Manager
                                   </button>
+                                  {/* Tech-only test reset: back to the waiting room, and the
+                                      backend wipes their saved layout + onboarding state. */}
+                                  {isTech && currentRole !== "waiting" && (
+                                    <>
+                                      <div className="usr-role-popover-divider" />
+                                      <button
+                                        className="usr-assign-btn usr-role-waiting-btn"
+                                        disabled={changingRole}
+                                        onClick={() => handleRoleChange("waiting")}
+                                      >
+                                        <span>Return to Waiting Room</span>
+                                        <span className="usr-role-waiting-note">Resets their saved layout and onboarding</span>
+                                      </button>
+                                    </>
+                                  )}
                                 </div>
                               </>
                             )}

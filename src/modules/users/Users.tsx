@@ -161,6 +161,7 @@ export default function Users() {
   const effRole = effectiveRole(rawRole)
   const isExecutive = effRole === "executive"   // true for executive/owner/tech
   const isAdmin = effRole === "executive" || effRole === "admin"
+  const isTech = rawRole === "tech"             // waiting-room reset is tech-only
 
   const [users, setUsers] = useState<UserRecord[]>([])
   const [connected, setConnected] = useState(false)
@@ -350,6 +351,7 @@ export default function Users() {
       user={selectedUser}
       isAdmin={isAdmin}
       isExecutive={isExecutive}
+      isTech={isTech}
       showEngagement={isAnalyticsAdmin}
       onClose={() => setSelectedUser(null)}
       onRoleChange={handleAssignRole}
