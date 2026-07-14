@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
+import { Home } from "lucide-react"
 import Logo from "../../../core/components/Logo"
+import JobcostIcon from "../../../core/components/JobcostIcon"
 import { LAYOUT_TEMPLATES, type LayoutTemplate } from "../config/layoutTemplates"
 import { SECTION_REGISTRY } from "../config/sectionRegistry"
 import type { SectionId } from "../types/dashboardLayout"
 
-// Full-screen intro (phases 0–2) of the admin onboarding flow — the promoted
+// Full-screen intro (phases 0–3) of the admin onboarding flow — the promoted
 // successor to WelcomeWalkthrough. Shares the daily-recap arrival's motion
 // vocabulary (height-opening reveals for lines and slots, the bobbing chevron,
 // the copper CTA), but phase BODIES swap differently: they crossfade in place
@@ -18,18 +20,22 @@ import type { SectionId } from "../types/dashboardLayout"
 
 const EASE: [number, number, number, number] = [0.25, 0.46, 0.45, 0.94]
 
-// One spring family for every reshaping morph (the hero card's shrink, the
-// section stack's handoff into the layout options) so the intro's container
-// moves share one physical character.
+// The spring for the hero card's shrink morph (beat 0 → 1).
 const MORPH_SPRING = { type: "spring", visualDuration: 0.65, bounce: 0.12 } as const
+// The nav → hero growth uses a near-critically-damped variant: at that scale
+// (a 78px card swelling to fill the stage) MORPH_SPRING's bounce reads as
+// wobble rather than life.
+const GROW_SPRING = { type: "spring", visualDuration: 0.6, bounce: 0.02 } as const
 
-export type AdminIntroPhase = 0 | 1 | 2
+// 0 welcome · 1 getting around (the two main pages) · 2 dashboard sections ·
+// 3 layout pick.
+export type AdminIntroPhase = 0 | 1 | 2 | 3
 
 export interface AdminIntroScreensProps {
   phase: AdminIntroPhase
-  /** Advance 0→1 and 1→2 (phase 1 spends its first click on its internal beat). */
+  /** Advance 0→1→2→3 (phase 2 spends its first click on its internal beat). */
   onAdvance: () => void
-  /** "Skip intro" on phases 0–1 — jumps straight to phase 2 (the required layout pick). */
+  /** "Skip intro" on phases 0–2 — jumps straight to phase 3 (the required layout pick). */
   onSkip: () => void
   /** Fired by the "Enter the Dashboard" CTA with the selected card. Host owns
    *  the commit; you only report the choice. */
@@ -43,12 +49,19 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
   // Dashboard" CTA (mirroring the recap's "Go to Dashboard") does the commit.
   const [picked, setPicked] = useState<LayoutTemplate | null>(null)
 
-  // Phase 1 runs two beats: 0 — one hero section introduces the concept;
+  // Phase 2 runs two beats: 0 — one hero section introduces the concept;
   // 1 — it shrinks into the stack and the traversal demo plays. The arrow's
-  // first phase-1 click steps the beat; the next hands the phase back to the host.
+  // first phase-2 click steps the beat; the next hands the phase back to the host.
   const [beat, setBeat] = useState(0)
+  // Advance clicks are rate-limited: a double-click would skip a whole section
+  // sight unseen. 1.25s covers the longest transition (the nav→hero click-in
+  // choreography runs 1.2s before its morph even starts).
+  const lastAdvanceRef = useRef(0)
   const advance = () => {
-    if (phase === 1 && beat === 0) setBeat(1)
+    const now = performance.now()
+    if (now - lastAdvanceRef.current < 1250) return
+    lastAdvanceRef.current = now
+    if (phase === 2 && beat === 0) setBeat(1)
     else onAdvance()
   }
 
@@ -61,12 +74,11 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
   const phaseIn = {
     initial: { opacity: 0 },
     animate: { opacity: 1, transition: { duration: 0.35, delay: reduced ? 0 : 0.15 } },
-    // The slow exit is what sells the 1→2 handoff: the section stack must stay
-    // visible DISSOLVING inside the morphing box while the option cards
-    // materialize in it — die faster and the box travels empty (stretch,
-    // vanish, then cards pop). Elements that shouldn't linger (the copy line,
-    // the demo controls, the rail) carry their own faster exits.
-    exit: { opacity: 0, transition: { duration: reduced ? 0.15 : 0.4 } },
+    // Exits are FAST: the popped-out ghost overlaps the incoming phase's
+    // content in place, and two translucent layers double-exposed there reads
+    // as shimmer — the outgoing body must be gone before the incoming content
+    // (delays ≥ 0.15s) becomes prominent.
+    exit: { opacity: 0, transition: { duration: reduced ? 0.15 : 0.2 } },
   }
 
   // Measured height of the live phase body. The container animates height only
@@ -89,9 +101,9 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
     return () => window.clearTimeout(t)
   }, [swapping, phase])
 
-  // Phases 1 and 2 share one title — same key, so the header simply holds
+  // Phases 2 and 3 share one title — same key, so the header simply holds
   // steady across that boundary instead of swapping.
-  const headerText = phase === 0 ? "Welcome" : "Dashboard sections"
+  const headerText = phase === 0 ? "Welcome" : phase === 1 ? "Getting around" : "Dashboard sections"
 
   // The welcome screen reuses the daily recap's opening sequence verbatim
   // (IntroArrival's HERO_AT): logo and title rise together at 0.9s, the sub
@@ -111,11 +123,15 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
       className="adm-screen"
       role="dialog"
       aria-label="Set up your home page"
-      // Host drives the whole-takeover exit via AnimatePresence — a plain fade,
-      // matching IntroArrival's root.
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.45, ease: "easeIn" }}
-      style={{ willChange: "opacity" }}
+      // Host drives the whole-takeover exit via AnimatePresence. Mirrors the
+      // daily recap's exit exactly (DailyArrival's root): the screen MELTS —
+      // fade + slight scale + blur — while the coachmark's blurred backdrop
+      // rises beneath it, so the veil over the dashboard reads as one
+      // continuous handoff instead of fade-to-crisp-then-blur.
+      exit={{ opacity: 0, scale: 1.015, filter: "blur(14px)" }}
+      transition={{ duration: 0.55, ease: "easeIn" }}
+      // blur(0px) gives the exit filter an animatable starting value.
+      style={{ filter: "blur(0px)", willChange: "opacity, transform, filter" }}
     >
       <div className="adm-shell">
         {/* Persistent chrome — the logo mounts once and rides across all
@@ -153,7 +169,11 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
               exit={{
                 height: 0,
                 opacity: 0,
-                transition: { height: { duration: 0.4, ease: EASE }, opacity: { duration: 0.2 } },
+                // Exit height duration MUST equal the enter's: the collapse
+                // and open run summed in one slot, and a faster collapse dips
+                // the total height mid-swap — everything below bobs up and
+                // settles back down.
+                transition: { height: { duration: reduced ? 0.2 : 0.45, ease: EASE }, opacity: { duration: 0.2 } },
               }}
               style={{ overflow: "hidden" }}
             >
@@ -182,7 +202,7 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
                 key="p0"
                 className="adm-phase"
                 initial={{ opacity: 1 }}
-                exit={phaseIn.exit}
+                exit={{ opacity: 0, transition: { duration: 0.15 } }}
                 style={{ width: "100%" }}
               >
                 <motion.p className="adm-sub" {...heroRise(HERO_AT.sub)}>
@@ -191,20 +211,28 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
               </motion.div>
             )}
 
-            {phase === 1 && (
+            {(phase === 1 || phase === 2) && (
+              // Phases 1 and 2 are ONE continuous scene (same key — the
+              // wrapper never remounts across the boundary): the navbar mock's
+              // Dashboard preview IS the section stack in miniature, and each
+              // advance is a numeric morph of the same elements — mini stack →
+              // Business Development hero → traversal stack.
               <motion.div
-                key="p1"
+                key="p12"
                 className="adm-phase adm-phase--explain"
                 {...phaseIn}
                 style={{ width: "100%" }}
               >
-                <SectionsExplainer beat={beat} reduced={reduced} />
+                <JourneyExplainer
+                  stage={phase === 1 ? "nav" : beat === 0 ? "hero" : "stack"}
+                  reduced={reduced}
+                />
               </motion.div>
             )}
 
-            {phase === 2 && (
+            {phase === 3 && (
               <motion.div
-                key="p2"
+                key="p3"
                 className="adm-phase adm-phase--choose"
                 {...phaseIn}
                 style={{ width: "100%" }}
@@ -215,27 +243,15 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
                     the cards stagger in behind it, each card's preview bars
                     behind their card, the hint last. */}
                 <p className="adm-choose-note">
-                  Entirely customizable.
+                  These sections are entirely customizable.
                   <br />
-                  Pick the order your sections appear in.
+                  Select a prebuilt layout to get started.
                 </p>
-                <motion.div
-                  className="adm-choose-cards"
-                  role="radiogroup"
-                  aria-label="Layout templates"
-                  // Shared element: takes over the demo's section-stack box
-                  // (same layoutId) and springs it out into the three-card
-                  // row — the sections literally grow into the options. On the
-                  // skip path (no demo mounted) there is no source box and
-                  // this simply mounts in place.
-                  layoutId="sections-into-options"
-                  transition={{ layout: reduced ? { duration: 0 } : MORPH_SPRING }}
-                >
-                  {/* Cards stagger in left to right, materializing INSIDE the
-                      morphing box while the old stack dissolves — early enough
-                      to overlap it. `layout` + inline borderRadius give them
-                      scale correction so they don't smear while the container
-                      is mid-spring. */}
+                <div className="adm-choose-cards" role="radiogroup" aria-label="Layout templates">
+                  {/* Cards stagger in left to right as pure fades — no
+                      movement, no scaling. popLayout means this grid is at its
+                      final position from frame one; the fades start once the
+                      traversal demo's quick fade-out has cleared the spot. */}
                   {LAYOUT_TEMPLATES.map((t, i) => (
                     <motion.button
                       key={t.id}
@@ -243,12 +259,10 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
                       role="radio"
                       aria-checked={picked?.id === t.id}
                       className={`adm-choose-card${picked?.id === t.id ? " adm-choose-card--selected" : ""}`}
-                      layout
-                      style={{ borderRadius: 16 }}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={
-                        reduced ? { duration: 0 } : { duration: 0.4, ease: EASE, delay: 0.05 + i * 0.08 }
+                        reduced ? { duration: 0 } : { duration: 0.4, ease: EASE, delay: 0.25 + i * 0.1 }
                       }
                       onClick={() => setPicked(t)}
                     >
@@ -257,13 +271,13 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
                       <span className="adm-choose-card-desc">{t.description}</span>
                     </motion.button>
                   ))}
-                </motion.div>
+                </div>
                 {/* Footnote fades in once the card stagger has landed. */}
                 <motion.p
                   className="adm-choose-hint"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  transition={reduced ? { duration: 0 } : { duration: 0.4, ease: EASE, delay: 0.55 }}
+                  transition={reduced ? { duration: 0 } : { duration: 0.4, ease: EASE, delay: 0.75 }}
                 >
                   This is easy to change later.
                 </motion.p>
@@ -274,12 +288,12 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
         </motion.div>
 
         {/* Persistent footer slot (fixed height, absolute stacking). Phases
-            0–1: the bobbing advance arrow. Phase 2: once a card is picked the
+            0–2: the bobbing advance arrow. Phase 3: once a card is picked the
             copper "Enter the Dashboard" CTA takes the slot — the same closing
             beat as the daily recap. */}
         <div className="adm-foot">
           <AnimatePresence>
-            {phase < 2 ? (
+            {phase < 3 ? (
               <motion.div
                 key="arrow"
                 className="adm-foot-inner"
@@ -331,7 +345,7 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
 
       {/* Skip straight to the required layout pick — offered only while there's
           an intro left to skip. */}
-      {phase < 2 && (
+      {phase < 3 && (
         <button type="button" className="adm-skip" onClick={onSkip}>
           Skip intro
         </button>
@@ -358,26 +372,41 @@ function useMeasuredHeight(): [(el: HTMLDivElement | null) => void, number | nul
   return [ref, h]
 }
 
-// ═══ Phase 1 — dashboard sections (two beats, one morphing mock) ══════════════
-// Beat 0: ONE hero section, near full mock size — "Business Development" with
-// dressed-up widgets (real widget titles, ghost figures and revenue curves) —
-// introduces what a section is. Beat 1 (arrow click):
-// the SAME card shrinks live into the top of the section stack; the widget
-// detail dissolves back into plain skeleton blocks as they shrink, so the card
-// lands matching its siblings. Then the looping traversal demo plays: arrow
-// keys, then the rail waking and opening, then scroll.
+// ═══ Phases 1–2 — one continuous scene ════════════════════════════════════════
+// Phase 1 ("Getting around"): the real navbar in miniature — logo, the two
+// focal destinations as real labeled rows, shimmer pills below — with a
+// scripted cursor hovering the two in a slow loop. The Dashboard preview
+// beside it IS the section stack (the traversal mock, in mini); hovering Job
+// Costing overlays its cost table. Phase 2 beat 0: the navbar slides shut and
+// the mini stack's top card GROWS into the Business Development hero — the
+// same numeric-morph language the hero later uses to shrink into the
+// traversal stack (beat 1). One component stays mounted across all three
+// stages, so every boundary is a morph of the same elements, never a swap.
 
-function SectionsExplainer({ beat, reduced }: { beat: number; reduced: boolean }) {
+type JourneyStage = "nav" | "hero" | "stack"
+
+const NAV_HOVER_MS = 1700
+// Cursor y per focal row: mock padding (8) + logo row (20) + divider band
+// (~14) + row * (20 row + 4 gap), aimed a touch above row center.
+const navCursorY = (row: number) => 46 + row * 24
+
+function JourneyExplainer({ stage, reduced }: { stage: JourneyStage; reduced: boolean }) {
   const line =
-    beat === 0 ? (
+    stage === "nav" ? (
       <>
-        Your dashboard is built from sections.
+        There are two main pages: the Dashboard and Job Costing board.
+        <br />
+        Both live at the top of the navigation bar, on the left of your screen.
+      </>
+    ) : stage === "hero" ? (
+      <>
+        Your dashboard is composed of different sections.
         <br />
         Each one groups a set of related widgets.
       </>
     ) : (
       <>
-        One section fills the screen at a time.
+        Designed to focus your attention, one section fills the screen at a time.
         <br />
         Move between them with your arrow keys, the rail, or by scrolling.
       </>
@@ -390,7 +419,7 @@ function SectionsExplainer({ beat, reduced }: { beat: number; reduced: boolean }
       <div className="adm-explain-lines">
         <AnimatePresence initial={false}>
           <motion.p
-            key={beat}
+            key={stage}
             className="adm-explain-line"
             initial={{ height: 0, opacity: 0 }}
             animate={{
@@ -404,7 +433,9 @@ function SectionsExplainer({ beat, reduced }: { beat: number; reduced: boolean }
             exit={{
               height: 0,
               opacity: 0,
-              transition: { height: { duration: 0.35, ease: EASE }, opacity: { duration: 0.18 } },
+              // Same duration as the enter (see the header): a faster
+              // collapse dips the summed line height and the demo below bobs.
+              transition: { height: { duration: reduced ? 0.2 : 0.45, ease: EASE }, opacity: { duration: 0.18 } },
             }}
             style={{ overflow: "hidden" }}
           >
@@ -412,7 +443,7 @@ function SectionsExplainer({ beat, reduced }: { beat: number; reduced: boolean }
           </motion.p>
         </AnimatePresence>
       </div>
-      <SectionDemo beat={beat} reduced={reduced} />
+      <JourneyDemo stage={stage} reduced={reduced} />
     </div>
   )
 }
@@ -464,24 +495,20 @@ function frame(mode: DemoMode, a: number, ms: number, over: Partial<DemoFrame> =
 }
 
 // Starts AND ends on card 0 — the hero card the beat-0 mock shrinks into — so
-// both the morph handoff and the loop seam are continuous. Order and movement
-// counts per the design: arrow keys (3 moves), rail (3 clicks), scroll (2 moves).
+// both the morph handoff and the loop seam are continuous. TWO movements per
+// mode: arrow keys (2 presses), rail (2 clicks), scroll (2 nudges); the whole
+// script loops forever.
 const DEMO: DemoFrame[] = [
-  // Arrow keys — three presses walk down the stack.
+  // Arrow keys — two presses walk down the stack.
   frame("keys", 0, 950),
   frame("keys", 1, 430, { key: "down" }),
   frame("keys", 1, 820),
   frame("keys", 2, 430, { key: "down" }),
-  frame("keys", 2, 820),
-  frame("keys", 3, 430, { key: "down" }),
-  frame("keys", 3, 950),
+  frame("keys", 2, 950),
   // Rail — the cursor arrives, the rail wakes and OPENS (labels slide out),
-  // then three dot clicks jump around the stack.
-  frame("rail", 3, 800),
-  frame("rail", 3, 1000, { cursorOn: true, cursorRow: 1, railOpen: true }),
-  frame("rail", 1, 380, { cursorOn: true, cursorRow: 1, railOpen: true, clickRow: 1 }),
-  frame("rail", 1, 850, { cursorOn: true, cursorRow: 1, railOpen: true }),
-  frame("rail", 1, 750, { cursorOn: true, cursorRow: 4, railOpen: true }),
+  // then two dot clicks jump around the stack.
+  frame("rail", 2, 800),
+  frame("rail", 2, 1000, { cursorOn: true, cursorRow: 4, railOpen: true }),
   frame("rail", 4, 380, { cursorOn: true, cursorRow: 4, railOpen: true, clickRow: 4 }),
   frame("rail", 4, 850, { cursorOn: true, cursorRow: 4, railOpen: true }),
   frame("rail", 4, 750, { cursorOn: true, cursorRow: 2, railOpen: true }),
@@ -522,19 +549,84 @@ const VIEW_H = CARD_H * 2 + CARD_GAP * 2 // full card + 2 × (half card + gap)
 const HERO_W = 384
 const STACK_W = 176
 
+// Nav stage: the slim navbar mock and the two page previews all share ONE
+// height, so the row reads as a navbar beside a page. NAV_VIEW_H must equal
+// .adm-navmock's natural height (padding + logo + divider + 5 rows + gaps).
+const NAV_W = 112
+const NAV_GAP = 22
+const NAV_FRAME_W = 158
+const NAV_VIEW_H = 166
+const NAV_CARD_H = 78
+
 // The viewport mask fades the peeking half-cards at the edges. It ANIMATES
-// between a no-op gradient (beat 0 — the hero must not fade at its edges) and
-// the fading one; both strings share the same stop structure so framer can
-// interpolate them.
+// between a no-op gradient (the hero must not fade at its edges), a
+// bottom-only fade (nav stage — the mini stack is a page seen from the top),
+// and the both-edges fade; all strings share the same stop structure so
+// framer can interpolate them.
 const MASK_FLAT = "linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 22%, rgba(0,0,0,1) 78%, rgba(0,0,0,1) 100%)"
 const MASK_FADE = "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 22%, rgba(0,0,0,1) 78%, rgba(0,0,0,0) 100%)"
+const MASK_BOTTOM = "linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 22%, rgba(0,0,0,1) 78%, rgba(0,0,0,0) 100%)"
 
-function SectionDemo({ beat, reduced }: { beat: number; reduced: boolean }) {
+function JourneyDemo({ stage, reduced }: { stage: JourneyStage; reduced: boolean }) {
+  // The nav → hero boundary is CHOREOGRAPHED, so the demo's visual stage can
+  // lag the host's: on the advance click the copy swaps at once (outside this
+  // component), while in here the cursor first travels to the Dashboard row,
+  // CLICKS it (press dip, then the row turning copper-active — the real
+  // navbar's navigation grammar), and only then does the scene morph. Other
+  // boundaries follow the host immediately.
+  const [visual, setVisual] = useState<JourneyStage>(stage)
+  const [pressed, setPressed] = useState(false)
+  const [navigated, setNavigated] = useState(false)
+  const nav = visual === "nav"
+  const hero = visual === "hero"
+
+  // Nav-stage hover loop: the cursor alternates between the two focal rows.
+  // Runs only while the HOST is still on the nav phase — the choreography
+  // freezes the cursor wherever it takes over.
+  const [focus, setFocus] = useState<0 | 1>(0)
+  useEffect(() => {
+    if (stage !== "nav" || reduced) return
+    let r: 0 | 1 = 0
+    let timer = 0
+    const tick = () => {
+      r = r === 0 ? 1 : 0
+      setFocus(r)
+      timer = window.setTimeout(tick, NAV_HOVER_MS)
+    }
+    // Let the phase settle and the cursor arrive before the first move.
+    timer = window.setTimeout(tick, NAV_HOVER_MS + 500)
+    return () => window.clearTimeout(timer)
+  }, [stage, reduced])
+
+  // Render-time sync (the supported prev-props pattern): non-choreographed
+  // boundaries follow the host immediately; nav→hero holds `visual` back and
+  // parks the cursor on the Dashboard row for the click choreography below.
+  const choreo = stage === "hero" && visual === "nav" && !reduced
+  if (stage !== visual && !choreo) setVisual(stage)
+  if (choreo && focus !== 0) setFocus(0)
+
+  // The click choreography itself: an unhurried beat while the copy swaps and
+  // the cursor settles on Dashboard (0.8s), press (0.2s), row goes
+  // copper-active, morph (1.2s from the advance click).
+  useEffect(() => {
+    if (!choreo) return
+    const t1 = window.setTimeout(() => setPressed(true), 800)
+    const t2 = window.setTimeout(() => {
+      setPressed(false)
+      setNavigated(true)
+    }, 1000)
+    const t3 = window.setTimeout(() => setVisual("hero"), 1200)
+    return () => {
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+      window.clearTimeout(t3)
+    }
+  }, [choreo])
+
+  // Traversal loop (stack stage only). Recursive setTimeout so each frame
+  // holds for its own dwell, looping forever.
   const [frameIndex, setFrameIndex] = useState(0)
-  const playing = beat === 1 && !reduced
-
-  // Recursive setTimeout so each frame holds for its own dwell, looping
-  // forever. Held until the morph beat begins.
+  const playing = visual === "stack" && !reduced
   useEffect(() => {
     if (!playing) return
     let i = 0
@@ -551,134 +643,225 @@ function SectionDemo({ beat, reduced }: { beat: number; reduced: boolean }) {
   }, [playing])
 
   const f = playing ? DEMO[frameIndex] : REST_FRAME
-  const hero = beat === 0
 
-  // One spring for every morphing dimension (frame width, card height, widget
-  // blocks, title size, track travel) so the whole shrink moves as one body.
-  const morph = reduced ? { duration: 0 } : MORPH_SPRING
+  // One spring for every morphing dimension so each stage boundary moves as
+  // one body — the growth into the hero damped, the shrink into the stack
+  // lively. Per-stage geometry, all numbers:
+  const morph = reduced ? { duration: 0 } : hero ? GROW_SPRING : MORPH_SPRING
+  const frameW = nav ? NAV_FRAME_W : hero ? HERO_W : STACK_W
+  const viewH = nav ? NAV_VIEW_H : VIEW_H
+  const heroH = nav ? NAV_CARD_H : hero ? VIEW_H : CARD_H
+  const sibH = nav ? NAV_CARD_H : CARD_H
+  const titlePx = hero ? 13 : 7
+  const heroBlockH = nav ? 14 : hero ? 64 : 20
+  const sibBlockH = nav ? 14 : 20
+  // Nav/hero anchor the page to its top (card 0 at y 0); the traversal
+  // centers the active card.
+  const trackY = nav || hero ? 0 : (VIEW_H - CARD_H) / 2 - f.a * CARD_STEP
+  const mask = nav ? MASK_BOTTOM : hero ? MASK_FLAT : MASK_FADE
 
   return (
     <div className="adm-demo-inner" aria-hidden="true">
-      <motion.div className="adm-demo-frame" animate={{ width: hero ? HERO_W : STACK_W }} transition={morph}>
+      <div className="adm-journey">
+        {/* The navbar mock slides shut (width + fade) when the scene moves on
+            to the hero — the page it pointed at takes the stage. */}
         <motion.div
-          className="adm-carousel"
-          // Shared element: on the 1→2 swap the layout-options grid (same
-          // layoutId) takes over this box, so the section stack visibly
-          // reshapes into the three option cards. The id is stable across the
-          // demo's own re-renders (the track moves by transform, so no layout
-          // animations fire during the loop).
-          layoutId="sections-into-options"
-          style={{ height: VIEW_H }}
-          animate={{ maskImage: hero ? MASK_FLAT : MASK_FADE }}
+          className="adm-navmock-wrap"
+          initial={false}
+          animate={{ width: nav ? NAV_W : 0, marginRight: nav ? NAV_GAP : 0, opacity: nav ? 1 : 0 }}
           transition={{
-            maskImage: reduced ? { duration: 0 } : { duration: 0.6, ease: EASE },
-            layout: reduced ? { duration: 0 } : MORPH_SPRING,
+            width: morph,
+            marginRight: morph,
+            opacity: { duration: reduced ? 0 : 0.35, ease: EASE },
           }}
         >
-          <motion.div
-            className="adm-carousel-track"
-            animate={{ y: hero ? 0 : (VIEW_H - CARD_H) / 2 - f.a * CARD_STEP }}
-            transition={morph}
-          >
-            {/* The hero card — Business Development in dressed-up form: real
-                widget titles, ghost figures and revenue curves. On the shrink
-                everything morphs NUMERICALLY down to
-                stack size while the widget detail dissolves into the shimmer,
-                so the card lands as a plain skeleton matching its siblings. */}
-            <motion.div
-              className="adm-skel-card adm-skel-card--hero"
-              animate={{
-                height: hero ? VIEW_H : CARD_H,
-                opacity: hero || f.a === 0 ? 1 : 0.35,
-              }}
-              transition={{ height: morph, opacity: { duration: 0.45, ease: EASE } }}
+          <div className="adm-navmock">
+            <div className="adm-navlogo">
+              <Logo size={16} />
+              <span className="adm-skel-pill" style={{ width: 48 }} />
+            </div>
+            <div className="adm-navdivider" />
+            <div
+              className={`adm-navrow adm-navrow--real${
+                nav && !reduced && focus === 0 && !navigated ? " adm-navrow--hover" : ""
+              }${pressed ? " adm-navrow--pressed" : ""}${navigated ? " adm-navrow--active" : ""}`}
             >
+              <Home size={10} />
+              <span className="adm-navrow-label">Dashboard</span>
+            </div>
+            <div className={`adm-navrow adm-navrow--real${nav && !reduced && focus === 1 ? " adm-navrow--hover" : ""}`}>
+              <JobcostIcon size={10} />
+              <span className="adm-navrow-label">Job Costing</span>
+            </div>
+            {[40, 32, 46].map((w) => (
+              <div key={w} className="adm-navrow">
+                <span className="adm-skel-dot" />
+                <span className="adm-skel-pill" style={{ width: w }} />
+              </div>
+            ))}
+            {nav && !reduced && (
               <motion.span
-                className="adm-hero-title"
-                animate={{ fontSize: hero ? 13 : 7 }}
-                transition={morph}
+                className="adm-cursor adm-navcursor"
+                initial={{ x: 22, y: 110, opacity: 0 }}
+                animate={{ x: 0, y: navCursorY(focus), opacity: 1, scale: pressed ? 0.82 : 1 }}
+                transition={{
+                  opacity: { duration: 0.4, ease: EASE, delay: 0.5 },
+                  scale: { type: "spring", visualDuration: 0.18, bounce: 0.3 },
+                  default: { type: "spring", visualDuration: 0.5, bounce: 0 },
+                }}
               >
-                Business Development
+                <CursorArrow />
               </motion.span>
-              <div className="adm-skel-grid">
-                {HERO_WIDGETS.map((w) => (
+            )}
+          </div>
+        </motion.div>
+
+        <div className="adm-journey-stage">
+          <motion.div className="adm-demo-frame" initial={false} animate={{ width: frameW }} transition={morph}>
+            <motion.div
+              className="adm-carousel"
+              initial={false}
+              animate={{ height: viewH, maskImage: mask }}
+              transition={{
+                height: morph,
+                maskImage: reduced ? { duration: 0 } : { duration: 0.6, ease: EASE },
+              }}
+            >
+              <motion.div className="adm-carousel-track" initial={false} animate={{ y: trackY }} transition={morph}>
+                {/* The hero card — Business Development. In the nav stage it's
+                    the top card of the mini page; on advance it GROWS into the
+                    dressed-up hero (real widget titles, ghost figures, revenue
+                    curves); on the next it shrinks into the traversal stack.
+                    Every dimension morphs NUMERICALLY between the three. */}
+                <motion.div
+                  className="adm-skel-card adm-skel-card--hero"
+                  initial={false}
+                  animate={{
+                    height: heroH,
+                    opacity: nav || hero || f.a === 0 ? 1 : 0.35,
+                  }}
+                  transition={{ height: morph, opacity: { duration: 0.45, ease: EASE } }}
+                >
                   <motion.span
-                    key={w.title}
-                    className="adm-skel-block adm-widget"
-                    animate={{ height: hero ? 64 : 20 }}
+                    className="adm-hero-title"
+                    initial={false}
+                    animate={{ fontSize: titlePx }}
                     transition={morph}
                   >
-                    <motion.span
-                      className="adm-widget-detail"
-                      animate={{ opacity: hero ? 1 : 0 }}
-                      transition={{ duration: reduced ? 0 : 0.3, ease: EASE }}
-                    >
-                      <span className="adm-widget-title">{w.title}</span>
-                      {w.kind === "figure" ? (
-                        <span className="adm-widget-figure">$0,000,000</span>
-                      ) : (
-                        <RevenueCurve />
-                      )}
-                    </motion.span>
+                    Business Development
                   </motion.span>
-                ))}
-              </div>
-            </motion.div>
-
-            {/* The sibling sections — titled like the hero's landed state —
-                waiting beneath the fold until the morph. */}
-            {SIBLING_TITLES.map((title, idx) => {
-              const i = idx + 1
-              return (
-                <motion.div
-                  key={title}
-                  className="adm-skel-card"
-                  animate={{ opacity: hero ? 0 : i === f.a ? 1 : 0.35 }}
-                  transition={{ duration: 0.45, ease: EASE }}
-                >
-                  <span className="adm-card-title">{title}</span>
                   <div className="adm-skel-grid">
-                    {Array.from({ length: 4 }).map((_, j) => (
-                      <span key={j} className="adm-skel-block" />
+                    {HERO_WIDGETS.map((w) => (
+                      <motion.span
+                        key={w.title}
+                        className="adm-skel-block adm-widget"
+                        initial={false}
+                        animate={{ height: heroBlockH }}
+                        transition={morph}
+                      >
+                        <motion.span
+                          className="adm-widget-detail"
+                          initial={false}
+                          animate={{ opacity: hero ? 1 : 0 }}
+                          transition={{ duration: reduced ? 0 : 0.3, ease: EASE }}
+                        >
+                          <span className="adm-widget-title">{w.title}</span>
+                          {w.kind === "figure" ? (
+                            <span className="adm-widget-figure">$0,000,000</span>
+                          ) : (
+                            <RevenueCurve />
+                          )}
+                        </motion.span>
+                      </motion.span>
                     ))}
                   </div>
                 </motion.div>
-              )
-            })}
-          </motion.div>
-        </motion.div>
 
-        {/* The rail arrives once the stack exists, just off its right edge —
-            where it lives on the real dashboard. */}
-        <AnimatePresence>
-          {!hero && (
-            <motion.div
-              className="adm-demo-rail"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              // Explicit exit transition: without it the entrance delay above
-              // leaks into the exit and the rail lingers over the 1→2 morph.
-              exit={{ opacity: 0, transition: { duration: 0.15 } }}
-              transition={reduced ? { duration: 0 } : { duration: 0.5, ease: EASE, delay: 0.45 }}
-            >
-              <SectionRail
-                active={f.a}
-                open={f.railOpen}
-                clickRow={f.clickRow}
-                cursorOn={f.cursorOn}
-                cursorRow={f.cursorRow}
-                awake={f.cursorOn}
-                reduced={reduced}
-              />
+                {/* The sibling sections — titled like the hero's landed state.
+                    Present in the nav-stage mini page, hidden while the hero
+                    has the stage, back for the traversal. */}
+                {SIBLING_TITLES.map((title, idx) => {
+                  const i = idx + 1
+                  return (
+                    <motion.div
+                      key={title}
+                      className="adm-skel-card"
+                      initial={false}
+                      animate={{
+                        height: sibH,
+                        opacity: hero ? 0 : nav ? 0.55 : i === f.a ? 1 : 0.35,
+                      }}
+                      transition={{ height: morph, opacity: { duration: 0.45, ease: EASE } }}
+                    >
+                      <span className="adm-card-title">{title}</span>
+                      <div className="adm-skel-grid">
+                        {Array.from({ length: 4 }).map((_, j) => (
+                          <motion.span
+                            key={j}
+                            className="adm-skel-block"
+                            initial={false}
+                            animate={{ height: sibBlockH }}
+                            transition={morph}
+                          />
+                        ))}
+                      </div>
+                    </motion.div>
+                  )
+                })}
+              </motion.div>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+
+            {/* The rail arrives once the stack exists, just off its right edge —
+                where it lives on the real dashboard. */}
+            <AnimatePresence>
+              {visual === "stack" && (
+                <motion.div
+                  className="adm-demo-rail"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  // Explicit exit transition: without it the entrance delay above
+                  // leaks into the exit and the rail lingers over the morph.
+                  exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                  transition={reduced ? { duration: 0 } : { duration: 0.5, ease: EASE, delay: 0.45 }}
+                >
+                  <SectionRail
+                    active={f.a}
+                    open={f.railOpen}
+                    clickRow={f.clickRow}
+                    cursorOn={f.cursorOn}
+                    cursorRow={f.cursorRow}
+                    awake={f.cursorOn}
+                    reduced={reduced}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Job Costing's page — a cost table in skeleton, overlaying the mini
+              dashboard while its nav row is hovered. Same footprint as the
+              mini page, so the swap is a pure crossfade. */}
+          <motion.div
+            className="adm-navjobcost"
+            initial={false}
+            animate={{ opacity: nav && !reduced && focus === 1 ? 1 : 0 }}
+            transition={{ duration: reduced ? 0 : 0.3, ease: EASE }}
+            style={{ width: NAV_FRAME_W, height: NAV_VIEW_H }}
+          >
+            <span className="adm-card-title">Job Costing</span>
+            <div className="adm-navtable">
+              {[100, 78, 88, 64, 92, 70].map((w) => (
+                <span key={w} className="adm-skel-block adm-navtable-row" style={{ width: `${w}%` }} />
+              ))}
+            </div>
+          </motion.div>
+        </div>
+      </div>
 
       {/* The input control and its label open beneath the stack with the morph
           (height reveal, recap style) and hold a fixed slot from then on. */}
       <AnimatePresence initial={false}>
-        {!hero && (
+        {visual === "stack" && (
           <motion.div
             key="below"
             className="adm-demo-below"
@@ -912,8 +1095,8 @@ function CursorArrow() {
 const BAR_WIDTH: Partial<Record<SectionId, number>> = {
   reports: 72,
   businessDevelopment: 90,
-  businessPerformance: 64,
-  financialTrends: 84,
+  businessPerformance: 84,
+  financialTrends: 60,
   businessFinancials: 58,
   businessRelations: 78,
   estimationPerformance: 70,
@@ -940,8 +1123,8 @@ function TemplatePreview({
             reduced
               ? { duration: 0 }
               : // Rides in just behind its card's fade (cards start at
-                // 0.05 + cardIndex * 0.08 — keep these in step).
-                { duration: 0.4, ease: EASE, delay: 0.2 + cardIndex * 0.08 + i * 0.05 }
+                // 0.25 + cardIndex * 0.1 — keep these in step).
+                { duration: 0.4, ease: EASE, delay: 0.4 + cardIndex * 0.1 + i * 0.05 }
           }
           style={{ width: `${BAR_WIDTH[id] ?? 75}%` }}
         >

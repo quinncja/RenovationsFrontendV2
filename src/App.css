@@ -5439,11 +5439,10 @@ body{
 
 .usr-role-popover .usr-activity-admin-lock { margin-top: 0; }
 
-.usr-role-popover-hint {
-  display: block;
-  font-size: 0.8125rem;
-  color: var(--secondary-text);
-  margin-bottom: 0.65rem;
+.usr-role-popover-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 0.45rem 0;
 }
 
 .usr-role-options {
@@ -5480,6 +5479,27 @@ body{
   opacity: 1;
   color: var(--secondary-text);
   background: var(--hover-bg);
+}
+
+/* Tech-only reset row: reads as the menu's one destructive action. */
+.usr-role-options .usr-role-waiting-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  color: #ef4444;
+}
+
+.usr-role-options .usr-role-waiting-btn:not(:disabled):hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #ef4444;
+}
+
+.usr-role-waiting-note {
+  font-size: 0.6875rem;
+  font-weight: 400;
+  color: var(--secondary-text);
 }
 
 .usr-activity-header {
@@ -13101,15 +13121,130 @@ svg.placeholder-illustration {
 }
 .adm-hero-title {
   display: block;
-  /* Baseline = the hero (beat 0) size, so the first paint — before framer's
-     inline fontSize lands — already matches; framer then animates 13 → 7 on
-     the shrink. Without this it inherits the body size for a frame and
-     visibly snaps down. */
-  font-size: 13px;
+  /* Baseline = the size at first mount (the nav stage's mini card), so any
+     pre-inline paint already matches; framer (initial={false} + inline
+     fontSize) drives 7 → 13 → 7 across the stages. Without a baseline it
+     inherits the body size for a frame and visibly snaps down. */
+  font-size: 7px;
   line-height: 1.3;
   font-weight: var(--font-weight-semibold);
   color: var(--primary-text);
   white-space: nowrap;
+}
+
+/* ── Phase 1 — getting around (navbar mock + page previews) ── */
+
+/* The whole scene: navbar mock (collapsible wrap) beside the demo stage. */
+.adm-journey {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Animated width clips the fixed-width mock inside — the navbar "slides
+   shut" when the scene moves on to the hero. */
+.adm-navmock-wrap {
+  overflow: hidden;
+  flex: none;
+}
+/* Anchors the Job Costing page overlay to the demo frame's top-left. */
+.adm-journey-stage {
+  position: relative;
+}
+
+/* The real navbar in miniature: deliberately slim, same surface treatment as
+   the section cards. Height must equal NAV_VIEW_H in AdminIntroScreens (the
+   mini page and the Job Costing card match it). */
+.adm-navmock {
+  position: relative;
+  width: 112px;
+  height: 166px;
+  padding: 8px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 12px;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+}
+.adm-navlogo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 6px;
+}
+.adm-navdivider {
+  height: 1px;
+  margin: 2px 4px 3px;
+  background: var(--border-color);
+  flex: none;
+}
+/* One nav row. The two focal rows carry real icon + label; skeleton rows a
+   shimmer dot + pill. Hover is the real navbar's quiet surface tint. */
+.adm-navrow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 6px;
+  color: var(--secondary-text);
+  transition: background-color 0.25s ease;
+}
+.adm-navrow--real {
+  color: var(--primary-text);
+}
+.adm-navrow--hover {
+  background: color-mix(in srgb, var(--primary-text) 6%, transparent);
+}
+/* Scripted click: a deeper press tint, then the row holds copper-active — the
+   real navbar's "you are here" — for the beat before the scene morphs. */
+.adm-navrow--pressed {
+  background: color-mix(in srgb, var(--primary-text) 12%, transparent);
+}
+.adm-navrow--active {
+  color: var(--primary-color);
+  background: color-mix(in srgb, var(--primary-color) 10%, transparent);
+}
+.adm-navrow-label {
+  font-size: 8px;
+  line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+/* The scripted cursor hugs the rows' right edge. */
+.adm-navcursor {
+  right: 26px;
+}
+
+/* Job Costing's page in skeleton — overlays the mini dashboard page (same
+   footprint, sized inline from the NAV_* constants) while its row is hovered.
+   Opaque surface so the crossfade fully covers the stack beneath. */
+.adm-navjobcost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 11px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  pointer-events: none;
+}
+.adm-navtable {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+/* Two classes to outrank the generic .adm-skel-block sizing below. */
+.adm-navtable .adm-navtable-row {
+  height: 10px;
+  border-radius: 4px;
 }
 
 /* Opens beneath the stack with the shrink morph; holds the control + label. */
@@ -13271,8 +13406,10 @@ svg.placeholder-illustration {
 }
 
 /* Scaled-down echo of the dashboard shimmer (.widget-skeleton) — same gradient
-   + keyframe. */
-.adm-skel-block {
+   + keyframe. Dot and pill are the navbar mock's skeleton atoms. */
+.adm-skel-block,
+.adm-skel-dot,
+.adm-skel-pill {
   display: block;
   background: linear-gradient(
     115deg,
@@ -13282,6 +13419,16 @@ svg.placeholder-illustration {
   );
   background-size: 900px 100%;
   animation: shimmer 3.2s linear infinite;
+}
+.adm-skel-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.adm-skel-pill {
+  height: 7px;
+  border-radius: 999px;
 }
 .adm-skel-grid {
   display: grid;
@@ -13495,7 +13642,9 @@ svg.placeholder-illustration {
    and the preview cascade; here we still the CSS shimmer so the skeletons rest
    on a calm static state. */
 @media (prefers-reduced-motion: reduce) {
-  .adm-skel-block {
+  .adm-skel-block,
+  .adm-skel-dot,
+  .adm-skel-pill {
     animation: none;
   }
   .adm-skel-card {
