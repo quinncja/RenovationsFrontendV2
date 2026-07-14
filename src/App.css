@@ -5449,11 +5449,37 @@ body{
 .usr-role-options {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.125rem;
 }
 
+/* Clean, neutral menu rows. The per-role color pills (executive/admin/gm/
+   manager) are the quick-assign look on the waiting-room card; inside this
+   popover the choice should read as a plain list, not five shouting colors. */
 .usr-role-options .usr-assign-btn {
-  padding: 0.5rem 0;
+  flex: none;
+  width: 100%;
+  padding: 0.4rem 0.625rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: left;
+  color: var(--primary-text);
+  background: transparent;
+}
+
+.usr-role-options .usr-assign-btn:not(:disabled):hover {
+  background: var(--hover-bg);
+  border-color: var(--border-color);
+  color: var(--primary-text);
+}
+
+/* Current role: a quiet "selected" row rather than the dimmed disabled look. */
+.usr-role-options .usr-assign-btn--active,
+.usr-role-options .usr-assign-btn--active:disabled {
+  opacity: 1;
+  color: var(--secondary-text);
+  background: var(--hover-bg);
 }
 
 .usr-activity-header {
@@ -13068,10 +13094,10 @@ svg.placeholder-illustration {
 
 /* The hero card ("Business Revenue") — same skeleton card, but its title is
    REAL text whose size morphs numerically with the shrink, and its widget
-   blocks morph their height. Left-aligned like a real section title. */
+   blocks morph their height. Title centered, matching the sibling cards. */
 .adm-skel-card--hero {
   align-items: stretch;
-  text-align: left;
+  text-align: center;
 }
 .adm-hero-title {
   display: block;
@@ -13275,7 +13301,7 @@ svg.placeholder-illustration {
   line-height: 1.3;
   font-weight: var(--font-weight-semibold);
   color: var(--primary-text);
-  text-align: left;
+  text-align: center;
   white-space: nowrap;
 }
 
