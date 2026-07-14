@@ -6,8 +6,8 @@ function readDark(): boolean {
   if (scheme === "dark") return true
   // colorScheme not yet set — read localStorage (may be JSON-stringified)
   const stored = localStorage.getItem("theme")
-  if (!stored) return true // app default is dark
-  try { return JSON.parse(stored) !== "light" } catch { return stored !== "light" }
+  if (!stored) return false // app default is light
+  try { return JSON.parse(stored) === "dark" } catch { return stored === "dark" }
 }
 
 export function useDarkMode(): boolean {

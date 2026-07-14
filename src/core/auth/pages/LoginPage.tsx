@@ -44,7 +44,7 @@ export default function LoginPage() {
       <div className="login-background" />
       <div className="auth-card">
         <div className="auth-card-header">
-          <Logo size={48} />
+          <Logo size={48} variant="white" />
           <h1 className="title1">Welcome back</h1>
           <p className="body-text">Sign in to Renovations Delivered</p>
         </div>

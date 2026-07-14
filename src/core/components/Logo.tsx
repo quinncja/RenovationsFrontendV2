@@ -1,10 +1,18 @@
 import { useDarkMode } from "../../shared/hooks/useDarkMode"
 
-export default function Logo({ size = 40 }: { size?: number; color?: string }) {
+// variant "white" pins the white artwork regardless of theme — for the
+// permanently dark auth shell (login/signup/signout).
+export default function Logo({
+  size = 40,
+  variant = "auto",
+}: {
+  size?: number
+  variant?: "auto" | "white"
+}) {
   const dark = useDarkMode()
   return (
     <img
-      src={dark ? "/r-logo-white.png" : "/r-logo.png"}
+      src={variant === "white" || dark ? "/r-logo-white.png" : "/r-logo.png"}
       alt="Renovations Delivered"
       width={size}
       height={size}

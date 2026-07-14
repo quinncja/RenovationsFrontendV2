@@ -95,7 +95,7 @@ export default function WaitingRoom() {
   const accessState = status === "admitted" ? "active" : "pending"
 
   return (
-    <div className="login-page">
+    <div className="login-page wr-page">
       <div className="login-background" />
       <div className="auth-card wr-card">
         <div className="auth-card-header">

@@ -42,7 +42,7 @@ export default function SignupPage() {
     <div className="login-page">
       <div className="auth-card">
         <div className="auth-card-header">
-          <Logo size={48} />
+          <Logo size={48} variant="white" />
           <h1 className="title1">Create an account</h1>
           <p className="body-text">Get started with Renovations Delivered</p>
         </div>

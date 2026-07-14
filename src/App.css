@@ -6026,8 +6026,26 @@ body{
 
 /* ─── Waiting room ───────────────────────────────────────────────────────
    Shares the LoginPage shell (.login-page / .login-background / .auth-card)
-   so an unapproved user stays inside the same atmosphere they just signed in
-   through, rather than landing on a separate modal-style card. */
+   for layout, but unlike the permanently dark auth pages it follows the app
+   theme (light by default) — the user is signed in at this point. */
+
+.wr-page {
+  background-color: var(--background-color);
+}
+
+.wr-page .auth-card {
+  background: light-dark(rgba(255, 255, 255, 0.9), rgba(38, 34, 32, 0.9));
+  border-color: var(--border-color);
+  box-shadow: light-dark(0 8px 40px rgba(25, 55, 90, 0.12), 0 8px 40px rgba(0, 0, 0, 0.5));
+}
+
+.wr-page .auth-card-header h1 {
+  color: var(--primary-text);
+}
+
+.wr-page .auth-card-header p {
+  color: var(--secondary-text);
+}
 
 .wr-card {
   width: 100%;
@@ -6069,11 +6087,11 @@ body{
   top: 1.5rem;
   bottom: 0.25rem;
   width: 1.5px;
-  background: rgba(200, 180, 160, 0.16);
+  background: light-dark(rgb(from var(--primary-text) r g b / 0.14), rgba(200, 180, 160, 0.16));
 }
 
 .wr-step--done:not(:last-child)::before {
-  background: rgba(200, 180, 160, 0.32);
+  background: light-dark(rgb(from var(--primary-text) r g b / 0.28), rgba(200, 180, 160, 0.32));
 }
 
 .wr-step-marker {
@@ -6085,16 +6103,16 @@ body{
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid rgba(200, 180, 160, 0.22);
-  background: rgba(26, 23, 20, 0.5);
-  color: rgba(232, 224, 216, 0.85);
+  border: 1.5px solid light-dark(rgb(from var(--primary-text) r g b / 0.22), rgba(200, 180, 160, 0.22));
+  background: light-dark(rgba(255, 255, 255, 0.5), rgba(26, 23, 20, 0.5));
+  color: rgb(from var(--primary-text) r g b / 0.85);
   margin-top: 0.0625rem;
 }
 
 .wr-step--done .wr-step-marker {
   border-color: transparent;
-  background: rgba(200, 180, 160, 0.2);
-  color: #e8e0d8;
+  background: light-dark(rgb(from var(--primary-text) r g b / 0.12), rgba(200, 180, 160, 0.2));
+  color: var(--primary-text);
 }
 
 /* Copper reserved for the single live step — the thing actually happening. */
@@ -6134,19 +6152,19 @@ body{
 .wr-step-title {
   font-size: 0.875rem;
   font-weight: var(--font-weight-medium);
-  color: rgba(232, 224, 216, 0.55);
+  color: rgb(from var(--primary-text) r g b / 0.55);
   letter-spacing: 0.01em;
 }
 
 .wr-step--done .wr-step-title,
 .wr-step--active .wr-step-title,
 .wr-step--error .wr-step-title {
-  color: #e8e0d8;
+  color: var(--primary-text);
 }
 
 .wr-step-detail {
   font-size: 0.78125rem;
-  color: rgba(232, 224, 216, 0.5);
+  color: rgb(from var(--primary-text) r g b / 0.5);
   line-height: 1.35;
   word-break: break-word;
 }
@@ -6155,9 +6173,9 @@ body{
   align-self: center;
   padding: 0.4375rem 1.125rem;
   border-radius: 6px;
-  border: 1px solid rgba(200, 180, 160, 0.2);
-  background: rgba(26, 23, 20, 0.4);
-  color: rgba(232, 224, 216, 0.7);
+  border: 1px solid light-dark(rgb(from var(--primary-text) r g b / 0.2), rgba(200, 180, 160, 0.2));
+  background: light-dark(rgba(255, 255, 255, 0.4), rgba(26, 23, 20, 0.4));
+  color: rgb(from var(--primary-text) r g b / 0.7);
   font-size: 0.8125rem;
   font-family: var(--font-family);
   cursor: pointer;
@@ -6166,8 +6184,8 @@ body{
 
 .wr-refresh:hover {
   border-color: var(--primary-color);
-  color: #e8e0d8;
-  background: rgba(26, 23, 20, 0.6);
+  color: var(--primary-text);
+  background: light-dark(#ffffff, rgba(26, 23, 20, 0.6));
 }
 
 @media (prefers-reduced-motion: reduce) {

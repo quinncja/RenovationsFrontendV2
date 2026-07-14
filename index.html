@@ -3,14 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <!-- Synchronously apply stored theme before first paint to prevent flash.
-         Defaults to light; only an explicit stored "dark" choice flips it. -->
+         Always set explicitly (light unless "dark" was stored) so useDarkMode
+         can trust colorScheme even on pages without the navbar. -->
     <script>
       try {
         var t = localStorage.getItem('theme');
-        if (t === '"dark"' || t === 'dark') {
-          document.documentElement.style.colorScheme = 'dark';
-        }
-      } catch (e) {}
+        document.documentElement.style.colorScheme =
+          (t === '"dark"' || t === 'dark') ? 'dark' : 'light';
+      } catch (e) {
+        document.documentElement.style.colorScheme = 'light';
+      }
     </script>
     <link rel="icon" type="image/png" href="/r-logo.png" />
     <style>
