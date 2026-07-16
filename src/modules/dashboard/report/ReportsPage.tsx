@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import Page from "../../../shared/components/Page"
 import { Widget } from "../../../shared/components/Widget/Widget"
+import { MotionList, MotionItem } from "../../../shared/components/MotionList/MotionList"
 import { useAuth } from "../../../core/auth/AuthProvider"
 import type { ReportMetricKey } from "./reportTypes"
 import {
@@ -73,67 +74,73 @@ export default function ReportsPage() {
       title="Activity"
       subtitle={range.from === range.to ? dayLabel(range.from) : rangeLabel(range)}
     >
-      <div className="rpt-controls">
-        <div className="period-selector" role="radiogroup" aria-label="Report window">
-          {PRESETS.map(({ key, label }) => {
-            const active = sel.kind === "preset" && sel.preset === key
-            return (
-              <button
-                key={key}
-                className={`period-selector-btn${active ? " period-selector-btn--active" : ""}`}
-                role="radio"
-                aria-checked={active}
-                onClick={() => setSel({ kind: "preset", preset: key })}
-              >
-                {label}
-              </button>
-            )
-          })}
-        </div>
-        <MiniCalendarPopover
-          value={sel.kind === "day" ? sel.day : null}
-          max={today}
-          active={sel.kind === "day"}
-          onSelect={(day) => setSel({ kind: "day", day })}
-        />
-      </div>
-
-      {isLoading ? (
-        <MetricGridSkeleton pmScoped={source === "pm"} />
-      ) : disconnected || !payload ? (
-        <div className="widget card">
-          <div className="widget-no-data">
-            <span className="body-text">Couldn't load this report — try again shortly</span>
+      <MotionList>
+        <MotionItem className="rpt-controls">
+          <div className="period-selector" role="radiogroup" aria-label="Report window">
+            {PRESETS.map(({ key, label }) => {
+              const active = sel.kind === "preset" && sel.preset === key
+              return (
+                <button
+                  key={key}
+                  className={`period-selector-btn${active ? " period-selector-btn--active" : ""}`}
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setSel({ kind: "preset", preset: key })}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
-        </div>
-      ) : (
-        <>
-          <MetricGrid summary={payload.summary} onOpen={setMetric} />
+          <MiniCalendarPopover
+            value={sel.kind === "day" ? sel.day : null}
+            max={today}
+            active={sel.kind === "day"}
+            onSelect={(day) => setSel({ kind: "day", day })}
+          />
+        </MotionItem>
 
-          <Widget
-            title="Timeline"
-            description={
-              capped
-                ? `Latest ${FEED_CAP} per category, newest first`
-                : `${payload.items.length} ${payload.items.length === 1 ? "item" : "items"}, newest first`
-            }
-            className="rcnt-widget rpt-feed-widget"
-          >
-            {payload.items.length === 0 ? (
+        {/* Skeleton/data swaps happen INSIDE the item so the entrance runs once
+            per page load, matching every other MotionList page. */}
+        <MotionItem>
+          {isLoading ? (
+            <MetricGridSkeleton pmScoped={source === "pm"} />
+          ) : disconnected || !payload ? (
+            <div className="widget card">
               <div className="widget-no-data">
-                <span className="body-text">No activity in this window</span>
+                <span className="body-text">Couldn't load this report — try again shortly</span>
               </div>
-            ) : (
-              <ActivityTimeline
-                items={payload.items}
-                summary={payload.summary}
-                grouped={range.from !== range.to}
-                onSelect={openItem}
-              />
-            )}
-          </Widget>
-        </>
-      )}
+            </div>
+          ) : (
+            <>
+              <MetricGrid summary={payload.summary} onOpen={setMetric} />
+
+              <Widget
+                title="Timeline"
+                description={
+                  capped
+                    ? `Latest ${FEED_CAP} per category, newest first`
+                    : `${payload.items.length} ${payload.items.length === 1 ? "item" : "items"}, newest first`
+                }
+                className="rcnt-widget rpt-feed-widget"
+              >
+                {payload.items.length === 0 ? (
+                  <div className="widget-no-data">
+                    <span className="body-text">No activity in this window</span>
+                  </div>
+                ) : (
+                  <ActivityTimeline
+                    items={payload.items}
+                    summary={payload.summary}
+                    grouped={range.from !== range.to}
+                    onSelect={openItem}
+                  />
+                )}
+              </Widget>
+            </>
+          )}
+        </MotionItem>
+      </MotionList>
 
       <MetricDrilldownModal
         metric={metric}

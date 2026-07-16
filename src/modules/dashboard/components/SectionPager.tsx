@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from "react"
+import { motion } from "framer-motion"
 import { useLocation, useNavigate } from "react-router-dom"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
+import { MotionList, itemVariants } from "../../../shared/components/MotionList/MotionList"
 import { useDashboardLayout } from "../context/DashboardLayoutContext"
 import { SECTION_REGISTRY } from "../config/sectionRegistry"
 import { SectionNav } from "./SectionNav"
@@ -24,7 +26,10 @@ function scrollBehavior(): ScrollBehavior {
 }
 
 /** Build the grid children for a section — mirrors the home flat-map: an
- *  invisible spacer fills the left column when a half-width widget is offset. */
+ *  invisible spacer fills the left column when a half-width widget is offset.
+ *  Slots are motion divs (the page-entrance stagger items); the grid around
+ *  them is the MotionList container. Raw motion.div rather than MotionItem
+ *  because the slots carry data attributes. */
 function renderSectionWidgets(widgets: WidgetLayoutItem[], sectionId: string): ReactNode[] {
   return widgets.flatMap((item) => {
     const elements: ReactNode[] = []
@@ -33,14 +38,15 @@ function renderSectionWidgets(widgets: WidgetLayoutItem[], sectionId: string): R
     }
     const Component = WIDGET_REGISTRY[item.id].component
     elements.push(
-      <div
+      <motion.div
         key={item.id}
+        variants={itemVariants}
         data-widget-id={item.id}
         data-section-id={sectionId}
         className={`widget-slot widget-slot-${item.id}${item.colSpan === 2 ? " col-span-full" : ""}`}
       >
         <Component colSpan={item.colSpan} />
-      </div>
+      </motion.div>
     )
     return elements
   })
@@ -356,22 +362,23 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
             {section.widgets.length === 0 ? (
               <p className="section-pager-empty">This section has no widgets.</p>
             ) : (
-              <div className="widget-grid section-stack-grid">
+              <MotionList className="widget-grid section-stack-grid">
                 {/* Every widget full width — no half columns, offsets or spacers. */}
                 {section.widgets.map((item) => {
                   const Component = WIDGET_REGISTRY[item.id].component
                   return (
-                    <div
+                    <motion.div
                       key={item.id}
+                      variants={itemVariants}
                       data-widget-id={item.id}
                       data-section-id={section.id}
                       className={`widget-slot widget-slot-${item.id}`}
                     >
                       <Component colSpan={item.colSpan} />
-                    </div>
+                    </motion.div>
                   )
                 })}
-              </div>
+              </MotionList>
             )}
           </section>
         ))}
@@ -411,11 +418,11 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
                 {section.widgets.length === 0 ? (
                   <p className="section-pager-empty">This section has no widgets.</p>
                 ) : (
-                  <div
+                  <MotionList
                     className={`widget-grid widget-grid-${SECTION_REGISTRY[section.id].columns ?? 2} dashboard-home-grid`}
                   >
                     {renderSectionWidgets(section.widgets, section.id)}
-                  </div>
+                  </MotionList>
                 )}
               </div>
             </div>

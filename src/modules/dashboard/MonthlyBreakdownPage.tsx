@@ -6,6 +6,7 @@ import { PageDataProvider, useWidgetData, usePageYear } from "../../shared/conte
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { Chart } from "../../shared/components/Chart/Chart"
+import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { MonthlyDetailTable } from "../../shared/components/MonthlyDetailTable/MonthlyDetailTable"
 import { buildMonthSeries } from "../../shared/utils/chart"
@@ -160,7 +161,8 @@ function BreakdownContent({ config, year, setYear }: BreakdownContentProps) {
         </>
       }
     >
-      <div className="mbp-stack">
+      <MotionList className="mbp-stack">
+        <MotionItem>
         <Widget title={`${config.title} — ${pageYear}`} loading={isLoading} noData={noData} className="mbp-chart-widget">
           <Chart
             config={{
@@ -179,7 +181,9 @@ function BreakdownContent({ config, year, setYear }: BreakdownContentProps) {
             }}
           />
         </Widget>
+        </MotionItem>
 
+        <MotionItem>
         <Widget
           title="Monthly breakdown"
           loading={isLoading && lineItems === null}
@@ -204,7 +208,8 @@ function BreakdownContent({ config, year, setYear }: BreakdownContentProps) {
             filterMonth={selectedMonth}
           />
         </Widget>
-      </div>
+        </MotionItem>
+      </MotionList>
     </Page>
   )
 }

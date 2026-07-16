@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react"
 import Page from "../../shared/components/Page"
 import { Widget } from "../../shared/components/Widget/Widget"
+import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { submitFeedback, deleteFeedback } from "../../shared/api/mutationApi"
 import { useAuth } from "../../core/auth/AuthProvider"
@@ -80,7 +81,9 @@ export default function FeedbackPage() {
         </button>
       }
     >
-      <Widget loading={loading} noData={!loading && feedback.length === 0}>
+      <MotionList>
+        <MotionItem>
+        <Widget loading={loading} noData={!loading && feedback.length === 0}>
         <div className="feedback-list">
           {feedback
             .sort((a, b) => new Date(b.date_submitted).getTime() - new Date(a.date_submitted).getTime())
@@ -103,7 +106,9 @@ export default function FeedbackPage() {
               </div>
             ))}
         </div>
-      </Widget>
+        </Widget>
+        </MotionItem>
+      </MotionList>
 
       {/* Feedback Modal */}
       {showModal && (

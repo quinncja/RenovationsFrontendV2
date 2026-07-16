@@ -7,6 +7,7 @@ import { PageDataProvider, useWidgetData } from "../../shared/context/PageContex
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { Chart } from "../../shared/components/Chart/Chart"
+import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { SortableHeader } from "../../shared/components/SortableHeader"
 import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
@@ -256,7 +257,8 @@ function UpcomingBillingsContent() {
         </>
       }
     >
-      <div className="mbp-stack">
+      <MotionList className="mbp-stack">
+        <MotionItem>
         <Widget
           title="Forecast — weeks until invoices reach 30 days past due"
           loading={isLoading}
@@ -279,9 +281,11 @@ function UpcomingBillingsContent() {
             />
           )}
         </Widget>
+        </MotionItem>
 
         {/* Week cards render straight onto the page (no parent card) — each
             week is its own standalone card. */}
+        <MotionItem>
         <section className="billings-week-section">
           {/* Same text treatment as a widget header, just floating on the page. */}
           <h2 className="widget-title headline billings-week-section-title">Invoices by week</h2>
@@ -394,7 +398,8 @@ function UpcomingBillingsContent() {
             })}
           </div>
         </section>
-      </div>
+        </MotionItem>
+      </MotionList>
 
       <InvoiceDetailModal
         invoiceId={selectedInvoice?.recnum ?? null}

@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import Page from "../../../shared/components/Page"
 import { Widget } from "../../../shared/components/Widget/Widget"
+import { MotionList, MotionItem } from "../../../shared/components/MotionList/MotionList"
 import { createChangeOrder, type ChangeOrderData } from "../../../shared/api/mutationApi"
 import { fetchPageData } from "../../../shared/api/pageApi"
 import { formatMoneyFull } from "../../../shared/utils/format"
@@ -156,7 +157,10 @@ export default function NewChangeOrder() {
         </div>
       }
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      {/* Only one child renders at a time (upload OR preview), so no gap/stack
+          styling is needed on the container. */}
+      <MotionList>
+        <MotionItem>
         {!coData ? (
           /* Upload — shown until a file is parsed. */
           <Widget title="Upload Change Order Excel">
@@ -273,7 +277,8 @@ export default function NewChangeOrder() {
             </Widget>
           </>
         )}
-      </div>
+        </MotionItem>
+      </MotionList>
     </Page>
   )
 }
