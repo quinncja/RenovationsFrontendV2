@@ -2522,12 +2522,10 @@ body{
    fill the row on large screens; below 768px they go full width and stack. */
 .employee-stat-card {
   flex: 0 1 240px;
-  min-height: 124px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
   gap: 1rem;
-  padding: 1.5rem;
+  padding: 1.25rem 1.5rem;
   background: var(--card-color);
   border: 1px solid var(--border-color);
   border-radius: 16px;
@@ -2556,6 +2554,13 @@ body{
   color: var(--primary-text);
   font-size: 2.25rem;
   line-height: 1;
+}
+
+/* Title stays pinned to the top line shared by every card in the row; the
+   figure (or its loading shimmer) centers in the space beneath it. */
+.employee-stat-card .employee-stat-card-value,
+.employee-stat-card .stat-widget-skeleton {
+  margin-block: auto;
 }
 
 .employee-stat-card--warn .employee-stat-card-value {
@@ -10175,6 +10180,96 @@ svg.placeholder-illustration {
   cursor: pointer;
   transition: box-shadow 0.2s ease;
   height: 100%;
+}
+
+/* GM home: the four reports live inside a fourth card in the stat row (same
+   surface/radius family as .employee-stat-card) as a labeled 2x2 pill grid —
+   contained, not floating on the page background. */
+.gm-reports-card {
+  flex: 0 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  /* Same insets as .employee-stat-card so the titles share a top line. */
+  padding: 1.25rem 1.5rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--button-shadow);
+}
+
+@media (max-width: 640px) {
+  .gm-reports-card {
+    flex: 1 1 100%;
+  }
+}
+
+.gm-reports-cluster {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  justify-content: start;
+  gap: 0.25rem 0.5rem;
+  /* Center the pill grid in the space beneath the pinned title, matching the
+     stat cards' centered figures. */
+  margin-block: auto;
+}
+
+/* On the card surface the pills are contained chips: tinted fill, no shadow.
+   Hover = slightly deeper tint (no y-travel). */
+.report-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+  background: color-mix(in srgb, var(--primary-text) 3%, var(--card-color));
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.report-pill:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary-text) 7%, var(--card-color));
+}
+
+.report-pill:disabled {
+  cursor: default;
+}
+
+.report-pill .report-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+}
+
+.report-pill .report-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.report-pill-count {
+  font-size: 1rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-text);
+  line-height: 1;
+}
+
+/* Override .widget-skeleton's widget-body sizing (flex: 1, min-height: 200px)
+   — inside a pill the shimmer must occupy exactly the count's box. */
+.report-pill-count-skeleton {
+  flex: none;
+  width: 1.25rem;
+  height: 1rem;
+  min-height: 0;
+  border-radius: 4px;
+}
+
+.report-pill-title {
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--secondary-text);
+  white-space: nowrap;
 }
 
 /* Fill the home grid slot so two report cards sharing a row match height. */

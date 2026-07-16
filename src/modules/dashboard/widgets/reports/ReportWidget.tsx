@@ -40,6 +40,8 @@ interface ReportDefinition {
   /** Icon glyph shown in the colored tile. */
   glyph: React.ReactNode
   title: string
+  /** Short label for the compact pill rendering (GM home alert strip). */
+  shortTitle: string
   subtitle: string
 }
 
@@ -50,6 +52,7 @@ const REPORT_DEFINITIONS: Record<ReportWidgetId, ReportDefinition> = {
     variant: "red",
     glyph: <TriangleAlert size={16} strokeWidth={2.5} />,
     title: "Reconciliation Report",
+    shortTitle: "Reconciliation",
     subtitle: "Open POs or Subcontracts on Closed Jobs",
   },
   dataQuality: {
@@ -57,6 +60,7 @@ const REPORT_DEFINITIONS: Record<ReportWidgetId, ReportDefinition> = {
     variant: "orange",
     glyph: "!",
     title: "Data Quality Report",
+    shortTitle: "Data Quality",
     subtitle: "Missing Required Fields",
   },
   missingContracts: {
@@ -64,6 +68,7 @@ const REPORT_DEFINITIONS: Record<ReportWidgetId, ReportDefinition> = {
     variant: "gray",
     glyph: "?",
     title: "Missing Contracts Report",
+    shortTitle: "Missing Contracts",
     subtitle: "Jobs Missing Contracts",
   },
   openProjectsNoBudget: {
@@ -71,6 +76,7 @@ const REPORT_DEFINITIONS: Record<ReportWidgetId, ReportDefinition> = {
     variant: "navy",
     glyph: <Calculator size={16} strokeWidth={2.5} />,
     title: "Missing Budgets Report",
+    shortTitle: "Missing Budgets",
     subtitle: "Open Projects With a Contract but No Budget",
   },
 }
@@ -80,8 +86,12 @@ const REPORT_DEFINITIONS: Record<ReportWidgetId, ReportDefinition> = {
  * card showing the issue count, opening a modal that lists the flagged jobs.
  * Split out of the former monolithic ReportsWidget so each report can be
  * arranged independently within the Reports section.
+ *
+ * `compact` renders the trigger as a slim one-line pill (icon, count, short
+ * title) instead of the stat card — the GM home's alert strip. The modal is
+ * identical in both renderings.
  */
-function ReportWidget({ reportId }: { reportId: ReportWidgetId }) {
+export function ReportWidget({ reportId, compact = false }: { reportId: ReportWidgetId; compact?: boolean }) {
   const report = REPORT_DEFINITIONS[reportId]
   const { data, isLoading } = useWidgetData<{
     dataValidation: ValidationCounts[] | null
@@ -110,25 +120,45 @@ function ReportWidget({ reportId }: { reportId: ReportWidgetId }) {
 
   return (
     <>
-      <button
-        type="button"
-        className="card report-card"
-        onClick={() => setOpen(true)}
-        disabled={isLoading || disconnected}
-      >
-        <div className="report-card-head">
+      {compact ? (
+        <button
+          type="button"
+          className="report-pill"
+          onClick={() => setOpen(true)}
+          disabled={isLoading || disconnected}
+          title={report.subtitle}
+        >
           <span className={`report-icon report-icon-${report.variant}`}>{report.glyph}</span>
-          <span className="widget-title headline">{report.title}</span>
-        </div>
-        {isLoading ? (
-          <span className="report-card-count-skeleton widget-skeleton" aria-hidden="true" />
-        ) : (
-          <span className="report-card-count">
-            {disconnected || count == null ? "—" : formatNumber(count)}
-          </span>
-        )}
-        <span className="report-card-subtitle">{report.subtitle}</span>
-      </button>
+          {isLoading ? (
+            <span className="report-pill-count-skeleton widget-skeleton" aria-hidden="true" />
+          ) : (
+            <span className="report-pill-count num">
+              {disconnected || count == null ? "—" : formatNumber(count)}
+            </span>
+          )}
+          <span className="report-pill-title">{report.shortTitle}</span>
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="card report-card"
+          onClick={() => setOpen(true)}
+          disabled={isLoading || disconnected}
+        >
+          <div className="report-card-head">
+            <span className={`report-icon report-icon-${report.variant}`}>{report.glyph}</span>
+            <span className="widget-title headline">{report.title}</span>
+          </div>
+          {isLoading ? (
+            <span className="report-card-count-skeleton widget-skeleton" aria-hidden="true" />
+          ) : (
+            <span className="report-card-count">
+              {disconnected || count == null ? "—" : formatNumber(count)}
+            </span>
+          )}
+          <span className="report-card-subtitle">{report.subtitle}</span>
+        </button>
+      )}
 
       {createPortal(
         <AnimatePresence>

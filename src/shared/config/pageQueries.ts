@@ -62,6 +62,10 @@ export const PAGE_QUERIES = {
     "openMonthFinances",
     "marginPerformance",
     "employeePerformance",
+    // The four data-validation report cards (same pair the admin home's
+    // Reports section reads — counts + per-issue job rows).
+    "dataValidation",
+    "dataValidationOpen",
   ],
 
   // Dashboard drill-down queries
