@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, Fragment } from "react"
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, Fragment } from "react"
 import { useJobcostNav } from "./useJobcostNav"
 import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ExternalLink, ChartNoAxesColumn } from "lucide-react"
 import Page from "../../shared/components/Page"
@@ -10,6 +10,7 @@ import { takePreloadedPageData } from "../../shared/api/pageDataCache"
 import { trackProjectView } from "../../shared/analytics/analytics"
 import { formatMoneyFull, marginTextColor } from "../../shared/utils/format"
 import useIsMobile from "../../shared/hooks/useIsMobile"
+import useElementWidth from "../../shared/hooks/useElementWidth"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { useAuth } from "../../core/auth/AuthProvider"
@@ -137,25 +138,37 @@ const FILTER_GROUPS: FilterGroup[] = [
 ]
 const FILTER_DEFAULTS = { status: "all" }
 
-// <td> count in a job row — drives the expanded panel's colSpan. Base layout
-// is 9 cells; +1 for the Variance column, −1 when Contract is hidden (managers).
-function columnCount(isManager: boolean): number {
-  return 10 - (isManager ? 1 : 0)
-}
+// Fit-driven column hiding. Fixed pixel breakpoints can't know the real
+// content widths, so the layout itself is the signal instead: every column
+// except Project is nowrap (PM capped with an ellipsis), Project is the one
+// flexible column with a min-width floor (see .jc-name-col), and when the
+// fixed columns plus that floor can't fit, the table overflows its wrapper.
+// After each layout pass, any overflow hides the least-critical visible
+// column (HIDE_ORDER, front first). Each hide records the container width it
+// happened at, and that column only returns once the container outgrows that
+// mark by RESHOW_BUFFER, so drag-resizing doesn't flap. Hidden data stays
+// reachable: everything lives in the row's expanded panel, and Status folds
+// into the Project cell's sub-line.
+const HIDE_ORDER = ["contract", "supervisor", "status", "variance", "budget"] as const
+type HideableCol = (typeof HIDE_ORDER)[number]
+// How far past the hide-point the container must grow before a column may
+// try to come back.
+const RESHOW_BUFFER = 60
 
-function SortTh({ col, label, align = "left", sortKey, sortDir, onSort }: {
+function SortTh({ col, label, align = "left", sortKey, sortDir, onSort, className }: {
   col: SortKey
   label: string
   align?: "left" | "right"
   sortKey: SortKey
   sortDir: SortDir
   onSort: (k: SortKey) => void
+  className?: string
 }) {
   const active = sortKey === col
   const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
   const thClass = align === "right" ? "spend-rank-table-value" : "spend-rank-table-name"
   return (
-    <th className={thClass}>
+    <th className={`${thClass}${className ? ` ${className}` : ""}`}>
       <button
         className={`co-th-btn${align === "right" ? " co-th-btn-right" : ""}${active ? " co-th-btn-active" : ""}`}
         onClick={() => onSort(col)}
@@ -225,7 +238,11 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
         {detail === "loading" || detail === undefined ? (
           <div className="jc-expand-loading body-text text-secondary">Loading cost breakdown…</div>
         ) : (
-          <CostBreakdownTable budget={detail.budget} costItems={detail.costItems} />
+          <CostBreakdownTable
+            budget={detail.budget}
+            costItems={detail.costItems}
+            job={{ id: job.jobNumber, name: job.name }}
+          />
         )}
       </div>
     </div>
@@ -253,6 +270,64 @@ export default function Jobcost() {
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [details, setDetails] = useState<Record<string, JobDetail | "loading">>({})
+
+  // Fit-driven column visibility (see HIDE_ORDER above). `hiddenCount` is how
+  // deep into the hide order we currently are; the layout effect below nudges
+  // it up/down one column per commit until the Project column is readable.
+  const [observeWrapWidth, tableWidth] = useElementWidth()
+  const wrapElRef = useRef<HTMLDivElement | null>(null)
+  // One callback ref feeds both the width observer and the overflow check.
+  const tableWrapRef = (el: HTMLDivElement | null) => {
+    wrapElRef.current = el
+    observeWrapWidth(el)
+  }
+  const [hiddenCount, setHiddenCount] = useState(0)
+  // Container width at the moment each hide happened, indexed by the hide
+  // level it created — the re-show hysteresis marks.
+  const hidAtWidthRef = useRef<number[]>([])
+  // Managers never get a Contract column, so it isn't part of their sequence.
+  const hideOrder: readonly HideableCol[] = isManager
+    ? HIDE_ORDER.filter((c) => c !== "contract")
+    : HIDE_ORDER
+  const hiddenCols = new Set<HideableCol>(hideOrder.slice(0, hiddenCount))
+  const showContract = !isManager && !hiddenCols.has("contract")
+  const showPM = !hiddenCols.has("supervisor")
+  const showStatus = !hiddenCols.has("status")
+  const showVariance = !hiddenCols.has("variance")
+  const showBudget = !hiddenCols.has("budget")
+  // Once Status drops, the View button goes icon-only too.
+  const compactActions = !showStatus
+  // Chevron + Project + Cost + Margin + View always render; the rest count
+  // only when visible. Drives the expanded panel's colSpan.
+  const visibleColumnCount =
+    5 +
+    (showContract ? 1 : 0) +
+    (showPM ? 1 : 0) +
+    (showStatus ? 1 : 0) +
+    (showVariance ? 1 : 0) +
+    (showBudget ? 1 : 0)
+
+  // Deliberately no dependency array: this must re-measure after *every*
+  // commit that could change the layout (data, filters, width, hides). Each
+  // pass changes hiddenCount by at most one — setState from a layout effect
+  // re-renders synchronously, so a cascade of hides settles before paint and
+  // never flashes. Termination: hides are capped at hideOrder.length, and a
+  // re-show that immediately re-squeezes re-records the *current* width as
+  // its mark, which the re-show condition can't beat without real growth.
+  useLayoutEffect(() => {
+    const wrap = wrapElRef.current
+    if (!wrap || tableWidth == null) return
+    const overflow = wrap.scrollWidth - wrap.clientWidth
+    if (overflow > 1 && hiddenCount < hideOrder.length) {
+      hidAtWidthRef.current[hiddenCount] = tableWidth
+      setHiddenCount(hiddenCount + 1)
+    } else if (
+      hiddenCount > 0 &&
+      tableWidth > (hidAtWidthRef.current[hiddenCount - 1] ?? Number.POSITIVE_INFINITY) + RESHOW_BUFFER
+    ) {
+      setHiddenCount(hiddenCount - 1)
+    }
+  })
 
   useEffect(() => {
     const controller = new AbortController()
@@ -471,19 +546,35 @@ export default function Jobcost() {
                 ))}
               </ul>
             ) : (
+              <div className="jc-table-wrap" ref={tableWrapRef}>
               <table className="spend-rank-table">
                 <thead>
                   <tr>
                     <th className="spend-rank-table-name jc-expand-th" aria-hidden="true" />
-                    <SortTh col="name" label="Project" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="supervisor" label="PM" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    {!isManager && (
+                    <SortTh col="name" label="Project" className="jc-name-col" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    {showStatus && (
+                      <SortTh col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    )}
+                    {showPM && (
+                      <SortTh col="supervisor" label="PM" className="jc-pm-col" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    )}
+                    {showContract && (
                       <SortTh col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     )}
-                    <SortTh col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    {showBudget && (
+                      <SortTh col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    )}
                     <SortTh col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="variance" label="Budget Variance" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    {showVariance && (
+                      <SortTh
+                        col="variance"
+                        label={showPM ? "Budget Variance" : "Variance"}
+                        align="right"
+                        sortKey={sortKey}
+                        sortDir={sortDir}
+                        onSort={handleSort}
+                      />
+                    )}
                     <SortTh col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <th className="spend-rank-table-name jc-view-th" aria-label="Actions" />
                   </tr>
@@ -506,32 +597,54 @@ export default function Jobcost() {
                           <td className="jc-expand-chevron-cell">
                             <ChevronRight size={14} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
                           </td>
-                          <td className="spend-rank-table-name">
-                            <div className="body-text emphasized">{job.name}</div>
-                            <div className="cell-secondary">#{job.jobNumber}</div>
+                          <td className="spend-rank-table-name jc-name-col">
+                            <div className="body-text emphasized jc-name-text" title={job.name}>{job.name}</div>
+                            <div className="cell-secondary jc-name-sub">
+                              <span className="jc-name-number">#{job.jobNumber}</span>
+                              {/* When the Status column is dropped for width, the
+                                  badge folds into the sub-line (mirrors the mobile
+                                  list) so status stays visible. */}
+                              {!showStatus && (
+                                <span className={`status-badge status-${job.status}`}>
+                                  {STATUS_LABELS[job.status] ?? job.status}
+                                </span>
+                              )}
+                            </div>
                           </td>
-                          <td className="spend-rank-table-name">
-                            <span className={`status-badge status-${job.status}`}>
-                              {STATUS_LABELS[job.status] ?? job.status}
-                            </span>
-                          </td>
-                          <td className="spend-rank-table-name body-text text-secondary">{job.supervisor || "—"}</td>
-                          {!isManager && (
+                          {showStatus && (
+                            <td className="spend-rank-table-name">
+                              <span className={`status-badge status-${job.status}`}>
+                                {STATUS_LABELS[job.status] ?? job.status}
+                              </span>
+                            </td>
+                          )}
+                          {showPM && (
+                            <td className="spend-rank-table-name jc-pm-col">
+                              <div className="body-text text-secondary jc-pm-text" title={job.supervisor || undefined}>
+                                {job.supervisor || "—"}
+                              </div>
+                            </td>
+                          )}
+                          {showContract && (
                             <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.contract)}</td>
                           )}
-                          <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.budget)}</td>
+                          {showBudget && (
+                            <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.budget)}</td>
+                          )}
                           <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.totalCost)}</td>
-                          <td
-                            className="spend-rank-table-value body-text emphasized"
-                            style={{
-                              color:
-                                !marginColorsOn || job.margin == null
-                                  ? undefined
-                                  : marginTextColor(job.margin),
-                            }}
-                          >
-                            {formatMoneyFull(job.variance)}
-                          </td>
+                          {showVariance && (
+                            <td
+                              className="spend-rank-table-value body-text emphasized"
+                              style={{
+                                color:
+                                  !marginColorsOn || job.margin == null
+                                    ? undefined
+                                    : marginTextColor(job.margin),
+                              }}
+                            >
+                              {formatMoneyFull(job.variance)}
+                            </td>
+                          )}
                           <td
                             className="spend-rank-table-value body-text emphasized"
                             style={{
@@ -551,14 +664,16 @@ export default function Jobcost() {
                                 goToJobcost(job.jobNumber)
                               }}
                               title="Open full report"
+                              aria-label="Open full report"
                             >
-                              View <ExternalLink size={13} />
+                              {!compactActions && "View "}
+                              <ExternalLink size={13} />
                             </button>
                           </td>
                         </tr>
                         {isOpen && (
                           <tr className="jc-expand-row">
-                            <td colSpan={columnCount(isManager)}>
+                            <td colSpan={visibleColumnCount}>
                               <JobExpandedPanel job={job} detail={details[job.recnum]} marginColorsOn={marginColorsOn} />
                             </td>
                           </tr>
@@ -568,6 +683,7 @@ export default function Jobcost() {
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </Widget>
         </MotionItem>

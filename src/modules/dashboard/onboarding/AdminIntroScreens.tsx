@@ -103,7 +103,7 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
 
   // Phases 2 and 3 share one title — same key, so the header simply holds
   // steady across that boundary instead of swapping.
-  const headerText = phase === 0 ? "Welcome" : phase === 1 ? "Getting around" : "Dashboard sections"
+  const headerText = phase === 0 ? "Welcome Aboard" : phase === 1 ? "Getting around" : "The Dashboard"
 
   // The welcome screen reuses the daily recap's opening sequence verbatim
   // (IntroArrival's HERO_AT): logo and title rise together at 0.9s, the sub
@@ -206,7 +206,7 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
                 style={{ width: "100%" }}
               >
                 <motion.p className="adm-sub" {...heroRise(HERO_AT.sub)}>
-                  Here&apos;s a quick run-through on how your dashboard works.
+                  Here&apos;s a quick run-through on how our system works.
                 </motion.p>
               </motion.div>
             )}
@@ -243,9 +243,9 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
                     the cards stagger in behind it, each card's preview bars
                     behind their card, the hint last. */}
                 <p className="adm-choose-note">
-                  These sections are entirely customizable.
+                  Your dashboard is entirely customizable.
                   <br />
-                  Select a prebuilt layout to get started.
+                  For now, select a prebuilt layout to get started.
                 </p>
                 <div className="adm-choose-cards" role="radiogroup" aria-label="Layout templates">
                   {/* Cards stagger in left to right as pure fades — no
@@ -272,15 +272,6 @@ export function AdminIntroScreens({ phase, onAdvance, onSkip, onPick }: AdminInt
                     </motion.button>
                   ))}
                 </div>
-                {/* Footnote fades in once the card stagger has landed. */}
-                <motion.p
-                  className="adm-choose-hint"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={reduced ? { duration: 0 } : { duration: 0.4, ease: EASE, delay: 0.75 }}
-                >
-                  This is easy to change later.
-                </motion.p>
               </motion.div>
             )}
             </AnimatePresence>
@@ -400,13 +391,13 @@ function JourneyExplainer({ stage, reduced }: { stage: JourneyStage; reduced: bo
       </>
     ) : stage === "hero" ? (
       <>
-        Your dashboard is composed of different sections.
+        The dashboard is your home page.
         <br />
-        Each one groups a set of related widgets.
+        It&apos;s built of sections that group together related widgets.
       </>
     ) : (
       <>
-        Designed to focus your attention, one section fills the screen at a time.
+        Each section focuses your attention on one part of the business.
         <br />
         Move between them with your arrow keys, the rail, or by scrolling.
       </>

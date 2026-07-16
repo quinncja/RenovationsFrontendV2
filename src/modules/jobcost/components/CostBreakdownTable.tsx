@@ -1,10 +1,40 @@
 import { useState } from "react"
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ChevronDown } from "lucide-react"
 import { formatMoneyFull } from "../../../shared/utils/format"
+import { useItemDrilldown } from "../../dashboard/report/ActivityFeed"
+import type { RecentChangeItem } from "../../dashboard/widgets/recent/recentTypes"
 import { computeCostGroups, type BudgetBreakdown, type CostItem } from "../types"
 
 type CostSortKey = "costGroup" | "budget" | "actual" | "variance" | "variancePct"
 type SortDir = "asc" | "desc"
+
+// Maps a line item to the recap-style drill-down it opens (same modals as the
+// Daily Recap feed): PO rows → purchase-order modal, subcontract rows →
+// subcontract modal, invoice-backed posted costs → the AP invoice modal.
+// Returns null for rows with nothing behind them (payroll/journal postings,
+// or a backend that predates itemType/linkRecnum) — those aren't clickable.
+function toDrilldownItem(t: CostItem, job: { id: string; name: string } | null | undefined): RecentChangeItem | null {
+  if (!t.linkRecnum) return null
+  const kind =
+    t.itemType === "po" ? "purchaseOrder" :
+    t.itemType === "sub" ? "subcontract" :
+    t.itemType === "cost" ? "apInvoice" :
+    null
+  if (kind == null) return null
+  return {
+    kind,
+    id: String(t.linkRecnum),
+    jobId: job?.id ?? null,
+    jobName: job?.name ?? null,
+    title: t.dscrpt?.trim() || t.id,
+    party: t.id,
+    amount: (t.committedAmount || 0) + (t.postedAmount || 0),
+    status: null,
+    pmName: null,
+    enteredBy: t.insusr ?? null,
+    occurredAt: t.insdte ?? "",
+  }
+}
 
 // Cost Breakdown table: cost-type groups that expand to their line items,
 // with sortable columns. Rendered in the app's standard spend-rank-table
@@ -13,15 +43,22 @@ type SortDir = "asc" | "desc"
 export function CostBreakdownTable({
   budget,
   costItems,
+  job,
 }: {
   budget: BudgetBreakdown | null
   costItems: CostItem[]
+  /** Job context for the drill-down modals' "View project" link. Omit on the
+   *  project detail page — you're already there, so the link is dropped. */
+  job?: { id: string; name: string } | null
 }) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   // No default sort — preserve the natural cost-type order until the user
   // explicitly sorts a column.
   const [costSortKey, setCostSortKey] = useState<CostSortKey | null>(null)
   const [costSortDir, setCostSortDir] = useState<SortDir>("asc")
+  // Same drill-down wiring as the Daily Recap feed: invoice-shaped items open
+  // the invoice modal, POs/subcontracts the generic detail modal.
+  const { openItem, modals } = useItemDrilldown({ backLabel: "Job Costing" })
 
   const { groups, totalBudget, totalActual, totalVariance } = computeCostGroups(budget, costItems)
 
@@ -77,6 +114,7 @@ export function CostBreakdownTable({
   const totalVarClass = totalVariance < 0 ? "jc-variance-over" : totalVariance > 0 ? "jc-variance-under" : ""
 
   return (
+    <>
     <table className="spend-rank-table jc-cost-breakdown">
       <thead>
         <tr>
@@ -128,14 +166,24 @@ export function CostBreakdownTable({
                     <tbody>
                       {group.items.length === 0 ? (
                         <tr><td colSpan={4} className="jc-txn-empty">No line items</td></tr>
-                      ) : group.items.map((t, i) => (
-                        <tr key={`${t.recnum}-${i}`} className="jc-txn-row">
-                          <td className="jc-txn-vendor">{t.id}</td>
-                          <td className="text-secondary">{t.dscrpt || "—"}</td>
-                          <td className="jc-txn-amount-col">{t.committedAmount ? formatMoneyFull(t.committedAmount) : "—"}</td>
-                          <td className="jc-txn-amount-col emphasized">{t.postedAmount ? formatMoneyFull(t.postedAmount) : "—"}</td>
-                        </tr>
-                      ))}
+                      ) : group.items.map((t, i) => {
+                        const drillItem = toDrilldownItem(t, job)
+                        return (
+                          <tr
+                            key={`${t.recnum}-${i}`}
+                            className={`jc-txn-row${drillItem ? " jc-txn-row-link" : ""}`}
+                            onClick={drillItem ? () => openItem(drillItem) : undefined}
+                            role={drillItem ? "button" : undefined}
+                            tabIndex={drillItem ? 0 : undefined}
+                            onKeyDown={drillItem ? (e) => e.key === "Enter" && openItem(drillItem) : undefined}
+                          >
+                            <td className="jc-txn-vendor">{t.id}</td>
+                            <td className="text-secondary">{t.dscrpt || "—"}</td>
+                            <td className="jc-txn-amount-col">{t.committedAmount ? formatMoneyFull(t.committedAmount) : "—"}</td>
+                            <td className="jc-txn-amount-col emphasized">{t.postedAmount ? formatMoneyFull(t.postedAmount) : "—"}</td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </td>
@@ -157,5 +205,9 @@ export function CostBreakdownTable({
         </tr>
       </tbody>
     </table>
+    {/* Drill-down modals render through portals, so they sit outside the
+        table markup regardless of where this fragment lands. */}
+    {modals}
+    </>
   )
 }

@@ -18,6 +18,16 @@ export interface CostItem {
   postedAmount: number
   dscrpt: string
   status: number
+  // Row provenance + drill-down key (see getAllCostItems in the backend):
+  // 'po' rows open the purchase order, 'sub' rows the subcontract (linkRecnum
+  // is the pchord/subcon HEADER recnum — ordnum/ctcnum aren't queryable), and
+  // 'cost' rows open the AP invoice they were posted from (linkRecnum null =
+  // payroll/journal posting, nothing to open). Optional because a backend
+  // still on the previous deploy won't send them — rows just aren't clickable.
+  itemType?: "cost" | "po" | "sub"
+  linkRecnum?: string | null
+  insdte?: string
+  insusr?: string | null
 }
 
 export const COST_TYPES = ["Material", "Labor", "Subcontractor", "WTPM"] as const

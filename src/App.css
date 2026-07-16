@@ -4076,10 +4076,13 @@ body{
 .co-widget .spend-rank-table.jc-cost-breakdown .jc-txn-container-row > td {
   padding: 0;
 }
+/* 1.25rem matches the elevated sub-table gutter (see .jc-cost-breakdown
+   .jc-txn-* below) — this higher-specificity neutralizer must agree with it
+   or it wins and drags the inline copy back to the old inset. */
 .co-widget .spend-rank-table.jc-cost-breakdown .jc-txn-table th,
 .co-widget .spend-rank-table.jc-cost-breakdown .jc-txn-table td {
-  padding-left: 1.125rem;
-  padding-right: 1.125rem;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
 }
 /* Total row matches the group rows' horizontal padding so the right-aligned
    numbers line up (in both the list and the detail page). */
@@ -4856,11 +4859,14 @@ body{
 /* Expanded line-item sub-table: give it the same airy treatment so it reads as
    a calmer, roomier extension of its parent row rather than a dense block.
    Headers and cells gain vertical breathing room and align to the card's
-   1.25rem gutter (matching the outer grid). Same .jcd-cost-widget scope. */
+   1.25rem gutter (matching the outer grid). Scoped to .jc-cost-breakdown so
+   it applies wherever CostBreakdownTable renders — the detail page's cost
+   widget AND the Job Costing list's inline expanded rows — but not to the
+   other jc-txn-* consumers (drill-down modals' jc-cost-table). */
 /* Match the outer grid's header type: sentence-case, subheadline size,
    semibold, secondary text — dropping the tiny uppercase tracked caps so the
    two header rows read as one family. */
-.jcd-cost-widget .jc-txn-th {
+.jc-cost-breakdown .jc-txn-th {
   padding-top: 0.7rem;
   padding-bottom: 0.7rem;
   padding-left: 1.25rem;
@@ -4876,18 +4882,18 @@ body{
    headers and beats `.jc-txn-amount-col` (0,1,0) — dragging "Committed" /
    "Posted" left while their values stay right. Re-assert right with enough
    specificity to win so the headers sit over their numbers. */
-.jcd-cost-widget .jc-txn-th.jc-txn-amount-col {
+.jc-cost-breakdown .jc-txn-th.jc-txn-amount-col {
   text-align: right;
 }
 
-.jcd-cost-widget .jc-txn-row td {
+.jc-cost-breakdown .jc-txn-row td {
   padding-top: 0.85rem;
   padding-bottom: 0.85rem;
   padding-left: 1.25rem;
   padding-right: 1.25rem;
 }
 
-.jcd-cost-widget .jc-txn-empty {
+.jc-cost-breakdown .jc-txn-empty {
   padding-top: 1.75rem;
   padding-bottom: 1.75rem;
 }
@@ -4895,11 +4901,22 @@ body{
 /* Recessed fill: the sub-table reads as inset into the card, using the same
    subtle wash as the Total row (primary-text 3% over the card) so the two
    tinted surfaces in the breakdown match. */
-.jcd-cost-widget .jc-txn-table {
+.jc-cost-breakdown .jc-txn-table {
   background: color-mix(in srgb, var(--primary-text) 3%, var(--card-color));
 }
 
-.jcd-cost-widget .jc-txn-th {
+/* No copper hover wash here — the accent is reserved for meaning. Rows with
+   a drill-down (.jc-txn-row-link: POs, subcontracts, invoice-backed costs)
+   get a neutral hover as their affordance; rows with nothing behind them
+   (payroll/journal postings) get none at all. */
+.jc-cost-breakdown .jc-txn-row:hover {
+  background: transparent;
+}
+.jc-cost-breakdown .jc-txn-row-link:hover {
+  background: var(--hover-bg);
+}
+
+.jc-cost-breakdown .jc-txn-th {
   background: transparent;
 }
 
@@ -6796,6 +6813,73 @@ body{
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+}
+
+/* Job Costing desktop table wrapper — the ResizeObserver target that drives
+   fit-based column hiding (Jobcost.tsx HIDE_ORDER). overflow-x is a last
+   resort: if even the minimal column set can't fit, the table pans inside the
+   card instead of bleeding out of it. */
+.jc-table-wrap {
+  overflow-x: auto;
+}
+
+/* Project is the table's flexible column: width is its generous *preferred*
+   size (a px preference, not a percentage — percent columns get re-resolved
+   against the overflowed table width and inflate the very overflow we're
+   measuring). Its text is excluded from intrinsic sizing (contain, below),
+   so a long name can never force the column — or the table — wider; names
+   ellipsize instead of wrapping into tall rows. The readability floor lives
+   on the inner div (.jc-name-text), NOT here: table layout ignores min-width
+   on a <td> when computing the table's own minimum, so a cell floor would
+   make cells silently spill past the table box (clipped, unscrollable);
+   an inner-div floor feeds intrinsic sizing honestly, the table box grows,
+   and the overflow is real and measurable. Overflowing the wrapper is the
+   signal Jobcost.tsx's layout effect watches to hide columns. */
+.co-widget .spend-rank-table th.jc-name-col,
+.co-widget .spend-rank-table td.jc-name-col {
+  width: 22rem;
+}
+/* contain:inline-size zeroes the text's intrinsic-width contribution (table
+   layout ignores max-width, so caps like max-width:0 don't work on columns);
+   min-width then raises the contribution back to exactly the floor. */
+.jc-name-text {
+  contain: inline-size;
+  min-width: 13rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Project cell sub-line: job number, plus the status badge when the Status
+   column is dropped for width. */
+.jc-name-sub {
+  contain: inline-size;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.jc-name-number {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jc-name-sub .status-badge {
+  flex: none;
+}
+
+/* PM column is a fixed 9rem: contain (see above) keeps long names from
+   widening it, the inner-div min-width keeps squeeze from crushing it (same
+   td-min-width caveat as .jc-name-col); text past the cap ellipsizes. */
+.co-widget .spend-rank-table th.jc-pm-col,
+.co-widget .spend-rank-table td.jc-pm-col {
+  width: 9rem;
+}
+.jc-pm-text {
+  contain: inline-size;
+  min-width: 8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Job Costing mobile list — one tap-through row per project: name with its
