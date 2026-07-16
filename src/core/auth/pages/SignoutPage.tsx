@@ -19,7 +19,7 @@ export default function SignoutPage() {
       <div className="login-background" />
       <div className="auth-card">
         <div className="auth-card-header">
-          <Logo size={48} variant="white" />
+          <Logo size={48} />
           <h1 className="title1">Sign out</h1>
           <p className="body-text">You will be returned to the login screen.</p>
         </div>

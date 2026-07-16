@@ -106,7 +106,7 @@ export default function WaitingRoom() {
           <p className="body-text">
             {status === "rejected"
               ? "An administrator declined this request. Reach out to your team if you think this is a mistake."
-              : "Your account is in. We just need an administrator to set your role before the dashboard opens up."}
+              : "Just waiting on an administrator to set your role."}
           </p>
         </div>
 

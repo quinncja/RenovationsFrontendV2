@@ -1,7 +1,7 @@
 import { useDarkMode } from "../../shared/hooks/useDarkMode"
 
-// variant "white" pins the white artwork regardless of theme — for the
-// permanently dark auth shell (login/signup/signout).
+// variant "white" pins the white artwork regardless of theme — for surfaces
+// that stay dark in both themes.
 export default function Logo({
   size = 40,
   variant = "auto",
