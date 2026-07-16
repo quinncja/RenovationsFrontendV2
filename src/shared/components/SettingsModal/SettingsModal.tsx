@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react"
-import { X, Sun, Moon, Database } from "lucide-react"
+import { X, Sun, Moon, Database, LogOut } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { signOut } from "firebase/auth"
+import { auth } from "../../../core/auth/firebase"
 import { useAuth } from "../../../core/auth/AuthProvider"
 import { fetchSqlStatus, connectSql, disconnectSql } from "../../api/sqlApi"
 import useLocalStorage from "../../hooks/useLocalStorage"
@@ -15,8 +17,13 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsModalProps) {
-  const { claims } = useAuth()
+  const { user, claims } = useAuth()
   const isAdmin = claims["role"] === "executive"
+
+  const handleSignOut = useCallback(async () => {
+    onClose()
+    await signOut(auth)
+  }, [onClose])
 
   const [marginColorsEnabled, setMarginColorsEnabled] = useLocalStorage("marginColorsEnabled", true)
   const [hashedRelationColors, setHashedRelationColors] = useLocalStorage(HASHED_RELATION_COLORS_KEY, false)
@@ -162,6 +169,21 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                   </div>
                 </div>
               )}
+
+              <div className="settings-section settings-section--divided">
+                <div className="settings-row">
+                  <div className="settings-row-info">
+                    <span className="settings-row-label">Sign out</span>
+                    <span className="settings-row-description">
+                      {user?.email ? `Signed in as ${user.email}` : "Sign out of your account"}
+                    </span>
+                  </div>
+                  <button className="settings-toggle" onClick={handleSignOut}>
+                    <LogOut size={16} />
+                    <span>Sign out</span>
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         </>
