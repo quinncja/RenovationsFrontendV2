@@ -42,7 +42,6 @@ const SECTION_LABELS: Record<string, string> = {
 const PAGE_LABELS: Array<[string, string]> = [
   ["/dashboard/breakdown", "Monthly Breakdown"],
   ["/dashboard/upcoming-billings", "Upcoming Billings"],
-  ["/dashboard/progress-billings", "Progress Billings"],
   ["/dashboard", "Dashboard"],
   ["/company", "Company Summary"],
   ["/jobcost", "Job Costing"],

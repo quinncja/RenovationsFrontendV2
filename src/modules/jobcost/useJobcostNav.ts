@@ -22,7 +22,7 @@ const BACK_LABELS: Array<[string, string]> = [
   ["/employees", "Employees"],
   ["/change-orders", "Change Orders"],
   ["/invoices", "Invoices"],
-  ["/dashboard/progress-billings", "Progress Billings"],
+  ["/progress-billings", "Progress Billings"],
   ["/dashboard/upcoming-billings", "Upcoming Billings"],
   ["/dashboard/breakdown", "Breakdown"],
   ["/dashboard", "Dashboard"],

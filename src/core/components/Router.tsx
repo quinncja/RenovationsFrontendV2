@@ -55,7 +55,6 @@ export default function Router() {
             <Route path="/dashboard" element={<SuspenseWrapper><Dashboard /></SuspenseWrapper>} />
             <Route path="/dashboard/breakdown/:category" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><MonthlyBreakdownPage /></SuspenseWrapper></RequireRole>} />
             <Route path="/dashboard/upcoming-billings" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><UpcomingBillingsPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/dashboard/progress-billings" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><ProgressBillingsPage /></SuspenseWrapper></RequireRole>} />
             <Route path="/employees" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><SuspenseWrapper><EmployeesPage /></SuspenseWrapper></RequireRole>} />
             <Route path="/employees/:employeeNum" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><SuspenseWrapper><EmployeeDetailPage /></SuspenseWrapper></RequireRole>} />
 

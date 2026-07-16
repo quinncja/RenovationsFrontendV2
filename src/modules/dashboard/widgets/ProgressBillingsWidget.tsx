@@ -41,7 +41,7 @@ interface ProgressBillings {
 const TOP_N = 5
 // Full-list page is a later task; the Top 5 Billing Variance header "See All"
 // points here so the nav is consistent the moment it ships.
-const FULL_LIST_ROUTE = "/dashboard/progress-billings"
+const FULL_LIST_ROUTE = "/progress-billings"
 
 const pct = (v: number) => `${Math.round(v * 100)}%`
 
