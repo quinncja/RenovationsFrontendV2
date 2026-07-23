@@ -81,9 +81,10 @@ interface ArrivalState {
    *  the app until navigation reveals them. Cleared when navigation starts. */
   blocking: boolean
   /** User with no local onboarding evidence (cleared browser / new device):
-   *  render the app normally and confirm onboarding over the wire; a
-   *  confirmation activates the arrival late, as an overlay on the
-   *  already-rendered app. */
+   *  hold the app back (blocking) while onboarding is confirmed over the wire,
+   *  so a confirmed greeting is still the first paint — the dashboard must not
+   *  flash first. If the check outlasts its cap, the app renders and a late
+   *  confirmation activates the arrival as an overlay instead. */
   pendingLayoutCheck: boolean
   intro: boolean
   /** Dev preview (`?arrival` / `?arrival-intro`) — never stamp markers. */
@@ -116,6 +117,9 @@ function deriveContinueTo(pathname: string, search: string): ArrivalDestination 
 const PRELOAD_DELAY_MS = 400
 // A recap that hasn't landed by now isn't coming in time to be a greeting.
 const REPORT_TIMEOUT_MS = 8000
+// Longest the cold-store onboarding check may blank-hold the app before it
+// falls back to rendering (with the arrival as a possible late overlay).
+const LAYOUT_CHECK_MAX_MS = 4000
 
 /**
  * App-wide host for the daily greeting: once per Chicago calendar day the
@@ -185,7 +189,7 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
     // cold-local case: `resolving` (no local onboarding evidence — cleared
     // browser or new device) defers to the async fallback below; anyone not yet
     // onboarded gets no greeting.
-    if (resolving) return { ...base, pendingLayoutCheck: true }
+    if (resolving) return { ...base, pendingLayoutCheck: true, blocking: true }
     if (phase !== "onboarded") return INERT_ARRIVAL
     return { ...base, active: true, blocking: true }
   })
@@ -193,13 +197,14 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
   // ── Async cold-store fallback ──────────────────────────────────────────
   // The synchronous gate couldn't tell if a cold-local user (cleared browser /
   // new device) is onboarded, so it parked the arrival on `pendingLayoutCheck`
-  // and deferred to the onboarding provider's bootstrap. When that settles
-  // (`resolving` flips false), activate the arrival as a late overlay if
-  // onboarded, else drop it. `intro` and the onboarded-today deferral are
-  // re-derived HERE, not taken from the initializer — the server union just
-  // landed, and it's exactly what suppresses an intro-tour replay for an
-  // established user on a fresh browser. The bootstrap is a shared, memoized
-  // fetch, so StrictMode's double mount can't double-fetch here.
+  // — still blocking, so the dashboard doesn't flash up first — and deferred
+  // to the onboarding provider's bootstrap. When that settles (`resolving`
+  // flips false), activate the arrival if onboarded, else release the app.
+  // `intro` and the onboarded-today deferral are re-derived HERE, not taken
+  // from the initializer — the server union just landed, and it's exactly what
+  // suppresses an intro-tour replay for an established user on a fresh
+  // browser. The bootstrap is a shared, memoized fetch, so StrictMode's double
+  // mount can't double-fetch here.
   useEffect(() => {
     if (!arrival.pendingLayoutCheck || resolving) return
     const greet = phase === "onboarded" && onboardedAt !== chicagoToday()
@@ -207,10 +212,24 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
       a.pendingLayoutCheck
         ? greet
           ? { ...a, pendingLayoutCheck: false, active: true, intro: !seen("intro-tour") }
-          : { ...a, pendingLayoutCheck: false }
+          : { ...a, pendingLayoutCheck: false, blocking: false }
         : a
     )
   }, [arrival.pendingLayoutCheck, resolving, phase, onboardedAt, seen])
+
+  // Safety valve on the blocking check: fetchUserPreferences retries on
+  // failure, so a bad connection could hold the blank screen for a while.
+  // Past the cap, release the app — a confirmation that lands later still
+  // activates the arrival, as an overlay on the rendered app (the old
+  // behavior, now the fallback instead of the norm).
+  useEffect(() => {
+    if (!arrival.pendingLayoutCheck) return
+    const timer = setTimeout(
+      () => setArrival((a) => (a.pendingLayoutCheck ? { ...a, blocking: false } : a)),
+      LAYOUT_CHECK_MAX_MS
+    )
+    return () => clearTimeout(timer)
+  }, [arrival.pendingLayoutCheck])
 
   // ── Report fetch + entry-page preloads, on activation ──────────────────
   useEffect(() => {
@@ -369,10 +388,11 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
     if (introStep !== 0 && location.pathname === "/reports") setIntroStep(0)
   }, [introStep, location.pathname])
 
-  // While the synchronous gate holds, the arrival replaces the app outright —
-  // Navbar, trackers, and page queries all wait until the user picks a
-  // destination. The overlay case (async fallback, or mid-exit) renders both.
-  const withholdChildren = arrival.active && arrival.blocking
+  // While the gate holds — synchronously passed, or still confirming over the
+  // wire (pendingLayoutCheck) — the arrival replaces the app outright: Navbar,
+  // trackers, and page queries all wait. The overlay case (the check outlived
+  // its cap, or mid-exit) renders both.
+  const withholdChildren = arrival.blocking && (arrival.active || arrival.pendingLayoutCheck)
 
   return (
     <DailyReportContext.Provider value={{ open: openManually, introStep, advanceIntro }}>

@@ -4,6 +4,7 @@ import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOu
 import { auth } from "../firebase"
 import { useAuth } from "../AuthProvider"
 import { ALLOWED_EMAIL_DOMAIN, DOMAIN_ERROR, isAllowedEmail } from "../domain"
+import LoadingScreen from "../../components/LoadingScreen"
 import Logo from "../../components/Logo"
 
 /** Firebase's raw error strings leak SDK internals; map the common sign-in
@@ -37,6 +38,14 @@ export default function LoginPage() {
       navigate("/dashboard", { replace: true })
     }
   }, [user, authLoading, navigate])
+
+  // Every landing passes through here (/ redirects to /login), including
+  // already-signed-in users — painting the form before auth resolves flashes
+  // it at them for a beat. Hold until we know; a signed-in user then goes
+  // straight to the redirect above without ever seeing the form.
+  if (authLoading || user) {
+    return <LoadingScreen />
+  }
 
   async function handleGoogleLogin() {
     setError("")
