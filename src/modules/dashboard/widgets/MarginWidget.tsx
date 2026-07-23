@@ -152,7 +152,9 @@ export function MarginWidget() {
   // Suffix the title while the toggle folds the open month's WIP into its bar
   // (same gate as the recompute above: toggle on and the page year is open).
   const wipActive = includeOverUnder && openYear != null && pageYear === openYear
-  const title = wipActive ? "Monthly Margin Performance (Incl. WIP)" : "Monthly Margin Performance"
+  const title = wipActive
+    ? "Monthly Gross Margin Performance (Incl. WIP)"
+    : "Monthly Gross Margin Performance"
 
   return (
     <Widget title={title} loading={isLoading} noData={!chart}>
