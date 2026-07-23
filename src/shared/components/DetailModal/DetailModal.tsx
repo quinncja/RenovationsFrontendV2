@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { X, ArrowUpRight } from "lucide-react"
 import { formatMoneyFull } from "../../utils/format"
 import { useModalLayer } from "../../hooks/useModalLayer"
+import { useCloseOnRouteChange } from "../../hooks/useCloseOnRouteChange"
 
 // ─── Shared detail-modal primitive ───────────────────────────────────────────
 //
@@ -31,6 +32,9 @@ export function DetailModal({
   children: ReactNode
 }) {
   const { overlayZ, contentZ } = useModalLayer(open)
+  // "View project" navigates while this modal (and any stack above it, e.g. the
+  // daily recap) stays mounted — a route change must dismiss it.
+  useCloseOnRouteChange(open, onClose)
 
   return createPortal(
     <AnimatePresence>

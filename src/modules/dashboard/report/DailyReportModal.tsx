@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { X } from "lucide-react"
 import { useModalLayer } from "../../../shared/hooks/useModalLayer"
+import { useCloseOnRouteChange } from "../../../shared/hooks/useCloseOnRouteChange"
 import type { ReportMetricKey, ReportPayload } from "./reportTypes"
 import { addDays, chicagoToday, dayLabel, rangeLabel, windowToRange } from "./chicagoDate"
 import { MetricGrid, MetricGridSkeleton } from "./MetricGrid"
@@ -44,6 +45,10 @@ export function DailyReportModal({
   const { overlayZ, contentZ } = useModalLayer(open)
   const navigate = useNavigate()
   const [metric, setMetric] = useState<ReportMetricKey | null>(null)
+  // Mounted app-wide (DailyReportProvider): a drill-down's "View project" can
+  // change the route underneath this modal — dismiss it when that happens.
+  // The drill-down layers watch the same change and close themselves.
+  useCloseOnRouteChange(open, onClose)
 
   const range = payload ? windowToRange(payload.window) : null
   const subtitle = payload

@@ -2,6 +2,7 @@ import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { X } from "lucide-react"
 import { useModalLayer } from "../../../shared/hooks/useModalLayer"
+import { useCloseOnRouteChange } from "../../../shared/hooks/useCloseOnRouteChange"
 import { formatMoneyFull } from "../../../shared/utils/format"
 import type { RecentChangeItem } from "../widgets/recent/recentTypes"
 import type { ReportMetricKey } from "./reportTypes"
@@ -35,6 +36,9 @@ export function MetricDrilldownModal({
 }) {
   const open = metric !== null
   const { overlayZ, contentZ } = useModalLayer(open)
+  // The item drill-downs below can navigate ("View project") while this list —
+  // mounted above the routes — stays up; a route change dismisses it.
+  useCloseOnRouteChange(open, onClose)
   const { openItem, modals } = useItemDrilldown({ backLabel, window, blockProjectNav })
 
   const def = metric !== null ? metricDef(metric) : null
