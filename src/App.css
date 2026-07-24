@@ -4304,10 +4304,16 @@ body{
 }
 .jc-project-title {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.625rem;
   min-width: 0;
   flex: 1;
+}
+/* Badge rides in the left cluster after name · client; it never shrinks and
+   gets a touch of extra separation from the text. */
+.jc-project-title .status-badge {
+  flex-shrink: 0;
+  margin-left: 0.25rem;
 }
 .jc-project-name {
   font-size: 1.0625rem;

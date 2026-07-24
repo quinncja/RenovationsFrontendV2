@@ -1105,9 +1105,9 @@ export default function Jobcost() {
                       <span className="jc-project-title" title={group.key}>
                         <span className="jc-project-name">{group.key}</span>
                         {group.client && <span className="cell-secondary jc-group-client">{group.client}</span>}
-                      </span>
-                      <span className={`status-badge status-${group.status}`}>
-                        {STATUS_LABELS[group.status] ?? group.status}
+                        <span className={`status-badge status-${group.status}`}>
+                          {STATUS_LABELS[group.status] ?? group.status}
+                        </span>
                       </span>
                       <span className="jc-project-counts">
                         {group.phases.length > 0 ? (
