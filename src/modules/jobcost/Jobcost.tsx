@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef, Fragment } from "react"
 import { useJobcostNav } from "./useJobcostNav"
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ExternalLink, ChartNoAxesColumn, Layers, PackageOpen } from "lucide-react"
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ExternalLink, ChartNoAxesColumn, Building2, Hammer } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
@@ -386,18 +386,17 @@ function GroupKindCard({ icon, title, members, open, onToggle, showContract, mar
   )
 }
 
-// Member rows revealed by an open sub-card — the same columns as the list
+// Member rows revealed by the open sub-card — the same columns as the list
 // view, minus the inline expand (row click / View opens the full report).
-function GroupMemberTable({ title, members, showContract, marginColorsOn, onOpen }: {
-  title: string
+// No caption: the highlighted card above says which kind is showing.
+function GroupMemberTable({ members, showContract, marginColorsOn, onOpen }: {
   members: Job[]
   showContract: boolean
   marginColorsOn: boolean
   onOpen: (job: Job) => void
 }) {
   return (
-    <div className="jc-expand-breakdown">
-      <div className="jc-summary-title subheadline text-secondary">{title}</div>
+    <div className="jc-expand-breakdown jc-member-table">
       <table className="spend-rank-table">
         <thead>
           <tr>
@@ -471,49 +470,66 @@ function GroupMemberTable({ title, members, showContract, marginColorsOn, onOpen
   )
 }
 
-function GroupExpandedPanel({ group, showContract, marginColorsOn, openKinds, onToggleKind, onOpenJob }: {
+// One stat in the overall strip at the top of an expanded group.
+function OverviewStat({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
+  return (
+    <div className="jc-overview-stat">
+      <span className="jc-overview-label subheadline text-secondary">{label}</span>
+      <span className="jc-overview-value body-text emphasized" style={valueColor ? { color: valueColor } : undefined}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onToggleKind, onOpenJob }: {
   group: Group
   showContract: boolean
   marginColorsOn: boolean
-  openKinds: { phases: boolean; oneoffs: boolean }
+  // At most one sub-card is open; clicking the other swaps, clicking the open
+  // one closes.
+  openKind: "phases" | "oneoffs" | null
   onToggleKind: (kind: "phases" | "oneoffs") => void
   onOpenJob: (job: Job) => void
 }) {
+  const marginColor = !marginColorsOn || group.margin == null ? undefined : marginTextColor(group.margin)
+  const openMembers = openKind === "phases" ? group.phases : openKind === "oneoffs" ? group.oneoffs : []
   return (
     <div className="jc-expand-panel">
+      {/* Overall project stats (the row itself only carries counts). */}
+      <div className="jc-group-overview">
+        {showContract && <OverviewStat label="Contract" value={formatMoneyFull(group.contract)} />}
+        <OverviewStat label="Budget" value={formatMoneyFull(group.budget)} />
+        <OverviewStat label="Committed + Spent" value={formatMoneyFull(group.totalCost)} />
+        <OverviewStat
+          label="Margin"
+          value={group.margin == null ? "—" : `${group.margin.toFixed(1)}%`}
+          valueColor={marginColor}
+        />
+      </div>
       <div className="jc-group-card-grid">
         <GroupKindCard
-          icon={<Layers size={13} />}
+          icon={<Building2 size={13} />}
           title="Phases"
           members={group.phases}
-          open={openKinds.phases}
+          open={openKind === "phases"}
           onToggle={() => onToggleKind("phases")}
           showContract={showContract}
           marginColorsOn={marginColorsOn}
         />
         <GroupKindCard
-          icon={<PackageOpen size={13} />}
+          icon={<Hammer size={13} />}
           title="One-Off Projects"
           members={group.oneoffs}
-          open={openKinds.oneoffs}
+          open={openKind === "oneoffs"}
           onToggle={() => onToggleKind("oneoffs")}
           showContract={showContract}
           marginColorsOn={marginColorsOn}
         />
       </div>
-      {openKinds.phases && group.phases.length > 0 && (
+      {openMembers.length > 0 && (
         <GroupMemberTable
-          title={`Phases — ${group.phases.length}`}
-          members={group.phases}
-          showContract={showContract}
-          marginColorsOn={marginColorsOn}
-          onOpen={onOpenJob}
-        />
-      )}
-      {openKinds.oneoffs && group.oneoffs.length > 0 && (
-        <GroupMemberTable
-          title={`One-Off Projects — ${group.oneoffs.length}`}
-          members={group.oneoffs}
+          members={openMembers}
           showContract={showContract}
           marginColorsOn={marginColorsOn}
           onOpen={onOpenJob}
@@ -546,9 +562,10 @@ export default function Jobcost() {
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [details, setDetails] = useState<Record<string, JobDetail | "loading">>({})
-  // Grouped view: which parents are open, and which sub-card(s) within each.
+  // Grouped view: which parents are open, and which single sub-card (phases
+  // OR one-offs) is open within each.
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
-  const [openKinds, setOpenKinds] = useState<Record<string, { phases: boolean; oneoffs: boolean }>>({})
+  const [openKinds, setOpenKinds] = useState<Record<string, "phases" | "oneoffs" | null>>({})
 
   const grouped = viewMode === "grouped" && !isMobile
 
@@ -589,10 +606,9 @@ export default function Jobcost() {
     (showVariance ? 1 : 0) +
     (showBudget ? 1 : 0)
 
-  // Grouped table: chevron + Project + Status + Budget + Cost + Margin +
-  // counts column, plus Contract for non-managers. No fit-driven hiding —
-  // it has fewer columns and the counts column is compact.
-  const groupColumnCount = 7 + (!isManager ? 1 : 0)
+  // Grouped table: chevron + Project (name · client) + Status + Phases +
+  // One-Offs. Financials live in the expanded panel, not the row.
+  const groupColumnCount = 5
 
   // Deliberately no dependency array: this must re-measure after *every*
   // commit that could change the layout (data, filters, width, hides). Each
@@ -704,10 +720,9 @@ export default function Jobcost() {
   }
 
   function toggleKind(groupKey: string, kind: "phases" | "oneoffs") {
-    setOpenKinds((prev) => {
-      const cur = prev[groupKey] ?? { phases: false, oneoffs: false }
-      return { ...prev, [groupKey]: { ...cur, [kind]: !cur[kind] } }
-    })
+    // Radio-with-off behavior: clicking the open card closes it, clicking the
+    // other swaps to it.
+    setOpenKinds((prev) => ({ ...prev, [groupKey]: prev[groupKey] === kind ? null : kind }))
   }
 
   function handleSort(key: SortKey) {
@@ -936,19 +951,13 @@ export default function Jobcost() {
                     <th className="spend-rank-table-name jc-expand-th" aria-hidden="true" />
                     <SortTh col="name" label="Project" className="jc-name-col" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    {!isManager && (
-                      <SortTh col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    )}
-                    <SortTh col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <th className="spend-rank-table-value jc-counts-th">Jobs</th>
+                    <th className="spend-rank-table-value jc-counts-th">Phases</th>
+                    <th className="spend-rank-table-value jc-counts-th">One-Offs</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredGroups.map((group) => {
                     const isOpen = expandedGroups.has(group.key)
-                    const kinds = openKinds[group.key] ?? { phases: false, oneoffs: false }
                     return (
                       <Fragment key={group.key}>
                         <tr
@@ -963,46 +972,34 @@ export default function Jobcost() {
                             <ChevronRight size={14} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
                           </td>
                           <td className="spend-rank-table-name jc-name-col">
-                            <div className="body-text emphasized jc-name-text" title={group.key}>{group.key}</div>
-                            {group.client && (
-                              <div className="cell-secondary jc-name-sub">
-                                <span className="jc-group-client">{group.client}</span>
-                              </div>
-                            )}
+                            <div className="jc-name-line" title={group.key}>
+                              <span className="body-text emphasized jc-name-text">{group.key}</span>
+                              {group.client && <span className="cell-secondary jc-group-client">{group.client}</span>}
+                            </div>
                           </td>
                           <td className="spend-rank-table-name">
                             <span className={`status-badge status-${group.status}`}>
                               {STATUS_LABELS[group.status] ?? group.status}
                             </span>
                           </td>
-                          {!isManager && (
-                            <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(group.contract)}</td>
-                          )}
-                          <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(group.budget)}</td>
-                          <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(group.totalCost)}</td>
-                          <td
-                            className="spend-rank-table-value body-text emphasized"
-                            style={{
-                              color:
-                                !marginColorsOn || group.margin == null
-                                  ? undefined
-                                  : marginTextColor(group.margin),
-                            }}
-                          >
-                            {group.margin == null ? "—" : `${group.margin.toFixed(1)}%`}
-                          </td>
                           <td className="spend-rank-table-value jc-counts-cell">
-                            {group.phases.length > 0 && (
+                            {group.phases.length > 0 ? (
                               <span className="jc-count-chip" title={`${group.phases.length} phase${group.phases.length === 1 ? "" : "s"}`}>
-                                <Layers size={11} />
+                                <Building2 size={12} />
                                 {group.phases.length}
                               </span>
+                            ) : (
+                              <span className="jc-count-none">—</span>
                             )}
-                            {group.oneoffs.length > 0 && (
+                          </td>
+                          <td className="spend-rank-table-value jc-counts-cell">
+                            {group.oneoffs.length > 0 ? (
                               <span className="jc-count-chip" title={`${group.oneoffs.length} one-off project${group.oneoffs.length === 1 ? "" : "s"}`}>
-                                <PackageOpen size={11} />
+                                <Hammer size={12} />
                                 {group.oneoffs.length}
                               </span>
+                            ) : (
+                              <span className="jc-count-none">—</span>
                             )}
                           </td>
                         </tr>
@@ -1013,7 +1010,7 @@ export default function Jobcost() {
                                 group={group}
                                 showContract={!isManager}
                                 marginColorsOn={marginColorsOn}
-                                openKinds={kinds}
+                                openKind={openKinds[group.key] ?? null}
                                 onToggleKind={(kind) => toggleKind(group.key, kind)}
                                 onOpenJob={(job) => goToJobcost(job.jobNumber)}
                               />
