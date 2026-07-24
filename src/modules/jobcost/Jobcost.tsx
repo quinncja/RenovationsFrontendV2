@@ -1101,7 +1101,7 @@ export default function Jobcost() {
                       onClick={() => toggleGroupExpand(group)}
                       aria-expanded={isOpen}
                     >
-                      <ChevronRight size={15} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
+                      <ChevronRight size={16} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
                       <span className="jc-project-title" title={group.key}>
                         <span className="jc-project-name">{group.key}</span>
                         {group.client && <span className="cell-secondary jc-group-client">{group.client}</span>}
@@ -1112,22 +1112,22 @@ export default function Jobcost() {
                       <span className="jc-project-counts">
                         {group.phases.length > 0 ? (
                           <span className="jc-count-chip" title={`${group.phases.length} phase${group.phases.length === 1 ? "" : "s"}`}>
-                            <Building2 size={12} />
+                            <Building2 size={13} />
                             {group.phases.length}
                           </span>
                         ) : (
                           <span className="jc-count-chip jc-count-chip-empty" title="No phases">
-                            <Building2 size={12} />0
+                            <Building2 size={13} />0
                           </span>
                         )}
                         {group.oneoffs.length > 0 ? (
                           <span className="jc-count-chip" title={`${group.oneoffs.length} one-off project${group.oneoffs.length === 1 ? "" : "s"}`}>
-                            <Hammer size={12} />
+                            <Hammer size={13} />
                             {group.oneoffs.length}
                           </span>
                         ) : (
                           <span className="jc-count-chip jc-count-chip-empty" title="No one-off projects">
-                            <Hammer size={12} />0
+                            <Hammer size={13} />0
                           </span>
                         )}
                       </span>
