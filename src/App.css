@@ -4260,8 +4260,10 @@ body{
 .jc-status-select { max-width: 10.5rem; }
 
 /* Grouped mode: the widget holds only the toolbar — drop the standard
-   widget min-height so it hugs its content. */
+   widget min-height so it hugs its content, and the toolbar's bottom
+   divider (there's no table below it to separate from). */
 .co-widget.jc-toolbar-only { min-height: 0; }
+.co-widget.jc-toolbar-only .co-widget-toolbar { border-bottom: none; padding-bottom: 0.75rem; }
 
 /* Each parent project is its own card, floating directly on the page
    background below the toolbar widget (same surface recipe as .card). */
@@ -4329,16 +4331,11 @@ body{
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Counts sit apart from the status badge behind a hairline divider, giving
-   the header a quiet columnar structure. */
 .jc-project-counts {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   white-space: nowrap;
-  margin-left: 0.25rem;
-  padding-left: 1.125rem;
-  border-left: 1px solid var(--border-color);
 }
 .jc-count-chip-empty { opacity: 0.45; }
 /* Expanded body carries the copper wash the open table rows used. The
