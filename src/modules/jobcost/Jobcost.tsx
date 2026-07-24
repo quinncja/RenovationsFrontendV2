@@ -806,7 +806,7 @@ export default function Jobcost() {
               skeleton, which would take the toolbar (view toggle, search,
               filters) with it. Keep the toolbar mounted and skeleton only the
               data region below so the navbar stays put across reloads/toggles. */}
-          <Widget className="co-widget">
+          <Widget className={`co-widget${grouped ? " jc-toolbar-only" : ""}`}>
             <div className="co-widget-toolbar">
               {!isMobile && (
                 <div
@@ -943,66 +943,7 @@ export default function Jobcost() {
                   </li>
                 ))}
               </ul>
-            ) : grouped ? (
-              <div className="jc-project-list">
-                {filteredGroups.map((group) => {
-                  const isOpen = expandedGroups.has(group.key)
-                  return (
-                    <div key={group.key} className={`jc-project-card${isOpen ? " jc-project-card-open" : ""}`}>
-                      <button
-                        type="button"
-                        className="jc-project-head"
-                        onClick={() => toggleGroupExpand(group)}
-                        aria-expanded={isOpen}
-                      >
-                        <ChevronRight size={15} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
-                        <span className="jc-project-title" title={group.key}>
-                          <span className="jc-project-name">{group.key}</span>
-                          {group.client && <span className="cell-secondary jc-group-client">{group.client}</span>}
-                        </span>
-                        <span className={`status-badge status-${group.status}`}>
-                          {STATUS_LABELS[group.status] ?? group.status}
-                        </span>
-                        <span className="jc-project-counts">
-                          {group.phases.length > 0 ? (
-                            <span className="jc-count-chip" title={`${group.phases.length} phase${group.phases.length === 1 ? "" : "s"}`}>
-                              <Building2 size={12} />
-                              {group.phases.length}
-                            </span>
-                          ) : (
-                            <span className="jc-count-chip jc-count-chip-empty" title="No phases">
-                              <Building2 size={12} />0
-                            </span>
-                          )}
-                          {group.oneoffs.length > 0 ? (
-                            <span className="jc-count-chip" title={`${group.oneoffs.length} one-off project${group.oneoffs.length === 1 ? "" : "s"}`}>
-                              <Hammer size={12} />
-                              {group.oneoffs.length}
-                            </span>
-                          ) : (
-                            <span className="jc-count-chip jc-count-chip-empty" title="No one-off projects">
-                              <Hammer size={12} />0
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                      {isOpen && (
-                        <div className="jc-project-body">
-                          <GroupExpandedPanel
-                            group={group}
-                            showContract={!isManager}
-                            marginColorsOn={marginColorsOn}
-                            openKind={openKinds[group.key] ?? null}
-                            onToggleKind={(kind) => toggleKind(group.key, kind)}
-                            onOpenJob={(job) => goToJobcost(job.jobNumber)}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
+            ) : grouped ? null : (
               <div className="jc-table-wrap" ref={tableWrapRef}>
               <table className="spend-rank-table">
                 <thead>
@@ -1144,6 +1085,71 @@ export default function Jobcost() {
             )}
           </Widget>
         </MotionItem>
+
+        {/* Grouped project cards float directly on the page background,
+            outside the toolbar widget. */}
+        {grouped && !loading && jobs.length > 0 && resultCount > 0 && (
+          <MotionItem>
+            <div className="jc-project-list">
+              {filteredGroups.map((group) => {
+                const isOpen = expandedGroups.has(group.key)
+                return (
+                  <div key={group.key} className={`jc-project-card${isOpen ? " jc-project-card-open" : ""}`}>
+                    <button
+                      type="button"
+                      className="jc-project-head"
+                      onClick={() => toggleGroupExpand(group)}
+                      aria-expanded={isOpen}
+                    >
+                      <ChevronRight size={15} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
+                      <span className="jc-project-title" title={group.key}>
+                        <span className="jc-project-name">{group.key}</span>
+                        {group.client && <span className="cell-secondary jc-group-client">{group.client}</span>}
+                      </span>
+                      <span className={`status-badge status-${group.status}`}>
+                        {STATUS_LABELS[group.status] ?? group.status}
+                      </span>
+                      <span className="jc-project-counts">
+                        {group.phases.length > 0 ? (
+                          <span className="jc-count-chip" title={`${group.phases.length} phase${group.phases.length === 1 ? "" : "s"}`}>
+                            <Building2 size={12} />
+                            {group.phases.length}
+                          </span>
+                        ) : (
+                          <span className="jc-count-chip jc-count-chip-empty" title="No phases">
+                            <Building2 size={12} />0
+                          </span>
+                        )}
+                        {group.oneoffs.length > 0 ? (
+                          <span className="jc-count-chip" title={`${group.oneoffs.length} one-off project${group.oneoffs.length === 1 ? "" : "s"}`}>
+                            <Hammer size={12} />
+                            {group.oneoffs.length}
+                          </span>
+                        ) : (
+                          <span className="jc-count-chip jc-count-chip-empty" title="No one-off projects">
+                            <Hammer size={12} />0
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                    {isOpen && (
+                      <div className="jc-project-body">
+                        <GroupExpandedPanel
+                          group={group}
+                          showContract={!isManager}
+                          marginColorsOn={marginColorsOn}
+                          openKind={openKinds[group.key] ?? null}
+                          onToggleKind={(kind) => toggleKind(group.key, kind)}
+                          onOpenJob={(job) => goToJobcost(job.jobNumber)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </MotionItem>
+        )}
       </MotionList>
 
       {isMobile && (

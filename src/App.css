@@ -4259,17 +4259,22 @@ body{
 /* Status filter <select> shares .year-selector; just keep it from growing. */
 .jc-status-select { max-width: 10.5rem; }
 
-/* Each parent project is its own card in a stacked list (not a table). */
+/* Grouped mode: the widget holds only the toolbar — drop the standard
+   widget min-height so it hugs its content. */
+.co-widget.jc-toolbar-only { min-height: 0; }
+
+/* Each parent project is its own card, floating directly on the page
+   background below the toolbar widget (same surface recipe as .card). */
 .jc-project-list {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  padding: 0.5rem 1.25rem 1.25rem;
 }
 .jc-project-card {
   border: 1px solid var(--border-color);
   border-radius: 12px;
   background: var(--card-color);
+  box-shadow: var(--button-shadow);
   overflow: hidden;
   transition: border-color 150ms ease;
 }
