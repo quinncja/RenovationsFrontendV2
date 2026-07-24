@@ -160,6 +160,10 @@ function buildGroups(jobs: Job[]): Group[] {
     else byParent.set(j.parent, [j])
   }
   return [...byParent.entries()].map(([key, members]) => {
+    // Member lists read most-recent first. The 8-digit recnum encodes
+    // creation order (YY prefix, phase month suffix), so numeric descending
+    // is newest → oldest.
+    members.sort((a, b) => Number(b.recnum) - Number(a.recnum))
     const contract = members.reduce((s, m) => s + m.contract, 0)
     const totalCost = members.reduce((s, m) => s + m.totalCost, 0)
     const firstClient = members.find((m) => m.client)?.client ?? ""
