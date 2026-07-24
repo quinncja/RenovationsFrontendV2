@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef, Fragment } from "react"
 import { useJobcostNav } from "./useJobcostNav"
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ExternalLink, ChartNoAxesColumn } from "lucide-react"
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ExternalLink, ChartNoAxesColumn, Layers, PackageOpen } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
@@ -14,17 +14,24 @@ import useElementWidth from "../../shared/hooks/useElementWidth"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { useAuth } from "../../core/auth/AuthProvider"
-import { FilterPills } from "../../shared/components/FilterPills"
 import { MobileFilterSheet, activeFilterCount, type FilterGroup } from "../../shared/components/MobileFilterSheet/MobileFilterSheet"
 import { MobileFilterButton } from "../../shared/components/MobileFilterSheet/MobileFilterButton"
 import { CostBreakdownTable } from "./components/CostBreakdownTable"
 import type { BudgetBreakdown, CostItem } from "./types"
 
-// Restyled to match the directory list pages (Clients / Vendors / Subs /
-// Employees): co-widget shell with a search + count toolbar and
-// spend-rank-table styling. Rows expand in place to an extended view
-// (metrics + Contract/Cost summaries + reused Cost Breakdown table); a
-// separate View button opens the full project report.
+// Two views over the same fetch:
+//  - "grouped" (default): jobs rolled up by their Sage `parent` custom field
+//    (a shared building address) into project cards — status is the min of
+//    the members' statuses, money columns are sums, and the expanded panel
+//    splits members into Phases vs One-Off sub-cards.
+//  - "list": one row per Sage job entry (the original table), rows expand in
+//    place to metrics + Cost Breakdown.
+// The fetch always requests the ALL-TIME list with a per-row `yearActive` bit
+// (yearFlag param): the list view filters rows to the active year client-side
+// (identical result to the old server-side filter), while the grouped view
+// keeps a parent visible if ANY member was active that year but still shows
+// its full all-time membership. Both toggles are therefore instant — only the
+// year selector refetches.
 
 interface ProjectPhase {
   recnum: string
@@ -51,6 +58,15 @@ interface RawProject {
   // projects only expose it on their nested `phases`. Accept both.
   pmName?: string | null
   phases?: ProjectPhase[]
+  clientName?: string | null
+  // Sage custom fields (dbo.actr_u): parent = shared-address grouping key,
+  // oneoff = 1 for non-phase projects. Both null/absent when the lazily
+  // created actr_u row doesn't exist yet (jobs added after the backfill).
+  parent?: string | null
+  oneoff?: number | null
+  // Present when the fetch passes yearFlag: 1 = had posted revenue or cost in
+  // the selected year. Absent (all-time fetch) = always active.
+  yearActive?: number
 }
 
 interface Job {
@@ -70,18 +86,32 @@ interface Job {
   variance: number
   margin: number | null
   supervisor: string
+  client: string
+  parent: string
+  oneoff: boolean
+  yearActive: boolean
 }
 
 // Lazily-fetched per-job cost detail for the expanded view.
 type JobDetail = { budget: BudgetBreakdown | null; costItems: CostItem[] }
 
+// Fallback when the actr_u row is missing: the recnum's last two digits are
+// the phase month (01–12); 00 or >12 marks a one-off (see tools/
+// SAGE_PARENT_ONEOFF_NOTES.md).
+function oneoffFromRecnum(recnum: string): boolean {
+  const suffix = Number(recnum.slice(-2))
+  return !(suffix >= 1 && suffix <= 12)
+}
+
 function normalizeProject(p: RawProject): Job {
   const contract = p.totalContract ?? 0
   const totalCost = p.totalCost ?? 0
   const budget = p.totalBudget ?? p.budget ?? 0
+  const recnum = String(p.recnum)
+  const parent = p.parent?.trim()
   return {
-    recnum: String(p.recnum),
-    jobNumber: p.phases?.[0]?.recnum ?? String(p.recnum),
+    recnum,
+    jobNumber: p.phases?.[0]?.recnum ?? recnum,
     name: p.name,
     status: p.status,
     contract,
@@ -97,7 +127,56 @@ function normalizeProject(p: RawProject): Job {
       p.pmName?.trim() ??
       p.phases?.find((ph) => ph.pmName?.trim())?.pmName?.trim() ??
       "",
+    client: p.clientName?.trim() ?? "",
+    // No parent yet (new job, actr_u row not created) → the job is its own
+    // single-member group under its own name.
+    parent: parent || p.name,
+    oneoff: p.oneoff != null ? p.oneoff === 1 : oneoffFromRecnum(recnum),
+    yearActive: p.yearActive == null ? true : p.yearActive === 1,
   }
+}
+
+// A parent group — Sage jobs sharing a building address.
+interface Group {
+  key: string
+  client: string
+  // min(member status): any Current member → Current; else any Complete →
+  // Complete; else all Closed → Closed (matches how the statuses escalate).
+  status: number
+  contract: number
+  budget: number
+  totalCost: number
+  margin: number | null
+  phases: Job[]
+  oneoffs: Job[]
+  yearActive: boolean
+}
+
+function buildGroups(jobs: Job[]): Group[] {
+  const byParent = new Map<string, Job[]>()
+  for (const j of jobs) {
+    const list = byParent.get(j.parent)
+    if (list) list.push(j)
+    else byParent.set(j.parent, [j])
+  }
+  return [...byParent.entries()].map(([key, members]) => {
+    const contract = members.reduce((s, m) => s + m.contract, 0)
+    const totalCost = members.reduce((s, m) => s + m.totalCost, 0)
+    const firstClient = members.find((m) => m.client)?.client ?? ""
+    const multiClient = members.some((m) => m.client && m.client !== firstClient)
+    return {
+      key,
+      client: multiClient ? "Multiple clients" : firstClient,
+      status: Math.min(...members.map((m) => m.status)),
+      contract,
+      budget: members.reduce((s, m) => s + m.budget, 0),
+      totalCost,
+      margin: contract > 0 ? ((contract - totalCost) / contract) * 100 : null,
+      phases: members.filter((m) => !m.oneoff),
+      oneoffs: members.filter((m) => m.oneoff),
+      yearActive: members.some((m) => m.yearActive),
+    }
+  })
 }
 
 type SortKey = "name" | "status" | "supervisor" | "contract" | "totalCost" | "budget" | "variance" | "margin"
@@ -112,18 +191,18 @@ const STATUS_LABELS: Record<number, string> = {
   6: "Closed",
 }
 
-// Status filter (same pill look as the Invoices toolbar). Pill colors match
-// the status-4/5/6 badge colors.
 type StatusFilter = "all" | number
 
-const STATUS_FILTERS: { key: StatusFilter; label: string; color: string }[] = [
-  { key: "all", label: "All", color: "var(--primary-color)" },
-  { key: 4, label: "Current", color: "var(--primary-color)" },
-  { key: 5, label: "Complete", color: "#22c55e" },
-  { key: 6, label: "Closed", color: "#6b7280" },
+const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
+  { key: "all", label: "All Statuses" },
+  { key: 4, label: "Current" },
+  { key: 5, label: "Complete" },
+  { key: 6, label: "Closed" },
 ]
 
-// Mobile sheet group mirrors the desktop pills (single-select).
+type ViewMode = "grouped" | "list"
+
+// Mobile sheet group mirrors the desktop dropdown (single-select).
 const FILTER_GROUPS: FilterGroup[] = [
   {
     key: "status",
@@ -138,17 +217,17 @@ const FILTER_GROUPS: FilterGroup[] = [
 ]
 const FILTER_DEFAULTS = { status: "all" }
 
-// Fit-driven column hiding. Fixed pixel breakpoints can't know the real
-// content widths, so the layout itself is the signal instead: every column
-// except Project is nowrap (PM capped with an ellipsis), Project is the one
-// flexible column with a min-width floor (see .jc-name-col), and when the
-// fixed columns plus that floor can't fit, the table overflows its wrapper.
-// After each layout pass, any overflow hides the least-critical visible
-// column (HIDE_ORDER, front first). Each hide records the container width it
-// happened at, and that column only returns once the container outgrows that
-// mark by RESHOW_BUFFER, so drag-resizing doesn't flap. Hidden data stays
-// reachable: everything lives in the row's expanded panel, and Status folds
-// into the Project cell's sub-line.
+// Fit-driven column hiding for the LIST view. Fixed pixel breakpoints can't
+// know the real content widths, so the layout itself is the signal instead:
+// every column except Project is nowrap (PM capped with an ellipsis), Project
+// is the one flexible column with a min-width floor (see .jc-name-col), and
+// when the fixed columns plus that floor can't fit, the table overflows its
+// wrapper. After each layout pass, any overflow hides the least-critical
+// visible column (HIDE_ORDER, front first). Each hide records the container
+// width it happened at, and that column only returns once the container
+// outgrows that mark by RESHOW_BUFFER, so drag-resizing doesn't flap. Hidden
+// data stays reachable: everything lives in the row's expanded panel, and
+// Status folds into the Project cell's sub-line.
 const HIDE_ORDER = ["contract", "supervisor", "status", "variance", "budget"] as const
 type HideableCol = (typeof HIDE_ORDER)[number]
 // How far past the hide-point the container must grow before a column may
@@ -249,11 +328,207 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
   )
 }
 
+// One of the two floating sub-cards inside an expanded group (Phases /
+// One-Off Projects). Empty kinds render grayed-out and inert; non-empty cards
+// are buttons that reveal their member rows below the card pair.
+function GroupKindCard({ icon, title, members, open, onToggle, showContract, marginColorsOn }: {
+  icon: React.ReactNode
+  title: string
+  members: Job[]
+  open: boolean
+  onToggle: () => void
+  showContract: boolean
+  marginColorsOn: boolean
+}) {
+  const empty = members.length === 0
+  const contract = members.reduce((s, m) => s + m.contract, 0)
+  const budget = members.reduce((s, m) => s + m.budget, 0)
+  const totalCost = members.reduce((s, m) => s + m.totalCost, 0)
+  const margin = contract > 0 ? ((contract - totalCost) / contract) * 100 : null
+  const marginColor = !marginColorsOn || margin == null ? undefined : marginTextColor(margin)
+
+  return (
+    <button
+      type="button"
+      className={`jc-group-card${empty ? " jc-group-card-empty" : ""}${open ? " jc-group-card-open" : ""}`}
+      onClick={empty ? undefined : onToggle}
+      disabled={empty}
+      aria-expanded={empty ? undefined : open}
+    >
+      <div className="jc-group-card-head">
+        <span className="jc-group-card-title subheadline text-secondary">
+          {icon}
+          {title}
+        </span>
+        {empty ? (
+          <span className="jc-group-card-none subheadline">None</span>
+        ) : (
+          <span className="jc-group-card-count">
+            {members.length}
+            <ChevronRight size={13} className={`jc-expand-chevron${open ? " open" : ""}`} />
+          </span>
+        )}
+      </div>
+      {!empty && (
+        <div className="jc-group-card-body">
+          {showContract && <SummaryRow label="Contract" value={formatMoneyFull(contract)} />}
+          <SummaryRow label="Budget" value={formatMoneyFull(budget)} />
+          <SummaryRow label="Committed + Spent" value={formatMoneyFull(totalCost)} />
+          <SummaryRow
+            label="Margin"
+            value={margin == null ? "—" : `${margin.toFixed(1)}%`}
+            total
+            valueColor={marginColor}
+          />
+        </div>
+      )}
+    </button>
+  )
+}
+
+// Member rows revealed by an open sub-card — the same columns as the list
+// view, minus the inline expand (row click / View opens the full report).
+function GroupMemberTable({ title, members, showContract, marginColorsOn, onOpen }: {
+  title: string
+  members: Job[]
+  showContract: boolean
+  marginColorsOn: boolean
+  onOpen: (job: Job) => void
+}) {
+  return (
+    <div className="jc-expand-breakdown">
+      <div className="jc-summary-title subheadline text-secondary">{title}</div>
+      <table className="spend-rank-table">
+        <thead>
+          <tr>
+            <th className="spend-rank-table-name">Job</th>
+            <th className="spend-rank-table-name">Status</th>
+            <th className="spend-rank-table-name">PM</th>
+            {showContract && <th className="spend-rank-table-value">Contract</th>}
+            <th className="spend-rank-table-value">Budget</th>
+            <th className="spend-rank-table-value">Cost</th>
+            <th className="spend-rank-table-value">Margin</th>
+            <th className="spend-rank-table-name jc-view-th" aria-label="Actions" />
+          </tr>
+        </thead>
+        <tbody>
+          {members.map((job) => (
+            <tr
+              key={job.recnum}
+              className="spend-rank-table-row"
+              onClick={() => onOpen(job)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && onOpen(job)}
+            >
+              <td className="spend-rank-table-name">
+                <div className="body-text emphasized jc-name-text" title={job.name}>{job.name}</div>
+                <div className="cell-secondary jc-name-sub">
+                  <span className="jc-name-number">#{job.jobNumber}</span>
+                </div>
+              </td>
+              <td className="spend-rank-table-name">
+                <span className={`status-badge status-${job.status}`}>
+                  {STATUS_LABELS[job.status] ?? job.status}
+                </span>
+              </td>
+              <td className="spend-rank-table-name">
+                <div className="body-text text-secondary jc-pm-text" title={job.supervisor || undefined}>
+                  {job.supervisor || "—"}
+                </div>
+              </td>
+              {showContract && (
+                <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.contract)}</td>
+              )}
+              <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.budget)}</td>
+              <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.totalCost)}</td>
+              <td
+                className="spend-rank-table-value body-text emphasized"
+                style={{
+                  color: !marginColorsOn || job.margin == null ? undefined : marginTextColor(job.margin),
+                }}
+              >
+                {job.margin == null ? "—" : `${job.margin.toFixed(1)}%`}
+              </td>
+              <td className="spend-rank-table-name jc-view-cell">
+                <button
+                  className="button secondary-button jc-view-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpen(job)
+                  }}
+                  title="Open full report"
+                  aria-label="Open full report"
+                >
+                  <ExternalLink size={13} />
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function GroupExpandedPanel({ group, showContract, marginColorsOn, openKinds, onToggleKind, onOpenJob }: {
+  group: Group
+  showContract: boolean
+  marginColorsOn: boolean
+  openKinds: { phases: boolean; oneoffs: boolean }
+  onToggleKind: (kind: "phases" | "oneoffs") => void
+  onOpenJob: (job: Job) => void
+}) {
+  return (
+    <div className="jc-expand-panel">
+      <div className="jc-group-card-grid">
+        <GroupKindCard
+          icon={<Layers size={13} />}
+          title="Phases"
+          members={group.phases}
+          open={openKinds.phases}
+          onToggle={() => onToggleKind("phases")}
+          showContract={showContract}
+          marginColorsOn={marginColorsOn}
+        />
+        <GroupKindCard
+          icon={<PackageOpen size={13} />}
+          title="One-Off Projects"
+          members={group.oneoffs}
+          open={openKinds.oneoffs}
+          onToggle={() => onToggleKind("oneoffs")}
+          showContract={showContract}
+          marginColorsOn={marginColorsOn}
+        />
+      </div>
+      {openKinds.phases && group.phases.length > 0 && (
+        <GroupMemberTable
+          title={`Phases — ${group.phases.length}`}
+          members={group.phases}
+          showContract={showContract}
+          marginColorsOn={marginColorsOn}
+          onOpen={onOpenJob}
+        />
+      )}
+      {openKinds.oneoffs && group.oneoffs.length > 0 && (
+        <GroupMemberTable
+          title={`One-Off Projects — ${group.oneoffs.length}`}
+          members={group.oneoffs}
+          showContract={showContract}
+          marginColorsOn={marginColorsOn}
+          onOpen={onOpenJob}
+        />
+      )}
+    </div>
+  )
+}
+
 export default function Jobcost() {
   const { goToJobcost } = useJobcostNav()
   const marginColorsOn = useMarginColorsEnabled()
   // Mobile: the table collapses to a simple tap-through list — name + status
   // on the left, margin + chevron on the right, tap → full project report.
+  // (Grouped view is desktop-only for now; mobile always shows the flat list.)
   const isMobile = useIsMobile()
   // Managers (PMs) default to their own projects but can flip to the whole
   // company list via a toolbar toggle; everyone else always sees all projects.
@@ -261,6 +536,7 @@ export default function Jobcost() {
   const isManager = claims["role"] === "manager"
   const [showAllProjects, setShowAllProjects] = useLocalStorage("jobcostShowAllProjects", false)
   const [year, setYear] = useLocalStorage<number | null>("jobcostYear", new Date().getFullYear())
+  const [viewMode, setViewMode] = useLocalStorage<ViewMode>("jobcostViewMode", "grouped")
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
@@ -270,10 +546,16 @@ export default function Jobcost() {
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [details, setDetails] = useState<Record<string, JobDetail | "loading">>({})
+  // Grouped view: which parents are open, and which sub-card(s) within each.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [openKinds, setOpenKinds] = useState<Record<string, { phases: boolean; oneoffs: boolean }>>({})
 
-  // Fit-driven column visibility (see HIDE_ORDER above). `hiddenCount` is how
-  // deep into the hide order we currently are; the layout effect below nudges
-  // it up/down one column per commit until the Project column is readable.
+  const grouped = viewMode === "grouped" && !isMobile
+
+  // Fit-driven column visibility for the list view (see HIDE_ORDER above).
+  // `hiddenCount` is how deep into the hide order we currently are; the layout
+  // effect below nudges it up/down one column per commit until the Project
+  // column is readable.
   const [observeWrapWidth, tableWidth] = useElementWidth()
   const wrapElRef = useRef<HTMLDivElement | null>(null)
   // One callback ref feeds both the width observer and the overflow check.
@@ -307,6 +589,11 @@ export default function Jobcost() {
     (showVariance ? 1 : 0) +
     (showBudget ? 1 : 0)
 
+  // Grouped table: chevron + Project + Status + Budget + Cost + Margin +
+  // counts column, plus Contract for non-managers. No fit-driven hiding —
+  // it has fewer columns and the counts column is compact.
+  const groupColumnCount = 7 + (!isManager ? 1 : 0)
+
   // Deliberately no dependency array: this must re-measure after *every*
   // commit that could change the layout (data, filters, width, hides). Each
   // pass changes hiddenCount by at most one — setState from a layout effect
@@ -314,7 +601,9 @@ export default function Jobcost() {
   // never flashes. Termination: hides are capped at hideOrder.length, and a
   // re-show that immediately re-squeezes re-records the *current* width as
   // its mark, which the re-show condition can't beat without real growth.
+  // Grouped view skips it (no hideable columns rendered there).
   useLayoutEffect(() => {
+    if (grouped) return
     const wrap = wrapElRef.current
     if (!wrap || tableWidth == null) return
     const overflow = wrap.scrollWidth - wrap.clientWidth
@@ -335,11 +624,15 @@ export default function Jobcost() {
     // A new year reloads the list, so drop any open rows + cached detail.
     setExpanded(new Set())
     setDetails({})
-    // allProjects is a manager-only hint: when on, the backend drops the
-    // PM scoping and returns the whole company list. Ignored for other roles.
+    setExpandedGroups(new Set())
+    setOpenKinds({})
+    // yearFlag: fetch the all-time list with a per-row yearActive bit instead
+    // of a server-filtered year subset (see the header comment). allProjects
+    // is a manager-only hint: when on, the backend drops the PM scoping and
+    // returns the whole company list. Ignored for other roles.
     // Params must keep this exact shape/order so a daily-arrival preload's
     // cache key matches (see pageDataCache).
-    const params = { year, allProjects: isManager ? showAllProjects : null }
+    const params = { year, yearFlag: true, allProjects: isManager ? showAllProjects : null }
     const preloaded = takePreloadedPageData("jobcost", ["getPhases"], params)
     const request = preloaded
       ? // A failed preload shouldn't strand the page — fall back to a real fetch.
@@ -401,6 +694,22 @@ export default function Jobcost() {
     })
   }
 
+  function toggleGroupExpand(group: Group) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(group.key)) next.delete(group.key)
+      else next.add(group.key)
+      return next
+    })
+  }
+
+  function toggleKind(groupKey: string, kind: "phases" | "oneoffs") {
+    setOpenKinds((prev) => {
+      const cur = prev[groupKey] ?? { phases: false, oneoffs: false }
+      return { ...prev, [groupKey]: { ...cur, [kind]: !cur[kind] } }
+    })
+  }
+
   function handleSort(key: SortKey) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"))
@@ -411,9 +720,12 @@ export default function Jobcost() {
     }
   }
 
+  // List view rows: scope to the selected year (yearActive is always true on
+  // an All Time fetch), then status + search + sort.
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    let list = statusFilter === "all" ? jobs : jobs.filter((j) => j.status === statusFilter)
+    let list = jobs.filter((j) => j.yearActive)
+    if (statusFilter !== "all") list = list.filter((j) => j.status === statusFilter)
     if (q)
       list = list.filter(
         (j) =>
@@ -437,18 +749,89 @@ export default function Jobcost() {
     })
   }, [jobs, search, statusFilter, sortKey, sortDir])
 
+  // Grouped view: a parent qualifies if ANY member was active in the selected
+  // year, but its stats/counts always cover the full all-time membership.
+  const filteredGroups = useMemo(() => {
+    const q = search.toLowerCase()
+    let list = buildGroups(jobs).filter((g) => g.yearActive)
+    if (statusFilter !== "all") list = list.filter((g) => g.status === statusFilter)
+    if (q)
+      list = list.filter(
+        (g) =>
+          g.key.toLowerCase().includes(q) ||
+          g.client.toLowerCase().includes(q) ||
+          [...g.phases, ...g.oneoffs].some(
+            (m) => m.name?.toLowerCase().includes(q) || m.jobNumber?.toLowerCase().includes(q),
+          ),
+      )
+    return [...list].sort((a, b) => {
+      const dir = sortDir === "asc" ? 1 : -1
+      if (sortKey === "name" || sortKey === "supervisor" || sortKey === "variance")
+        return a.key.localeCompare(b.key) * dir
+      if (sortKey === "status") return (a.status - b.status) * dir
+      if (sortKey === "contract") return (a.contract - b.contract) * dir
+      if (sortKey === "totalCost") return (a.totalCost - b.totalCost) * dir
+      if (sortKey === "budget") return (a.budget - b.budget) * dir
+      const am = a.margin == null ? Number.NEGATIVE_INFINITY : a.margin
+      const bm = b.margin == null ? Number.NEGATIVE_INFINITY : b.margin
+      return (am - bm) * dir
+    })
+  }, [jobs, search, statusFilter, sortKey, sortDir])
+
+  const resultCount = grouped ? filteredGroups.length : filtered.length
+  const resultNoun = grouped
+    ? resultCount === 1 ? "project" : "projects"
+    : resultCount === 1 ? "job" : "jobs"
+
   return (
     <Page title="Job Costing" actions={<YearSelector value={year} onChange={setYear} allowAllTime />}>
       <MotionList className="inv-page-stack">
         <MotionItem>
           {/* No `loading`/`noData` on the Widget: those swap the whole body for a
-              skeleton, which would take the toolbar (scope toggle, search,
+              skeleton, which would take the toolbar (view toggle, search,
               filters) with it. Keep the toolbar mounted and skeleton only the
               data region below so the navbar stays put across reloads/toggles. */}
           <Widget className="co-widget">
             <div className="co-widget-toolbar">
               {!isMobile && (
-                <FilterPills label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
+                <div
+                  className="period-selector period-selector--equal jc-scope-toggle"
+                  role="tablist"
+                  aria-label="View mode"
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={grouped}
+                    className={`period-selector-btn${grouped ? " period-selector-btn--active" : ""}`}
+                    onClick={() => setViewMode("grouped")}
+                  >
+                    Projects
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={!grouped}
+                    className={`period-selector-btn${!grouped ? " period-selector-btn--active" : ""}`}
+                    onClick={() => setViewMode("list")}
+                  >
+                    All Jobs
+                  </button>
+                </div>
+              )}
+              {!isMobile && (
+                <select
+                  className="year-selector jc-status-select"
+                  value={String(statusFilter)}
+                  onChange={(e) => setStatusFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
+                  aria-label="Filter by status"
+                >
+                  {STATUS_OPTIONS.map((o) => (
+                    <option key={String(o.key)} value={String(o.key)}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               )}
               {isManager && !isMobile && (
                 <div
@@ -493,7 +876,7 @@ export default function Jobcost() {
                 />
               )}
               <span className="co-count subheadline text-secondary">
-                {filtered.length} {filtered.length === 1 ? "project" : "projects"}
+                {resultCount} {resultNoun}
               </span>
             </div>
 
@@ -504,7 +887,7 @@ export default function Jobcost() {
                 <ChartNoAxesColumn size={24} className="widget-no-data-icon" />
                 <span className="body-text">No data available</span>
               </div>
-            ) : filtered.length === 0 && (search || statusFilter !== "all") ? (
+            ) : resultCount === 0 && (search || statusFilter !== "all") ? (
               <div className="co-no-results body-text text-secondary">
                 {search ? `No jobs match "${search}"` : "No jobs match your filters"}
               </div>
@@ -545,6 +928,104 @@ export default function Jobcost() {
                   </li>
                 ))}
               </ul>
+            ) : grouped ? (
+              <div className="jc-table-wrap">
+              <table className="spend-rank-table">
+                <thead>
+                  <tr>
+                    <th className="spend-rank-table-name jc-expand-th" aria-hidden="true" />
+                    <SortTh col="name" label="Project" className="jc-name-col" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    {!isManager && (
+                      <SortTh col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    )}
+                    <SortTh col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <th className="spend-rank-table-value jc-counts-th">Jobs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredGroups.map((group) => {
+                    const isOpen = expandedGroups.has(group.key)
+                    const kinds = openKinds[group.key] ?? { phases: false, oneoffs: false }
+                    return (
+                      <Fragment key={group.key}>
+                        <tr
+                          className={`spend-rank-table-row${isOpen ? " jc-row-open" : ""}`}
+                          onClick={() => toggleGroupExpand(group)}
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={isOpen}
+                          onKeyDown={(e) => e.key === "Enter" && toggleGroupExpand(group)}
+                        >
+                          <td className="jc-expand-chevron-cell">
+                            <ChevronRight size={14} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
+                          </td>
+                          <td className="spend-rank-table-name jc-name-col">
+                            <div className="body-text emphasized jc-name-text" title={group.key}>{group.key}</div>
+                            {group.client && (
+                              <div className="cell-secondary jc-name-sub">
+                                <span className="jc-group-client">{group.client}</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="spend-rank-table-name">
+                            <span className={`status-badge status-${group.status}`}>
+                              {STATUS_LABELS[group.status] ?? group.status}
+                            </span>
+                          </td>
+                          {!isManager && (
+                            <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(group.contract)}</td>
+                          )}
+                          <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(group.budget)}</td>
+                          <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(group.totalCost)}</td>
+                          <td
+                            className="spend-rank-table-value body-text emphasized"
+                            style={{
+                              color:
+                                !marginColorsOn || group.margin == null
+                                  ? undefined
+                                  : marginTextColor(group.margin),
+                            }}
+                          >
+                            {group.margin == null ? "—" : `${group.margin.toFixed(1)}%`}
+                          </td>
+                          <td className="spend-rank-table-value jc-counts-cell">
+                            {group.phases.length > 0 && (
+                              <span className="jc-count-chip" title={`${group.phases.length} phase${group.phases.length === 1 ? "" : "s"}`}>
+                                <Layers size={11} />
+                                {group.phases.length}
+                              </span>
+                            )}
+                            {group.oneoffs.length > 0 && (
+                              <span className="jc-count-chip" title={`${group.oneoffs.length} one-off project${group.oneoffs.length === 1 ? "" : "s"}`}>
+                                <PackageOpen size={11} />
+                                {group.oneoffs.length}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                        {isOpen && (
+                          <tr className="jc-expand-row">
+                            <td colSpan={groupColumnCount}>
+                              <GroupExpandedPanel
+                                group={group}
+                                showContract={!isManager}
+                                marginColorsOn={marginColorsOn}
+                                openKinds={kinds}
+                                onToggleKind={(kind) => toggleKind(group.key, kind)}
+                                onOpenJob={(job) => goToJobcost(job.jobNumber)}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+              </div>
             ) : (
               <div className="jc-table-wrap" ref={tableWrapRef}>
               <table className="spend-rank-table">

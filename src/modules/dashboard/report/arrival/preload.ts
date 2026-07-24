@@ -59,7 +59,7 @@ export function preloadEntryPages(source: "admin" | "pm", employeeId: number | n
   preloadPageData({
     module: "jobcost",
     queries: ["getPhases"],
-    params: { year: jobcostYear, allProjects: isManager ? showAllProjects : null },
+    params: { year: jobcostYear, yearFlag: true, allProjects: isManager ? showAllProjects : null },
   })
 
   // Warm the lazy route chunks too (same specifiers Router.tsx lazy-loads),
