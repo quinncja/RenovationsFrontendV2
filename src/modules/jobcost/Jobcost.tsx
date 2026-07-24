@@ -610,10 +610,6 @@ export default function Jobcost() {
     (showVariance ? 1 : 0) +
     (showBudget ? 1 : 0)
 
-  // Grouped table: chevron + Project (name · client) + Status + Phases +
-  // One-Offs. Financials live in the expanded panel, not the row.
-  const groupColumnCount = 5
-
   // Deliberately no dependency array: this must re-measure after *every*
   // commit that could change the layout (data, filters, width, hides). Each
   // pass changes hiddenCount by at most one — setState from a layout effect
@@ -948,84 +944,63 @@ export default function Jobcost() {
                 ))}
               </ul>
             ) : grouped ? (
-              <div className="jc-table-wrap">
-              <table className="spend-rank-table">
-                <thead>
-                  <tr>
-                    <th className="spend-rank-table-name jc-expand-th" aria-hidden="true" />
-                    <SortTh col="name" label="Project" className="jc-name-col" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <th className="spend-rank-table-value jc-counts-th">Phases</th>
-                    <th className="spend-rank-table-value jc-counts-th">One-Offs</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredGroups.map((group) => {
-                    const isOpen = expandedGroups.has(group.key)
-                    return (
-                      <Fragment key={group.key}>
-                        <tr
-                          className={`spend-rank-table-row${isOpen ? " jc-row-open" : ""}`}
-                          onClick={() => toggleGroupExpand(group)}
-                          role="button"
-                          tabIndex={0}
-                          aria-expanded={isOpen}
-                          onKeyDown={(e) => e.key === "Enter" && toggleGroupExpand(group)}
-                        >
-                          <td className="jc-expand-chevron-cell">
-                            <ChevronRight size={14} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
-                          </td>
-                          <td className="spend-rank-table-name jc-name-col">
-                            <div className="jc-name-line" title={group.key}>
-                              <span className="body-text emphasized jc-name-text">{group.key}</span>
-                              {group.client && <span className="cell-secondary jc-group-client">{group.client}</span>}
-                            </div>
-                          </td>
-                          <td className="spend-rank-table-name">
-                            <span className={`status-badge status-${group.status}`}>
-                              {STATUS_LABELS[group.status] ?? group.status}
+              <div className="jc-project-list">
+                {filteredGroups.map((group) => {
+                  const isOpen = expandedGroups.has(group.key)
+                  return (
+                    <div key={group.key} className={`jc-project-card${isOpen ? " jc-project-card-open" : ""}`}>
+                      <button
+                        type="button"
+                        className="jc-project-head"
+                        onClick={() => toggleGroupExpand(group)}
+                        aria-expanded={isOpen}
+                      >
+                        <ChevronRight size={15} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
+                        <span className="jc-project-title" title={group.key}>
+                          <span className="jc-project-name">{group.key}</span>
+                          {group.client && <span className="cell-secondary jc-group-client">{group.client}</span>}
+                        </span>
+                        <span className={`status-badge status-${group.status}`}>
+                          {STATUS_LABELS[group.status] ?? group.status}
+                        </span>
+                        <span className="jc-project-counts">
+                          {group.phases.length > 0 ? (
+                            <span className="jc-count-chip" title={`${group.phases.length} phase${group.phases.length === 1 ? "" : "s"}`}>
+                              <Building2 size={12} />
+                              {group.phases.length}
                             </span>
-                          </td>
-                          <td className="spend-rank-table-value jc-counts-cell">
-                            {group.phases.length > 0 ? (
-                              <span className="jc-count-chip" title={`${group.phases.length} phase${group.phases.length === 1 ? "" : "s"}`}>
-                                <Building2 size={12} />
-                                {group.phases.length}
-                              </span>
-                            ) : (
-                              <span className="jc-count-none">—</span>
-                            )}
-                          </td>
-                          <td className="spend-rank-table-value jc-counts-cell">
-                            {group.oneoffs.length > 0 ? (
-                              <span className="jc-count-chip" title={`${group.oneoffs.length} one-off project${group.oneoffs.length === 1 ? "" : "s"}`}>
-                                <Hammer size={12} />
-                                {group.oneoffs.length}
-                              </span>
-                            ) : (
-                              <span className="jc-count-none">—</span>
-                            )}
-                          </td>
-                        </tr>
-                        {isOpen && (
-                          <tr className="jc-expand-row">
-                            <td colSpan={groupColumnCount}>
-                              <GroupExpandedPanel
-                                group={group}
-                                showContract={!isManager}
-                                marginColorsOn={marginColorsOn}
-                                openKind={openKinds[group.key] ?? null}
-                                onToggleKind={(kind) => toggleKind(group.key, kind)}
-                                onOpenJob={(job) => goToJobcost(job.jobNumber)}
-                              />
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
+                          ) : (
+                            <span className="jc-count-chip jc-count-chip-empty" title="No phases">
+                              <Building2 size={12} />0
+                            </span>
+                          )}
+                          {group.oneoffs.length > 0 ? (
+                            <span className="jc-count-chip" title={`${group.oneoffs.length} one-off project${group.oneoffs.length === 1 ? "" : "s"}`}>
+                              <Hammer size={12} />
+                              {group.oneoffs.length}
+                            </span>
+                          ) : (
+                            <span className="jc-count-chip jc-count-chip-empty" title="No one-off projects">
+                              <Hammer size={12} />0
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                      {isOpen && (
+                        <div className="jc-project-body">
+                          <GroupExpandedPanel
+                            group={group}
+                            showContract={!isManager}
+                            marginColorsOn={marginColorsOn}
+                            openKind={openKinds[group.key] ?? null}
+                            onToggleKind={(kind) => toggleKind(group.key, kind)}
+                            onOpenJob={(job) => goToJobcost(job.jobNumber)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             ) : (
               <div className="jc-table-wrap" ref={tableWrapRef}>
