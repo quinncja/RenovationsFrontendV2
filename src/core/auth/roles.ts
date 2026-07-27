@@ -20,6 +20,7 @@ import {
   CalendarClock,
   Receipt,
   Clock,
+  ChartPie,
 } from "lucide-react"
 
 export interface NavItem {
@@ -62,6 +63,7 @@ const navItems = {
   invoices: { label: "Invoices", path: "/invoices", icon: FileText },
   upcomingBillings: { label: "Upcoming Billings", path: "/upcoming-billings", icon: CalendarClock },
   progressBillings: { label: "Progress Billings", path: "/progress-billings", icon: Receipt },
+  overheadReport: { label: "Overhead Report", path: "/overhead-report", icon: ChartPie },
   users: { label: "Users", path: "/users", icon: Users },
   clients: { label: "Clients", path: "/clients", icon: Users2 },
   vendors: { label: "Vendors", path: "/vendors", icon: Truck },
@@ -76,7 +78,7 @@ const navItems = {
 const financesGroup: NavGroup = {
   label: "Finances",
   icon: Landmark,
-  items: [navItems.invoices, navItems.upcomingBillings, navItems.progressBillings],
+  items: [navItems.invoices, navItems.upcomingBillings, navItems.progressBillings, navItems.overheadReport],
 }
 
 const directoryGroup: NavGroup = {

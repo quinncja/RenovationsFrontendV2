@@ -9610,6 +9610,23 @@ svg.placeholder-illustration {
 .mbp-table-widget .widget-header { padding: 1.25rem 1.25rem 0.75rem; }
 .mbp-table-widget .widget-body { padding: 0; gap: 0; }
 
+/* ── Overhead Expense Report ── */
+/* YoY delta line under a stat value; the signed span inside carries the color. */
+.ohr-stat-caption {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--secondary-text);
+  line-height: 1.3;
+}
+
+/* Top-movers reuses the donut legend's list styling; left-align it since
+   there's no pie beside it, and let rows breathe a little more. */
+.ohr-movers-list {
+  width: 100%;
+  max-width: none;
+}
+
 /* ── Monthly Detail Table (shared component) ── */
 /* Outer monthly table — fixed layout so the inner items row can't widen the card. */
 .mdt-table {
