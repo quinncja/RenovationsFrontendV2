@@ -1,6 +1,8 @@
-import { useState, useMemo, useEffect, useLayoutEffect, useRef, Fragment } from "react"
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, useDeferredValue, memo } from "react"
+import { motion, AnimatePresence, useMotionValue, useTransform, type MotionValue, type Transition } from "framer-motion"
+import { useVirtualizer } from "@tanstack/react-virtual"
 import { useJobcostNav } from "./useJobcostNav"
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ExternalLink, ChartNoAxesColumn, Building2, Hammer } from "lucide-react"
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ChevronDown, ExternalLink, ChartNoAxesColumn, Building2, Hammer, Pin, RotateCcw } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
@@ -8,7 +10,7 @@ import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { takePreloadedPageData } from "../../shared/api/pageDataCache"
 import { trackProjectView } from "../../shared/analytics/analytics"
-import { formatMoneyFull, marginTextColor } from "../../shared/utils/format"
+import { formatMoney, formatMoneyFull, marginTextColor } from "../../shared/utils/format"
 import useIsMobile from "../../shared/hooks/useIsMobile"
 import useElementWidth from "../../shared/hooks/useElementWidth"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
@@ -16,7 +18,7 @@ import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { useAuth } from "../../core/auth/AuthProvider"
 import { MobileFilterSheet, activeFilterCount, type FilterGroup } from "../../shared/components/MobileFilterSheet/MobileFilterSheet"
 import { MobileFilterButton } from "../../shared/components/MobileFilterSheet/MobileFilterButton"
-import { CostBreakdownTable } from "./components/CostBreakdownTable"
+import { CostBreakdownTable, CostBreakdownSkeleton } from "./components/CostBreakdownTable"
 import type { BudgetBreakdown, CostItem } from "./types"
 
 // Two views over the same fetch:
@@ -186,6 +188,18 @@ function buildGroups(jobs: Job[]): Group[] {
 type SortKey = "name" | "status" | "supervisor" | "contract" | "totalCost" | "budget" | "variance" | "margin"
 type SortDir = "asc" | "desc"
 
+// Property-view sorting lives in the command bar (cards have no column
+// headers). Volume is hidden from managers, matching the contract column.
+type GroupSortKey = "name" | "client" | "volume" | "margin" | "phases" | "projects"
+const GROUP_SORT_OPTIONS: { key: GroupSortKey; label: string }[] = [
+  { key: "name", label: "Name" },
+  { key: "client", label: "Client" },
+  { key: "volume", label: "Volume" },
+  { key: "margin", label: "Margin" },
+  { key: "phases", label: "Phase Count" },
+  { key: "projects", label: "Project Count" },
+]
+
 const STATUS_LABELS: Record<number, string> = {
   1: "Bidding",
   2: "Refused",
@@ -242,7 +256,8 @@ function SortTh({ col, label, align = "left", sortKey, sortDir, onSort, classNam
   col: SortKey
   label: string
   align?: "left" | "right"
-  sortKey: SortKey
+  // null = no column sort applied (the list sits in its default name order).
+  sortKey: SortKey | null
   sortDir: SortDir
   onSort: (k: SortKey) => void
   className?: string
@@ -318,8 +333,11 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
       {/* Cost Breakdown (reused from the detail page) */}
       <div className="jc-expand-breakdown">
         <div className="jc-summary-title subheadline text-secondary">Cost Breakdown</div>
+        {/* Full-height skeleton (4 fixed categories + Total) so the row's
+            open animation travels straight to the final height — see
+            CostBreakdownSkeleton. */}
         {detail === "loading" || detail === undefined ? (
-          <div className="jc-expand-loading body-text text-secondary">Loading cost breakdown…</div>
+          <CostBreakdownSkeleton />
         ) : (
           <CostBreakdownTable
             budget={detail.budget}
@@ -335,9 +353,12 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
 // One of the two floating sub-cards inside an expanded group (Phases /
 // One-Off Projects). Empty kinds render grayed-out and inert; non-empty cards
 // are buttons that reveal their member rows below the card pair.
-function GroupKindCard({ icon, title, members, open, onToggle, showContract, marginColorsOn }: {
+function GroupKindCard({ icon, title, singular, plural, members, open, onToggle, showContract, marginColorsOn }: {
   icon: React.ReactNode
   title: string
+  // Count noun: "25 Phases ›" / "2 One-Offs ›", not a bare number.
+  singular: string
+  plural: string
   members: Job[]
   open: boolean
   onToggle: () => void
@@ -368,7 +389,7 @@ function GroupKindCard({ icon, title, members, open, onToggle, showContract, mar
           <span className="jc-group-card-none subheadline">None</span>
         ) : (
           <span className="jc-group-card-count">
-            {members.length}
+            {members.length} {members.length === 1 ? singular : plural}
             <ChevronRight size={13} className={`jc-expand-chevron${open ? " open" : ""}`} />
           </span>
         )}
@@ -378,12 +399,27 @@ function GroupKindCard({ icon, title, members, open, onToggle, showContract, mar
           {showContract && <SummaryRow label="Contract" value={formatMoneyFull(contract)} />}
           <SummaryRow label="Budget" value={formatMoneyFull(budget)} />
           <SummaryRow label="Committed + Spent" value={formatMoneyFull(totalCost)} />
-          <SummaryRow
-            label="Margin"
-            value={margin == null ? "—" : `${margin.toFixed(1)}%`}
-            total
-            valueColor={marginColor}
-          />
+          {/* Margin + Gross Profit are the card's conclusions — a recessed
+              well sets the pair apart from the plain money lines above. */}
+          <div className="jc-summary-totals">
+            {/* Contract-derived (hidden from managers). Wears the same margin
+                color as the Margin row below — the pair reads as one verdict;
+                negative-red stays as the fallback when margin colors are off. */}
+            {showContract && (
+              <SummaryRow
+                label="Gross Profit"
+                value={formatMoneyFull(contract - totalCost)}
+                total
+                valueColor={marginColor ?? (contract - totalCost < 0 ? "#ef4444" : undefined)}
+              />
+            )}
+            <SummaryRow
+              label="Margin"
+              value={margin == null ? "—" : `${margin.toFixed(1)}%`}
+              total
+              valueColor={marginColor}
+            />
+          </div>
         </div>
       )}
     </button>
@@ -479,7 +515,7 @@ function OverviewStat({ label, value, valueColor }: { label: string; value: stri
   return (
     <div className="jc-overview-stat">
       <span className="jc-overview-label subheadline text-secondary">{label}</span>
-      <span className="jc-overview-value body-text emphasized" style={valueColor ? { color: valueColor } : undefined}>
+      <span className="jc-overview-value" style={valueColor ? { color: valueColor } : undefined}>
         {value}
       </span>
     </div>
@@ -500,21 +536,31 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
   const openMembers = openKind === "phases" ? group.phases : openKind === "oneoffs" ? group.oneoffs : []
   return (
     <div className="jc-expand-panel">
-      {/* Overall project stats (the row itself only carries counts). */}
+      {/* Overall property stats (the row itself only carries counts). */}
       <div className="jc-group-overview">
-        {showContract && <OverviewStat label="Contract" value={formatMoneyFull(group.contract)} />}
-        <OverviewStat label="Budget" value={formatMoneyFull(group.budget)} />
-        <OverviewStat label="Committed + Spent" value={formatMoneyFull(group.totalCost)} />
+        {showContract && <OverviewStat label="Property Contract Volume" value={formatMoneyFull(group.contract)} />}
         <OverviewStat
-          label="Margin"
+          label="Property Gross Margin"
           value={group.margin == null ? "—" : `${group.margin.toFixed(1)}%`}
           valueColor={marginColor}
         />
+        {/* Gross profit exposes contract - cost, so it follows the contract
+            visibility rule (hidden from managers). Uncolored except when
+            negative — losing money is the only state worth flagging. */}
+        {showContract && (
+          <OverviewStat
+            label="Property Gross Profit"
+            value={formatMoneyFull(group.contract - group.totalCost)}
+            valueColor={group.contract - group.totalCost < 0 ? "#ef4444" : undefined}
+          />
+        )}
       </div>
       <div className="jc-group-card-grid">
         <GroupKindCard
           icon={<Building2 size={13} />}
-          title="Phases"
+          title="Rolling Phase Work"
+          singular="Phase"
+          plural="Phases"
           members={group.phases}
           open={openKind === "phases"}
           onToggle={() => onToggleKind("phases")}
@@ -523,7 +569,9 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
         />
         <GroupKindCard
           icon={<Hammer size={13} />}
-          title="One-Off Projects"
+          title="One-Off Work"
+          singular="One-Off"
+          plural="One-Offs"
           members={group.oneoffs}
           open={openKind === "oneoffs"}
           onToggle={() => onToggleKind("oneoffs")}
@@ -531,14 +579,862 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
           marginColorsOn={marginColorsOn}
         />
       </div>
-      {openMembers.length > 0 && (
-        <GroupMemberTable
-          members={openMembers}
-          showContract={showContract}
-          marginColorsOn={marginColorsOn}
-          onOpen={onOpenJob}
-        />
-      )}
+      {/* The member list mounts through AnimatePresence so swapping between
+          kinds (or closing) collapses smoothly instead of popping. marginTop
+          animates from the panel's negated flex gap (-1.25rem = zero net
+          space closed) to -0.5rem (the open air gap) so the gap eases in
+          with the height instead of popping. The caret + table are static
+          layout inside this element (App.css .jc-member-reveal); the kind
+          class centers the caret under whichever card is open. */}
+      <AnimatePresence initial={false} mode="wait">
+        {openKind && openMembers.length > 0 && (
+          <motion.div
+            key={openKind}
+            className={`jc-member-reveal jc-member-reveal-${openKind}`}
+            initial={{ height: 0, opacity: 0, marginTop: "-1.25rem" }}
+            animate={{ height: "auto", opacity: 1, marginTop: "-0.5rem" }}
+            exit={{ height: 0, opacity: 0, marginTop: "-1.25rem" }}
+            transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+          >
+            <div className="jc-tray-caret" aria-hidden="true" />
+            <GroupMemberTable
+              members={openMembers}
+              showContract={showContract}
+              marginColorsOn={marginColorsOn}
+              onOpen={onOpenJob}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+// Thumb slide for the command-bar segmented controls.
+const SEG_SPRING: Transition = { type: "spring", bounce: 0.15, visualDuration: 0.35 }
+
+// Animates real width (not transforms) when its child's intrinsic size
+// changes, so text never scale-stretches — used by the sort-direction toggle
+// whose label swaps between "A-Z" and "Low-High". Bounce stays 0: width
+// overshoot would clip the label mid-flight.
+function AnimatedWidth({ children }: { children: React.ReactNode }) {
+  const innerRef = useRef<HTMLSpanElement>(null)
+  const [width, setWidth] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    const el = innerRef.current
+    if (el) setWidth(Math.ceil(el.getBoundingClientRect().width))
+  })
+  return (
+    <motion.span
+      animate={width != null ? { width } : undefined}
+      transition={{ type: "spring", bounce: 0, visualDuration: 0.3 }}
+      style={{ display: "inline-block", overflow: "hidden", whiteSpace: "nowrap" }}
+    >
+      <span ref={innerRef} style={{ display: "inline-block" }}>{children}</span>
+    </motion.span>
+  )
+}
+
+// Card travel when the list order changes (pin/unpin, sort) — soft-landing
+// spring so a card pinned from mid-list visibly glides to the top.
+const REORDER_SPRING: Transition = { type: "spring", bounce: 0.18, visualDuration: 0.45 }
+
+// Count tag on a property card's right side: "2 Phases ›" / "1 Project ›".
+// Clicking one opens the card straight to that section (the head is a
+// role=button div, not a <button>, so these can be real buttons inside it).
+// Empty kinds read as quiet "No Phases" text with no affordance.
+function KindChip({ icon, count, singular, plural, onOpen }: {
+  icon: React.ReactNode
+  count: number
+  singular: string
+  plural: string
+  onOpen: () => void
+}) {
+  if (count === 0) {
+    return (
+      <span className="jc-kind-chip jc-kind-chip-empty">
+        {icon}
+        No {plural}
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      className="jc-kind-chip"
+      onClick={(e) => {
+        e.stopPropagation()
+        onOpen()
+      }}
+    >
+      {icon}
+      {count} {count === 1 ? singular : plural}
+      <ChevronRight size={12} className="jc-kind-chip-arrow" />
+    </button>
+  )
+}
+
+// One property (parent group) card. Scroll-linked "wave": scale/opacity ease
+// up as the card enters the reading band, back down at the edges. The wave is
+// driven by a shared `tick` motion value (bumped by the list on scroll AND on
+// any layout resize) and reads live getBoundingClientRect positions, so cards
+// re-settle correctly when a tall card above them collapses — a pure
+// scroll-offset source goes stale there because no scroll event fires.
+// memo: the virtualizer re-renders the list on every scroll frame; without it
+// every mounted card re-renders per frame. Handlers take the group as an
+// argument (no per-item closures) so props stay referentially stable.
+const PropertyCard = memo(function PropertyCard({ group, open, openKind, entrance, index, tick, scrollerRef, showContract, marginColorsOn, pinned, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin }: {
+  group: Group
+  open: boolean
+  openKind: "phases" | "oneoffs" | null
+  // Staggered blur-in on the list's first paint only — cards mounted later by
+  // the virtualizer (while scrolling) must not replay it.
+  entrance: boolean
+  index: number
+  tick: MotionValue<number>
+  scrollerRef: React.RefObject<HTMLElement | null>
+  showContract: boolean
+  marginColorsOn: boolean
+  pinned: boolean
+  onToggle: (group: Group) => void
+  onToggleKind: (kind: "phases" | "oneoffs") => void
+  onOpenKind: (group: Group, kind: "phases" | "oneoffs") => void
+  onOpenJob: (job: Job) => void
+  onTogglePin: (group: Group) => void
+}) {
+  const cardRef = useRef<HTMLDivElement | null>(null)
+  // 0 = card top at the container's bottom edge, 1 = card bottom at its top
+  // edge, ~0.5 = comfortably in view. Reading rects keeps it truthful under
+  // any layout shift; tick.get() subscribes this transform to the bumps.
+  const waveProgress = useTransform(() => {
+    tick.get()
+    const el = cardRef.current
+    const sc = scrollerRef.current
+    if (!el || !sc) return 0.5
+    const r = el.getBoundingClientRect()
+    const s = sc.getBoundingClientRect()
+    return (s.bottom - r.top) / (s.height + r.height)
+  })
+  const waveScale = useTransform(waveProgress, [0, 0.08, 0.92, 1], [0.965, 1, 1, 0.965])
+  const waveOpacity = useTransform(waveProgress, [0, 0.08, 0.92, 1], [0.55, 1, 1, 0.55])
+
+  const marginColor = !marginColorsOn || group.margin == null ? undefined : marginTextColor(group.margin)
+
+  return (
+    <motion.div
+      ref={cardRef}
+      className="jc-card-wave"
+      // Open cards opt out of the wave: a tall expanded card scaling under
+      // 1 would soften its text while it's being read.
+      style={{ scale: open ? 1 : waveScale, opacity: open ? 1 : waveOpacity, willChange: "transform" }}
+    >
+      <motion.div
+        className={`jc-project-card${open ? " jc-project-card-open" : ""}`}
+        // App-standard MotionList entrance (same values as itemVariants),
+        // continuing the header's stagger rhythm.
+        initial={entrance ? { opacity: 0, y: 12, scale: 0.97 } : false}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.3, delay: 0.08 + Math.min(index, 8) * 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
+      >
+        <div
+          className="jc-project-head"
+          role="button"
+          tabIndex={0}
+          onClick={() => onToggle(group)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              onToggle(group)
+            }
+          }}
+          aria-expanded={open}
+        >
+          {/* Pinned marker: copper rail on the card's left edge, growing from
+              its vertical center on pin and receding on unpin. Lives in the
+              head (not the card) so an expanded body doesn't stretch it. */}
+          <motion.span
+            className="jc-pin-rail"
+            aria-hidden="true"
+            initial={false}
+            animate={{ scaleY: pinned ? 1 : 0, opacity: pinned ? 1 : 0 }}
+            transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+          />
+          <span className="jc-head-toggle">
+            <ChevronRight size={15} className={`jc-expand-chevron${open ? " open" : ""}`} />
+          </span>
+          <span className="jc-project-title" title={group.key}>
+            <span className="jc-project-name-row">
+              <span className="jc-project-name">{group.key}</span>
+              <span className={`status-badge status-${group.status}`}>
+                {STATUS_LABELS[group.status] ?? group.status}
+              </span>
+            </span>
+            {group.client && <span className="jc-group-client">{group.client}</span>}
+          </span>
+          <span className="jc-head-stats">
+            {showContract && (
+              <span className="jc-head-stat">
+                <span className="jc-head-stat-label">Volume</span>
+                <span className="jc-head-stat-value">{formatMoney(group.contract)}</span>
+              </span>
+            )}
+            <span className="jc-head-stat">
+              <span className="jc-head-stat-label">Margin</span>
+              <span className="jc-head-stat-value" style={marginColor ? { color: marginColor } : undefined}>
+                {group.margin == null ? "—" : `${group.margin.toFixed(1)}%`}
+              </span>
+            </span>
+          </span>
+          <span className="jc-project-counts">
+            <KindChip
+              icon={<Building2 size={12} />}
+              count={group.phases.length}
+              singular="Phase"
+              plural="Phases"
+              onOpen={() => onOpenKind(group, "phases")}
+            />
+            <KindChip
+              icon={<Hammer size={12} />}
+              count={group.oneoffs.length}
+              singular="Project"
+              plural="Projects"
+              onOpen={() => onOpenKind(group, "oneoffs")}
+            />
+          </span>
+          {/* Neutral tile when unpinned, copper when pinned (active state).
+              stopPropagation on click AND keydown — the head is a role=button
+              that would otherwise toggle open. The icon pops on pin as the
+              instant local feedback while the card itself travels. */}
+          <button
+            type="button"
+            className={`jc-pin-btn${pinned ? " jc-pin-btn-active" : ""}`}
+            aria-pressed={pinned}
+            aria-label={pinned ? "Unpin property" : "Pin property to top"}
+            title={pinned ? "Pinned — click to unpin" : "Pin to top"}
+            onClick={(e) => {
+              e.stopPropagation()
+              onTogglePin(group)
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <motion.span
+              className="jc-pin-icon"
+              initial={false}
+              animate={{ scale: pinned ? [1, 1.35, 1] : 1 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+            >
+              <Pin size={13} />
+            </motion.span>
+          </button>
+        </div>
+        <AnimatePresence initial={false}>
+          {open && (
+            <motion.div
+              className="jc-project-body"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
+            >
+              <GroupExpandedPanel
+                group={group}
+                showContract={showContract}
+                marginColorsOn={marginColorsOn}
+                openKind={openKind}
+                onToggleKind={onToggleKind}
+                onOpenJob={onOpenJob}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+    </motion.div>
+  )
+})
+
+// Virtualized property list: only the cards near the viewport are mounted
+// (the full portfolio is 50+ cards, each with its own motion values — mounting
+// them all at once is what made the view toggle lag). Items are absolutely
+// positioned by measured offset inside a spacer of the total height; card
+// expand/collapse is picked up live by the virtualizer's ResizeObserver.
+function PropertyList({ groups, openGroupKey, openKind, entrance, showContract, marginColorsOn, pins, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin }: {
+  groups: Group[]
+  openGroupKey: string | null
+  openKind: "phases" | "oneoffs" | null
+  // False when the list is re-entered via the view toggle: the blur-in
+  // stagger plays once per page visit, after that the crossfade alone
+  // handles the reveal (replaying it doubled the animation AND the cost).
+  entrance: boolean
+  showContract: boolean
+  marginColorsOn: boolean
+  pins: string[]
+  onToggle: (group: Group) => void
+  onToggleKind: (kind: "phases" | "oneoffs") => void
+  onOpenKind: (group: Group, kind: "phases" | "oneoffs") => void
+  onOpenJob: (job: Job) => void
+  onTogglePin: (group: Group) => void
+}) {
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const scrollerRef = useRef<HTMLElement | null>(null)
+  const [scroller, setScroller] = useState<HTMLElement | null>(null)
+  // Offset of the list's top inside the scroll container (the command bar
+  // sits above it) — keeps the virtualizer's visible-range math honest.
+  const [scrollMargin, setScrollMargin] = useState(0)
+  const tick = useMotionValue(0)
+  // Entrance stagger plays once per list mount, then later virtualizer mounts
+  // (scrolling) skip it.
+  const entranceRef = useRef(true)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      entranceRef.current = false
+    }, 900)
+    return () => clearTimeout(t)
+  }, [])
+
+  // Stable: an inline ref here would re-run these layout reads on every
+  // scroll-driven re-render.
+  const setListEl = useCallback((el: HTMLDivElement | null) => {
+    listRef.current = el
+    if (!el) return
+    const sc = (el.closest(".page") as HTMLElement) ?? null
+    scrollerRef.current = sc
+    setScroller(sc)
+    if (sc) {
+      const sr = sc.getBoundingClientRect()
+      const er = el.getBoundingClientRect()
+      setScrollMargin(Math.max(0, Math.round(er.top - sr.top + sc.scrollTop)))
+    }
+  }, [])
+
+  // One shared wave driver: scroll moves cards, but so do collapse animations
+  // above them (no scroll event fires for those) — the ResizeObserver on the
+  // list catches that case and re-settles every card.
+  useEffect(() => {
+    const sc = scroller
+    const list = listRef.current
+    if (!sc || !list) return
+    const bump = () => tick.set(tick.get() + 1)
+    sc.addEventListener("scroll", bump, { passive: true })
+    const ro = new ResizeObserver(bump)
+    ro.observe(list)
+    ro.observe(sc)
+    bump()
+    return () => {
+      sc.removeEventListener("scroll", bump)
+      ro.disconnect()
+    }
+  }, [scroller, tick])
+
+  // Deliberately no dependency array: sorting/filtering teleport cards to new
+  // offsets via translateY — no scroll fires and the list's total height is
+  // unchanged, so neither observer above notices. Bump per commit BEFORE paint
+  // (layout effect: the corrected wave must be in the same frame the cards
+  // land, or the old edge style flashes), then once more on the next frame —
+  // the virtualizer's re-measure settles positions after this commit, and a
+  // single sync bump left cards wearing their pre-sort wave style.
+  useLayoutEffect(() => {
+    tick.set(tick.get() + 1)
+    const raf = requestAnimationFrame(() => tick.set(tick.get() + 1))
+    return () => cancelAnimationFrame(raf)
+  })
+
+  const virtualizer = useVirtualizer({
+    count: groups.length,
+    getScrollElement: () => scroller,
+    estimateSize: () => 88,
+    overscan: 4,
+    scrollMargin,
+    getItemKey: (i) => groups[i].key,
+  })
+
+  // Reorders (pin/unpin, sort change) GLIDE cards to their new offsets;
+  // everything else that moves an offset (a card above expanding, scroll
+  // remounts) must stay an instant teleport — animating those would fight the
+  // body height animation frame by frame. The tell is the item's list index:
+  // record each key's index after every commit, and on the next render a
+  // changed index means reorder (animate) while a changed offset alone means
+  // resize (snap).
+  const prevIndexRef = useRef(new Map<string, number>())
+  useEffect(() => {
+    const m = prevIndexRef.current
+    m.clear()
+    groups.forEach((g, i) => m.set(g.key, i))
+  })
+
+  return (
+    <div ref={setListEl} className="jc-project-list" style={{ height: virtualizer.getTotalSize() }}>
+      {virtualizer.getVirtualItems().map((vi) => {
+        const group = groups[vi.index]
+        const isOpen = openGroupKey === group.key
+        const prevIndex = prevIndexRef.current.get(group.key)
+        const moved = prevIndex !== undefined && prevIndex !== vi.index
+        // A long-haul traveler (a card just pinned to the top) rides above the
+        // one-slot shifters it crosses on the way.
+        const traveled = moved && Math.abs(prevIndex - vi.index) > 1
+        return (
+          <motion.div
+            key={group.key}
+            data-index={vi.index}
+            ref={virtualizer.measureElement}
+            className="jc-virtual-item"
+            initial={false}
+            animate={{ y: vi.start - scrollMargin }}
+            transition={moved ? REORDER_SPRING : { duration: 0 }}
+            // No scroll/resize fires during the glide, so the wave would hold
+            // each card's pre-move edge style for the whole flight — bump the
+            // shared tick per animation frame to keep it reading live rects.
+            onUpdate={() => tick.set(tick.get() + 1)}
+            style={{ zIndex: traveled ? 2 : moved ? 1 : undefined }}
+          >
+            <PropertyCard
+              group={group}
+              open={isOpen}
+              openKind={isOpen ? openKind : null}
+              entrance={entrance && entranceRef.current}
+              index={vi.index}
+              tick={tick}
+              scrollerRef={scrollerRef}
+              showContract={showContract}
+              marginColorsOn={marginColorsOn}
+              pinned={pins.includes(group.key)}
+              onToggle={onToggle}
+              onToggleKind={onToggleKind}
+              onOpenKind={onOpenKind}
+              onOpenJob={onOpenJob}
+              onTogglePin={onTogglePin}
+            />
+          </motion.div>
+        )
+      })}
+    </div>
+  )
+}
+
+// One table row (plus its expanded panel) as a memoized unit. The virtualizer
+// re-renders JobTable on every scroll frame; without memo every visible row
+// re-rendered per frame, which is what stuttered. Handlers come from Jobcost,
+// which does NOT re-render on scroll, so their identities are stable and a
+// shallow compare holds.
+const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, showContract, showBudget, showPM, showStatus, showVariance, visibleColumnCount, marginColorsOn, pinned, orderDep, traveled, onToggle, onOpen, onTogglePin }: {
+  job: Job
+  isOpen: boolean
+  detail: JobDetail | "loading" | undefined
+  index: number
+  measureRef: (el: Element | null) => void
+  showContract: boolean
+  showBudget: boolean
+  showPM: boolean
+  showStatus: boolean
+  showVariance: boolean
+  visibleColumnCount: number
+  marginColorsOn: boolean
+  pinned: boolean
+  // Identity of the jobs array — layoutDependency, so the FLIP glide below
+  // measures ONLY when the list order/membership changes, never on
+  // scroll-frame re-renders.
+  orderDep: unknown
+  // Moved more than one slot this commit (a row pinned to the top): it rides
+  // above the one-slot shifters it crosses.
+  traveled: boolean
+  onToggle: (job: Job) => void
+  onOpen: (job: Job) => void
+  onTogglePin: (job: Job) => void
+}) {
+  // True while a reorder glide is in flight — rows turn opaque so crossing
+  // rows don't read through each other.
+  const [flying, setFlying] = useState(false)
+  return (
+    <motion.tbody
+      data-index={index}
+      ref={measureRef}
+      // Rows are table-flow (no transforms to animate like the property
+      // cards), so reorders glide via framer's FLIP layout animation —
+      // position only, same spring as the cards.
+      layout="position"
+      layoutDependency={orderDep}
+      transition={REORDER_SPRING}
+      onLayoutAnimationStart={() => setFlying(true)}
+      onLayoutAnimationComplete={() => setFlying(false)}
+      className={flying ? `jc-row-flying${traveled ? " jc-row-traveler" : ""}` : undefined}
+    >
+      {/* The project row is unchanged on open/close — it just takes the same
+          quiet ink wash as an open property card and the chevron rotates. */}
+      <tr
+        className={`spend-rank-table-row${isOpen ? " jc-row-open" : ""}${pinned ? " jc-row-pinned" : ""}`}
+        onClick={() => onToggle(job)}
+        role="button"
+        tabIndex={0}
+        aria-expanded={isOpen}
+        onKeyDown={(e) => e.key === "Enter" && onToggle(job)}
+      >
+        <td className="jc-expand-chevron-cell">
+          <ChevronRight size={14} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
+        </td>
+        <td className="spend-rank-table-name jc-name-col">
+          <div className="body-text emphasized jc-name-text" title={job.name}>{job.name}</div>
+          {/* When the Status column is dropped for width, the badge folds
+              into a sub-line (mirrors the mobile list) so status stays
+              visible. */}
+          {!showStatus && (
+            <div className="cell-secondary jc-name-sub">
+              <span className={`status-badge status-${job.status}`}>
+                {STATUS_LABELS[job.status] ?? job.status}
+              </span>
+            </div>
+          )}
+        </td>
+        {showStatus && (
+          <td className="spend-rank-table-name">
+            <span className={`status-badge status-${job.status}`}>
+              {STATUS_LABELS[job.status] ?? job.status}
+            </span>
+          </td>
+        )}
+        {showPM && (
+          <td className="spend-rank-table-name jc-pm-col">
+            <div className="body-text text-secondary jc-pm-text" title={job.supervisor || undefined}>
+              {job.supervisor || "—"}
+            </div>
+          </td>
+        )}
+        {showContract && (
+          <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.contract)}</td>
+        )}
+        {showBudget && (
+          <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.budget)}</td>
+        )}
+        <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.totalCost)}</td>
+        {showVariance && (
+          <td
+            className="spend-rank-table-value body-text emphasized"
+            style={{
+              color:
+                !marginColorsOn || job.margin == null
+                  ? undefined
+                  : marginTextColor(job.margin),
+            }}
+          >
+            {formatMoneyFull(job.variance)}
+          </td>
+        )}
+        <td
+          className="spend-rank-table-value body-text emphasized"
+          style={{
+            color:
+              !marginColorsOn || job.margin == null
+                ? undefined
+                : marginTextColor(job.margin),
+          }}
+        >
+          {job.margin == null ? "—" : `${job.margin.toFixed(1)}%`}
+        </td>
+        <td className="spend-rank-table-name jc-view-cell">
+          {/* Same pin control as the property cards: neutral tile, copper
+              when pinned, icon pop on pin while the row travels to the top.
+              stopPropagation on click AND keydown — the row itself is a
+              role=button that would otherwise toggle open. */}
+          <button
+            type="button"
+            className={`jc-pin-btn jc-row-pin${pinned ? " jc-pin-btn-active" : ""}`}
+            aria-pressed={pinned}
+            aria-label={pinned ? "Unpin project" : "Pin project to top"}
+            title={pinned ? "Pinned — click to unpin" : "Pin to top"}
+            onClick={(e) => {
+              e.stopPropagation()
+              onTogglePin(job)
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            <motion.span
+              className="jc-pin-icon"
+              initial={false}
+              animate={{ scale: pinned ? [1, 1.35, 1] : 1 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+            >
+              <Pin size={13} />
+            </motion.span>
+          </button>
+          <button
+            type="button"
+            className="jc-view-tile"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpen(job)
+            }}
+            title="Open full report"
+            aria-label="Open full report"
+          >
+            View <ExternalLink size={13} />
+          </button>
+        </td>
+      </tr>
+      {/* The detail panel opens/closes as an animated reveal (same timing as
+          a property card body). A <tr> can't animate height, so the motion
+          div lives inside the cell and the row collapses with it; the tr
+          itself stays mounted through AnimatePresence until the exit
+          finishes, keeping the ink frame around the shrinking panel. */}
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <tr key="expand" className="jc-expand-row">
+            <td colSpan={visibleColumnCount}>
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
+                style={{ overflow: "hidden" }}
+              >
+                <JobExpandedPanel job={job} detail={detail} marginColorsOn={marginColorsOn} />
+              </motion.div>
+            </td>
+          </tr>
+        )}
+      </AnimatePresence>
+    </motion.tbody>
+  )
+})
+
+// The Project (flat) view table, self-contained so the row virtualizer's
+// scroll-driven re-renders stay inside it — when it lived in Jobcost, every
+// scroll frame re-rendered the whole page (command bar included), and the
+// inline wrapper ref re-wired the width ResizeObserver per frame.
+function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, onSort, openJobKey, details, pins, onToggleExpand, onOpenJob, onTogglePin }: {
+  jobs: Job[]
+  isManager: boolean
+  marginColorsOn: boolean
+  sortKey: SortKey | null
+  sortDir: SortDir
+  onSort: (key: SortKey) => void
+  openJobKey: string | null
+  details: Record<string, JobDetail | "loading">
+  pins: string[]
+  onToggleExpand: (job: Job) => void
+  onOpenJob: (job: Job) => void
+  onTogglePin: (job: Job) => void
+}) {
+  // Fit-driven column visibility (see HIDE_ORDER above): `hiddenCount` is how
+  // deep into the hide order we currently are.
+  const [observeWrapWidth, tableWidth] = useElementWidth()
+  const wrapElRef = useRef<HTMLDivElement | null>(null)
+  const [scroller, setScroller] = useState<HTMLElement | null>(null)
+  const [scrollMargin, setScrollMargin] = useState(0)
+  const [hiddenCount, setHiddenCount] = useState(0)
+  // Container width at the moment each hide happened, indexed by the hide
+  // level it created — the re-show hysteresis marks.
+  const hidAtWidthRef = useRef<number[]>([])
+
+  // Stable callback ref: feeds the width observer, the overflow check, and
+  // the virtualizer's scroll-element/offset resolution exactly once per
+  // mount/unmount (an inline ref here re-ran all of it every render).
+  const tableWrapRef = useCallback((el: HTMLDivElement | null) => {
+    wrapElRef.current = el
+    observeWrapWidth(el)
+    if (el) {
+      const sc = (el.closest(".page") as HTMLElement) ?? null
+      setScroller(sc)
+      if (sc) {
+        const sr = sc.getBoundingClientRect()
+        const er = el.getBoundingClientRect()
+        setScrollMargin(Math.max(0, Math.round(er.top - sr.top + sc.scrollTop)))
+      }
+    }
+  }, [observeWrapWidth])
+
+  // Managers never get a Contract column, so it isn't part of their sequence.
+  const hideOrder: readonly HideableCol[] = isManager
+    ? HIDE_ORDER.filter((c) => c !== "contract")
+    : HIDE_ORDER
+  const hiddenCols = new Set<HideableCol>(hideOrder.slice(0, hiddenCount))
+  const showContract = !isManager && !hiddenCols.has("contract")
+  const showPM = !hiddenCols.has("supervisor")
+  const showStatus = !hiddenCols.has("status")
+  const showVariance = !hiddenCols.has("variance")
+  const showBudget = !hiddenCols.has("budget")
+  // Chevron + Project + Cost + Margin + View always render; the rest count
+  // only when visible. Drives the expanded panel's colSpan.
+  const visibleColumnCount =
+    5 +
+    (showContract ? 1 : 0) +
+    (showPM ? 1 : 0) +
+    (showStatus ? 1 : 0) +
+    (showVariance ? 1 : 0) +
+    (showBudget ? 1 : 0)
+
+  // Re-measure only when fit inputs actually change — running this on every
+  // commit forced a synchronous reflow per scroll frame (the stutter). Each
+  // pass changes hiddenCount by at most one; setState from a layout effect
+  // re-renders synchronously, so a cascade of hides settles before paint.
+  useLayoutEffect(() => {
+    const wrap = wrapElRef.current
+    if (!wrap || tableWidth == null) return
+    const overflow = wrap.scrollWidth - wrap.clientWidth
+    if (overflow > 1 && hiddenCount < hideOrder.length) {
+      hidAtWidthRef.current[hiddenCount] = tableWidth
+      setHiddenCount(hiddenCount + 1)
+    } else if (
+      hiddenCount > 0 &&
+      tableWidth > (hidAtWidthRef.current[hiddenCount - 1] ?? Number.POSITIVE_INFINITY) + RESHOW_BUFFER
+    ) {
+      setHiddenCount(hiddenCount - 1)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableWidth, hiddenCount, jobs, isManager])
+
+  // Widest rendered content per column across the FULL dataset. Auto table
+  // layout sizes columns from mounted content only, and the virtualizer
+  // mounts a sliding window of rows — so as scrolling swapped rows in and
+  // out, every column (and the flexible Project column with them) re-flowed.
+  // An always-mounted zero-height sizer row carries these values so column
+  // widths are pinned to the dataset maximum no matter which rows are live.
+  const sizer = useMemo(() => {
+    const longest = (vals: string[]) => vals.reduce((a, b) => (b.length > a.length ? b : a), "")
+    return {
+      status: longest(jobs.map((j) => STATUS_LABELS[j.status] ?? String(j.status))),
+      contract: longest(jobs.map((j) => formatMoneyFull(j.contract))),
+      budget: longest(jobs.map((j) => formatMoneyFull(j.budget))),
+      cost: longest(jobs.map((j) => formatMoneyFull(j.totalCost))),
+      variance: longest(jobs.map((j) => formatMoneyFull(j.variance))),
+      margin: longest(jobs.map((j) => (j.margin == null ? "—" : `${j.margin.toFixed(1)}%`))),
+    }
+  }, [jobs])
+
+  // Each item is a <tbody> holding the row plus its optional expanded panel,
+  // so measurement covers the open panel too.
+  const rowVirtualizer = useVirtualizer({
+    count: jobs.length,
+    getScrollElement: () => scroller,
+    estimateSize: () => 46,
+    overscan: 6,
+    scrollMargin,
+    getItemKey: (i) => jobs[i].recnum,
+  })
+  const virtualRows = rowVirtualizer.getVirtualItems()
+  // Same tell as PropertyList: each key's index is recorded after every
+  // commit, and a >1-slot index change on the next render marks a long-haul
+  // traveler (a row pinned to the top) that should ride above the one-slot
+  // shifters it crosses mid-glide.
+  const prevIndexRef = useRef(new Map<string, number>())
+  useEffect(() => {
+    const m = prevIndexRef.current
+    m.clear()
+    jobs.forEach((j, i) => m.set(j.recnum, i))
+  })
+  // item.start includes scrollMargin; getTotalSize() excludes it. Rounded:
+  // measured offsets are fractional, and fractional spacer heights make the
+  // table wrapper ~1px scrollable (phantom inner scrollbar).
+  const padTop = virtualRows.length ? Math.max(0, Math.round(virtualRows[0].start - scrollMargin)) : 0
+  const padBottom = virtualRows.length
+    ? Math.max(0, Math.round(rowVirtualizer.getTotalSize() - (virtualRows[virtualRows.length - 1].end - scrollMargin)))
+    : 0
+
+  return (
+    <div className="jc-table-wrap" ref={tableWrapRef}>
+      <table className="spend-rank-table">
+        <thead>
+          <tr>
+            <th className="spend-rank-table-name jc-expand-th" aria-hidden="true" />
+            <SortTh col="name" label="Project" className="jc-name-col" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            {showStatus && (
+              <SortTh col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            )}
+            {showPM && (
+              <SortTh col="supervisor" label="PM" className="jc-pm-col" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            )}
+            {showContract && (
+              <SortTh col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            )}
+            {showBudget && (
+              <SortTh col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            )}
+            <SortTh col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            {showVariance && (
+              <SortTh
+                col="variance"
+                label={showPM ? "Budget Variance" : "Variance"}
+                align="right"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onSort={onSort}
+              />
+            )}
+            <SortTh col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            <th className="spend-rank-table-name jc-view-th" aria-label="Actions" />
+          </tr>
+        </thead>
+        {/* Zero-height sizer row (see `sizer` above): same cell classes as a
+            real row so fonts/padding match, content hidden inside height-0
+            wrappers so it adds no visual height. */}
+        <tbody aria-hidden="true" className="jc-sizer-body">
+          <tr>
+            <td className="jc-expand-chevron-cell" />
+            <td className="spend-rank-table-name jc-name-col" />
+            {showStatus && (
+              <td className="spend-rank-table-name">
+                <div className="jc-sizer-content">
+                  <span className="status-badge">{sizer.status}</span>
+                </div>
+              </td>
+            )}
+            {showPM && <td className="spend-rank-table-name jc-pm-col" />}
+            {showContract && (
+              <td className="spend-rank-table-value body-text emphasized">
+                <div className="jc-sizer-content">{sizer.contract}</div>
+              </td>
+            )}
+            {showBudget && (
+              <td className="spend-rank-table-value body-text emphasized">
+                <div className="jc-sizer-content">{sizer.budget}</div>
+              </td>
+            )}
+            <td className="spend-rank-table-value body-text emphasized">
+              <div className="jc-sizer-content">{sizer.cost}</div>
+            </td>
+            {showVariance && (
+              <td className="spend-rank-table-value body-text emphasized">
+                <div className="jc-sizer-content">{sizer.variance}</div>
+              </td>
+            )}
+            <td className="spend-rank-table-value body-text emphasized">
+              <div className="jc-sizer-content">{sizer.margin}</div>
+            </td>
+            <td className="spend-rank-table-name jc-view-cell" />
+          </tr>
+        </tbody>
+        {/* Virtualized: spacer bodies stand in for off-screen rows. */}
+        <tbody aria-hidden="true">
+          <tr style={{ height: padTop }} />
+        </tbody>
+        {virtualRows.map((vi) => {
+          const job = jobs[vi.index]
+          const prevIndex = prevIndexRef.current.get(job.recnum)
+          return (
+            <JobRow
+              key={job.recnum}
+              job={job}
+              isOpen={openJobKey === job.recnum}
+              detail={details[job.recnum]}
+              index={vi.index}
+              orderDep={jobs}
+              traveled={prevIndex !== undefined && Math.abs(prevIndex - vi.index) > 1}
+              measureRef={rowVirtualizer.measureElement}
+              showContract={showContract}
+              showBudget={showBudget}
+              showPM={showPM}
+              showStatus={showStatus}
+              showVariance={showVariance}
+              visibleColumnCount={visibleColumnCount}
+              marginColorsOn={marginColorsOn}
+              pinned={pins.includes(job.recnum)}
+              onToggle={onToggleExpand}
+              onOpen={onOpenJob}
+              onTogglePin={onTogglePin}
+            />
+          )
+        })}
+        <tbody aria-hidden="true">
+          <tr style={{ height: padBottom }} />
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -560,88 +1456,65 @@ export default function Jobcost() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [filterSheetOpen, setFilterSheetOpen] = useState(false)
-  const [sortKey, setSortKey] = useState<SortKey>("name")
+  // null = unsorted (default name order); each header cycles through its
+  // default direction → reversed → cleared on repeated clicks.
+  const [sortKey, setSortKey] = useState<SortKey | null>("name")
   const [sortDir, setSortDir] = useState<SortDir>("asc")
+  const [groupSort, setGroupSort] = useState<GroupSortKey>("name")
+  const [groupSortDir, setGroupSortDir] = useState<SortDir>("asc")
+  // Pinned property keys (Group.key = Sage parent string), in pin order.
+  // Stale keys (properties absent this year, or gone entirely) are harmless —
+  // the partition below simply never matches them.
+  const [pins, setPins] = useLocalStorage<string[]>("jobcostPinnedProperties", [])
+  // Project-view pins, keyed by recnum (its own list — a pinned property and
+  // a pinned project are different objects, so they don't share keys).
+  const [projectPins, setProjectPins] = useLocalStorage<string[]>("jobcostPinnedProjects", [])
+  // One-time repair: a since-fixed replay bug in useLocalStorage could
+  // double-apply pin toggles and leave duplicate keys behind; a duplicate
+  // skews the pin-order ranking (Map keeps the LAST index per key).
+  useEffect(() => {
+    setPins((prev) => {
+      const uniq = [...new Set(prev)]
+      return uniq.length === prev.length ? prev : uniq
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // Single-open everywhere: at most one list row and one property card are
+  // expanded at a time, and within an open property at most one sub-card
+  // (phases OR one-offs).
+  const [openJobKey, setOpenJobKey] = useState<string | null>(null)
   const [details, setDetails] = useState<Record<string, JobDetail | "loading">>({})
-  // Grouped view: which parents are open, and which single sub-card (phases
-  // OR one-offs) is open within each.
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
-  const [openKinds, setOpenKinds] = useState<Record<string, "phases" | "oneoffs" | null>>({})
+  const [openGroupKey, setOpenGroupKey] = useState<string | null>(null)
+  const [openKind, setOpenKind] = useState<"phases" | "oneoffs" | null>(null)
+  // The property cards' blur-in stagger plays once per page visit; re-entering
+  // the view via the toggle relies on the crossfade alone.
+  const entrancePlayedRef = useRef(false)
 
   const grouped = viewMode === "grouped" && !isMobile
+  // Content lags the toggle by one concurrent render: the seg thumb and click
+  // feedback stay instant while the heavy list/table swap renders in the
+  // background instead of blocking the frame.
+  const deferredViewMode = useDeferredValue(viewMode)
+  const groupedContent = deferredViewMode === "grouped" && !isMobile
 
-  // Fit-driven column visibility for the list view (see HIDE_ORDER above).
-  // `hiddenCount` is how deep into the hide order we currently are; the layout
-  // effect below nudges it up/down one column per commit until the Project
-  // column is readable.
-  const [observeWrapWidth, tableWidth] = useElementWidth()
-  const wrapElRef = useRef<HTMLDivElement | null>(null)
-  // One callback ref feeds both the width observer and the overflow check.
-  const tableWrapRef = (el: HTMLDivElement | null) => {
-    wrapElRef.current = el
-    observeWrapWidth(el)
-  }
-  const [hiddenCount, setHiddenCount] = useState(0)
-  // Container width at the moment each hide happened, indexed by the hide
-  // level it created — the re-show hysteresis marks.
-  const hidAtWidthRef = useRef<number[]>([])
-  // Managers never get a Contract column, so it isn't part of their sequence.
-  const hideOrder: readonly HideableCol[] = isManager
-    ? HIDE_ORDER.filter((c) => c !== "contract")
-    : HIDE_ORDER
-  const hiddenCols = new Set<HideableCol>(hideOrder.slice(0, hiddenCount))
-  const showContract = !isManager && !hiddenCols.has("contract")
-  const showPM = !hiddenCols.has("supervisor")
-  const showStatus = !hiddenCols.has("status")
-  const showVariance = !hiddenCols.has("variance")
-  const showBudget = !hiddenCols.has("budget")
-  // Once Status drops, the View button goes icon-only too.
-  const compactActions = !showStatus
-  // Chevron + Project + Cost + Margin + View always render; the rest count
-  // only when visible. Drives the expanded panel's colSpan.
-  const visibleColumnCount =
-    5 +
-    (showContract ? 1 : 0) +
-    (showPM ? 1 : 0) +
-    (showStatus ? 1 : 0) +
-    (showVariance ? 1 : 0) +
-    (showBudget ? 1 : 0)
-
-  // Deliberately no dependency array: this must re-measure after *every*
-  // commit that could change the layout (data, filters, width, hides). Each
-  // pass changes hiddenCount by at most one — setState from a layout effect
-  // re-renders synchronously, so a cascade of hides settles before paint and
-  // never flashes. Termination: hides are capped at hideOrder.length, and a
-  // re-show that immediately re-squeezes re-records the *current* width as
-  // its mark, which the re-show condition can't beat without real growth.
-  // Grouped view skips it (no hideable columns rendered there).
-  useLayoutEffect(() => {
-    if (grouped) return
-    const wrap = wrapElRef.current
-    if (!wrap || tableWidth == null) return
-    const overflow = wrap.scrollWidth - wrap.clientWidth
-    if (overflow > 1 && hiddenCount < hideOrder.length) {
-      hidAtWidthRef.current[hiddenCount] = tableWidth
-      setHiddenCount(hiddenCount + 1)
-    } else if (
-      hiddenCount > 0 &&
-      tableWidth > (hidAtWidthRef.current[hiddenCount - 1] ?? Number.POSITIVE_INFINITY) + RESHOW_BUFFER
-    ) {
-      setHiddenCount(hiddenCount - 1)
-    }
-  })
+  // Mark the entrance as spent once the property view has shown anything —
+  // including the ghost-card skeleton, which plays the blur-in stagger itself.
+  // The real cards then arrive via the crossfade alone, already in place,
+  // instead of re-blurring on top of it.
+  useEffect(() => {
+    if (groupedContent) entrancePlayedRef.current = true
+  }, [groupedContent])
 
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true)
     // A new year reloads the list, so drop any open rows + cached detail.
-    setExpanded(new Set())
+    setOpenJobKey(null)
     setDetails({})
-    setExpandedGroups(new Set())
-    setOpenKinds({})
+    setOpenGroupKey(null)
+    setOpenKind(null)
     // yearFlag: fetch the all-time list with a per-row yearActive bit instead
     // of a server-filtered year subset (see the header comment). allProjects
     // is a manager-only hint: when on, the backend drops the PM scoping and
@@ -693,53 +1566,86 @@ export default function Jobcost() {
   }
 
   function toggleExpand(job: Job) {
-    const willOpen = !expanded.has(job.recnum)
+    const willOpen = openJobKey !== job.recnum
     // Count an inline expand as a "widget"-source project view (distinct from a
     // full job-detail page open). Only on open, and use jobNumber so it groups
     // with page opens under the same recnum.
-    if (willOpen) trackProjectView(job.jobNumber, job.name, "widget")
-    setExpanded((prev) => {
-      const next = new Set(prev)
-      if (next.has(job.recnum)) {
-        next.delete(job.recnum)
-      } else {
-        next.add(job.recnum)
-        if (!details[job.recnum]) loadDetail(job)
-      }
-      return next
-    })
+    if (willOpen) {
+      trackProjectView(job.jobNumber, job.name, "widget")
+      if (!details[job.recnum]) loadDetail(job)
+    }
+    setOpenJobKey(willOpen ? job.recnum : null)
   }
 
-  function toggleGroupExpand(group: Group) {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev)
-      if (next.has(group.key)) next.delete(group.key)
-      else next.add(group.key)
-      return next
-    })
+  function openJob(job: Job) {
+    goToJobcost(job.jobNumber)
   }
 
-  function toggleKind(groupKey: string, kind: "phases" | "oneoffs") {
+  function toggleGroup(group: Group) {
+    setOpenGroupKey((k) => (k === group.key ? null : group.key))
+    setOpenKind(null)
+  }
+
+  function toggleKind(kind: "phases" | "oneoffs") {
     // Radio-with-off behavior: clicking the open card closes it, clicking the
     // other swaps to it.
-    setOpenKinds((prev) => ({ ...prev, [groupKey]: prev[groupKey] === kind ? null : kind }))
+    setOpenKind((k) => (k === kind ? null : kind))
+  }
+
+  // Head chips ("3 Phases ›") jump straight to that section of the card.
+  function openWithKind(group: Group, kind: "phases" | "oneoffs") {
+    setOpenGroupKey(group.key)
+    setOpenKind(kind)
+  }
+
+  function handleGroupSortKey(key: GroupSortKey) {
+    setGroupSort(key)
+    // Text sorts read A-Z; numeric sorts lead with the biggest.
+    setGroupSortDir(key === "name" || key === "client" ? "asc" : "desc")
+  }
+
+  function togglePin(group: Group) {
+    setPins((prev) => (prev.includes(group.key) ? prev.filter((k) => k !== group.key) : [...prev, group.key]))
+  }
+
+  function togglePinProject(job: Job) {
+    setProjectPins((prev) =>
+      prev.includes(job.recnum) ? prev.filter((k) => k !== job.recnum) : [...prev, job.recnum],
+    )
   }
 
   function handleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
-    } else {
+    // Text columns default asc, numeric columns default desc.
+    const defaultDir: SortDir = key === "name" || key === "supervisor" ? "asc" : "desc"
+    if (sortKey !== key) {
       setSortKey(key)
-      // Text columns default asc, numeric columns default desc.
-      setSortDir(key === "name" || key === "supervisor" ? "asc" : "desc")
+      setSortDir(defaultDir)
+    } else if (sortDir === defaultDir) {
+      setSortDir(defaultDir === "asc" ? "desc" : "asc")
+    } else {
+      // Third click clears the sort back to the default order.
+      setSortKey(null)
     }
+  }
+
+  // Closed marks jobs from previous years that are fully wrapped up, so it
+  // can't apply to anything in the CURRENT calendar year — hide Closed rows
+  // (and the filter option) only there. Previous years and All Time show
+  // Closed jobs as normal.
+  const thisYear = new Date().getFullYear()
+  const hideClosed = year === thisYear
+
+  function handleYearChange(y: number | null) {
+    setYear(y)
+    // Don't strand the user on a filter that can no longer match anything.
+    if (y === thisYear && statusFilter === 6) setStatusFilter("all")
   }
 
   // List view rows: scope to the selected year (yearActive is always true on
   // an All Time fetch), then status + search + sort.
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
-    let list = jobs.filter((j) => j.yearActive)
+    let list = jobs.filter((j) => j.yearActive && !(hideClosed && j.status === 6))
     if (statusFilter !== "all") list = list.filter((j) => j.status === statusFilter)
     if (q)
       list = list.filter(
@@ -748,7 +1654,9 @@ export default function Jobcost() {
           j.jobNumber?.toLowerCase().includes(q) ||
           j.supervisor?.toLowerCase().includes(q),
       )
-    return [...list].sort((a, b) => {
+    const sorted = [...list].sort((a, b) => {
+      // Cleared sort = the default name order.
+      if (sortKey == null) return a.name.localeCompare(b.name)
       const dir = sortDir === "asc" ? 1 : -1
       if (sortKey === "name") return a.name.localeCompare(b.name) * dir
       if (sortKey === "supervisor") return (a.supervisor ?? "").localeCompare(b.supervisor ?? "") * dir
@@ -762,13 +1670,43 @@ export default function Jobcost() {
       const bm = b.margin == null ? Number.NEGATIVE_INFINITY : b.margin
       return (am - bm) * dir
     })
-  }, [jobs, search, statusFilter, sortKey, sortDir])
+    // Same pin rule as the property view: pinned projects float to the top
+    // in pin order, but only while the view sits at its defaults (no sort or
+    // the equivalent explicit name-asc counts as default).
+    const defaultOrder = sortKey == null || (sortKey === "name" && sortDir === "asc")
+    if (!(defaultOrder && search === "" && statusFilter === "all") || projectPins.length === 0)
+      return sorted
+    const rank = new Map(projectPins.map((k, i) => [k, i] as const))
+    const pinnedRows: Job[] = []
+    const rest: Job[] = []
+    for (const j of sorted) (rank.has(j.recnum) ? pinnedRows : rest).push(j)
+    pinnedRows.sort((a, b) => rank.get(a.recnum)! - rank.get(b.recnum)!)
+    return [...pinnedRows, ...rest]
+  }, [jobs, search, statusFilter, sortKey, sortDir, hideClosed, projectPins])
+
+  // Pins only privilege ordering while the command bar sits at its defaults.
+  // Any sort/search/filter dissolves them into the list as ordinary rows
+  // (still marked); the Reset button returns here and floats them back up.
+  const isDefaultView = groupSort === "name" && groupSortDir === "asc" && search === "" && statusFilter === "all"
+  const isListDefaultView =
+    (sortKey == null || (sortKey === "name" && sortDir === "asc")) && search === "" && statusFilter === "all"
+
+  function resetView() {
+    setGroupSort("name")
+    setGroupSortDir("asc")
+    setSortKey("name")
+    setSortDir("asc")
+    setSearch("")
+    setStatusFilter("all")
+  }
 
   // Grouped view: a parent qualifies if ANY member was active in the selected
   // year, but its stats/counts always cover the full all-time membership.
   const filteredGroups = useMemo(() => {
     const q = search.toLowerCase()
-    let list = buildGroups(jobs).filter((g) => g.yearActive)
+    // Same current-year rule as the list view: a fully-closed property (every
+    // member Closed) can't belong to the current calendar year.
+    let list = buildGroups(jobs).filter((g) => g.yearActive && !(hideClosed && g.status === 6))
     if (statusFilter !== "all") list = list.filter((g) => g.status === statusFilter)
     if (q)
       list = list.filter(
@@ -779,117 +1717,214 @@ export default function Jobcost() {
             (m) => m.name?.toLowerCase().includes(q) || m.jobNumber?.toLowerCase().includes(q),
           ),
       )
-    return [...list].sort((a, b) => {
-      const dir = sortDir === "asc" ? 1 : -1
-      if (sortKey === "name" || sortKey === "supervisor" || sortKey === "variance")
-        return a.key.localeCompare(b.key) * dir
-      if (sortKey === "status") return (a.status - b.status) * dir
-      if (sortKey === "contract") return (a.contract - b.contract) * dir
-      if (sortKey === "totalCost") return (a.totalCost - b.totalCost) * dir
-      if (sortKey === "budget") return (a.budget - b.budget) * dir
-      const am = a.margin == null ? Number.NEGATIVE_INFINITY : a.margin
-      const bm = b.margin == null ? Number.NEGATIVE_INFINITY : b.margin
-      return (am - bm) * dir
+    const sorted = [...list].sort((a, b) => {
+      const dir = groupSortDir === "asc" ? 1 : -1
+      let cmp = 0
+      if (groupSort === "volume") cmp = a.contract - b.contract
+      else if (groupSort === "phases") cmp = a.phases.length - b.phases.length
+      else if (groupSort === "projects") cmp = a.oneoffs.length - b.oneoffs.length
+      else if (groupSort === "client") {
+        // Clientless properties sink to the end regardless of direction.
+        if (!a.client !== !b.client) return a.client ? -1 : 1
+        cmp = a.client.localeCompare(b.client)
+      } else if (groupSort === "margin") {
+        // Null margins sink to the end regardless of direction.
+        const am = a.margin == null ? Number.NEGATIVE_INFINITY : a.margin
+        const bm = b.margin == null ? Number.NEGATIVE_INFINITY : b.margin
+        cmp = am - bm
+      } else {
+        cmp = a.key.localeCompare(b.key)
+      }
+      // Name breaks ties so equal counts keep a stable, scannable order.
+      return cmp * dir || a.key.localeCompare(b.key)
     })
-  }, [jobs, search, statusFilter, sortKey, sortDir])
+    // Default view only: pinned properties float to the top in pin order
+    // (drag-reorderable); everything else keeps the name sort below them.
+    if (!isDefaultView || pins.length === 0) return sorted
+    const rank = new Map(pins.map((k, i) => [k, i] as const))
+    const pinned: Group[] = []
+    const rest: Group[] = []
+    for (const g of sorted) (rank.has(g.key) ? pinned : rest).push(g)
+    pinned.sort((a, b) => rank.get(a.key)! - rank.get(b.key)!)
+    return [...pinned, ...rest]
+  }, [jobs, search, statusFilter, groupSort, groupSortDir, hideClosed, pins, isDefaultView])
 
-  const resultCount = grouped ? filteredGroups.length : filtered.length
-  const resultNoun = grouped
-    ? resultCount === 1 ? "project" : "projects"
-    : resultCount === 1 ? "job" : "jobs"
+  const resultCount = groupedContent ? filteredGroups.length : filtered.length
+  const resultNoun = groupedContent
+    ? resultCount === 1 ? "Property" : "Properties"
+    : resultCount === 1 ? "Project" : "Projects"
+  const searchPlaceholder = grouped ? "Search properties..." : "Search projects..."
 
   return (
-    <Page title="Job Costing" actions={<YearSelector value={year} onChange={setYear} allowAllTime />}>
+    <Page title="Job Costing" actions={<YearSelector value={year} onChange={handleYearChange} allowAllTime />}>
       <MotionList className="inv-page-stack">
-        <MotionItem>
-          {/* No `loading`/`noData` on the Widget: those swap the whole body for a
-              skeleton, which would take the toolbar (view toggle, search,
-              filters) with it. Keep the toolbar mounted and skeleton only the
-              data region below so the navbar stays put across reloads/toggles. */}
-          <Widget className={`co-widget${grouped ? " jc-toolbar-only" : ""}`}>
-            <div className="co-widget-toolbar">
-              {!isMobile && (
-                <div
-                  className="period-selector period-selector--equal jc-scope-toggle"
-                  role="tablist"
-                  aria-label="View mode"
+        {/* Desktop command bar: a dark control deck, deliberately a different
+            surface from the white property cards below it. Stays mounted
+            across loading/view swaps so the controls never jump. */}
+        {!isMobile && (
+          <MotionItem>
+            <div className="jc-command-bar">
+              <div className="jc-seg" role="tablist" aria-label="View mode">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={grouped}
+                  className={`jc-seg-btn${grouped ? " jc-seg-btn-active" : ""}`}
+                  onClick={() => setViewMode("grouped")}
                 >
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={grouped}
-                    className={`period-selector-btn${grouped ? " period-selector-btn--active" : ""}`}
-                    onClick={() => setViewMode("grouped")}
-                  >
-                    Projects
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={!grouped}
-                    className={`period-selector-btn${!grouped ? " period-selector-btn--active" : ""}`}
-                    onClick={() => setViewMode("list")}
-                  >
-                    All Jobs
-                  </button>
-                </div>
-              )}
-              {!isMobile && (
-                <select
-                  className="year-selector jc-status-select"
-                  value={String(statusFilter)}
-                  onChange={(e) => setStatusFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
-                  aria-label="Filter by status"
+                  {grouped && <motion.span layoutId="jcViewThumb" className="jc-seg-thumb" transition={SEG_SPRING} />}
+                  <span className="jc-seg-label">Property</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={!grouped}
+                  className={`jc-seg-btn${!grouped ? " jc-seg-btn-active" : ""}`}
+                  onClick={() => setViewMode("list")}
                 >
-                  {STATUS_OPTIONS.map((o) => (
-                    <option key={String(o.key)} value={String(o.key)}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {isManager && !isMobile && (
-                <div
-                  className="period-selector period-selector--equal jc-scope-toggle"
-                  role="tablist"
-                  aria-label="Project scope"
-                >
+                  {!grouped && <motion.span layoutId="jcViewThumb" className="jc-seg-thumb" transition={SEG_SPRING} />}
+                  <span className="jc-seg-label">Project</span>
+                </button>
+              </div>
+              <span className="jc-cb-divider" aria-hidden="true" />
+              {isManager && (
+                <div className="jc-seg" role="tablist" aria-label="Project scope">
                   <button
                     type="button"
                     role="tab"
                     aria-selected={!showAllProjects}
-                    className={`period-selector-btn${!showAllProjects ? " period-selector-btn--active" : ""}`}
+                    className={`jc-seg-btn${!showAllProjects ? " jc-seg-btn-active" : ""}`}
                     onClick={() => setShowAllProjects(false)}
                   >
-                    My Projects
+                    {!showAllProjects && (
+                      <motion.span layoutId="jcScopeThumb" className="jc-seg-thumb" transition={SEG_SPRING} />
+                    )}
+                    <span className="jc-seg-label">Mine</span>
                   </button>
                   <button
                     type="button"
                     role="tab"
                     aria-selected={showAllProjects}
-                    className={`period-selector-btn${showAllProjects ? " period-selector-btn--active" : ""}`}
+                    className={`jc-seg-btn${showAllProjects ? " jc-seg-btn-active" : ""}`}
                     onClick={() => setShowAllProjects(true)}
                   >
-                    All Projects
+                    {showAllProjects && (
+                      <motion.span layoutId="jcScopeThumb" className="jc-seg-thumb" transition={SEG_SPRING} />
+                    )}
+                    <span className="jc-seg-label">All</span>
                   </button>
                 </div>
               )}
+              <span className="jc-cb-select-wrap">
+                <select
+                  className="jc-cb-select"
+                  value={String(statusFilter)}
+                  onChange={(e) => setStatusFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
+                  aria-label="Filter by status"
+                >
+                  {STATUS_OPTIONS.filter((o) => !hideClosed || o.key !== 6).map((o) => (
+                    <option key={String(o.key)} value={String(o.key)}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={12} className="jc-cb-select-arrow" />
+              </span>
+              {grouped && (
+                /* Sort select + direction share one joined control so the
+                   arrow reads as part of the sort, not a stray button. The
+                   direction half says what it does in words ("A-Z" /
+                   "High-Low"), not just an arrow glyph. */
+                <span className="jc-cb-sort">
+                  <span className="jc-cb-select-wrap">
+                    <select
+                      className="jc-cb-select jc-cb-sort-select"
+                      value={groupSort}
+                      onChange={(e) => handleGroupSortKey(e.target.value as GroupSortKey)}
+                      aria-label="Sort properties"
+                    >
+                      {GROUP_SORT_OPTIONS.filter((o) => !isManager || o.key !== "volume").map((o) => (
+                        <option key={o.key} value={o.key}>
+                          Sort: {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={12} className="jc-cb-select-arrow" />
+                  </span>
+                  <button
+                    type="button"
+                    className="jc-cb-dir"
+                    onClick={() => setGroupSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                    aria-label={groupSortDir === "asc" ? "Sorted ascending, switch to descending" : "Sorted descending, switch to ascending"}
+                    title="Reverse sort order"
+                  >
+                    {groupSortDir === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />}
+                    <AnimatedWidth>
+                      <span className="jc-cb-dir-label">
+                        {groupSort === "name" || groupSort === "client"
+                          ? groupSortDir === "asc" ? "A-Z" : "Z-A"
+                          : groupSortDir === "asc" ? "Low-High" : "High-Low"}
+                      </span>
+                    </AnimatedWidth>
+                  </button>
+                </span>
+              )}
+              <AnimatePresence initial={false}>
+                {(grouped ? !isDefaultView : !isListDefaultView) && (
+                  /* Back-to-default: clears sort, search, and status in one go,
+                     which also floats any pinned properties/projects back to
+                     the top of their view. */
+                  <motion.button
+                    key="jc-cb-reset"
+                    type="button"
+                    className="jc-cb-dir"
+                    onClick={resetView}
+                    title="Clear sort, search, and filters"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                  >
+                    <RotateCcw size={13} />
+                    <span>Reset</span>
+                  </motion.button>
+                )}
+              </AnimatePresence>
+              <div className="jc-cb-search">
+                <Search size={14} className="jc-cb-search-icon" />
+                <input
+                  className="jc-cb-search-input"
+                  type="text"
+                  placeholder={searchPlaceholder}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <span className="jc-cb-count">
+                <span className="jc-cb-count-num">{resultCount}</span> {resultNoun}
+              </span>
+            </div>
+          </MotionItem>
+        )}
+
+        {isMobile ? (
+          <MotionItem>
+          <Widget className="co-widget">
+            <div className="co-widget-toolbar">
               <div className="co-search-wrapper">
                 <Search size={13} className="co-search-icon" />
                 <input
                   className="co-search-input"
                   type="text"
-                  placeholder="Search jobs..."
+                  placeholder="Search projects..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              {isMobile && (
-                <MobileFilterButton
-                  count={activeFilterCount({ status: String(statusFilter) }, FILTER_DEFAULTS)}
-                  onClick={() => setFilterSheetOpen(true)}
-                />
-              )}
+              <MobileFilterButton
+                count={activeFilterCount({ status: String(statusFilter) }, FILTER_DEFAULTS)}
+                onClick={() => setFilterSheetOpen(true)}
+              />
               <span className="co-count subheadline text-secondary">
                 {resultCount} {resultNoun}
               </span>
@@ -904,9 +1939,9 @@ export default function Jobcost() {
               </div>
             ) : resultCount === 0 && (search || statusFilter !== "all") ? (
               <div className="co-no-results body-text text-secondary">
-                {search ? `No jobs match "${search}"` : "No jobs match your filters"}
+                {search ? `No projects match "${search}"` : "No projects match your filters"}
               </div>
-            ) : isMobile ? (
+            ) : (
               <ul className="jc-mobile-list">
                 {filtered.map((job) => (
                   <li key={job.recnum}>
@@ -943,212 +1978,175 @@ export default function Jobcost() {
                   </li>
                 ))}
               </ul>
-            ) : grouped ? null : (
-              <div className="jc-table-wrap" ref={tableWrapRef}>
-              <table className="spend-rank-table">
-                <thead>
-                  <tr>
-                    <th className="spend-rank-table-name jc-expand-th" aria-hidden="true" />
-                    <SortTh col="name" label="Project" className="jc-name-col" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    {showStatus && (
-                      <SortTh col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    )}
-                    {showPM && (
-                      <SortTh col="supervisor" label="PM" className="jc-pm-col" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    )}
-                    {showContract && (
-                      <SortTh col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    )}
-                    {showBudget && (
-                      <SortTh col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    )}
-                    <SortTh col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    {showVariance && (
-                      <SortTh
-                        col="variance"
-                        label={showPM ? "Budget Variance" : "Variance"}
-                        align="right"
-                        sortKey={sortKey}
-                        sortDir={sortDir}
-                        onSort={handleSort}
-                      />
-                    )}
-                    <SortTh col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <th className="spend-rank-table-name jc-view-th" aria-label="Actions" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((job) => {
-                    const isOpen = expanded.has(job.recnum)
-                    return (
-                      <Fragment key={job.recnum}>
-                        {/* The project row is unchanged on open/close — it just
-                            tints orange and the chevron rotates. */}
-                        <tr
-                          className={`spend-rank-table-row${isOpen ? " jc-row-open" : ""}`}
-                          onClick={() => toggleExpand(job)}
-                          role="button"
-                          tabIndex={0}
-                          aria-expanded={isOpen}
-                          onKeyDown={(e) => e.key === "Enter" && toggleExpand(job)}
-                        >
-                          <td className="jc-expand-chevron-cell">
-                            <ChevronRight size={14} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
-                          </td>
-                          <td className="spend-rank-table-name jc-name-col">
-                            <div className="body-text emphasized jc-name-text" title={job.name}>{job.name}</div>
-                            <div className="cell-secondary jc-name-sub">
-                              <span className="jc-name-number">#{job.jobNumber}</span>
-                              {/* When the Status column is dropped for width, the
-                                  badge folds into the sub-line (mirrors the mobile
-                                  list) so status stays visible. */}
-                              {!showStatus && (
-                                <span className={`status-badge status-${job.status}`}>
-                                  {STATUS_LABELS[job.status] ?? job.status}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          {showStatus && (
-                            <td className="spend-rank-table-name">
-                              <span className={`status-badge status-${job.status}`}>
-                                {STATUS_LABELS[job.status] ?? job.status}
-                              </span>
-                            </td>
-                          )}
-                          {showPM && (
-                            <td className="spend-rank-table-name jc-pm-col">
-                              <div className="body-text text-secondary jc-pm-text" title={job.supervisor || undefined}>
-                                {job.supervisor || "—"}
-                              </div>
-                            </td>
-                          )}
-                          {showContract && (
-                            <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.contract)}</td>
-                          )}
-                          {showBudget && (
-                            <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.budget)}</td>
-                          )}
-                          <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.totalCost)}</td>
-                          {showVariance && (
-                            <td
-                              className="spend-rank-table-value body-text emphasized"
-                              style={{
-                                color:
-                                  !marginColorsOn || job.margin == null
-                                    ? undefined
-                                    : marginTextColor(job.margin),
-                              }}
-                            >
-                              {formatMoneyFull(job.variance)}
-                            </td>
-                          )}
-                          <td
-                            className="spend-rank-table-value body-text emphasized"
-                            style={{
-                              color:
-                                !marginColorsOn || job.margin == null
-                                  ? undefined
-                                  : marginTextColor(job.margin),
-                            }}
-                          >
-                            {job.margin == null ? "—" : `${job.margin.toFixed(1)}%`}
-                          </td>
-                          <td className="spend-rank-table-name jc-view-cell">
-                            <button
-                              className="button secondary-button jc-view-btn"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                goToJobcost(job.jobNumber)
-                              }}
-                              title="Open full report"
-                              aria-label="Open full report"
-                            >
-                              {!compactActions && "View "}
-                              <ExternalLink size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                        {isOpen && (
-                          <tr className="jc-expand-row">
-                            <td colSpan={visibleColumnCount}>
-                              <JobExpandedPanel job={job} detail={details[job.recnum]} marginColorsOn={marginColorsOn} />
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    )
-                  })}
-                </tbody>
-              </table>
-              </div>
             )}
           </Widget>
-        </MotionItem>
-
-        {/* Grouped project cards float directly on the page background,
-            outside the toolbar widget. */}
-        {grouped && !loading && jobs.length > 0 && resultCount > 0 && (
-          <MotionItem>
-            <div className="jc-project-list">
-              {filteredGroups.map((group) => {
-                const isOpen = expandedGroups.has(group.key)
-                return (
-                  <div key={group.key} className={`jc-project-card${isOpen ? " jc-project-card-open" : ""}`}>
-                    <button
-                      type="button"
-                      className="jc-project-head"
-                      onClick={() => toggleGroupExpand(group)}
-                      aria-expanded={isOpen}
-                    >
-                      <ChevronRight size={16} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
-                      <span className="jc-project-title" title={group.key}>
-                        <span className="jc-project-name">{group.key}</span>
-                        {group.client && <span className="cell-secondary jc-group-client">{group.client}</span>}
-                        <span className={`status-badge status-${group.status}`}>
-                          {STATUS_LABELS[group.status] ?? group.status}
+          </MotionItem>
+        ) : (
+          /* View switches crossfade (mode="wait": ~150ms out, then in) — the
+             heavy mount of the incoming view lands behind the fade instead of
+             popping mid-frame, which is what read as lag. NOTE: no
+             initial={false} here — that flag propagates "skip initial
+             animations" to every descendant, which froze the ghost cards'
+             blur-in on page load while the command bar staggered in. */
+          <AnimatePresence mode="wait">
+          <motion.div
+            /* The property view keeps one key across loading → loaded so the
+               ghost cards resolve in place (inner stack below) instead of
+               exiting through this crossfade first. */
+            key={groupedContent ? "property" : loading ? "loading" : "project"}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
+          >
+          {groupedContent ? (
+            /* Ghost list and real content share one grid cell: when data lands
+               the ghosts dissolve while the real cards fade in underneath the
+               same geometry — one quiet in-place swap, not out-then-in. */
+            <div className="jc-swap-stack">
+              {/* No initial={false} here — same trap as the outer presence:
+                 it propagates skip-initial to the ghosts and kills their
+                 blur-in stagger on page load. */}
+              <AnimatePresence>
+              {loading && (
+              /* Ghost property cards: same surface, same heights, same blur-in
+                 stagger as the real list, so the load resolves as a quiet
+                 crossfade into content that's already where it belongs. */
+              <motion.div
+                key="ghosts"
+                className="jc-skeleton-list"
+                aria-hidden="true"
+                style={{ pointerEvents: "none" }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+              >
+                {Array.from({ length: 6 }, (_, i) => (
+                  <motion.div
+                    key={i}
+                    className="jc-project-card"
+                    // App-standard MotionList entrance (same values as
+                    // itemVariants), continuing the header's stagger rhythm.
+                    initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.3, delay: 0.08 + i * 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  >
+                    {/* Real head structure with shimmer stand-ins in each slot,
+                        so ghost and loaded cards share exact geometry. */}
+                    <div className="jc-project-head jc-skeleton-head">
+                      <span className="jc-head-toggle">
+                        <span className="skel-line" style={{ width: "0.875rem", height: "0.875rem", borderRadius: 4 }} />
+                      </span>
+                      <span className="jc-project-title">
+                        <span className="jc-project-name-row">
+                          <span className="skel-line" style={{ width: i % 2 ? "10rem" : "8rem", height: "1.3125rem" }} />
+                          <span className="skel-line" style={{ width: "3.5rem", height: "1.25rem", borderRadius: 999 }} />
+                        </span>
+                        <span className="skel-line" style={{ width: i % 2 ? "7rem" : "9.25rem", height: "1.0625rem" }} />
+                      </span>
+                      <span className="jc-head-stats">
+                        <span className="jc-head-stat">
+                          <span className="skel-line" style={{ width: "3rem", height: "0.6875rem" }} />
+                          <span className="skel-line" style={{ width: "3.5rem", height: "1.05rem" }} />
+                        </span>
+                        <span className="jc-head-stat">
+                          <span className="skel-line" style={{ width: "3rem", height: "0.6875rem" }} />
+                          <span className="skel-line" style={{ width: "3.5rem", height: "1.05rem" }} />
                         </span>
                       </span>
                       <span className="jc-project-counts">
-                        {group.phases.length > 0 ? (
-                          <span className="jc-count-chip" title={`${group.phases.length} phase${group.phases.length === 1 ? "" : "s"}`}>
-                            <Building2 size={13} />
-                            {group.phases.length}
-                          </span>
-                        ) : (
-                          <span className="jc-count-chip jc-count-chip-empty" title="No phases">
-                            <Building2 size={13} />0
-                          </span>
-                        )}
-                        {group.oneoffs.length > 0 ? (
-                          <span className="jc-count-chip" title={`${group.oneoffs.length} one-off project${group.oneoffs.length === 1 ? "" : "s"}`}>
-                            <Hammer size={13} />
-                            {group.oneoffs.length}
-                          </span>
-                        ) : (
-                          <span className="jc-count-chip jc-count-chip-empty" title="No one-off projects">
-                            <Hammer size={13} />0
-                          </span>
-                        )}
+                        <span className="skel-line" style={{ width: "8.5rem", height: "1.9375rem", borderRadius: 9 }} />
+                        <span className="skel-line" style={{ width: "8.5rem", height: "1.9375rem", borderRadius: 9 }} />
                       </span>
-                    </button>
-                    {isOpen && (
-                      <div className="jc-project-body">
-                        <GroupExpandedPanel
-                          group={group}
-                          showContract={!isManager}
-                          marginColorsOn={marginColorsOn}
-                          openKind={openKinds[group.key] ?? null}
-                          onToggleKind={(kind) => toggleKind(group.key, kind)}
-                          onOpenJob={(job) => goToJobcost(job.jobNumber)}
-                        />
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+              )}
+              </AnimatePresence>
+              {!loading && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                >
+                  {jobs.length === 0 ? (
+                    <Widget className="co-widget">
+                      <div className="widget-no-data">
+                        <ChartNoAxesColumn size={24} className="widget-no-data-icon" />
+                        <span className="body-text">No data available</span>
                       </div>
-                    )}
-                  </div>
-                )
-              })}
+                    </Widget>
+                  ) : resultCount === 0 && (search || statusFilter !== "all") ? (
+                    <div className="jc-empty-note body-text text-secondary">
+                      {search
+                        ? `No properties match "${search}"`
+                        : "No properties match your filters"}
+                    </div>
+                  ) : (
+                    <PropertyList
+                      groups={filteredGroups}
+                      openGroupKey={openGroupKey}
+                      openKind={openKind}
+                      entrance={!entrancePlayedRef.current}
+                      showContract={!isManager}
+                      marginColorsOn={marginColorsOn}
+                      pins={pins}
+                      onToggle={toggleGroup}
+                      onToggleKind={toggleKind}
+                      onOpenKind={openWithKind}
+                      onOpenJob={openJob}
+                      onTogglePin={togglePin}
+                    />
+                  )}
+                </motion.div>
+              )}
             </div>
-          </MotionItem>
+          ) : loading ? (
+            /* Flat-list skeleton enters with the app-standard blur-in, so a
+               mid-load view toggle (or landing here) matches the rest of the
+               dashboard instead of popping in behind the crossfade. */
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.3, delay: 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <Widget className="co-widget">
+                <div className="widget-skeleton" />
+              </Widget>
+            </motion.div>
+          ) : jobs.length === 0 ? (
+            <Widget className="co-widget">
+              <div className="widget-no-data">
+                <ChartNoAxesColumn size={24} className="widget-no-data-icon" />
+                <span className="body-text">No data available</span>
+              </div>
+            </Widget>
+          ) : resultCount === 0 && (search || statusFilter !== "all") ? (
+            <div className="jc-empty-note body-text text-secondary">
+              {search
+                ? `No projects match "${search}"`
+                : "No projects match your filters"}
+            </div>
+          ) : (
+          <Widget className="co-widget jc-table-widget">
+            <JobTable
+              jobs={filtered}
+              isManager={isManager}
+              marginColorsOn={marginColorsOn}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={handleSort}
+              openJobKey={openJobKey}
+              details={details}
+              pins={projectPins}
+              onToggleExpand={toggleExpand}
+              onOpenJob={openJob}
+              onTogglePin={togglePinProject}
+            />
+          </Widget>
+          )}
+          </motion.div>
+          </AnimatePresence>
         )}
       </MotionList>
 
@@ -1156,7 +2154,13 @@ export default function Jobcost() {
         <MobileFilterSheet
           open={filterSheetOpen}
           onClose={() => setFilterSheetOpen(false)}
-          groups={FILTER_GROUPS}
+          groups={
+            hideClosed
+              ? FILTER_GROUPS.map((g) =>
+                  g.key === "status" ? { ...g, options: g.options.filter((o) => o.value !== "6") } : g,
+                )
+              : FILTER_GROUPS
+          }
           values={{ status: String(statusFilter) }}
           defaults={FILTER_DEFAULTS}
           onChange={(v) => setStatusFilter(v.status === "all" ? "all" : Number(v.status))}

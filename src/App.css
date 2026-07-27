@@ -697,7 +697,10 @@ body{
 .page-header {
   margin-bottom: 2rem;
   display: flex;
-  align-items: center;
+  /* Top-aligned, not centered: centering let the row-mates move the title
+     (a tall year pill pushed it down; a subtitle-only header didn't), so the
+     h1 sat at a different y from page to page. */
+  align-items: flex-start;
   justify-content: space-between;
   gap: 1rem;
 }
@@ -725,7 +728,10 @@ body{
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding-top: 0.25rem;
+  /* Pin the cluster to the title's first line: the row is exactly one title
+     line tall and taller controls (year pill, toolbar) center-overflow it,
+     so they read as vertically centered on the h1 without moving it. */
+  height: var(--title1-line-height);
 }
 
 .page-subtitle {
@@ -4165,42 +4171,156 @@ body{
 .jc-view-th { width: 1px; }
 .jc-view-cell { text-align: right; white-space: nowrap; }
 .jc-view-btn { font-size: 0.8125rem; padding: 0.3rem 0.7rem; }
+/* Open-project affordance hovers like the header YearSelector: quiet gray
+   fill, border unchanged (the .secondary-button border-darken read as a
+   different control language). .button. prefix outranks .secondary-button. */
+.button.jc-view-btn:hover {
+  border-color: var(--border-color);
+  background: var(--hover-bg);
+  color: var(--primary-text);
+}
 
-/* Open job — the project row is unchanged besides a faint orange tint
-   (matching the Period / Year summary widget) and no divider above its
-   detail panel, so the row + panel read as one block. */
-.spend-rank-table-row.jc-row-open {
-  background: color-mix(in srgb, var(--primary-color) 8%, var(--card-color));
-  /* Subtle gray divider between the project header and the open contents. */
+/* Open job — same neutral language as an open property card: the quiet 2%
+   ink wash inside a rounded ink-darkened 1px frame, no copper. The frame
+   needs real cell borders with corner radii, and border-collapse ignores
+   radius on cells — so the flat table (and ONLY it: the child combinator
+   keeps the nested Cost Breakdown tables on collapse) runs
+   border-collapse: separate. tr borders/backgrounds don't render usefully
+   in separate mode, so dividers and the open styling live on the CELLS. */
+.jc-table-wrap {
+  --jc-open-border: color-mix(in srgb, var(--primary-text) 18%, var(--border-color));
+  --jc-open-radius: 12px;
+  /* Same shadow-ink rule as the property cards: black in dark mode, or the
+     light-text "shadow" reads as a glow. */
+  --jc-shadow-ink: light-dark(var(--primary-text), #000);
+}
+.jc-table-wrap > .spend-rank-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.jc-table-wrap > .spend-rank-table > thead th {
   border-bottom: 1px solid var(--border-color);
 }
-/* Detail panel row: same tint, full width (overriding the shared gap rule). */
+/* EVERY row carries the open frame's borders permanently — transparent when
+   closed — so opening a row only recolors them. Borders that appear on open
+   changed cell sizes and nudged the whole list by a pixel. */
+.jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row > td {
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid var(--border-color);
+  /* The ink frame + wash fade in step with the panel's height animation
+     instead of snapping when jc-row-open flips — including the top corners
+     rounding on (0 → 12px), which otherwise popped. */
+  transition: background-color 120ms ease, border-color 180ms ease, border-radius 180ms ease;
+}
+.jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row > td:first-child {
+  border-left: 1px solid transparent;
+}
+.jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row > td:last-child {
+  border-right: 1px solid transparent;
+}
+/* The divider of the row ABOVE an open block would sit flush against the
+   block's ink border-top and read as a doubled 2px seam — blank it. */
+.jc-table-wrap > .spend-rank-table > tbody:has(+ tbody > .jc-row-open) > .spend-rank-table-row > td {
+  border-bottom-color: transparent;
+}
+/* Neutral press feedback for both Job Costing tables — the app-wide
+   --active-bg is copper-tinted, which read as an orange flicker on click. */
+.jc-table-wrap .spend-rank-table-row:active,
+.jc-member-table .spend-rank-table-row:active {
+  background: rgb(from var(--primary-text) r g b / 0.08);
+}
+/* Rows are toggle surfaces, not copy (same rule as the property card head):
+   rapid clicks were selecting the row text. The expanded panel's contents
+   stay selectable — this covers only the clickable rows themselves. */
+.jc-table-wrap .spend-rank-table-row,
+.jc-member-table .spend-rank-table-row {
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Pinned project rows: the property cards' copper rail, drawn in the
+   chevron cell against the table's left edge. */
+.jc-table-wrap .spend-rank-table-row.jc-row-pinned > td:first-child {
+  position: relative;
+}
+.jc-table-wrap .spend-rank-table-row.jc-row-pinned > td:first-child::before {
+  content: "";
+  position: absolute;
+  /* -1px covers the cell's reserved (transparent) frame border so the rail
+     sits on the row's true left edge instead of 1px inboard. */
+  left: -1px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 1.5rem;
+  width: 3px;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(180deg, var(--primary-color-hover) 0%, var(--primary-color) 100%);
+  pointer-events: none;
+}
+/* Rows mid-glide during a reorder (pin/unpin, sort): opaque so crossing
+   rows don't read through each other, and the long-haul traveler (a row
+   pinned to the top) rides above the one-slot shifters it passes. The
+   z-indexes need the relative position — the FLIP transform alone makes a
+   stacking context but static elements still paint in DOM order. */
+.jc-row-flying { position: relative; z-index: 1; }
+.jc-row-flying > tr { background: var(--card-color); }
+.jc-row-traveler { z-index: 2; }
+
+/* Pin + view tiles sit as one cluster in the actions cell; both center on
+   the row's text baseline. The view tile keeps its "View" label — same tile
+   surface, widened by padding instead of the fixed square. */
+.jc-row-pin { margin-right: 0.375rem; vertical-align: middle; }
+.jc-view-cell .jc-view-tile {
+  vertical-align: middle;
+  width: auto;
+  padding: 0 0.55rem;
+  gap: 0.3rem;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
+}
+/* Open-row backgrounds move to the cells so the corner radii clip them; the
+   tr itself must stay transparent in every state or its square fill shows
+   behind the rounded corners. */
+.spend-rank-table-row.jc-row-open,
+.spend-rank-table-row.jc-row-open:hover,
+.jc-table-wrap .spend-rank-table-row.jc-row-open:active {
+  background: transparent;
+}
+.jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row.jc-row-open > td {
+  background: rgb(from var(--primary-text) r g b / 0.02);
+  border-top-color: var(--jc-open-border);
+}
+.jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row.jc-row-open:hover > td {
+  background: var(--hover-bg);
+}
+.jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row.jc-row-open:active > td {
+  background: rgb(from var(--primary-text) r g b / 0.08);
+}
+.jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row.jc-row-open > td:first-child {
+  border-left-color: var(--jc-open-border);
+  border-top-left-radius: var(--jc-open-radius);
+}
+.jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row.jc-row-open > td:last-child {
+  border-right-color: var(--jc-open-border);
+  border-top-right-radius: var(--jc-open-radius);
+}
+/* Detail panel cell: same wash, full width (overriding the shared gap rule),
+   closing the frame with the side borders and rounded bottom corners. The
+   generic cell-divider rule above still draws the quiet gray line between
+   the project row and this panel. */
 .co-widget .spend-rank-table tr.jc-expand-row > td {
   padding: 0;
-  background: color-mix(in srgb, var(--primary-color) 8%, var(--card-color));
-}
-/* 1px outline around the whole open section (row + panel), matching the
-   Period / Year summary widget border. Drawn with OUTSET box-shadows
-   (top across the row; left/right down the row's end cells + the panel;
-   bottom on the panel) so it works with the table's border-collapse. */
-.spend-rank-table-row.jc-row-open > td {
-  box-shadow: 0 -1px 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color));
-}
-.spend-rank-table-row.jc-row-open > td:first-child {
+  background: rgb(from var(--primary-text) r g b / 0.02);
+  border-left: 1px solid var(--jc-open-border);
+  border-right: 1px solid var(--jc-open-border);
+  border-bottom: 1px solid var(--jc-open-border);
+  border-bottom-left-radius: var(--jc-open-radius);
+  border-bottom-right-radius: var(--jc-open-radius);
+  /* Ambient drop off the open block's bottom edge — the same lift the
+     property cards get on hover — so the open project pops off the table.
+     Rows below have transparent backgrounds, so it shows through cleanly. */
   box-shadow:
-    0 -1px 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color)),
-    -1px 0 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color));
-}
-.spend-rank-table-row.jc-row-open > td:last-child {
-  box-shadow:
-    0 -1px 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color)),
-    1px 0 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color));
-}
-.co-widget .spend-rank-table tr.jc-expand-row > td {
-  box-shadow:
-    -1px 0 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color)),
-    1px 0 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color)),
-    0 1px 0 color-mix(in srgb, var(--primary-color) 25%, var(--border-color));
+    0 1px 2px rgb(from var(--jc-shadow-ink) r g b / 0.05),
+    0 18px 40px -26px rgb(from var(--jc-shadow-ink) r g b / 0.45);
 }
 
 .jc-expand-panel {
@@ -4221,7 +4341,15 @@ body{
 }
 .jc-expand-breakdown { overflow: hidden; }
 .jc-expand-breakdown .jc-summary-title { padding: 1rem 1.25rem 0.75rem; }
-.jc-expand-loading { padding: 1.25rem; }
+/* Numeric shimmer bars in the cost-breakdown skeleton: right-aligned like
+   the money values they stand in for. Row heights come from the real
+   category labels beside them, so the bar height is purely cosmetic. */
+.jc-skel-num {
+  display: inline-block;
+  width: 4.25rem;
+  height: 0.9375rem;
+  vertical-align: middle;
+}
 
 .jc-summary-grid {
   display: grid;
@@ -4254,76 +4382,438 @@ body{
 .jc-summary-total .jc-summary-label,
 .jc-summary-total .jc-summary-value { color: var(--primary-text); font-weight: 700; }
 
-/* ── Job Costing grouped view (parent projects) ── */
+/* Conclusion block inside a sub-card (Margin + Gross Profit): separated
+   from the plain money lines above by a single rule under Committed +
+   Spent, no background. */
+.jc-summary-totals {
+  margin-top: 0.375rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid var(--border-color);
+}
+/* Tighter rhythm inside the pair than between the plain lines above. */
+.jc-summary-totals .jc-summary-row {
+  border-bottom: none;
+  padding: 0.25rem 0;
+}
+/* The plain line right above the block keeps just the block's own top rule —
+   drop its divider so the two don't stack. */
+.jc-summary-row:has(+ .jc-summary-totals) { border-bottom: none; }
 
-/* Status filter <select> shares .year-selector; just keep it from growing. */
-.jc-status-select { max-width: 10.5rem; }
-
-/* Grouped mode: the widget holds only the toolbar — drop the standard
-   widget min-height so it hugs its content, and the toolbar's bottom
-   divider (there's no table below it to separate from). */
-.co-widget.jc-toolbar-only { min-height: 0; }
-.co-widget.jc-toolbar-only .co-widget-toolbar { border-bottom: none; padding-bottom: 0.75rem; }
-
-/* Each parent project is its own card, floating directly on the page
-   background below the toolbar widget (same surface recipe as .card). */
-.jc-project-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
+/* ── Job Costing command bar ─────────────────────────────────────────────
+   Desktop control deck above the property cards. Deliberately a different
+   surface from the white cards below it: deep ink with a faint copper bloom
+   in the corner, recessed wells for each control, and a copper thumb that
+   slides between segments (framer layoutId). All controls share one type
+   size/weight so the row reads as a single instrument. */
+/* Shared "control deck" recipe, worn by the command bar and the overview
+   strip inside an open property so the two read as one system. Theme-aware:
+   light mode gets a warm porcelain gradient (differentiated from the pure
+   white cards by tint + recessed wells, not by darkness — a dark slab looked
+   pasted-on in light mode), dark mode keeps the warm charcoal deck. The
+   copper bloom in the corner scales down for light. */
+.jc-command-bar,
+.jc-group-overview {
+  --jcb-text: light-dark(var(--primary-text), rgba(240, 232, 222, 0.93));
+  --jcb-muted: light-dark(var(--secondary-text), rgba(240, 232, 222, 0.55));
+  --jcb-line: light-dark(var(--border-color), rgba(240, 232, 222, 0.1));
+  --jcb-well: light-dark(rgb(from var(--primary-text) r g b / 0.06), rgba(240, 232, 222, 0.08));
+  --jcb-s1: light-dark(#fdfcfa, #2b241e);
+  --jcb-s2: light-dark(#f4f1ec, #1f1a15);
+  --jcb-bloom: light-dark(rgb(from var(--primary-color) r g b / 0.08), rgb(from var(--primary-color) r g b / 0.18));
+  --jcb-topline: light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.07));
+  --jcb-inset: light-dark(rgb(from var(--primary-text) r g b / 0.1), rgba(0, 0, 0, 0.25));
+  border: 1px solid var(--jcb-line);
+  background:
+    radial-gradient(120% 200% at 88% 0%, var(--jcb-bloom) 0%, transparent 55%),
+    linear-gradient(180deg, var(--jcb-s1) 0%, var(--jcb-s2) 100%);
+  /* Shadow ink: primary-text is near-white in dark mode, so shadows drawn
+     from it GLOW there — dark mode shades with black instead. */
+  --jc-shadow-ink: light-dark(var(--primary-text), #000);
+  box-shadow:
+    inset 0 1px 0 var(--jcb-topline),
+    0 1px 2px rgb(from var(--jc-shadow-ink) r g b / 0.06),
+    0 16px 32px -24px rgb(from var(--jc-shadow-ink) r g b / 0.3);
 }
-.jc-project-card {
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  background: var(--card-color);
-  box-shadow: var(--button-shadow);
-  overflow: hidden;
-  transition: border-color 150ms ease;
-}
-.jc-project-card:hover {
-  border-color: color-mix(in srgb, var(--primary-color) 35%, var(--border-color));
-}
-.jc-project-card-open {
-  border-color: color-mix(in srgb, var(--primary-color) 55%, var(--border-color));
-}
-.jc-project-head {
+.jc-command-bar {
   display: flex;
   align-items: center;
   gap: 0.875rem;
+  padding: 0.625rem 1rem;
+  border-radius: 14px;
+}
+@media (max-width: 980px) {
+  .jc-command-bar { flex-wrap: wrap; }
+  .jc-cb-search { order: 10; flex-basis: 100%; max-width: none; }
+}
+
+/* Segmented control: recessed well + sliding copper thumb. */
+.jc-seg {
+  display: flex;
+  align-items: stretch;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--jcb-well);
+  box-shadow: inset 0 1px 2px var(--jcb-inset);
+  flex-shrink: 0;
+}
+.jc-seg-btn {
+  position: relative;
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.375rem 0.9375rem;
+  border-radius: 8px;
+  font-family: var(--font-family);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  color: var(--jcb-muted);
+  transition: color 160ms ease;
+}
+.jc-seg-btn:hover { color: var(--jcb-text); }
+.jc-seg-btn-active,
+.jc-seg-btn-active:hover { color: #fff; }
+.jc-seg-thumb {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--primary-color-hover) 0%, var(--primary-color) 100%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+.jc-seg-label { position: relative; z-index: 1; }
+
+.jc-cb-divider {
+  width: 1px;
+  height: 1.375rem;
+  background: var(--jcb-line);
+  flex-shrink: 0;
+}
+
+.jc-cb-select-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.jc-cb-select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 2.125rem;
+  box-sizing: border-box;
+  padding: 0 2.125rem 0 0.875rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--jcb-well);
+  color: var(--jcb-text);
+  font-family: var(--font-family);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: border-color 160ms ease;
+}
+.jc-cb-select:hover { border-color: var(--jcb-line); }
+.jc-cb-select:focus {
+  outline: none;
+  border-color: rgb(from var(--primary-color) r g b / 0.6);
+}
+/* Theme-aware arrow drawn by lucide instead of a baked-in data URI. */
+.jc-cb-select-arrow {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--jcb-muted);
+  pointer-events: none;
+}
+/* Native dropdown list paints on a light surface in most engines. */
+.jc-cb-select option { color: #1c1c1c; background: #fff; }
+
+/* Sort = one joined control: the "Sort: X" select and the direction toggle
+   share a well, split by a hairline seam, so the arrow reads as the sort's
+   direction rather than a free-floating button. */
+.jc-cb-sort {
+  display: inline-flex;
+  align-items: stretch;
+  flex-shrink: 0;
+}
+.jc-cb-sort .jc-cb-sort-select {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.jc-cb-sort .jc-cb-dir {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 1px solid var(--jcb-line);
+}
+.jc-cb-dir {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2.125rem;
+  padding: 0 0.75rem;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--jcb-well);
+  color: var(--jcb-text);
+  font-family: var(--font-family);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: border-color 160ms ease;
+}
+.jc-cb-dir:hover { border-color: var(--jcb-line); }
+.jc-cb-dir:focus-visible {
+  outline: none;
+  border-color: rgb(from var(--primary-color) r g b / 0.6);
+}
+/* Direction words stay quieter than the selected sort key. */
+.jc-cb-dir-label { color: var(--jcb-muted); }
+
+.jc-cb-search {
+  position: relative;
+  flex: 1;
+  min-width: 8rem;
+  max-width: 26rem;
+  margin-left: auto;
+}
+.jc-cb-search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--jcb-muted);
+  pointer-events: none;
+}
+.jc-cb-search-input {
   width: 100%;
+  height: 2.125rem;
+  box-sizing: border-box;
+  padding: 0 0.875rem 0 2.25rem;
+  border: 1px solid var(--jcb-line);
+  border-radius: 10px;
+  background: var(--jcb-well);
+  color: var(--jcb-text);
+  font-family: var(--font-family);
+  font-size: 0.8125rem;
+  outline: none;
+  transition: border-color 160ms ease;
+}
+.jc-cb-search-input::placeholder { color: var(--jcb-muted); }
+.jc-cb-search-input:focus {
+  border-color: rgb(from var(--primary-color) r g b / 0.65);
+}
+
+.jc-cb-count {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  flex-shrink: 0;
+  color: var(--jcb-muted);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+}
+.jc-cb-count-num {
+  color: var(--jcb-text);
+  font-size: 1rem;
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* Desktop list view: table sits alone in the widget (toolbar moved to the
+   command bar), so give it back a little top breathing room. */
+.jc-table-widget .jc-table-wrap { padding-top: 0.5rem; }
+/* (Row dividers for this table live on the cells — see the
+   border-collapse: separate block above — so the base table's
+   tr:last-child divider removal is moot here.) */
+
+/* Quiet no-results note floating on the page background. */
+.jc-empty-note {
+  padding: 2.5rem 1rem;
+  text-align: center;
+}
+
+/* Load-resolution stack: the ghost list and the real property list occupy the
+   same grid cell, so when data lands the ghosts dissolve directly over the
+   real cards already sitting in their positions — no out-then-in. */
+.jc-swap-stack {
+  display: grid;
+}
+.jc-swap-stack > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+/* Initial-load ghost cards: they reuse .jc-project-card + .jc-project-head
+   (real classes, real geometry) with .skel-line stand-ins in each slot, so
+   the loaded list lands exactly where the ghosts were. */
+.jc-skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.jc-skeleton-head {
+  pointer-events: none;
+  cursor: default;
+}
+
+/* ── Job Costing grouped view (property cards) ── */
+
+/* Each property is its own card floating on the page background. Layered
+   shadow (contact line + soft ambient) instead of the flat button shadow;
+   hover warms the border and deepens the ambient shadow, no y-travel. */
+/* Virtualized list: the container is a spacer at the measured total height;
+   each mounted item is absolutely positioned by offset, carrying the 0.75rem
+   row gap as bottom padding (included in its measured size). */
+.jc-project-list {
+  position: relative;
+  width: 100%;
+}
+.jc-virtual-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding-bottom: 0.75rem;
+  box-sizing: border-box;
+}
+.jc-card-wave { transform-origin: 50% 50%; }
+.jc-project-card {
+  position: relative;
+  /* Same shadow-ink rule as the command bar: black in dark mode, or the
+     light-text "shadow" reads as a glow. */
+  --jc-shadow-ink: light-dark(var(--primary-text), #000);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--card-color);
+  box-shadow:
+    0 1px 2px rgb(from var(--jc-shadow-ink) r g b / 0.05),
+    0 14px 32px -26px rgb(from var(--jc-shadow-ink) r g b / 0.35);
+  overflow: hidden;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+/* Hover speaks the app's neutral language (a quiet gray darken, like the
+   nav flyout rows and year selector) — copper is reserved for the OPEN
+   card. Scoped to closed cards: an unscoped :hover outranks the -open rule
+   and stripped the copper border whenever the open card was hovered. */
+.jc-project-card:not(.jc-project-card-open):hover {
+  border-color: color-mix(in srgb, var(--primary-text) 18%, var(--border-color));
+  box-shadow:
+    0 1px 2px rgb(from var(--jc-shadow-ink) r g b / 0.05),
+    0 18px 40px -26px rgb(from var(--jc-shadow-ink) r g b / 0.45);
+}
+/* Open card: no copper slabs, no rail. The card just firms up — ink-
+   darkened border, deeper ambient shadow — and the whole interior takes
+   the quiet 2% ink wash so head + body read as one opened tray against
+   the white closed cards. Copper marks the active state only in the
+   chevron tile; the open sub-card below is marked by the member tray's
+   caret pointing at it, not by color. */
+.jc-project-card-open {
+  border-color: color-mix(in srgb, var(--primary-text) 18%, var(--border-color));
+  box-shadow:
+    0 1px 2px rgb(from var(--jc-shadow-ink) r g b / 0.05),
+    0 18px 40px -26px rgb(from var(--jc-shadow-ink) r g b / 0.45);
+}
+
+.jc-project-head {
+  /* Positioning context for the pinned rail (.jc-pin-rail), which is scoped
+     to the head so it doesn't stretch when the body expands. */
+  position: relative;
+  display: flex;
+  align-items: center;
+  /* Chips/stats may wrap under the title on tight widths instead of pushing
+     past the card's right edge (title is the only shrinkable segment). */
+  flex-wrap: wrap;
+  gap: 0.625rem 1rem;
+  width: 100%;
+  box-sizing: border-box;
   text-align: left;
   font: inherit;
   color: inherit;
   cursor: pointer;
   background: none;
   border: none;
-  padding: 1.5rem 1.625rem;
+  padding: 1.125rem 1.375rem;
+  /* Toggle surface, not copy: rapid clicks were selecting the title/stat
+     text. (Member-table content below stays selectable.) */
+  -webkit-user-select: none;
+  user-select: none;
+  /* Open tint fades in/out like every other state change on the card
+     (border, toggle tile) instead of snapping. */
+  transition: background-color 180ms ease;
 }
-.jc-project-head .jc-expand-chevron { color: var(--secondary-text); flex-shrink: 0; }
+/* Same quiet gray fill the whole app uses for "this row is hoverable"
+   (table rows, nav flyout, year selector). */
+.jc-project-card:not(.jc-project-card-open) .jc-project-head:hover {
+  background: var(--hover-bg);
+}
+/* Open head joins the body's neutral wash (one continuous tray), and hover
+   feedback is the same app-wide gray in every state. */
 .jc-project-card-open .jc-project-head {
-  background: color-mix(in srgb, var(--primary-color) 8%, var(--card-color));
-  border-bottom: 1px solid var(--border-color);
+  background: rgb(from var(--primary-text) r g b / 0.02);
 }
+.jc-project-card-open .jc-project-head:hover {
+  background: var(--hover-bg);
+}
+/* Chevron rides in a small rounded-square tile; stays neutral in every
+   state (rotation signals open). */
+.jc-head-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: rgb(from var(--primary-text) r g b / 0.05);
+  color: var(--secondary-text);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+/* Scoped to closed cards — unscoped, this hover outranked the open rule
+   below and turned the copper tile gray whenever the open head was hovered. */
+.jc-project-card:not(.jc-project-card-open) .jc-project-head:hover .jc-head-toggle {
+  background: rgb(from var(--primary-text) r g b / 0.09);
+  color: var(--primary-text);
+}
+/* Open tile stays in the neutral family — just a firmer gray than rest,
+   with the rotated chevron doing the "open" talking. */
+.jc-project-card-open .jc-head-toggle {
+  background: rgb(from var(--primary-text) r g b / 0.09);
+  color: var(--primary-text);
+}
+
+/* Name + client lockup; badge hugs the name. The min-width floor keeps the
+   name readable — past it, the right-side clusters wrap instead. */
 .jc-project-title {
   display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  min-width: 0;
+  flex-direction: column;
+  gap: 0.1875rem;
+  min-width: 14rem;
   flex: 1;
 }
-/* Badge rides in the left cluster after name · client; it never shrinks and
-   gets a touch of extra separation from the text. */
-.jc-project-title .status-badge {
-  flex-shrink: 0;
-  margin-left: 0.25rem;
+.jc-project-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
 }
+.jc-project-name-row .status-badge { flex-shrink: 0; }
 .jc-project-name {
   font-size: 1.0625rem;
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   letter-spacing: -0.01em;
   color: var(--primary-text);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+/* Client sub-line keeps the dashboard's plain secondary-text voice (no
+   small-caps treatment — it fought the rest of the app's typography). */
 .jc-group-client {
   color: var(--secondary-text);
   font-size: 0.875rem;
@@ -4331,49 +4821,213 @@ body{
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Collapsed-head financial preview (hidden when the row gets tight). */
+.jc-head-stats {
+  display: flex;
+  gap: 1.125rem;
+  flex-shrink: 0;
+  padding-right: 0.5rem;
+}
+@media (max-width: 1280px) {
+  .jc-head-stats { display: none; }
+}
+.jc-head-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+  /* Floor wide enough for the widest value ("-15.4%"), so the Volume and
+     Margin columns sit at the same x across cards instead of drifting with
+     each card's number width. */
+  min-width: 4.25rem;
+}
+/* Same voice as .jc-overview-label (subheadline + uppercase) so the head
+   preview and the expanded overview strip read as one system. */
+.jc-head-stat-label {
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--secondary-text);
+}
+.jc-head-stat-value {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+
+/* Count tags: squared, textual ("2 Phases ›"), quiet when empty. */
 .jc-project-counts {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   white-space: nowrap;
+  flex-shrink: 0;
 }
-.jc-count-chip-empty { opacity: 0.45; }
-/* Expanded body carries the copper wash the open table rows used. The
-   panel's gutters match the header's 1.5rem so everything sits on one
-   vertical rhythm. */
-.jc-project-body {
-  background: color-mix(in srgb, var(--primary-color) 8%, var(--card-color));
-}
-.jc-project-body .jc-expand-panel {
-  padding: 1.5rem;
-  gap: 1.25rem;
-}
-
-.jc-count-chip {
+.jc-kind-chip {
+  appearance: none;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.4375rem 0.9375rem;
+  justify-content: center;
+  /* One fixed chip width for every state — "12 Projects ›" and the wider
+     empty label "No Projects" both fit — so the right-side column lines up
+     across all cards (a min-width let the empty chips outgrow the rest). */
+  width: 7.5rem;
+  box-sizing: border-box;
+  gap: 0.4375rem;
+  padding: 0.4375rem 0.375rem;
   border: 1px solid var(--border-color);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--primary-text) 3%, var(--card-color));
+  border-radius: 9px;
+  background: rgb(from var(--primary-text) r g b / 0.03);
   color: var(--primary-text);
-  font-size: 0.875rem;
-  font-weight: 700;
+  font-family: var(--font-family);
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease;
 }
-.jc-count-chip svg { color: var(--secondary-text); }
+button.jc-kind-chip:hover {
+  border-color: color-mix(in srgb, var(--primary-text) 35%, var(--border-color));
+  background: rgb(from var(--primary-text) r g b / 0.06);
+}
+.jc-kind-chip svg { color: var(--secondary-text); flex-shrink: 0; }
+.jc-kind-chip-arrow { margin-left: -0.125rem; }
+.jc-kind-chip-empty { opacity: 0.5; cursor: default; }
 
-/* Overall stats strip at the top of an expanded group — floating card like
-   the kind cards below it. */
+/* Pin toggle: always visible, same neutral tile treatment as the chevron
+   toggle; copper when pinned — pinning is an active state, so it earns the
+   accent per the app's copper-restraint rule. .jc-view-tile shares the whole
+   tile recipe: in the Project list's actions cell the open-report button is
+   an icon tile too, so the pin + view pair reads as one cluster. */
+.jc-pin-btn,
+.jc-view-tile {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgb(from var(--primary-text) r g b / 0.05);
+  color: var(--secondary-text);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.jc-pin-btn:hover,
+.jc-view-tile:hover {
+  background: rgb(from var(--primary-text) r g b / 0.09);
+  color: var(--primary-text);
+}
+.jc-pin-btn:focus-visible,
+.jc-view-tile:focus-visible {
+  outline: none;
+  border-color: rgb(from var(--primary-color) r g b / 0.6);
+}
+.jc-pin-btn-active {
+  color: var(--primary-color);
+  background: rgb(from var(--primary-color) r g b / 0.1);
+}
+.jc-pin-btn-active:hover {
+  color: var(--primary-color-hover);
+  background: rgb(from var(--primary-color) r g b / 0.14);
+}
+/* Filled glyph — color alone reads too quiet at 13px. */
+.jc-pin-btn-active svg { fill: currentColor; }
+/* motion.span wrapper for the pin-pop; centers the glyph in the tile. */
+.jc-pin-icon { display: inline-flex; }
+
+/* Pinned rail: a contained copper pill hugging the card's left edge (same
+   gradient as the command bar's seg thumb, same inset-pill language as the
+   nav flyout). Vertical inset keeps it clear of the rounded corners; scaleY
+   is animated by framer from the vertical center. */
+.jc-pin-rail {
+  position: absolute;
+  left: 0;
+  top: 0.875rem;
+  bottom: 0.875rem;
+  width: 3px;
+  /* Square against the card edge, rounded where it meets the surface. */
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(180deg, var(--primary-color-hover) 0%, var(--primary-color) 100%);
+  pointer-events: none;
+}
+
+/* Expanded body: neutral wash (copper stays on the rail + toggle tile).
+   overflow hidden so the height animation clips cleanly. */
+.jc-project-body {
+  overflow: hidden;
+  background: rgb(from var(--primary-text) r g b / 0.02);
+}
+.jc-project-body .jc-expand-panel {
+  padding: 1.375rem;
+  gap: 1.25rem;
+  border-top: 1px solid var(--border-color);
+  /* Shared tokens: the open kind card, the tray caret, and the member
+     table all draw from these so the three pieces read as one object. */
+  --jc-tray-surface: color-mix(in srgb, var(--primary-text) 4%, var(--card-color));
+  --jc-tray-line: color-mix(in srgb, var(--primary-text) 18%, var(--border-color));
+}
+/* Caret-connection mechanics. NO border surgery anywhere: the tray floats
+   below the cards with its full rounded outline intact, and a popover-style
+   caret on its top edge points up at the open card — the standard
+   "this panel belongs to that anchor" idiom. The caret and table are static
+   layout inside the reveal, so framer's single tween (height + the air-gap
+   margin, see Jobcost.tsx) is the only clock. */
+.jc-member-reveal { overflow: hidden; }
+/* Triangle caret: the classic popover arrow — a rotated square, upper half
+   rising above the tray's edge as a crisp triangle, lower half sunk so the
+   fill sits over the tray's border segment beneath it. Hairline on the two
+   visible edges, 2px tip radius to keep the point from looking sharp-cheap.
+   3px top margin keeps the rotated tip inside the reveal's clip. */
+.jc-tray-caret {
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  transform: rotate(45deg);
+  background: var(--jc-tray-surface);
+  border-top: 1px solid var(--jc-tray-line);
+  border-left: 1px solid var(--jc-tray-line);
+  border-top-left-radius: 2px;
+  margin-top: 3px;
+  margin-bottom: -7px;
+  position: relative;
+  z-index: 1;
+}
+/* Centered under the open card: columns are 1fr 1fr with a 1.25rem gap, so
+   card midlines sit at 25% - 0.3125rem and 75% + 0.3125rem. */
+.jc-member-reveal-phases .jc-tray-caret { margin-left: calc(25% - 0.3125rem - 7px); }
+.jc-member-reveal-oneoffs .jc-tray-caret { margin-left: calc(75% + 0.3125rem - 7px); }
+.jc-member-reveal .jc-expand-breakdown {
+  border-color: var(--jc-tray-line);
+  background: var(--jc-tray-surface);
+}
+/* Single column: the open card spans the full width (and reorders to sit
+   directly above the tray), so the caret centers on the panel. */
+@media (max-width: 720px) {
+  .jc-member-reveal-phases .jc-tray-caret,
+  .jc-member-reveal-oneoffs .jc-tray-caret { margin-left: calc(50% - 7px); }
+}
+
+/* Overall stats strip at the top of an expanded property. Wears the same
+   ink-deck surface as the command bar (see the shared recipe above) so the
+   dark treatment reads as one system, not a one-off header. */
 .jc-group-overview {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 3rem;
   padding: 1.125rem 1.5rem;
-  background: var(--card-color);
-  border: 1px solid var(--border-color);
   border-radius: 12px;
+  /* Unlike the command bar this strip sits INSIDE a panel, not floating on
+     the page — keep the topline + contact shadow, drop the deep ambient. */
+  box-shadow:
+    inset 0 1px 0 var(--jcb-topline),
+    0 1px 2px rgb(from var(--jc-shadow-ink) r g b / 0.06);
 }
 .jc-overview-stat {
   display: flex;
@@ -4383,12 +5037,21 @@ body{
 .jc-overview-label {
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  color: var(--jcb-muted);
 }
-.jc-overview-value { font-variant-numeric: tabular-nums; }
+/* These are the property's bottom-line figures — they must outrank the
+   0.875rem detail rows in the cards below, not undercut them. */
+.jc-overview-value {
+  font-size: 1.1875rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--jcb-text);
+}
 
 /* The two sub-cards (Phases / One-Off Projects) floating on the open row's
-   copper-tinted panel. Whole card is a button; copper border marks the open
-   (active) card — background/border shifts only, no y-travel. */
+   panel. Whole card is a button; the member table below points a caret at
+   the open card — background/border shifts only, no y-travel. */
 .jc-group-card-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -4409,25 +5072,46 @@ body{
   background: var(--card-color);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  transition: border-color 150ms ease, background-color 150ms ease;
+  /* Same rule as the project head: these are toggles, double-clicking
+     shouldn't highlight the summary figures. */
+  -webkit-user-select: none;
+  user-select: none;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
 }
+/* Neutral hover (gray fill + ink border darken, same voice as the kind
+   chips) — copper stays reserved for the open card below. */
 .jc-group-card:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--primary-color) 40%, var(--border-color));
+  border-color: color-mix(in srgb, var(--primary-text) 25%, var(--border-color));
+  background: color-mix(in srgb, var(--primary-text) 4%, var(--card-color));
 }
-/* Open card = the active state: copper border + faint copper wash + copper
-   title, so there's no ambiguity about which member list is showing below. */
+/* Open sub-card: the card's SHAPE never changes — no corner morphing, no
+   dropped borders. It takes the tray surface + firmer ink border, and the
+   stem inside the reveal (below) pierces its bottom border to connect it
+   to the table. Hover is frozen: any shift would flicker the surface the
+   stem flows out of. */
 .jc-group-card-open,
 .jc-group-card-open:hover:not(:disabled) {
-  border-color: var(--primary-color);
-  background: color-mix(in srgb, var(--primary-color) 5%, var(--card-color));
+  border-color: var(--jc-tray-line);
+  background: var(--jc-tray-surface);
 }
-.jc-group-card-open .jc-group-card-title { color: var(--primary-color); }
+.jc-group-card-open .jc-group-card-title {
+  color: var(--primary-text);
+  font-weight: var(--font-weight-semibold);
+}
+/* Single column: the open card reorders below its sibling so it sits
+   directly on the table it fuses with — otherwise the closed card would
+   wedge between tab and tray. */
+@media (max-width: 720px) {
+  .jc-group-card-open { order: 1; }
+}
 
 /* Member table card: no caption row, so trim the table straight to the top
    edge and let the rounded card clip it. Outside the co-widget shell the
    base table gutters are tight — open the edge cells to a 1.25rem gutter
    and give rows a touch more height so the card breathes. */
-.jc-member-table { overflow: hidden; }
+/* Wide member tables pan inside the panel instead of bleeding past the
+   card's right edge. */
+.jc-member-table { overflow-x: auto; }
 .jc-member-table .spend-rank-table th,
 .jc-member-table .spend-rank-table td {
   padding-top: 0.625rem;
@@ -4461,6 +5145,8 @@ body{
   gap: 0.375rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  /* Active title color eases in with the card's border/shadow shift. */
+  transition: color 150ms ease;
 }
 .jc-group-card-count {
   display: inline-flex;
@@ -7074,9 +7760,32 @@ body{
 /* Job Costing desktop table wrapper — the ResizeObserver target that drives
    fit-based column hiding (Jobcost.tsx HIDE_ORDER). overflow-x is a last
    resort: if even the minimal column set can't fit, the table pans inside the
-   card instead of bleeding out of it. */
+   card instead of bleeding out of it.
+   overflow-y must be pinned to hidden: overflow-x:auto alone computes
+   overflow-y to auto, and the virtualizer's fractional spacer heights can
+   leave the content ~1px taller than the box (scrollHeight rounds up), which
+   makes the wrap micro-scrollable and pops a phantom second scrollbar inside
+   the card mid-list. It never legitimately scrolls vertically (auto height),
+   so hide + no anchoring. */
 .jc-table-wrap {
   overflow-x: auto;
+  overflow-y: hidden;
+  overflow-anchor: none;
+}
+
+/* Always-mounted sizer row (Jobcost.tsx JobTable): its cells carry the
+   dataset-widest content per column so column widths ignore which rows the
+   virtualizer currently has mounted. Horizontal padding stays identical to
+   real cells (it's part of the measured width); vertical padding and the
+   content's own height zero out so the row is invisible. */
+.co-widget .spend-rank-table .jc-sizer-body td {
+  padding-top: 0;
+  padding-bottom: 0;
+  border: none;
+}
+.jc-sizer-content {
+  height: 0;
+  overflow: hidden;
 }
 
 /* Project is the table's flexible column: width is its generous *preferred*
@@ -7095,6 +7804,13 @@ body{
 .co-widget .spend-rank-table td.jc-name-col {
   width: 22rem;
 }
+/* The change-orders fluid-gap rule (nth-child, below) pads this column's
+   left edge up to 2.25rem, stranding the name far from its chevron — pull
+   it back to a snug gap. tr> lifts specificity over the nth-child rule. */
+.co-widget .spend-rank-table tr > th.jc-name-col,
+.co-widget .spend-rank-table tr > td.jc-name-col {
+  padding-left: 0.375rem;
+}
 /* contain:inline-size zeroes the text's intrinsic-width contribution (table
    layout ignores max-width, so caps like max-width:0 don't work on columns);
    min-width then raises the contribution back to exactly the floor. */
@@ -7106,8 +7822,9 @@ body{
   white-space: nowrap;
 }
 
-/* Project cell sub-line: job number, plus the status badge when the Status
-   column is dropped for width. */
+/* Name cell sub-line. Property member tray: the job number. Project list
+   view: only the status badge, and only when the Status column is dropped
+   for width (the list rows carry no recnum). */
 .jc-name-sub {
   contain: inline-size;
   display: flex;
@@ -7227,17 +7944,6 @@ body{
   padding-top: 0;
   padding-bottom: 0;
 }
-.co-widget-toolbar .jc-scope-toggle {
-  box-sizing: border-box;
-  height: var(--co-control-h);
-}
-.co-widget-toolbar .jc-scope-toggle .period-selector-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-top: 0;
-  padding-bottom: 0;
-}
 
 .co-search-wrapper {
   position: relative;
@@ -7274,25 +7980,6 @@ body{
 
 .co-count { margin-left: auto; flex-shrink: 0; }
 
-/* Job Costing scope toggle (My Projects / All Projects) sits in the left
-   filter cluster, divided from the Status pills so the two filters read as
-   distinct groups. The divider is drawn as a pseudo-element in the toolbar
-   gap rather than as padding/border on the pill itself — putting it on the
-   pill would push empty space inside the rounded border. */
-.jc-scope-toggle {
-  position: relative;
-  flex-shrink: 0;
-}
-.jc-scope-toggle::before {
-  content: "";
-  position: absolute;
-  left: -0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1px;
-  height: 60%;
-  background: var(--border-color);
-}
 
 /* Sortable column headers inside spend-rank-table */
 .co-th-btn {
@@ -8408,8 +9095,9 @@ svg.placeholder-illustration {
   margin: 0;
   /* Right pad = 4rem so the whole actions cluster ends at the widget cutoff edge
      (matches .section-slide-content's 4rem right pad); left stays 2.5rem to keep
-     the title aligned with the widgets. */
-  padding: 1rem 4rem 1rem 2.5rem;
+     the title aligned with the widgets. Top = 2rem to match the normal .page
+     padding, so the title sits at the same y as every other page's header. */
+  padding: 2rem 4rem 1rem 2.5rem;
   background: transparent;
   pointer-events: none;
 }
@@ -8429,9 +9117,10 @@ svg.placeholder-illustration {
      (see its ResizeObserver) — turn native anchoring off so the two never
      double-correct. */
   overflow-anchor: none;
-  /* Content fades out under the overlay header. */
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 3rem);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 3rem);
+  /* Content fades out under the overlay header (fade spans past the title,
+     which now bottoms out around 3.6rem with the 2rem header padding). */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 4rem);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 4rem);
   /* Scrollbar hidden — the section dots are the only position reference. */
   scrollbar-width: none;
 }
@@ -9419,6 +10108,11 @@ svg.placeholder-illustration {
   .page-header-text {
     flex: 1;
     min-width: 0;
+  }
+
+  /* The desktop single-line height would overlap wrapped rows here. */
+  .page-header-actions {
+    height: auto;
   }
 
   /* Sticky header adjustment for reduced padding */

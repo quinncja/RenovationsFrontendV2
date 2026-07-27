@@ -3,7 +3,60 @@ import { ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ChevronDown } from "luci
 import { formatMoneyFull } from "../../../shared/utils/format"
 import { useItemDrilldown } from "../../dashboard/report/ActivityFeed"
 import type { RecentChangeItem } from "../../dashboard/widgets/recent/recentTypes"
-import { computeCostGroups, type BudgetBreakdown, type CostItem } from "../types"
+import { computeCostGroups, COST_TYPES, type BudgetBreakdown, type CostItem } from "../types"
+
+// Full-height loading stand-in for CostBreakdownTable. The table's shape is
+// fully known before the fetch returns — always the four COST_TYPES rows
+// plus Total — so this renders the real header, real category labels, and
+// shimmer bars where the numbers will land, at identical geometry. The
+// expanded row's open animation therefore travels to the FINAL height
+// immediately instead of landing short and jumping when data arrives.
+export function CostBreakdownSkeleton() {
+  const numCells = [0, 1, 2, 3]
+  return (
+    <table className="spend-rank-table jc-cost-breakdown" aria-hidden="true" style={{ pointerEvents: "none" }}>
+      <thead>
+        <tr>
+          {(["Category", "Budget", "Actual", "Variance", "Variance %"] as const).map((label, i) => (
+            <th key={label} className={i === 0 ? "spend-rank-table-name" : "spend-rank-table-value"}>
+              <span className={`co-th-btn${i === 0 ? "" : " co-th-btn-right"}`}>
+                {label} <ArrowUpDown size={11} />
+              </span>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {COST_TYPES.map((key) => (
+          <tr key={key} className="spend-rank-table-row">
+            <td className="spend-rank-table-name body-text emphasized">
+              <span className="jc-group-label">
+                <span className="jc-group-chevron"><ChevronRight size={11} /></span>
+                {key}
+              </span>
+            </td>
+            {numCells.map((i) => (
+              <td key={i} className="spend-rank-table-value body-text">
+                <span className="skel-line jc-skel-num" />
+              </td>
+            ))}
+          </tr>
+        ))}
+        <tr className="jc-total-row">
+          <td className="spend-rank-table-name body-text emphasized">
+            <span className="jc-group-chevron jc-group-chevron-spacer"><ChevronRight size={11} /></span>
+            Total
+          </td>
+          {numCells.map((i) => (
+            <td key={i} className="spend-rank-table-value body-text emphasized">
+              <span className="skel-line jc-skel-num" />
+            </td>
+          ))}
+        </tr>
+      </tbody>
+    </table>
+  )
+}
 
 type CostSortKey = "costGroup" | "budget" | "actual" | "variance" | "variancePct"
 type SortDir = "asc" | "desc"

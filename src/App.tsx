@@ -10,7 +10,7 @@ import { useAuth } from "./core/auth/AuthProvider"
 import { useOnboarding } from "./core/onboarding/OnboardingProvider"
 import AnalyticsTracker from "./shared/analytics/AnalyticsTracker"
 import IdleRefreshOverlay from "./core/components/IdleRefreshOverlay"
-import { DailyReportProvider } from "./modules/dashboard/report/DailyReportContext"
+import { DailyReportProvider } from "./modules/dashboard/report/DailyReportProvider"
 import { useAdminOnboardingTour } from "./modules/dashboard/onboarding/AdminOnboarding"
 import "./App.css"
 

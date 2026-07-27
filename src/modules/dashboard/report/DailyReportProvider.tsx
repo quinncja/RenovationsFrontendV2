@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useRef,
   useState,
@@ -20,6 +18,7 @@ import { DailyReportModal } from "./DailyReportModal"
 import { DailyReportCoach } from "./DailyReportCoach"
 import { DailyArrival, type ArrivalDestination } from "./arrival/DailyArrival"
 import { preloadEntryPages } from "./arrival/preload"
+import { DailyReportContext, type IntroStep } from "./DailyReportContext"
 
 // ─── Per-user markers ────────────────────────────────────────────────────────
 // This one recurring, daily-recap marker stays local (it's a per-day dedupe, not
@@ -37,28 +36,6 @@ function readMarker(key: string): string | null {
   } catch {
     return null
   }
-}
-
-/** First-run coachmark sequence, shown once the intro arrival lands on the
- *  dashboard home: 0 = idle, 1 = the header clock spotlight, 2 = the Reports
- *  nav-item hint. Each step's dismissal advances to the next (see advanceIntro). */
-export type IntroStep = 0 | 1 | 2
-
-interface DailyReportContextValue {
-  /** Open the report on demand (the header clock button). */
-  open: () => void
-  /** Which intro coachmark is currently showing (0 when none). */
-  introStep: IntroStep
-  /** Close the current coachmark: step 1 → step 2, step 2 → done. */
-  advanceIntro: () => void
-}
-
-const DailyReportContext = createContext<DailyReportContextValue | null>(null)
-
-export function useDailyReport(): DailyReportContextValue {
-  const ctx = useContext(DailyReportContext)
-  if (!ctx) throw new Error("useDailyReport must be used within DailyReportProvider")
-  return ctx
 }
 
 /** Which report the user gets: admin tier + GM company-wide, managers job-scoped.

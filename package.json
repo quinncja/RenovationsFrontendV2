@@ -20,6 +20,7 @@
     "@nivo/radial-bar": "^0.99.0",
     "@nivo/sankey": "^0.99.0",
     "@nivo/treemap": "^0.99.0",
+    "@tanstack/react-virtual": "^3.14.8",
     "ag-grid-community": "^33.0.0",
     "ag-grid-react": "^33.0.0",
     "firebase": "^12.10.0",
