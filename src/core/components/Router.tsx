@@ -31,6 +31,7 @@ const MonthlyBreakdownPage = lazy(() => import("../../modules/dashboard/MonthlyB
 const UpcomingBillingsPage = lazy(() => import("../../modules/dashboard/UpcomingBillingsPage.tsx"))
 const ProgressBillingsPage = lazy(() => import("../../modules/dashboard/ProgressBillingsPage.tsx"))
 const Invoices = lazy(() => import("../../modules/invoices/Invoices.tsx"))
+const OverheadReportPage = lazy(() => import("../../modules/dashboard/OverheadReportPage.tsx"))
 const Users = lazy(() => import("../../modules/users/Users.tsx"))
 const FeedbackPage = lazy(() => import("../../modules/feedback/FeedbackPage.tsx"))
 
@@ -105,6 +106,11 @@ export default function Router() {
             <Route path="/progress-billings" element={
               <RequireRole allowed={["executive", "admin"]}>
                 <SuspenseWrapper><ProgressBillingsPage /></SuspenseWrapper>
+              </RequireRole>
+            } />
+            <Route path="/overhead-report" element={
+              <RequireRole allowed={["executive", "admin"]}>
+                <SuspenseWrapper><OverheadReportPage /></SuspenseWrapper>
               </RequireRole>
             } />
 

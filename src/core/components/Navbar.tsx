@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate, useLocation } from "react-router-dom"
 import { Settings, ChevronsRight, ChevronsLeft, ChevronRight } from "lucide-react"
@@ -9,6 +9,9 @@ import { SettingsModal } from "../../shared/components/SettingsModal/SettingsMod
 import { useDailyReport } from "../../modules/dashboard/report/DailyReportContext"
 import { NavReportsHint } from "../../modules/dashboard/report/NavReportsHint"
 import { registerCoachTarget } from "../onboarding/coachTargets"
+import { useOnboarding } from "../onboarding/OnboardingProvider"
+import { SECTION_ANNOUNCEMENTS } from "../onboarding/sectionAnnouncements"
+import { NavSectionHint } from "../onboarding/NavSectionHint"
 import type { NavbarVeil } from "../../modules/dashboard/onboarding/AdminOnboarding"
 import Logo from "./Logo"
 import LogoText from "./LogoText"
@@ -20,12 +23,17 @@ function NavGroupItem({
   group,
   isOpen: sidebarOpen,
   active,
+  attention,
+  buttonRef,
   onOpenFlyout,
   onScheduleClose,
 }: {
   group: NavGroup
   isOpen: boolean
   active: boolean
+  /** Pulse ring while a new-section hint points at this group. */
+  attention?: boolean
+  buttonRef?: (el: HTMLButtonElement | null) => void
   onOpenFlyout: (group: NavGroup, anchor: DOMRect) => void
   onScheduleClose: () => void
 }) {
@@ -34,7 +42,8 @@ function NavGroupItem({
 
   return (
     <button
-      className={`button nav-button nav-group-header${active ? " nav-button-active" : ""}`}
+      ref={buttonRef}
+      className={`button nav-button nav-group-header${active ? " nav-button-active" : ""}${attention ? " nav-button-attention" : ""}`}
       onMouseEnter={open}
       onMouseLeave={onScheduleClose}
       onFocus={open}
@@ -64,6 +73,55 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
   const jobcostRef = useCallback((el: HTMLButtonElement | null) => {
     registerCoachTarget("nav-jobcost", el)
   }, [])
+  // Stable per-group callback refs for announcement coach targets.
+  const announcementRefs = useMemo(() => {
+    const refs = new Map<string, (el: HTMLButtonElement | null) => void>()
+    for (const a of SECTION_ANNOUNCEMENTS) {
+      if (!refs.has(a.navGroup)) refs.set(a.navGroup, (el) => registerCoachTarget(a.targetId, el))
+    }
+    return refs
+  }, [])
+
+  // Section announcements — incremental milestones (§4.5) shown to established
+  // users only (phase gates them off during setup; introStep off during the
+  // intro coachmarks; veil off during the admin tour). Of all unseen
+  // announcements the user's nav can show, only the NEWEST renders; a
+  // `?<previewParam>` previews its entry without stamping.
+  const { phase, resolving, seen, acknowledge } = useOnboarding()
+  const [previewAnnouncement] = useState(() => {
+    if (!import.meta.env.DEV) return null
+    const params = new URLSearchParams(window.location.search)
+    return SECTION_ANNOUNCEMENTS.filter((a) => params.has(a.previewParam)).at(-1) ?? null
+  })
+  const [previewDismissed, setPreviewDismissed] = useState(false)
+  const eligible = veil === "off" && introStep === 0 && phase === "onboarded" && !resolving
+  const navGroupLabels = new Set(navItems.filter(isNavGroup).map((g) => g.label))
+  const announcement = previewAnnouncement
+    ? previewDismissed
+      ? null
+      : previewAnnouncement
+    : (eligible
+        ? SECTION_ANNOUNCEMENTS.filter((a) => navGroupLabels.has(a.navGroup) && !seen(a.milestone))
+        : []
+      ).at(-1) ?? null
+
+  // Retire superseded announcements: while a newer one is showing, silently
+  // acknowledge every older unseen entry so a user who missed several releases
+  // is caught up by one hint instead of a queue of stale ones. (Runs regardless
+  // of the older entry's nav group — a role that never had the group shouldn't
+  // be nagged about it after a role change either.)
+  useEffect(() => {
+    if (!announcement || previewAnnouncement) return
+    const shownIdx = SECTION_ANNOUNCEMENTS.findIndex((a) => a.milestone === announcement.milestone)
+    for (const stale of SECTION_ANNOUNCEMENTS.slice(0, shownIdx)) {
+      if (!seen(stale.milestone)) acknowledge(stale.milestone)
+    }
+  }, [announcement, previewAnnouncement, seen, acknowledge])
+
+  const dismissAnnouncement = useCallback(() => {
+    if (previewAnnouncement) setPreviewDismissed(true)
+    else if (announcement) acknowledge(announcement.milestone)
+  }, [previewAnnouncement, announcement, acknowledge])
 
   // Flyout panel for nav groups: hover/click a group → its children float out to
   // the right, anchored to the group row. Works the same open or collapsed.
@@ -141,6 +199,8 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
                 group={item}
                 isOpen={isOpen}
                 active={item.items.some(child => location.pathname.startsWith(child.path))}
+                attention={announcement?.navGroup === item.label}
+                buttonRef={announcementRefs.get(item.label)}
                 onOpenFlyout={openFlyout}
                 onScheduleClose={scheduleClose}
               />
@@ -218,6 +278,17 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
       )}
 
       <NavReportsHint />
+
+      {/* Kept mounted with fallback props while inactive: AnimatePresence
+          freezes the exiting card's content, so the fallbacks never paint. */}
+      <NavSectionHint
+        targetId={(announcement ?? SECTION_ANNOUNCEMENTS[SECTION_ANNOUNCEMENTS.length - 1]).targetId}
+        active={announcement != null}
+        veiled={flyout != null}
+        title={announcement?.title ?? ""}
+        body={announcement?.body ?? ""}
+        onDismiss={dismissAnnouncement}
+      />
 
       <SettingsModal
         open={settingsOpen}

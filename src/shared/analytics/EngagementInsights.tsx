@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react"
 import { createPortal } from "react-dom"
-import { X } from "lucide-react"
-import type { WidgetEngagement, PageEngagement, ProjectEngagement } from "./engagementApi"
+import { X, ChevronRight } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import type { WidgetEngagement, PageEngagement, ProjectEngagement, SessionSummary } from "./engagementApi"
 import { widgetLabel, sectionLabel, pageLabel, formatDuration } from "./labels"
 import { useModalLayer } from "../hooks/useModalLayer"
 
@@ -380,6 +381,147 @@ export function ProjectEngagementList({
                 />
               )
             })}
+          </div>
+        )
+      }
+    </EngListCard>
+  )
+}
+
+// ─── Sessions ───────────────────────────────────────────────────────────────
+
+// "Jul 27" + "2:14 PM" for a session's start. Date and time split so the row can
+// weight them differently.
+function fmtSessionWhen(iso: string): { date: string; time: string } {
+  const d = new Date(iso)
+  if (isNaN(d.getTime())) return { date: "—", time: "" }
+  return {
+    date: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    time: d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
+  }
+}
+
+// One summary count — bold value + muted noun (singular/plural). Kept inline so
+// the row reads as one compact "3 pages · 1 project · 5 interactions" line.
+function SessCount({ n, noun }: { n: number; noun: string }) {
+  return (
+    <span className="eng-sess-count">
+      <b>{n.toLocaleString()}</b> {n === 1 ? noun : `${noun}s`}
+    </span>
+  )
+}
+
+// One expandable session: a full-width row reading left-to-right — when (start),
+// where they landed (entry page, filling the middle), then the pages / projects
+// / interactions summary. Expands to the ordered page path + the projects and
+// widgets touched.
+function SessionRow({ s }: { s: SessionSummary }) {
+  const [open, setOpen] = useState(false)
+  const { date, time } = fmtSessionWhen(s.startedAt)
+  const hasDetail = s.pages.length > 0 || s.projects.length > 0 || s.widgets.length > 0
+
+  return (
+    <div className={`eng-sess${open ? " eng-sess--open" : ""}`}>
+      <button
+        type="button"
+        className="eng-sess-head"
+        onClick={() => hasDetail && setOpen((o) => !o)}
+        aria-expanded={open}
+        disabled={!hasDetail}
+      >
+        <span className="eng-sess-when">
+          <ChevronRight size={15} className="eng-sess-caret" aria-hidden />
+          <span className="eng-sess-date">{date}</span>
+          <span className="eng-sess-time">{time}</span>
+        </span>
+        <span className="eng-sess-entry" title={s.entryPage ? pageLabel(s.entryPage) : undefined}>
+          {s.entryPage ? pageLabel(s.entryPage) : ""}
+        </span>
+        <span className="eng-sess-summary">
+          <SessCount n={s.pageCount} noun="page" />
+          <span className="eng-sess-dot">·</span>
+          <SessCount n={s.projectCount} noun="project" />
+          <span className="eng-sess-dot">·</span>
+          <SessCount n={s.interactions} noun="interaction" />
+        </span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && hasDetail && (
+          <motion.div
+            className="eng-sess-detail-wrap"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
+          >
+            <div className="eng-sess-detail">
+              {s.pages.length > 0 && (
+                <div className="eng-sess-group">
+                  <span className="eng-sess-group-label">Path</span>
+                  <div className="eng-sess-path">
+                    {s.pages.map((p, i) => (
+                      <span className="eng-sess-step" key={`${p}-${i}`}>
+                        {i > 0 && <ChevronRight size={11} className="eng-sess-step-sep" aria-hidden />}
+                        <span className="eng-sess-node">{pageLabel(p)}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {s.projects.length > 0 && (
+                <div className="eng-sess-group">
+                  <span className="eng-sess-group-label">Projects</span>
+                  <div className="eng-sess-chips">
+                    {s.projects.map((p) => (
+                      <span className="eng-sess-chip" key={p.recnum}>
+                        {p.name?.trim() || `Job #${p.recnum}`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {s.widgets.length > 0 && (
+                <div className="eng-sess-group">
+                  <span className="eng-sess-group-label">Widgets</span>
+                  <div className="eng-sess-chips">
+                    {s.widgets.map((w) => (
+                      <span className="eng-sess-chip" key={`${w.widgetId}-${w.section ?? ""}`}>
+                        {widgetLabel(w.widgetId)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+export function SessionEngagementList({
+  sessions,
+  title,
+  subtitle,
+  emptyHint = "No sessions recorded yet.",
+}: {
+  sessions: SessionSummary[]
+  title: string
+  subtitle: string
+  emptyHint?: string
+}) {
+  return (
+    <EngListCard title={title} subtitle={subtitle} total={sessions.length}>
+      {(limit) =>
+        sessions.length === 0 ? (
+          <p className="eng-empty">{emptyHint}</p>
+        ) : (
+          <div className="eng-sess-list">
+            {sessions.slice(0, limit).map((s) => (
+              <SessionRow key={s.sessionId} s={s} />
+            ))}
           </div>
         )
       }

@@ -12,21 +12,30 @@ import {
 } from "../../shared/components/MonthlyDetailTable/MonthlyDetailTable"
 import type { SheetRow, StyledCell } from "../../shared/utils/exportXlsx"
 
-// Builds the styled cell matrix for the Monthly Breakdown XLSX export. Two
-// sections — Monthly Summary (one row per month + total) followed by Line
-// Items Detail (every contributing lgrtrn/lgtnln row, ordered + filtered
-// the same way the on-screen MonthlyDetailTable does, with `Month`
-// prepended so each detail row stands alone). Returns rows plus the
-// header-row index so the caller can hand it to downloadXlsx's autofilter.
+// Builds the styled cell matrix for the Monthly Breakdown XLSX export. The base
+// report is two sections — Monthly Summary (one row per month + total) followed
+// by Line Items Detail (every contributing lgrtrn/lgtnln row, ordered +
+// filtered the same way the on-screen MonthlyDetailTable does, with `Month`
+// prepended so each detail row stands alone).
+//
+// Callers with richer data (the Overhead report) can opt into extra sections —
+// a KPI summary band, a prior-year column on the monthly summary, and a
+// per-category breakdown — via the optional fields on BreakdownExportInput.
+// Callers that omit them get the original two-section layout unchanged.
 
-// ── Colors ────────────────────────────────────────────────────────────────────
+// ── Colors (brand copper) ──────────────────────────────────────────────────────
 
-const BRAND       = "1F78C5"
-const BRAND_LIGHT = "EBF3FA"
+const BRAND       = "C27C3E" // copper — title text / accents
+const BRAND_DARK  = "9A5626" // deeper copper — header fills (white text stays legible)
+const BRAND_LIGHT = "F7EEE3" // light copper — zebra stripe / KPI values
 const GRAY_BG     = "F5F6F8"
 const BORDER_CLR  = "D0D5DD"
 const WHITE       = "FFFFFF"
 const BLACK       = "000000"
+const MUTED       = "6B7280"
+
+const MONEY_FMT = "#,##0.00"
+const PCT_FMT   = '0.0"%"'
 
 const thinBorder = { style: "thin" as const, color: { rgb: BORDER_CLR } }
 const cellBorder = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }
@@ -39,20 +48,20 @@ const titleStyle: StyledCell["s"] = {
 }
 
 const subtitleStyle: StyledCell["s"] = {
-  font: { sz: 12, color: { rgb: "6B7280" } },
+  font: { sz: 12, color: { rgb: MUTED } },
   alignment: { horizontal: "left" },
 }
 
 const sectionStyle: StyledCell["s"] = {
   font: { bold: true, color: { rgb: WHITE }, sz: 14 },
-  fill: { fgColor: { rgb: BRAND } },
+  fill: { fgColor: { rgb: BRAND_DARK } },
   alignment: { horizontal: "left", vertical: "center" },
   border: cellBorder,
 }
 
 const tableHeaderStyle: StyledCell["s"] = {
   font: { bold: true, color: { rgb: WHITE }, sz: 12 },
-  fill: { fgColor: { rgb: BRAND } },
+  fill: { fgColor: { rgb: BRAND_DARK } },
   alignment: { horizontal: "right", vertical: "center" },
   border: cellBorder,
 }
@@ -74,7 +83,15 @@ function bodyStyle(stripe: boolean): StyledCell["s"] {
 function bodyMoneyStyle(stripe: boolean): StyledCell["s"] {
   return {
     ...bodyStyle(stripe),
-    numFmt: '#,##0.00',
+    numFmt: MONEY_FMT,
+    alignment: { horizontal: "right", vertical: "center" },
+  }
+}
+
+function bodyPctStyle(stripe: boolean): StyledCell["s"] {
+  return {
+    ...bodyStyle(stripe),
+    numFmt: PCT_FMT,
     alignment: { horizontal: "right", vertical: "center" },
   }
 }
@@ -95,7 +112,28 @@ const totalLabelStyle: StyledCell["s"] = {
 
 const totalMoneyStyle: StyledCell["s"] = {
   ...totalLabelStyle,
-  numFmt: '#,##0.00',
+  numFmt: MONEY_FMT,
+  alignment: { horizontal: "right", vertical: "center" },
+}
+
+const totalPctStyle: StyledCell["s"] = {
+  ...totalLabelStyle,
+  numFmt: PCT_FMT,
+  alignment: { horizontal: "right", vertical: "center" },
+}
+
+const kpiLabelStyle: StyledCell["s"] = {
+  font: { bold: true, sz: 12 },
+  fill: { fgColor: { rgb: GRAY_BG } },
+  border: cellBorder,
+  alignment: { horizontal: "left", vertical: "center" },
+}
+
+const kpiValueStyle: StyledCell["s"] = {
+  font: { bold: true, sz: 12, color: { rgb: BRAND_DARK } },
+  fill: { fgColor: { rgb: BRAND_LIGHT } },
+  border: cellBorder,
+  numFmt: MONEY_FMT,
   alignment: { horizontal: "right", vertical: "center" },
 }
 
@@ -103,6 +141,10 @@ const totalMoneyStyle: StyledCell["s"] = {
 
 function styled(v: string | number | null, s?: StyledCell["s"]): StyledCell {
   return { v, s }
+}
+
+function num(v: number, s?: StyledCell["s"]): StyledCell {
+  return { v, s, t: "n" }
 }
 
 function sectionHeader(label: string, colSpan: number): SheetRow {
@@ -163,6 +205,20 @@ export interface BreakdownExportInput {
   year: number
   monthlyTotals: { month: number; value: number }[]
   lineItems: Record<string, unknown>[]
+
+  // ── Optional richer sections (Overhead report) ──
+  /** Summary band rendered above the monthly table. */
+  kpis?: { label: string; value: number | null; format?: "money" | "percent" }[]
+  /** Prior-year value per month. When present the Monthly Summary gains
+   *  {prevYear} / Change / Change % columns. */
+  monthlyPrevious?: { month: number; value: number }[]
+  /** Per-account breakdown, both years, rendered as its own section. */
+  categories?: {
+    accountNumber: string | number
+    accountName: string
+    current: number
+    previous: number
+  }[]
 }
 
 export interface XlsxBuildResult {
@@ -173,7 +229,8 @@ export interface XlsxBuildResult {
 }
 
 export function buildMonthlyBreakdownXlsx(input: BreakdownExportInput): XlsxBuildResult {
-  const { title, totalLabel, year, monthlyTotals, lineItems } = input
+  const { title, totalLabel, year, monthlyTotals, lineItems, kpis, monthlyPrevious, categories } = input
+  const prevYear = year - 1
   const rows: SheetRow[] = []
 
   // ── Report title ──
@@ -184,27 +241,113 @@ export function buildMonthlyBreakdownXlsx(input: BreakdownExportInput): XlsxBuil
   ])
   rows.push(emptyRow())
 
+  // ── Summary KPIs (optional) ──
+  if (kpis && kpis.length) {
+    rows.push(sectionHeader("Summary", 2))
+    for (const k of kpis) {
+      const valueCell: StyledCell =
+        k.value == null
+          ? styled("—", { ...kpiValueStyle, numFmt: undefined })
+          : k.format === "percent"
+            ? num(k.value, { ...kpiValueStyle, numFmt: PCT_FMT })
+            : num(k.value, kpiValueStyle)
+      rows.push([styled(k.label, kpiLabelStyle), valueCell])
+    }
+    rows.push(emptyRow())
+  }
+
   // ── Monthly summary ──
-  rows.push(sectionHeader("Monthly Summary", 2))
-  rows.push([
-    styled("Month", tableHeaderLeftStyle),
-    styled(totalLabel, tableHeaderStyle),
-  ])
+  const withPrev = !!(monthlyPrevious && monthlyPrevious.length)
+  const prevByMonth = new Map((monthlyPrevious ?? []).map((r) => [r.month, r.value]))
+
+  const monthlyCols = withPrev ? 5 : 2
+  rows.push(sectionHeader("Monthly Summary", monthlyCols))
+  rows.push(
+    withPrev
+      ? [
+          styled("Month", tableHeaderLeftStyle),
+          styled(`${totalLabel} (${year})`, tableHeaderStyle),
+          styled(`${totalLabel} (${prevYear})`, tableHeaderStyle),
+          styled("Change", tableHeaderStyle),
+          styled("Change %", tableHeaderStyle),
+        ]
+      : [styled("Month", tableHeaderLeftStyle), styled(totalLabel, tableHeaderStyle)],
+  )
+
   const sortedMonthly = [...monthlyTotals].sort((a, b) => a.month - b.month)
   let yearTotal = 0
+  let prevTotal = 0
   sortedMonthly.forEach((row, i) => {
     const stripe = i % 2 === 1
     yearTotal += row.value
-    rows.push([
-      styled(fullMonth(row.month), bodyStyle(stripe)),
-      { v: row.value, s: bodyMoneyStyle(stripe), t: "n" },
-    ])
+    if (withPrev) {
+      const prev = prevByMonth.get(row.month) ?? 0
+      prevTotal += prev
+      const change = row.value - prev
+      rows.push([
+        styled(fullMonth(row.month), bodyStyle(stripe)),
+        num(row.value, bodyMoneyStyle(stripe)),
+        num(prev, bodyMoneyStyle(stripe)),
+        num(change, bodyMoneyStyle(stripe)),
+        prev !== 0 ? num((change / Math.abs(prev)) * 100, bodyPctStyle(stripe)) : styled("—", bodyPctStyle(stripe)),
+      ])
+    } else {
+      rows.push([styled(fullMonth(row.month), bodyStyle(stripe)), num(row.value, bodyMoneyStyle(stripe))])
+    }
   })
-  rows.push([
-    styled("Total", totalLabelStyle),
-    { v: yearTotal, s: totalMoneyStyle, t: "n" },
-  ])
+
+  if (withPrev) {
+    const totalChange = yearTotal - prevTotal
+    rows.push([
+      styled("Total", totalLabelStyle),
+      num(yearTotal, totalMoneyStyle),
+      num(prevTotal, totalMoneyStyle),
+      num(totalChange, totalMoneyStyle),
+      prevTotal !== 0 ? num((totalChange / Math.abs(prevTotal)) * 100, totalPctStyle) : styled("—", totalPctStyle),
+    ])
+  } else {
+    rows.push([styled("Total", totalLabelStyle), num(yearTotal, totalMoneyStyle)])
+  }
   rows.push(emptyRow())
+
+  // ── Category breakdown (optional) ──
+  if (categories && categories.length) {
+    const sortedCats = [...categories].sort((a, b) => b.current - a.current)
+    const catTotal = sortedCats.reduce((s, c) => s + c.current, 0)
+    const catPrevTotal = sortedCats.reduce((s, c) => s + c.previous, 0)
+
+    rows.push(sectionHeader("Category Breakdown", 6))
+    rows.push([
+      styled("Account", tableHeaderLeftStyle),
+      styled("Category", tableHeaderLeftStyle),
+      styled(`${year}`, tableHeaderStyle),
+      styled(`${prevYear}`, tableHeaderStyle),
+      styled("Change", tableHeaderStyle),
+      styled("% of Total", tableHeaderStyle),
+    ])
+    sortedCats.forEach((c, i) => {
+      const stripe = i % 2 === 1
+      const change = c.current - c.previous
+      const share = catTotal > 0 ? (c.current / catTotal) * 100 : 0
+      rows.push([
+        styled(String(c.accountNumber), bodyStyle(stripe)),
+        styled(c.accountName, bodyStyle(stripe)),
+        num(c.current, bodyMoneyStyle(stripe)),
+        num(c.previous, bodyMoneyStyle(stripe)),
+        num(change, bodyMoneyStyle(stripe)),
+        num(share, bodyPctStyle(stripe)),
+      ])
+    })
+    rows.push([
+      styled("Total", totalLabelStyle),
+      styled("", totalLabelStyle),
+      num(catTotal, totalMoneyStyle),
+      num(catPrevTotal, totalMoneyStyle),
+      num(catTotal - catPrevTotal, totalMoneyStyle),
+      num(100, totalPctStyle),
+    ])
+    rows.push(emptyRow())
+  }
 
   // ── Line-item detail (every GL line, ordered + filtered like the on-screen table) ──
   const visibleKeys = (() => {

@@ -35,6 +35,30 @@ export interface ProjectEngagement {
   userCount?: number // company view only
 }
 
+/** One reconstructed browsing session, most-recent first. Duration is omitted by
+ * design (not meaningful under the 2h idle-refresh model). Counts are exact; the
+ * enumerated `pages`/`projects`/`widgets` lists are capped server-side. */
+export interface SessionSummary {
+  sessionId: string
+  startedAt: string
+  /** Total page navigations (incl. repeats). */
+  pageViews: number
+  /** Deliberate interaction events (widget hover/click, tooltip, project open). */
+  interactions: number
+  /** Distinct pages visited. */
+  pageCount: number
+  /** Distinct projects opened. */
+  projectCount: number
+  /** Distinct widgets engaged. */
+  widgetCount: number
+  /** First route landed on this session (null if none recorded). */
+  entryPage: string | null
+  /** Ordered page path, consecutive repeats collapsed. */
+  pages: string[]
+  projects: Array<{ recnum: string; name: string | null }>
+  widgets: Array<{ widgetId: string; section: string | null }>
+}
+
 export interface UserEngagement {
   rangeDays: number
   topWidgets: WidgetEngagement[]
@@ -44,6 +68,8 @@ export interface UserEngagement {
   /** All-time sessions (bounded by 180-day raw-event retention). */
   totalSessionCount: number
   daily: Array<{ date: string; count: number }>
+  /** Most recent individual sessions with per-session activity detail. */
+  sessions: SessionSummary[]
 }
 
 export interface CompanyEngagement {

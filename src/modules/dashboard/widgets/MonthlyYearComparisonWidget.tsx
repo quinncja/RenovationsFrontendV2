@@ -60,6 +60,10 @@ interface Props {
    *  toggle is folding the open period into this chart. Opt-in (Gross Revenue
    *  / Net Profit) rather than tied to `overUnderApplies`. */
   wipTitleSuffix?: boolean
+  /** Passthroughs for click-to-filter pages (e.g. the Overhead Report's
+   *  chart-click → monthly-table filter). See ChartConfig for semantics. */
+  onPointClick?: (xValue: string) => void
+  highlightedX?: string | null
 }
 
 export function MonthlyYearComparisonWidget({
@@ -71,6 +75,8 @@ export function MonthlyYearComparisonWidget({
   includeOpenPeriod,
   overUnderApplies,
   wipTitleSuffix,
+  onPointClick,
+  highlightedX,
 }: Props) {
   const year = usePageYear()
   const lastYear = year - 1
@@ -198,7 +204,7 @@ export function MonthlyYearComparisonWidget({
     <Widget title={displayTitle} loading={isLoading} noData={!series} actions={viewLink}>
       {series && (
         <Chart
-          config={{ type: "line", series, legend: true, markers, pulsePoint, wipMonthLabel }}
+          config={{ type: "line", series, legend: true, markers, pulsePoint, wipMonthLabel, onPointClick, highlightedX }}
         />
       )}
     </Widget>

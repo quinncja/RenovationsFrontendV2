@@ -35,6 +35,18 @@ export const PAGE_QUERIES = {
   dashboardBreakdownDirectExpense: ["monthlyDirectExpenseComparison", "openMonthFinances", "directExpenseLineItems"],
   dashboardBreakdownOverhead: ["monthlyOverheadComparison", "openMonthFinances", "overheadLineItems"],
 
+  // Overhead Expense Report (Finances tab) — monthly + cumulative comparisons,
+  // per-category donut with drill-down (line items filtered client-side by
+  // GL account), annual YoY trend, and overhead-as-%-of-revenue.
+  overheadReport: [
+    "monthlyOverheadComparison",
+    "monthlyRevenueComparison",
+    "openMonthFinances",
+    "overheadLineItems",
+    "overheadCategoryComparison",
+    "annualOverheadTrend",
+  ],
+
   // Upcoming Billings breakdown — the per-invoice open AR/AP rows behind the chart.
   dashboardUpcomingBillings: ["agingSummaryOpen"],
 

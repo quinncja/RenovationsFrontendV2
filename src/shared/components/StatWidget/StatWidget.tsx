@@ -19,6 +19,9 @@ interface StatWidgetProps {
   format?: ((v: number) => string) | FormatPreset
   /** Optional caption rendered below the value (e.g. a YoY delta). Hidden during loading/offline/no-data. */
   caption?: ReactNode
+  /** Optional badge pinned to the card's top-right corner, opposite the title
+   *  (e.g. a YoY pill). Hidden during loading/offline/no-data. */
+  badge?: ReactNode
   /** Optional inline color for the value text (e.g. margin-color thresholds).
    *  Only applied when a real value is rendered — loading/no-data/offline
    *  states keep their default coloring. */
@@ -32,15 +35,20 @@ export function StatWidget({
   disconnected,
   format = "money",
   caption,
+  badge,
   valueColor,
 }: StatWidgetProps) {
   const pageDisconnected = usePageDisconnected()
   const isDisconnected = disconnected || pageDisconnected
   const formatFn = typeof format === "function" ? format : FORMATTERS[format]
+  const showBadge = badge != null && !loading && !isDisconnected && value != null
 
   return (
     <div className="stat-widget card">
-      <span className="stat-widget-title subheadline">{title}</span>
+      <div className="stat-widget-head">
+        <span className="stat-widget-title subheadline">{title}</span>
+        {showBadge && badge}
+      </div>
       {loading ? (
         <div className="stat-widget-skeleton" />
       ) : isDisconnected ? (

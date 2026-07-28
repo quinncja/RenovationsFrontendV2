@@ -5,7 +5,7 @@
 
 import { useCallback, useSyncExternalStore } from "react"
 
-export type CoachTargetId = "edit-gear" | "wip-toggle" | "nav-jobcost"
+export type CoachTargetId = "edit-gear" | "wip-toggle" | "nav-jobcost" | "nav-finances"
 
 const targets = new Map<CoachTargetId, HTMLElement>()
 const listeners = new Map<CoachTargetId, Set<() => void>>()

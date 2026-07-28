@@ -1566,6 +1566,15 @@ body{
   letter-spacing: 0.04em;
 }
 
+/* Title row: title on the left, optional corner badge (e.g. a YoY pill)
+   pinned to the right. */
+.stat-widget-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .stat-widget-value {
   color: var(--primary-text);
 }
@@ -6560,6 +6569,74 @@ button.jc-kind-chip:hover {
   margin-bottom: 0.5rem;
 }
 
+/* ── Onboarding checklist (advanced view) ──
+   Compact strip inside the API-activity card (no card of its own — the overview
+   must fit its pager section without scrolling): hairline divider, label and
+   pills on one row. Done vs pending is carried by fill + the check/dot mark,
+   not color shouting; seen dates live in the pill tooltips. */
+.usr-onb-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Same caption voice as .invoice-modal-section-label, without its spacing. */
+.usr-onb-strip-label {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--secondary-text);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.usr-onb-skeleton {
+  height: 1.5rem;
+  flex: 1;
+}
+
+.usr-onb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.usr-onb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.18rem 0.55rem;
+  border: 1px dashed var(--border-color);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--secondary-text);
+  cursor: default;
+}
+
+.usr-onb-chip--done {
+  border-style: solid;
+  background: var(--hover-bg);
+  color: var(--primary-text);
+}
+
+.usr-onb-chip--done svg {
+  color: #4d8f66; /* the app's quiet-good sage, not alert green */
+}
+
+/* Pending marker: a hollow dot where the check would be. */
+.usr-onb-dot {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 .usr-activity-chart {
   height: 16rem;
   display: flex;
@@ -6598,6 +6675,210 @@ button.jc-kind-chip:hover {
   font-size: 0.8125rem;
   color: var(--secondary-text);
   padding: 0.75rem 0;
+}
+
+/* ─── Recent sessions (per-user modal) ─────────────────────────────────────── */
+
+/* Sessions wrapper — mirrors .usr-activity-eng-lists' top margin, but a distinct
+   class so the pager panel does NOT get the lists' overflow:hidden rule: an
+   expanded session grows the card, and the active panel must scroll to reveal it. */
+.usr-activity-sessions {
+  margin-top: 2.25rem;
+}
+
+/* The sessions list runs edge-to-edge inside its card: zero the card's
+   horizontal padding (mirrors .widget:has(.data-table)) and re-pad the header +
+   rows, so each row's hover band and divider span the full container width. */
+.ceng-col:has(.eng-sess-list) {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ceng-col:has(.eng-sess-list) .ceng-col-head {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.eng-sess-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Hairline divider between rows — no divider above the first. The open row keeps
+   its divider so the row + detail read as one banded block. */
+.eng-sess + .eng-sess {
+  border-top: 1px solid var(--border-color);
+}
+
+/* Full-width row: when (left, fixed column so entry pages line up) · entry page
+   (grows to fill the middle) · summary counts (right). The whole row toggles the
+   detail; a session with no detail is inert (caret hidden). */
+.eng-sess-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition: background 0.14s ease;
+}
+
+.eng-sess-head:hover:not(:disabled),
+.eng-sess-head:focus-visible {
+  background: var(--hover-bg);
+}
+
+.eng-sess--open .eng-sess-head {
+  background: color-mix(in srgb, var(--secondary-text) 8%, transparent);
+}
+
+.eng-sess-head:disabled {
+  cursor: default;
+}
+
+/* When: chevron + date + time. Fixed min-width so entry pages align in a tidy
+   column down the list, table-like, without a rigid table. */
+.eng-sess-when {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  flex-shrink: 0;
+  min-width: 9.5rem;
+}
+
+/* Caret rotates to point down when open — the one moving part. */
+.eng-sess-caret {
+  align-self: center;
+  color: var(--secondary-text);
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.eng-sess--open .eng-sess-caret {
+  transform: rotate(90deg);
+  color: var(--primary-text);
+}
+
+.eng-sess-head:disabled .eng-sess-caret {
+  visibility: hidden;
+}
+
+.eng-sess-date {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+
+.eng-sess-time {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+}
+
+/* Entry page fills the middle so the row uses the full width instead of leaving
+   a hollow gap; truncates rather than pushing the summary off the right edge. */
+.eng-sess-entry {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eng-sess-summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  white-space: nowrap;
+}
+
+.eng-sess-count b {
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.eng-sess-dot {
+  color: var(--border-color);
+}
+
+/* framer-motion animates the wrapper's height/opacity; overflow clip keeps the
+   content from spilling during the collapse. */
+.eng-sess-detail-wrap {
+  overflow: hidden;
+}
+
+.eng-sess-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.35rem 1.25rem 1rem 2.9rem;
+}
+
+.eng-sess-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.eng-sess-group-label {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--secondary-text);
+}
+
+/* Ordered path: nodes separated by a small chevron, wrapping as needed. */
+.eng-sess-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.1rem;
+}
+
+.eng-sess-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.eng-sess-step-sep {
+  color: var(--secondary-text);
+  opacity: 0.55;
+  margin: 0 0.15rem;
+  flex-shrink: 0;
+}
+
+.eng-sess-node {
+  font-size: 0.78rem;
+  color: var(--primary-text);
+}
+
+.eng-sess-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.eng-sess-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.16rem 0.55rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--primary-text);
+  background: var(--card-color);
 }
 
 .eng-list {
@@ -10524,6 +10805,149 @@ svg.placeholder-illustration {
 .mbp-table-widget .widget-header { padding: 1.25rem 1.25rem 0.75rem; }
 .mbp-table-widget .widget-body { padding: 0; gap: 0; }
 
+/* ── Overhead Expense Report ── */
+/* Give the four summary tiles a touch more room than the dense default so the
+   value + delta chip don't feel packed. */
+.ohr-kpi-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.875rem;
+}
+
+/* Monthly / Running total toggle in the trend widget's header. Mirrors the
+   Job Costing command-bar segmented control (.jc-seg on the jobcost branch):
+   recessed well + a copper thumb that slides between segments (framer
+   layoutId). Values are self-contained here because this one sits on a white
+   widget card rather than the command bar's ink deck. */
+.ohr-seg {
+  display: flex;
+  align-items: stretch;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgb(from var(--primary-text) r g b / 0.06);
+  box-shadow: inset 0 1px 2px light-dark(rgb(from var(--primary-text) r g b / 0.1), rgba(0, 0, 0, 0.25));
+  flex-shrink: 0;
+}
+
+.ohr-seg-btn {
+  position: relative;
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.3rem 0.8rem;
+  border-radius: 8px;
+  font-family: var(--font-family);
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  color: var(--secondary-text);
+  transition: color 160ms ease;
+}
+
+.ohr-seg-btn:hover { color: var(--primary-text); }
+.ohr-seg-btn-active,
+.ohr-seg-btn-active:hover { color: #fff; }
+
+.ohr-seg-thumb {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--primary-color-hover) 0%, var(--primary-color) 100%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.ohr-seg-label { position: relative; z-index: 1; }
+
+/* YoY pill in the top-right corner of each summary tile ("▼ 4% vs ’25").
+   The inline style carries the color + tinted background. */
+.ohr-kpi-pill {
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rows in the "Other categories" drill-down modal are clickable (each opens
+   that category's cost modal on top). */
+.ohr-other-row {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.ohr-other-row:hover {
+  background: var(--hover-bg);
+}
+
+/* ── Top Movers list ──
+   Each row: a soft tinted trend badge, the category name, and a right-aligned
+   figure stack (signed amount over its % change). Restrained and scannable —
+   the badge carries the up/down read so the numbers can stay calm. */
+.ohr-movers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.ohr-mover {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  padding: 0.55rem 0.5rem;
+  border-radius: 10px;
+  transition: background-color 0.15s;
+}
+
+.ohr-mover:hover {
+  background: var(--hover-bg);
+}
+
+.ohr-mover-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+}
+
+.ohr-mover-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--primary-text);
+  font-size: var(--body-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.ohr-mover-figures {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.05rem;
+  line-height: 1.2;
+}
+
+.ohr-mover-amt {
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.ohr-mover-pct {
+  font-size: 0.72rem;
+  color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Monthly Detail Table (shared component) ── */
 /* Outer monthly table — fixed layout so the inner items row can't widen the card. */
 .mdt-table {
@@ -10534,16 +10958,23 @@ svg.placeholder-illustration {
 }
 
 .mdt-month-col { width: 40%; }
-.mdt-total-col { width: 60%; text-align: right; }
-.mdt-table th.mdt-total-col { text-align: right; }
+.mdt-total-col { width: 60%; }
 
-/* In this drill-down popup the row hover reads neutral, not copper. The base
-   .jc-group-row / .jc-txn-row hovers tint with --primary-color (kept for the
-   Job Cost page), so scope a gray override to the mdt- tables only. The extra
-   class here outranks the base single-class hover rules. */
-.mdt-table .jc-group-row:hover,
-.mdt-line-table .jc-txn-row:hover {
-  background: var(--hover-bg);
+/* Expand chevron on a month row. */
+.mdt-chevron {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  color: var(--secondary-text);
+  transition: color 120ms;
+}
+.mdt-month-row:hover .mdt-chevron { color: var(--primary-text); }
+
+/* Open month + its line-item panel read as one recessed block. */
+.mdt-month-row-expanded,
+.mdt-items-row > .mdt-items-cell {
+  background: light-dark(rgba(0, 0, 0, 0.02), rgba(255, 255, 255, 0.02));
 }
 
 .mdt-loading,
@@ -10578,41 +11009,16 @@ svg.placeholder-illustration {
   border-collapse: collapse;
 }
 
-.mdt-line-table .jc-txn-th,
-.mdt-line-table .jc-txn-row td {
+.mdt-line-table th,
+.mdt-line-table td {
   white-space: nowrap;
 }
 
-/* Sort header button inside the line-item table. */
-.mdt-line-table .jc-txn-th { padding: 0; }
-
-.mdt-sort-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  width: 100%;
-  padding: 0.5rem 1.125rem;
-  background: transparent;
-  border: none;
-  font-family: var(--font-family);
-  font-size: 0.5938rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--secondary-text);
-  cursor: pointer;
-  text-align: left;
-  white-space: nowrap;
-  transition: color 0.12s ease, background 0.12s ease;
-}
-
-.mdt-sort-btn:hover {
-  color: var(--primary-text);
-  background: color-mix(in srgb, var(--primary-color) 5%, transparent);
-}
-
-.mdt-sort-btn.active {
-  color: var(--primary-color);
+/* The last line-item row keeps its border — it doubles as the divider between
+   the open panel and the next month row (the outer :last-child rule only
+   applies to the outer table's own final row). */
+.mdt-items-row:not(:last-child) .mdt-line-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--border-color);
 }
 
 /* ── Widget Search ── */
@@ -13243,6 +13649,17 @@ svg.placeholder-illustration {
 @keyframes navHintIn {
   from { opacity: 0; transform: translateY(calc(-50% - 6px)) scale(0.97); }
   to { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+
+/* New-section announcement variant (NavSectionHint): same card, but framer
+   drives entrance/exit and centering is measured in JS — so the CSS keyframe
+   and the translateY(-50%) both switch off. z drops below the arrival/admin
+   screens (190) and the modal base (200): if a full-screen overlay is up, the
+   hint waits underneath it instead of floating on top. */
+.nav-hint--motion {
+  z-index: 150;
+  transform: none;
+  animation: none;
 }
 
 .nav-hint-arrow {
