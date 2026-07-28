@@ -44,11 +44,14 @@ added or retired.
   plain recap. Auto-open starts the day AFTER `onboardedAt`.
 
 **D — New-section announcements (incremental milestones)**
-- `NavSectionHint.tsx` (this directory): reusable one-time popover anchored to
-  a nav item, non-blocking, veils under an open flyout, auto-acknowledged by
-  visiting the section it announces. First instance: `section:overhead-report`
-  on the Finances group (wired in `core/components/Navbar.tsx`; the page visit
-  acknowledge lives in `OverheadReportPage.tsx`).
+- Registry-driven: `sectionAnnouncements.ts` (this directory) lists every
+  shipped announcement oldest → newest; `Navbar.tsx` renders at most ONE —
+  the newest unseen entry — via `NavSectionHint.tsx` (one-time popover,
+  non-blocking, veils under an open flyout). Older unseen entries are silently
+  acknowledged while a newer one shows (superseded — a user who missed several
+  releases gets one hint, never a queue), and visiting the announced section
+  acknowledges it too. First instance: `section:overhead-report` on the
+  Finances group (page-visit acknowledge in `OverheadReportPage.tsx`).
 
 ## Engine surface (`useOnboarding()` — OnboardingProvider.tsx)
 
@@ -110,11 +113,12 @@ nicely.
 ## Shipping the next `section:*` announcement
 
 1. Add the key constant in `markers.ts` (`section:<slug>`).
-2. Add a `CoachTargetId` and register the nav element's ref (see the Finances
-   group in `Navbar.tsx`).
-3. Render `NavSectionHint` from `Navbar.tsx` with the gating chain: has the nav
-   item, `veil === "off"`, `introStep === 0`, `phase === "onboarded"`,
-   `!resolving`, `!seen(key)` — plus a DEV `?<slug>-hint` preview that never
-   stamps.
+2. Add a `CoachTargetId` in `coachTargets.ts` for the nav anchor (new anchors
+   only — announcements on an already-registered group reuse its id).
+3. APPEND an entry to `SECTION_ANNOUNCEMENTS` in `sectionAnnouncements.ts`
+   (order is age — newest last; the Navbar shows only the newest unseen entry
+   and retires the rest). Gating, pulse, preview, and target registration all
+   follow from the registry.
 4. Acknowledge on the section page's mount (visiting = seen).
-5. Add the preview to the table above.
+5. Add a `MILESTONE_LABEL` entry in `UserActivityModal.tsx` (Observability)
+   and the preview param to the table above.
