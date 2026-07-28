@@ -5405,8 +5405,24 @@ button.jc-kind-chip:hover {
   white-space: nowrap;
 }
 .jcd-tl-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--secondary-text); flex: none; }
-.jcd-tl-dot-open { background: transparent; border: 2px solid var(--secondary-text); }
+/* The open end is the job's live edge — the page's one copper accent
+   (copper marks the active state, never decoration). */
+.jcd-tl-dot-open {
+  background: var(--primary-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 22%, transparent);
+}
 .jcd-tl-dot-done { background: #22c55e; }
+
+/* Overview + summary-card skeletons — shaped like the loaded content so the
+   layout doesn't jump when data lands. Shimmer comes from the shared
+   .jcd-skel-* primitives. */
+.jcd-skel-fact-value { width: 5.5rem; height: 1.0625rem; }
+.jcd-skel-fact-label { width: 4rem; }
+.jcd-timeline-skeleton { padding-top: 1.375rem; }
+.jcd-timeline-skeleton .jcd-skel-bar { height: 14px; border-radius: 999px; }
+.jcd-skel-sum-title { width: 8.5rem; height: 0.75rem; margin: 0.125rem 0 0.875rem; }
+.jcd-skel-sum-label { width: 42%; margin-top: 0; height: 0.8125rem; }
+.jcd-skel-sum-value { width: 22%; margin-top: 0; height: 0.8125rem; }
 
 /* Phases table card (consolidated projects only). */
 .jcd-phases-card { padding: 1rem 1.25rem; }
@@ -5425,13 +5441,6 @@ button.jc-kind-chip:hover {
   .jcd-timeline { gap: 0.625rem; }
   /* Tables inside the phases card scroll like the app's other wide tables. */
   .jcd-phases-card { overflow-x: auto; }
-}
-
-.jcd-metrics-card {
-  padding: 0;
-}
-.jcd-metrics-card .inv-metrics-row {
-  border-top: none;
 }
 
 /* ─── Shared skeleton building blocks ── */
@@ -10597,7 +10606,6 @@ svg.placeholder-illustration {
   }
 
   /* Clip grid background to parent card's border-radius */
-  .jcd-metrics-card,
   .det-section,
   .inv-filter-metrics-card {
     overflow: hidden;

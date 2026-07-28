@@ -190,12 +190,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
 
   // Cost-type groups + totals (shared with the Cost Breakdown table and the
   // Job Costing list's inline view).
-  const { groups, totalBudget, totalActual } = computeCostGroups(budget, costItems)
-
-  // Spending by cost type (pie)
-  const typeSpend: SpendItem[] = groups
-    .filter(g => g.actual > 0)
-    .map(g => ({ id: g.key, label: g.key, value: g.actual }))
+  const { groups, totalBudget } = computeCostGroups(budget, costItems)
 
   // Top vendors / sources by total cost (pie)
   const vendorSpend: SpendItem[] = (() => {
@@ -237,13 +232,6 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const unitCount = project?.totalUnitCount && project.totalUnitCount > 0 ? project.totalUnitCount : null
   const costPerUnit = unitCount && project ? project.totalCost / unitCount : null
   const budgetPerUnit = unitCount && totalBudget > 0 ? totalBudget / unitCount : null
-  // Recent pace: average weekly spend over the last 4 week buckets. Only shown
-  // while the job is open — a completed job's "burn" is noise.
-  const recentWeeks = weeks.slice(-4)
-  const weeklyBurn = !jobCompletedDate && recentWeeks.length >= 2
-    ? recentWeeks.reduce((s, w) => s + w.spending, 0) / recentWeeks.length
-    : null
-  const pctComplete = pb?.hasBudget ? Math.round(pb.expectedPct * 100) : null
   // Most recent cost entry or invoice — a stalled job shows its age here.
   // YYYY-MM-DD prefixes compare lexicographically.
   const lastActivity = (() => {
@@ -306,25 +294,6 @@ function JobcostDetail({ recnum }: { recnum: string }) {
         budgetLeft >= 0 ? `${formatMoneyFull(budgetLeft)} left` : `${formatMoneyFull(-budgetLeft)} over`
       }`
     : undefined
-
-  // ── Budget vs Actual by cost type ──
-  // Where, specifically, is the money going off-plan? Grouped bars per cost
-  // type (Material / Labor / Sub / WTPM): revised budget beside actual spend.
-  // Reuses the same `groups` rollup as the Cost Breakdown table, so the two
-  // reconcile exactly. Drop types with neither budget nor spend (e.g. WTPM).
-  const budgetVsActual = groups
-    .filter(g => g.budget > 0 || g.actual > 0)
-    .map(g => ({ type: g.key, Budget: g.budget, Actual: g.actual }))
-  // One-line caption — mirrors the trajectory's description so both widget
-  // headers are the same height (and their plots/axes/legends line up). Reports
-  // how many cost types have run past their budget.
-  const overCount = budgetVsActual.filter(g => g.Actual > g.Budget).length
-  const bvaDesc = budgetVsActual.length === 0
-    ? undefined
-    : overCount === 0
-      ? "All cost types within budget"
-      : `${overCount} of ${budgetVsActual.length} types over budget`
-
 
   const pm = project?.phases?.find(p => p.pmName?.trim())?.pmName?.trim()
   const margin = project && project.totalContract > 0
@@ -413,19 +382,25 @@ function JobcostDetail({ recnum }: { recnum: string }) {
     >
       <MotionList className="jcd-sections">
 
-        {/* ── Project Overview ─────────────────────────────────────── */}
+        {/* ── Overview ─────────────────────────────────────────────── */}
         <MotionItem>
           <section className="jcd-section">
-            <h2 className="jcd-section-title title2 emphasized">Project Overview</h2>
-
-            {/* Hero: identity/pace facts + factual timeline strip. */}
+            {/* Hero: who/what/where facts + factual timeline strip. */}
             <div className="card jcd-overview-card">
               {isLoading ? (
-                <div className="jcd-metrics-skeleton">
-                  {[0, 1, 2, 3].map(i => (
-                    <div key={i} className="jcd-metrics-skeleton-cell"><div className="jcd-skel-value" /><div className="jcd-skel-label" /></div>
-                  ))}
-                </div>
+                <>
+                  <div className="jcd-facts">
+                    {[0, 1, 2, 3, 4].map(i => (
+                      <div key={i} className="jcd-fact">
+                        <div className="jcd-skel-value jcd-skel-fact-value" />
+                        <div className="jcd-skel-label jcd-skel-fact-label" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="jcd-timeline jcd-timeline-skeleton">
+                    <div className="jcd-skel-bar" />
+                  </div>
+                </>
               ) : project && (
                 <>
                   <div className="jcd-facts">
@@ -439,8 +414,6 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                         sub={budgetPerUnit != null ? `${formatMoneyFull(budgetPerUnit)} budgeted` : undefined}
                       />
                     )}
-                    {weeklyBurn != null && <Fact label="Weekly Burn" value={formatMoneyFull(weeklyBurn)} sub="4-week average" />}
-                    {pctComplete != null && <Fact label="Complete" value={`${pctComplete}%`} sub="cost-to-cost" />}
                     {lastActivity && <Fact label="Last Activity" value={formatDate(lastActivity)} />}
                   </div>
 
@@ -468,16 +441,31 @@ function JobcostDetail({ recnum }: { recnum: string }) {
             </div>
 
             {/* Contract + Cost summary cards — same pair the list's expanded
-                row shows, so the two views reconcile at a glance. */}
-            {!isLoading && project && (
+                row shows, so the two views reconcile at a glance. Skeletons
+                mirror the loaded card shape so nothing jumps on arrival. */}
+            {isLoading ? (
               <div className="jc-summary-grid">
-                <div className="jc-summary-card">
+                {[3, 5].map((rows, c) => (
+                  <div key={c} className="card jc-summary-card">
+                    <div className="jcd-skel-label jcd-skel-sum-title" />
+                    {Array.from({ length: rows }, (_, i) => (
+                      <div key={i} className="jc-summary-row">
+                        <span className="jcd-skel-label jcd-skel-sum-label" />
+                        <span className="jcd-skel-label jcd-skel-sum-value" />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : project && (
+              <div className="jc-summary-grid">
+                <div className="card jc-summary-card">
                   <div className="jc-summary-title subheadline text-secondary">Contract Summary</div>
                   <SummaryRow label="Original Contract" value={formatMoneyFull(project.originalContract)} />
                   <SummaryRow label="Change Orders" value={project.changeOrderAmount ? formatMoneyFull(project.changeOrderAmount) : "—"} />
                   <SummaryRow label="Revised Contract" value={formatMoneyFull(project.totalContract)} total />
                 </div>
-                <div className="jc-summary-card">
+                <div className="card jc-summary-card">
                   <div className="jc-summary-title subheadline text-secondary">Cost Summary</div>
                   <SummaryRow label="Revised Budget" value={formatMoneyFull(totalBudget)} />
                   {spentPosted != null && committed != null ? (
@@ -509,13 +497,15 @@ function JobcostDetail({ recnum }: { recnum: string }) {
           </section>
         </MotionItem>
 
-        {/* ── Budget & Costs ───────────────────────────────────────── */}
+        {/* ── Costs ────────────────────────────────────────────────── */}
         <MotionItem>
           <section className="jcd-section">
-            <h2 className="jcd-section-title title2 emphasized">Budget &amp; Costs</h2>
+            <h2 className="jcd-section-title title2 emphasized">Costs</h2>
             <div className="widget-grid widget-grid-2">
               {/* Cost Breakdown leads the section — it sits directly under the
-                  overview's summary cards, which it itemizes. */}
+                  overview's summary cards, which it itemizes. It is the single
+                  by-type view (no duplicate budget-vs-actual chart or by-type
+                  pie beside it). */}
               <div className="col-span-full">
                 <Widget title="Cost Breakdown" loading={isLoading} noData={!isLoading && !budget} className="jcd-cost-widget">
                   <CostBreakdownTable budget={budget} costItems={costItems} />
@@ -559,56 +549,6 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                 }} />
               </Widget>
 
-              <Widget
-                title="Budget vs Actual by Type"
-                description={bvaDesc}
-                loading={isLoading}
-                noData={!isLoading && budgetVsActual.length === 0}
-                className="jcd-chart-widget"
-                // Custom HTML legend in the header's top-right corner (colors
-                // match the bar `colors` below).
-                actions={
-                  <ChartLegend items={[
-                    { label: "Budget", color: "#94a3b8" },
-                    { label: "Actual", color: "#c27c3e" },
-                  ]} />
-                }
-              >
-                <Chart config={{
-                  type: "bar",
-                  data: budgetVsActual,
-                  keys: ["Budget", "Actual"],
-                  indexBy: "type",
-                  groupMode: "grouped",
-                  // Align the plot with the trajectory line chart beside it.
-                  compactTop: true,
-                  // Legend is rendered in the header (actions) instead of nivo's.
-                  hideLegend: true,
-                  // Hovering a category shows one card with both Budget and
-                  // Actual plus the variance (budget − actual) for that type.
-                  groupTooltip: true,
-                  tooltipTotalLabel: "Variance",
-                  // Thin the y-axis to ~5 ticks so its label density matches the
-                  // line chart's (which uses everyOtherYTicks) instead of ~11.
-                  axisLeftTickValues: 5,
-                  // Budget reads as a neutral reference bar; actual takes brand
-                  // orange so an over-budget trade pops against its budget peer.
-                  colors: ["#94a3b8", "#c27c3e"],
-                  yFormat: formatMoneyFull,
-                }} />
-              </Widget>
-
-              <Widget title="Spending by Type" loading={isLoading} noData={!isLoading && typeSpend.length === 0}>
-                <Chart config={{
-                  type: "pie-with-list",
-                  items: typeSpend,
-                  centerLabel: "TOTAL SPEND",
-                  centerTotal: totalActual,
-                  showPercent: true,
-                  chartSize: "md",
-                }} />
-              </Widget>
-
               <Widget title="Spending by Vendor" loading={isLoading} noData={!isLoading && vendorSpend.length === 0}>
                 <Chart config={{
                   type: "pie-with-list",
@@ -627,10 +567,10 @@ function JobcostDetail({ recnum }: { recnum: string }) {
           </section>
         </MotionItem>
 
-        {/* ── Cash & Billing ───────────────────────────────────────── */}
+        {/* ── Billing ──────────────────────────────────────────────── */}
         <MotionItem>
           <section className="jcd-section">
-            <h2 className="jcd-section-title title2 emphasized">Cash &amp; Billing</h2>
+            <h2 className="jcd-section-title title2 emphasized">Billing</h2>
             <div>
               <div className="det-section card jcd-billing-card">
                 <div
