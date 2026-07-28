@@ -1507,11 +1507,6 @@ body{
   transition: color 0.15s ease;
 }
 
-/* Hovering the Billing Position card highlights its Show/Hide Invoices toggle. */
-.jcd-billing-card:hover .det-section-action {
-  color: var(--primary-color);
-}
-
 .det-section-chevron {
   transition: transform 0.25s ease;
   transform: rotate(-90deg);
@@ -4386,6 +4381,20 @@ body{
 }
 .jc-summary-row:last-child { border-bottom: none; }
 .jc-summary-label { color: var(--secondary-text); }
+/* Value cluster: an optional muted secondary figure (e.g. a variance's %
+   form) sits just left of the primary figure, so the column of $ amounts
+   stays flush right. */
+.jc-summary-values {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+.jc-summary-note {
+  font-size: var(--footnote-size);
+  font-weight: var(--footnote-weight);
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+}
 .jc-summary-value { font-variant-numeric: tabular-nums; color: var(--primary-text); }
 .jc-summary-total { font-weight: 700; }
 .jc-summary-total .jc-summary-label,
@@ -5328,21 +5337,74 @@ button.jc-kind-chip:hover {
 }
 .jcd-section-title { margin: 0; }
 
-/* Overview hero: identity/pace facts row + factual timeline strip. */
-.jcd-overview-card {
-  padding: 1.25rem 1.5rem;
+/* ── Overview hero ───────────────────────────────────────────────────
+   The page's single opening instrument, on the shared ink-deck recipe
+   (.jc-group-overview) with the command bar's full floating shadow. Three
+   stacked registers divided by deck hairlines: verdict figures (the page's
+   largest type), identity facts, factual timeline.
+
+   Type comes entirely from the shared scale — .subheadline labels over
+   .title1 (verdict) / .headline (identity) values, matching .stat-widget
+   on every other page. Only the RANK differs between registers, so the
+   hero reads top-down in one direction. */
+.jc-group-overview.jcd-hero {
   display: flex;
   flex-direction: column;
   gap: 1.125rem;
+  border-radius: 14px;
+  padding: 1.375rem 1.75rem;
+  box-shadow:
+    inset 0 1px 0 var(--jcb-topline),
+    0 1px 2px rgb(from var(--jc-shadow-ink) r g b / 0.06),
+    0 16px 32px -24px rgb(from var(--jc-shadow-ink) r g b / 0.3);
 }
+/* Deck-toned recolors for the facts + timeline living on the hero. */
+.jcd-hero .jcd-fact-value { color: var(--jcb-text); }
+.jcd-hero .jcd-fact-label,
+.jcd-hero .jcd-fact-sub { color: var(--jcb-muted); }
+.jcd-hero .jcd-timeline { border-top-color: var(--jcb-line); }
+.jcd-hero .jcd-tl-cap-date { color: var(--jcb-text); }
+.jcd-hero .jcd-tl-cap-label { color: var(--jcb-muted); }
+.jcd-hero .jcd-tl-rule { background: var(--jcb-line); }
+.jcd-hero .jcd-tl-days {
+  color: var(--jcb-muted);
+  border-color: var(--jcb-line);
+}
+.jcd-hero .jcd-tl-dot { background: var(--jcb-muted); }
+/* Live/done endpoint colors re-asserted over the muted recolor above. */
+.jcd-hero .jcd-tl-dot-open { background: var(--primary-color); }
+.jcd-hero .jcd-tl-dot-done { background: #22c55e; }
+/* Deck-surface shimmer stand-ins (the card-toned .jcd-skel-* mixes read
+   wrong on the ink deck) — recessed-well blocks at the loaded text sizes. */
+.jcd-verdict-skel {
+  display: inline-block;
+  border-radius: 4px;
+  background: var(--jcb-well);
+}
+.jcd-verdict-skel-label { width: 6.5rem; height: 0.6875rem; }
+.jcd-verdict-skel-fact { width: 5.5rem; height: 1.0625rem; }
+.jcd-verdict-skel-value { width: 5.5rem; height: 1.625rem; }
+.jcd-verdict-skel-bar { width: 100%; height: 14px; border-radius: 999px; }
+
+@media (max-width: 640px) {
+  .jc-group-overview.jcd-hero {
+    gap: 1rem;
+    padding: 1.125rem 1.25rem;
+  }
+}
+
 .jcd-facts {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem 2.75rem;
-  /* Distribute the facts across the card's full width — a left-huddled row
-     leaves a dead right half on wide screens. */
-  justify-content: space-between;
-  padding-right: clamp(0rem, 8vw, 7rem);
+  /* Left-aligned reading order, generous column gap doing the separating. */
+  gap: 1rem 3.5rem;
+  justify-content: flex-start;
+}
+/* Identity register: hairline above it, since the verdict figures always
+   precede it. */
+.jcd-facts-identity {
+  border-top: 1px solid var(--jcb-line);
+  padding-top: 1.125rem;
 }
 .jcd-fact {
   display: flex;
@@ -5350,20 +5412,20 @@ button.jc-kind-chip:hover {
   gap: 0.1875rem;
   min-width: 6.5rem;
 }
+/* Sizes ride .title1 / .headline; only tabular figures and the tightened
+   tracking on the big numerals are set here. */
 .jcd-fact-value {
-  font-size: 1.0625rem;
-  font-weight: 650;
-  font-variant-numeric: tabular-nums;
   color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
 }
+.jcd-fact-value.title1 { letter-spacing: -0.015em; }
+/* Matches .stat-widget-title exactly — one label voice across the app. */
 .jcd-fact-label {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--secondary-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
-.jcd-fact-sub { font-size: 0.75rem; color: var(--secondary-text); }
+.jcd-fact-sub { color: var(--secondary-text); }
 
 /* Timeline strip: start cap — rule — elapsed-days pill — rule — end cap.
    Strictly factual (actrec.sttdte / cmpdte); the open-end dot is hollow,
@@ -5375,21 +5437,17 @@ button.jc-kind-chip:hover {
   border-top: 1px solid var(--border-color);
   padding-top: 1.125rem;
 }
-/* A hero with dates but no facts is just the strip — no divider above. */
-.jcd-timeline-only { border-top: none; padding-top: 0; }
 .jcd-tl-cap { display: flex; flex-direction: column; gap: 0.125rem; }
 .jcd-tl-cap-end { text-align: right; }
+/* Same label/value voice as .jcd-fact (sizes from .subheadline / .body-text
+   emphasized) — the strip is one register below the identity facts. */
 .jcd-tl-cap-label {
-  font-size: 0.6875rem;
-  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   color: var(--secondary-text);
   white-space: nowrap;
 }
 .jcd-tl-cap-date {
-  font-size: 0.9375rem;
-  font-weight: 650;
   color: var(--primary-text);
   white-space: nowrap;
 }
@@ -5402,8 +5460,7 @@ button.jc-kind-chip:hover {
 }
 .jcd-tl-rule { flex: 1; height: 2px; border-radius: 1px; background: var(--border-color); }
 .jcd-tl-days {
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: var(--footnote-weight-emphasized);
   color: var(--secondary-text);
   border: 1px solid var(--border-color);
   border-radius: 999px;
@@ -5419,21 +5476,53 @@ button.jc-kind-chip:hover {
 }
 .jcd-tl-dot-done { background: #22c55e; }
 
-/* Overview + summary-card skeletons — shaped like the loaded content so the
-   layout doesn't jump when data lands. Shimmer comes from the shared
-   .jcd-skel-* primitives. */
-.jcd-skel-fact-value { width: 5.5rem; height: 1.0625rem; }
-.jcd-skel-fact-label { width: 4rem; }
+/* Summary-card skeletons — shaped like the loaded content so the layout
+   doesn't jump when data lands. Shimmer comes from the shared .jcd-skel-*
+   primitives. */
 .jcd-timeline-skeleton { padding-top: 1.375rem; }
-.jcd-timeline-skeleton .jcd-skel-bar { height: 14px; border-radius: 999px; }
 .jcd-skel-sum-title { width: 8.5rem; height: 0.75rem; margin: 0.125rem 0 0.875rem; }
 .jcd-skel-sum-label { width: 42%; margin-top: 0; height: 0.8125rem; }
 .jcd-skel-sum-value { width: 22%; margin-top: 0; height: 0.8125rem; }
 
-/* Invoices widget: KPI strip above the table (always visible — no expander). */
-.jcd-invoices-kpis {
+/* Shared KPI cluster: the ONE stat-strip treatment for every list card on
+   the page (Invoices, Change Orders) — quiet left-aligned label-over-value
+   pairs with hairline dividers, replacing the old full-width KPI thirds.
+   Double-class specificity beats the generic mobile inv-metrics-row grid. */
+.jcd-invoices-widget.widget { min-height: 0; }
+.jcd-section .jcd-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.75rem 1.75rem;
+  border-top: none;
   border-bottom: 1px solid var(--border-color);
-  margin-bottom: 0.625rem;
+  background: none;
+  margin-bottom: 0.25rem;
+  padding: 0.125rem 0 1rem;
+}
+.jcd-section .jcd-kpis .inv-metric {
+  flex: 0 0 auto;
+  padding: 0;
+  background: none;
+  gap: 0.25rem;
+}
+.jcd-section .jcd-kpis .inv-metric-divider {
+  display: block;
+  width: 1px;
+  align-self: stretch;
+  background: var(--border-color);
+}
+.jcd-section .jcd-kpis .inv-metric-value {
+  font-size: 1.1875rem;
+  letter-spacing: -0.01em;
+}
+/* Change Orders variant: lives inside the card's clickable toggle header,
+   so it aligns to the header's 1.25rem gutter; no bottom rule (the
+   collapsible body draws its own edge). */
+.jcd-section .jcd-kpis.jcd-co-kpis {
+  padding: 0 1.25rem 1.125rem;
+  border-bottom: none;
+  margin-bottom: 0;
 }
 
 /* Phases table card (consolidated projects only). */
@@ -5448,8 +5537,7 @@ button.jc-kind-chip:hover {
 
 @media (max-width: 640px) {
   .jcd-sections { gap: 2rem; }
-  .jcd-overview-card { padding: 1rem 1.125rem; }
-  .jcd-facts { gap: 0.875rem 1.5rem; justify-content: flex-start; padding-right: 0; }
+  .jcd-facts { gap: 0.875rem 1.5rem; }
   .jcd-timeline { gap: 0.625rem; }
   /* Tables inside the phases card scroll like the app's other wide tables. */
   .jcd-phases-card { overflow-x: auto; }
@@ -5509,12 +5597,6 @@ button.jc-kind-chip:hover {
   border-left: 1px solid var(--border-color);
 }
 
-/* Invoice section: metrics with borders top and bottom */
-.jcd-inv-metrics {
-  border-top: 1px solid var(--border-color);
-  border-bottom: 1px solid var(--border-color);
-}
-
 /* Invoice hero: large percentage + bar */
 .jcd-inv-hero {
   display: flex;
@@ -5529,8 +5611,9 @@ button.jc-kind-chip:hover {
   flex-shrink: 0;
 }
 .jcd-inv-pct {
-  font-size: 2.25rem;
+  font-size: 1.75rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
   line-height: 1;
   color: var(--primary-color);
 }
@@ -5568,12 +5651,33 @@ button.jc-kind-chip:hover {
 }
 
 /* Billing Position: lead with the Billed & Earned amounts; a single combined
-   meter (billed fill + earned marker) carries the visual, contract is context. */
+   meter (billed fill + earned marker) carries the visual, contract is context.
+   The card is grid-stretched to its chart neighbor's height, so the content
+   centers in the leftover room instead of huddling at the top over a slab of
+   white. */
+.jcd-billing-card {
+  display: flex;
+  flex-direction: column;
+}
+.jcd-billing-card > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
 .jcd-billing-pos {
+  flex: 1;
   padding: 1rem 1.5rem 1.75rem;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: 1.75rem;
+}
+/* Same rule for the no-progress-data fallback (the big % + bar): center it
+   vertically and let the pair breathe instead of pinning under the title. */
+.jcd-billing-card .jcd-inv-hero {
+  flex: 1;
+  align-items: center;
+  gap: 2rem;
 }
 .jcd-bp-hero {
   display: flex;
@@ -5601,8 +5705,11 @@ button.jc-kind-chip:hover {
   color: var(--secondary-text);
 }
 .jcd-bp-stat-value {
-  font-size: 1.875rem;
+  /* One step below the hero's 1.625rem verdicts — the page's stat scale
+     descends hero → billing → KPI clusters → table rows. */
+  font-size: 1.5rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
   line-height: 1.05;
   color: var(--primary-text);
 }
@@ -10759,6 +10866,12 @@ svg.placeholder-illustration {
 
 .data-table th.sortable-th:hover .sortable-header {
   color: var(--primary-color);
+}
+
+/* Same affordance for spend-rank-table headers (the copper label hover comes
+   from the global .sortable-header:hover rule above). */
+.spend-rank-table th.sortable-th {
+  cursor: pointer;
 }
 
 .clickable-row {

@@ -8,6 +8,8 @@ interface SortableHeaderProps<K extends string> {
   dir: SortDir | null
   onSort: (key: K) => void
   align?: "left" | "right"
+  /** Extra <th> classes, e.g. a table's fixed-width column class. */
+  className?: string
 }
 
 /**
@@ -22,6 +24,7 @@ export function SortableHeader<K extends string>({
   dir,
   onSort,
   align = "left",
+  className,
 }: SortableHeaderProps<K>) {
   const active = activeKey === columnKey
   const icon = !active ? (
@@ -33,7 +36,7 @@ export function SortableHeader<K extends string>({
   )
 
   return (
-    <th className="sortable-th" style={{ textAlign: align }} onClick={() => onSort(columnKey)}>
+    <th className={`sortable-th${className ? ` ${className}` : ""}`} style={{ textAlign: align }} onClick={() => onSort(columnKey)}>
       <span className="sortable-header">{label} {icon}</span>
     </th>
   )

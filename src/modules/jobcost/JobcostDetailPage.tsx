@@ -24,12 +24,18 @@ import type { SpendItem, LineMarker } from "../../shared/components/Chart/chart.
 import { computeWeeklySpend, computeCostVsBilled, thinLabels, type DailySpend } from "./weeklySpend"
 import { colorRamp, hashColor, RAMP_SCHEMES } from "../../shared/config/chartColors"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
-import { DrillDownModal } from "../../shared/components/DrillDownModal/DrillDownModal"
+import { DrillDownModal, type DrillRow } from "../../shared/components/DrillDownModal/DrillDownModal"
+import { SortableHeader } from "../../shared/components/SortableHeader"
+import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
 import { JOBCOST_BACK_FALLBACK, type JobcostBackState } from "./useJobcostNav"
 import { trackProjectView } from "../../shared/analytics/analytics"
 
 const INV_STATUS_LABEL: Record<number, string> = { 1: "Open", 2: "Review", 3: "Dispute", 4: "Paid", 5: "Void" }
 const INV_STATUS_CLASS: Record<number, string> = { 1: "open", 2: "review", 3: "dispute", 4: "paid", 5: "void" }
+
+type InvSortKey = "num" | "date" | "status" | "total" | "paid" | "remaining"
+type CoSortKey = "num" | "name" | "budget" | "contract"
+type PhaseSortKey = "num" | "name" | "status" | "pm" | "units" | "contract" | "cost" | "margin"
 
 // ─── Backend shapes ──────────────────────────────────────────────────
 interface Phase {
@@ -107,13 +113,26 @@ function fmtLongDate(d: Date): string {
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
-// One identity/pace stat in the overview card's facts row.
-function Fact({ label, value, sub }: { label: string; value: string; sub?: string }) {
+// One stat in the overview hero, in the app's .stat-widget voice: subheadline
+// label on top, figure beneath. `verdict` promotes the figure to .title1 (the
+// page's largest type); identity facts stay at .headline.
+function Fact({ label, value, sub, valueColor, verdict }: {
+  label: string
+  value: string
+  sub?: string
+  valueColor?: string
+  verdict?: boolean
+}) {
   return (
     <div className="jcd-fact">
-      <span className="jcd-fact-value">{value}</span>
-      <span className="jcd-fact-label">{label}</span>
-      {sub && <span className="jcd-fact-sub">{sub}</span>}
+      <span className="jcd-fact-label subheadline">{label}</span>
+      <span
+        className={`jcd-fact-value ${verdict ? "title1 emphasized" : "headline emphasized"}`}
+        style={valueColor ? { color: valueColor } : undefined}
+      >
+        {value}
+      </span>
+      {sub && <span className="jcd-fact-sub footnote">{sub}</span>}
     </div>
   )
 }
@@ -182,8 +201,23 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const [changeOrdersOpen, setChangeOrdersOpen] = useState(false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
   // Drill-down for the two spending pies: a category slice lists who was paid
-  // within it; a vendor slice lists what that vendor was paid for.
-  const [drill, setDrill] = useState<{ title: string; items: SpendItem[] } | null>(null)
+  // within it (rows drill through to that vendor's line items); a vendor slice
+  // lists what that vendor was paid for. Rendered in the app's standard
+  // reports-modal table (committed/posted split, sortable, footer total).
+  const [drill, setDrill] = useState<{
+    title: string
+    subtitle: string
+    labelHeader: string
+    rows: DrillRow[]
+    canDrillVendors?: boolean
+  } | null>(null)
+
+  // Three-state sorts (desc → asc → natural) on every money/date column, same
+  // as the app's other in-widget tables. Natural order is the backend's:
+  // invoices newest-first, change orders and phases by number.
+  const invSort = useTableSort<InvSortKey>()
+  const coSort = useTableSort<CoSortKey>()
+  const phaseSort = useTableSort<PhaseSortKey>()
 
   useEffect(() => {
     fetchPageData({ module: "changeOrders", queries: [], params: { jobnum: recnum } })
@@ -314,6 +348,10 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   // (good); NEGATIVE = over budget (bad). Class-colored by its own sign — same
   // treatment as the list's expanded panel.
   const budgetVariance = project ? totalBudget - project.totalCost : null
+  // The variance as a share of budget — the muted % note beside the $ figure.
+  const budgetVariancePct = budgetVariance != null && totalBudget > 0
+    ? (budgetVariance / totalBudget) * 100
+    : null
   const varianceClass = budgetVariance == null || budgetVariance === 0
     ? undefined
     : budgetVariance > 0 ? "jc-variance-under" : "jc-variance-over"
@@ -328,43 +366,101 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const showPhases = !isLoading && phases.length > 1
   const showChanges = !isLoading && changeOrders.length > 0
 
+  const sortedInvoices = applySort(invoices, invSort, (inv, key) => {
+    switch (key) {
+      case "num": { const n = Number(inv.invoiceNum); return isNaN(n) ? inv.invoiceNum : n }
+      case "date": return inv.invoiceDate
+      case "status": return inv.status
+      case "total": return inv.total
+      case "paid": return inv.amountPaid
+      case "remaining": return inv.amountRemaining
+    }
+  })
+  const sortedChangeOrders = applySort(changeOrders, coSort, (co, key) => {
+    switch (key) {
+      case "num": return Number(co.chgnum ?? co.recnum) || 0
+      case "name": return co.name
+      case "budget": return co.budget == null ? null : Number(co.budget)
+      case "contract": return Number(co.total) || 0
+    }
+  })
+  const sortedPhases = applySort(phases, phaseSort, (ph, key) => {
+    switch (key) {
+      case "num": return Number(ph.recnum) || 0
+      case "name": return ph.name
+      case "status": return ph.status
+      case "pm": return ph.pmName?.trim() || null
+      case "units": return Number(ph.unitCount) || 0
+      case "contract": return ph.totalContract ?? 0
+      case "cost": return ph.totalCost ?? 0
+      case "margin": return ph.margin == null ? null : Number(ph.margin)
+    }
+  })
+
   // Closed jobs (status > 4, matching the backend's closed rollup) report
   // final figures — "Projected" would read as if the job were still moving.
   const isClosed = (project?.status ?? 0) > 4
   const grossProfit = project ? project.totalContract - project.totalCost : null
-  const hasHeroFacts = Boolean(project?.clientName || pm || unitCount != null || lastActivity)
+  const hasIdentity = Boolean(project?.clientName || pm || lastActivity)
   const hasTimeline = Boolean(jobStartDate || jobCompletedDate)
 
-  // Category slice → who was paid within that cost type, ranked.
+  // Category slice → who was paid within that cost type, with the
+  // committed/posted split preserved. Rows drill through to the vendor view.
   function drillCategory(key: string) {
     const group = groups.find(g => g.key === key)
     if (!group) return
-    const byVendor = new Map<string, number>()
+    const byVendor = new Map<string, { committed: number; posted: number }>()
     for (const c of group.items) {
-      const amt = (c.committedAmount || 0) + (c.postedAmount || 0)
-      if (amt > 0) byVendor.set(c.id, (byVendor.get(c.id) ?? 0) + amt)
+      const committed = c.committedAmount || 0
+      const posted = c.postedAmount || 0
+      if (committed <= 0 && posted <= 0) continue
+      const cur = byVendor.get(c.id) ?? { committed: 0, posted: 0 }
+      cur.committed += committed
+      cur.posted += posted
+      byVendor.set(c.id, cur)
     }
-    const items = Array.from(byVendor.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([label, value]) => ({ id: label, label, value }))
-    if (items.length) setDrill({ title: `${key} Spending`, items })
+    const rows: DrillRow[] = Array.from(byVendor.entries()).map(([id, v]) => ({
+      id,
+      label: id,
+      committed: v.committed,
+      posted: v.posted,
+    }))
+    if (!rows.length) return
+    const total = rows.reduce((s, r) => s + r.committed + r.posted, 0)
+    setDrill({
+      title: `${key} Spending`,
+      subtitle: `${rows.length} vendor${rows.length === 1 ? "" : "s"} · ${formatMoneyFull(total)} total`,
+      labelHeader: "Vendor / Source",
+      rows,
+      canDrillVendors: true,
+    })
   }
 
-  // Vendor slice → what that vendor was paid for (their line items).
+  // Vendor slice → what that vendor was paid for (their line items, tagged
+  // with the cost category each belongs to).
   function drillVendor(vendorId: string) {
-    const items = costItems
+    const rows: DrillRow[] = costItems
       .filter(c => c.id === vendorId)
       .map((c, i) => ({
         id: `${vendorId}-${i}`,
         label: c.dscrpt?.trim() || c.costType,
-        value: (c.committedAmount || 0) + (c.postedAmount || 0),
+        sub: c.dscrpt?.trim() ? c.costType : undefined,
+        committed: c.committedAmount || 0,
+        posted: c.postedAmount || 0,
       }))
-      .filter(it => it.value > 0)
-      .sort((a, b) => b.value - a.value)
-    if (items.length) setDrill({ title: vendorId, items })
+      .filter(r => r.committed > 0 || r.posted > 0)
+    if (!rows.length) return
+    const total = rows.reduce((s, r) => s + r.committed + r.posted, 0)
+    setDrill({
+      title: vendorId,
+      subtitle: `${rows.length} line item${rows.length === 1 ? "" : "s"} · ${formatMoneyFull(total)} total`,
+      labelHeader: "Description",
+      rows,
+    })
   }
 
-  const subtitleText = isMobile ? pm : [pm, `#${recnum}`].filter(Boolean).join(" · ")
+  // PM lives in the overview facts card, not the page header.
+  const subtitleText = isMobile ? undefined : `#${recnum}`
   const subtitle = project ? (
     <span className="jcd-subtitle">
       {project.status != null && (
@@ -431,64 +527,93 @@ function JobcostDetail({ recnum }: { recnum: string }) {
         {/* ── Overview ─────────────────────────────────────────────── */}
         <MotionItem>
           <section className="jcd-section">
-            {/* Hero: who/what/where facts + factual timeline strip. Skipped
-                entirely when the job has neither (older Sage records). */}
-            {(isLoading || hasHeroFacts || hasTimeline) && (
-              <div className="card jcd-overview-card">
-                {isLoading ? (
-                  <>
-                    <div className="jcd-facts">
-                      {[0, 1, 2, 3].map(i => (
-                        <div key={i} className="jcd-fact">
-                          <div className="jcd-skel-value jcd-skel-fact-value" />
-                          <div className="jcd-skel-label jcd-skel-fact-label" />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="jcd-timeline jcd-timeline-skeleton">
-                      <div className="jcd-skel-bar" />
-                    </div>
-                  </>
-                ) : project && (
-                  <>
-                    {hasHeroFacts && (
-                      <div className="jcd-facts">
-                        {project.clientName && <Fact label="Client" value={project.clientName} />}
-                        {pm && <Fact label="Project Manager" value={pm} />}
-                        {unitCount != null && <Fact label="Units" value={String(unitCount)} />}
-                        {unitCount != null && costPerUnit != null && (
-                          <Fact
-                            label="Cost / Unit"
-                            value={formatMoneyFull(costPerUnit)}
-                            sub={budgetPerUnit != null ? `${formatMoneyFull(budgetPerUnit)} budgeted` : undefined}
-                          />
-                        )}
-                        {lastActivity && <Fact label="Last Activity" value={formatDate(lastActivity)} />}
+            {/* Hero: ONE instrument on the page's signature deck surface,
+                reading top to bottom as verdict (margin and gross profit, plus
+                pace facts) → identity (who/where) → timeline (the factual date
+                strip). Every figure on it is built from the same shared type
+                classes as the rest of the app — .subheadline labels over
+                .title1 (verdict) / .headline (identity) values — so rank reads
+                by size in one direction instead of the two registers competing. */}
+            {(isLoading || project) && (
+            <div className="jc-group-overview jcd-hero">
+              {isLoading ? (
+                <>
+                  <div className="jcd-facts" aria-hidden="true">
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className="jcd-fact">
+                        <span className="jcd-verdict-skel jcd-verdict-skel-label" />
+                        <span className="jcd-verdict-skel jcd-verdict-skel-value" />
                       </div>
+                    ))}
+                  </div>
+                  <div className="jcd-facts jcd-facts-identity" aria-hidden="true">
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className="jcd-fact">
+                        <span className="jcd-verdict-skel jcd-verdict-skel-label" />
+                        <span className="jcd-verdict-skel jcd-verdict-skel-fact" />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="jcd-timeline jcd-timeline-skeleton" aria-hidden="true">
+                    <div className="jcd-verdict-skel jcd-verdict-skel-bar" />
+                  </div>
+                </>
+              ) : project && (
+                <>
+                  <div className="jcd-facts">
+                    <Fact
+                      verdict
+                      label={isClosed ? "Final Margin" : "Current Margin"}
+                      value={margin == null ? "—" : `${margin.toFixed(1)}%`}
+                      valueColor={marginColor}
+                    />
+                    <Fact
+                      verdict
+                      label="Gross Profit"
+                      value={grossProfit == null ? "—" : formatMoneyFull(grossProfit)}
+                      valueColor={marginColor ?? (grossProfit != null && grossProfit < 0 ? "#ef4444" : undefined)}
+                    />
+                    {unitCount != null && <Fact verdict label="Units" value={String(unitCount)} />}
+                    {unitCount != null && costPerUnit != null && (
+                      <Fact
+                        verdict
+                        label="Cost / Unit"
+                        value={formatMoneyFull(costPerUnit)}
+                        sub={budgetPerUnit != null ? `${formatMoneyFull(budgetPerUnit)} budgeted` : undefined}
+                      />
                     )}
+                  </div>
 
-                    {hasTimeline && (
-                      <div className={`jcd-timeline${hasHeroFacts ? "" : " jcd-timeline-only"}`}>
-                        <div className="jcd-tl-cap">
-                          <span className="jcd-tl-cap-label">Started</span>
-                          <span className="jcd-tl-cap-date">{jobStartDate ? fmtLongDate(jobStartDate) : "—"}</span>
-                        </div>
-                        <div className="jcd-tl-line">
-                          <span className="jcd-tl-dot" />
-                          <span className="jcd-tl-rule" />
-                          {daysElapsed != null && <span className="jcd-tl-days">{daysElapsed} days</span>}
-                          <span className="jcd-tl-rule" />
-                          <span className={`jcd-tl-dot ${jobCompletedDate ? "jcd-tl-dot-done" : "jcd-tl-dot-open"}`} />
-                        </div>
-                        <div className="jcd-tl-cap jcd-tl-cap-end">
-                          <span className="jcd-tl-cap-label">{jobCompletedDate ? "Completed" : "In Progress"}</span>
-                          <span className="jcd-tl-cap-date">{jobCompletedDate ? fmtLongDate(jobCompletedDate) : "Today"}</span>
-                        </div>
+                  {hasIdentity && (
+                    <div className="jcd-facts jcd-facts-identity">
+                      {project.clientName && <Fact label="Client" value={project.clientName} />}
+                      {pm && <Fact label="Project Manager" value={pm} />}
+                      {lastActivity && <Fact label="Last Activity" value={formatDate(lastActivity)} />}
+                    </div>
+                  )}
+
+                  {hasTimeline && (
+                    <div className="jcd-timeline">
+                      <div className="jcd-tl-cap">
+                        <span className="jcd-tl-cap-label subheadline">Started</span>
+                        <span className="jcd-tl-cap-date body-text emphasized">{jobStartDate ? fmtLongDate(jobStartDate) : "—"}</span>
                       </div>
-                    )}
-                  </>
-                )}
-              </div>
+                      <div className="jcd-tl-line">
+                        <span className="jcd-tl-dot" />
+                        <span className="jcd-tl-rule" />
+                        {daysElapsed != null && <span className="jcd-tl-days footnote">{daysElapsed} days</span>}
+                        <span className="jcd-tl-rule" />
+                        <span className={`jcd-tl-dot ${jobCompletedDate ? "jcd-tl-dot-done" : "jcd-tl-dot-open"}`} />
+                      </div>
+                      <div className="jcd-tl-cap jcd-tl-cap-end">
+                        <span className="jcd-tl-cap-label subheadline">{jobCompletedDate ? "Completed" : "In Progress"}</span>
+                        <span className="jcd-tl-cap-date body-text emphasized">{jobCompletedDate ? fmtLongDate(jobCompletedDate) : "Today"}</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
             )}
 
             {/* Contract + Cost summary cards — same pair the list's expanded
@@ -496,7 +621,9 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                 mirror the loaded card shape so nothing jumps on arrival. */}
             {isLoading ? (
               <div className="jc-summary-grid">
-                {[4, 4].map((rows, c) => (
+                {/* Mirrors the loaded cards: 3-row contract build-up, 5-row
+                    cost build-up (4 lines + the variance well). */}
+                {[3, 5].map((rows, c) => (
                   <div key={c} className="card jc-summary-card">
                     <div className="jcd-skel-label jcd-skel-sum-title" />
                     {Array.from({ length: rows }, (_, i) => (
@@ -510,52 +637,36 @@ function JobcostDetail({ recnum }: { recnum: string }) {
               </div>
             ) : project && (
               <div className="jc-summary-grid">
-                {/* Contract card carries the contract-side verdict (Gross
-                    Profit + Margin, as on the list's group cards); the cost
-                    card carries the budget-side verdict (Variance). Closed
-                    jobs report final figures, not "Projected". */}
+                {/* The cards itemize the hero's conclusions — contract build-up
+                    on the left, cost build-up on the right — each ending at its
+                    own bottom line (the cost card keeps its variance well). */}
                 <div className="card jc-summary-card">
                   <div className="jc-summary-title subheadline text-secondary">Contract Summary</div>
                   <SummaryRow label="Original Contract" value={formatMoneyFull(project.originalContract)} />
                   <SummaryRow label="Change Orders" value={project.changeOrderAmount ? formatMoneyFull(project.changeOrderAmount) : "—"} />
                   <SummaryRow label="Revised Contract" value={formatMoneyFull(project.totalContract)} total />
-                  <div className="jc-summary-totals">
-                    <SummaryRow
-                      label="Gross Profit"
-                      value={grossProfit == null ? "—" : formatMoneyFull(grossProfit)}
-                      total
-                      valueColor={marginColor ?? (grossProfit != null && grossProfit < 0 ? "#ef4444" : undefined)}
-                    />
-                    <SummaryRow
-                      label={isClosed ? "Margin" : "Projected Margin"}
-                      value={margin == null ? "—" : `${margin.toFixed(1)}%`}
-                      total
-                      valueColor={marginColor}
-                    />
-                  </div>
                 </div>
+                {/* Full cost build-up: budget, then the two halves of spend
+                    (posted invoices + open commitments), their sum, and the
+                    variance that sum leaves against budget — in $ and as a
+                    share of budget. */}
                 <div className="card jc-summary-card">
                   <div className="jc-summary-title subheadline text-secondary">Cost Summary</div>
                   <SummaryRow label="Revised Budget" value={formatMoneyFull(totalBudget)} />
                   {spentPosted != null && committed != null ? (
-                    committed > 0 ? (
-                      <>
-                        <SummaryRow label="Spent to Date" value={formatMoneyFull(spentPosted)} />
-                        <SummaryRow label="Committed (Open POs + Subs)" value={formatMoneyFull(committed)} />
-                        <SummaryRow label="Total Committed + Spent" value={formatMoneyFull(project.totalCost)} />
-                      </>
-                    ) : (
-                      // Nothing on order — a $0 Committed row and a repeated
-                      // total are noise; one Spent line says it all.
-                      <SummaryRow label="Spent to Date" value={formatMoneyFull(project.totalCost)} />
-                    )
+                    <>
+                      <SummaryRow label="Total Posted" value={formatMoneyFull(spentPosted)} />
+                      <SummaryRow label="Total Committed" value={formatMoneyFull(committed)} />
+                    </>
                   ) : (
-                    <SummaryRow label="Total Committed + Spent" value={formatMoneyFull(project.totalCost)} />
+                    <SummaryRow label="Total Posted" value={formatMoneyFull(project.totalCost)} />
                   )}
+                  <SummaryRow label="Committed + Posted" value={formatMoneyFull(project.totalCost)} total />
                   <div className="jc-summary-totals">
                     <SummaryRow
-                      label={isClosed ? "Budget Variance" : "Projected Variance"}
+                      label={isClosed ? "Final Budget Variance" : "Current Budget Variance"}
                       value={budgetVariance == null ? "—" : formatMoneyFull(budgetVariance)}
+                      note={budgetVariancePct == null ? undefined : `${budgetVariancePct > 0 ? "+" : ""}${budgetVariancePct.toFixed(1)}%`}
                       total
                       valueClass={varianceClass}
                     />
@@ -581,7 +692,6 @@ function JobcostDetail({ recnum }: { recnum: string }) {
 
               <Widget
                 title="Spending by Category"
-                description="Click a category to see who was paid"
                 loading={isLoading}
                 noData={!isLoading && typeSpend.length === 0}
               >
@@ -598,7 +708,6 @@ function JobcostDetail({ recnum }: { recnum: string }) {
 
               <Widget
                 title="Spending by Vendor"
-                description="Click a vendor to see what they were paid for"
                 loading={isLoading}
                 noData={!isLoading && vendorSpend.length === 0}
               >
@@ -773,15 +882,17 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                 <Widget
                   title="Invoices"
                   description={
+                    // Count only — the % of contract already lives in Billing
+                    // Position; repeating it here said the same thing twice.
                     activeInvoices.length > 0
-                      ? `${activeInvoices.length} invoice${activeInvoices.length === 1 ? "" : "s"} · ${invoicePct.toFixed(1)}% of contract invoiced`
+                      ? `${activeInvoices.length} invoice${activeInvoices.length === 1 ? "" : "s"}`
                       : undefined
                   }
                   loading={isLoading}
                   noData={!isLoading && invoices.length === 0}
                   className="jcd-invoices-widget"
                 >
-                  <div className="inv-metrics-row jcd-invoices-kpis">
+                  <div className="inv-metrics-row jcd-kpis">
                     <div className="inv-metric">
                       <span className="inv-metric-value">{formatMoneyFull(totalInvoiced)}</span>
                       <span className="inv-metric-label">Total Invoiced</span>
@@ -800,16 +911,16 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                   <table className="spend-rank-table inv-table">
                     <thead>
                       <tr>
-                        <th className="spend-rank-table-name inv-th-num">Invoice #</th>
-                        <th className="spend-rank-table-name inv-th-date">Date</th>
-                        <th className="spend-rank-table-name inv-th-status">Status</th>
-                        <th className="spend-rank-table-value">Total</th>
-                        <th className="spend-rank-table-value">Paid</th>
-                        <th className="spend-rank-table-value">Remaining</th>
+                        <SortableHeader label="Invoice #" columnKey="num" activeKey={invSort.key} dir={invSort.dir} onSort={invSort.toggle} className="inv-th-num" />
+                        <SortableHeader label="Date" columnKey="date" activeKey={invSort.key} dir={invSort.dir} onSort={invSort.toggle} className="inv-th-date" />
+                        <SortableHeader label="Status" columnKey="status" activeKey={invSort.key} dir={invSort.dir} onSort={invSort.toggle} className="inv-th-status" />
+                        <SortableHeader label="Total" columnKey="total" activeKey={invSort.key} dir={invSort.dir} onSort={invSort.toggle} align="right" />
+                        <SortableHeader label="Paid" columnKey="paid" activeKey={invSort.key} dir={invSort.dir} onSort={invSort.toggle} align="right" />
+                        <SortableHeader label="Remaining" columnKey="remaining" activeKey={invSort.key} dir={invSort.dir} onSort={invSort.toggle} align="right" />
                       </tr>
                     </thead>
                     <tbody>
-                      {invoices.map(inv => (
+                      {sortedInvoices.map(inv => (
                         <tr
                           key={inv.id}
                           className="spend-rank-table-row"
@@ -854,9 +965,9 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                         <ChevronDown size={13} className={`det-section-chevron${changeOrdersOpen ? " open" : ""}`} />
                       </span>
                     </div>
-                    <div className="inv-metrics-row jcd-inv-metrics">
+                    <div className="inv-metrics-row jcd-kpis jcd-co-kpis">
                       <div className="inv-metric">
-                        <span className={`inv-metric-value ${coTotalContract >= 0 ? "jc-margin-high" : "jc-margin-critical"}`}>
+                        <span className={`inv-metric-value ${coTotalContract > 0 ? "jc-margin-high" : coTotalContract < 0 ? "jc-margin-critical" : ""}`}>
                           {coTotalContract > 0 ? "+" : ""}{formatMoneyFull(coTotalContract)}
                         </span>
                         <span className="inv-metric-label">Total Change Orders</span>
@@ -883,14 +994,14 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                       <table className="spend-rank-table inv-table">
                         <thead>
                           <tr>
-                            <th className="spend-rank-table-name jcd-co-th-num">CO #</th>
-                            <th className="spend-rank-table-name">Description</th>
-                            <th className="spend-rank-table-value">Budget</th>
-                            <th className="spend-rank-table-value">Contract</th>
+                            <SortableHeader label="CO #" columnKey="num" activeKey={coSort.key} dir={coSort.dir} onSort={coSort.toggle} className="jcd-co-th-num" />
+                            <SortableHeader label="Description" columnKey="name" activeKey={coSort.key} dir={coSort.dir} onSort={coSort.toggle} />
+                            <SortableHeader label="Budget" columnKey="budget" activeKey={coSort.key} dir={coSort.dir} onSort={coSort.toggle} align="right" />
+                            <SortableHeader label="Contract" columnKey="contract" activeKey={coSort.key} dir={coSort.dir} onSort={coSort.toggle} align="right" />
                           </tr>
                         </thead>
                         <tbody>
-                          {changeOrders.map(co => {
+                          {sortedChangeOrders.map(co => {
                             const coBudget = co.budget == null ? null : Number(co.budget)
                             const contract = Number(co.total) || 0
                             return (
@@ -905,7 +1016,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                                 <td className="spend-rank-table-name body-text emphasized jcd-co-th-num">#{co.chgnum ?? co.recnum}</td>
                                 <td className="spend-rank-table-name body-text">{co.name}</td>
                                 <td className="spend-rank-table-value body-text emphasized">
-                                  {coBudget == null ? "-" : formatMoneyFull(coBudget)}
+                                  {coBudget == null ? "—" : formatMoneyFull(coBudget)}
                                 </td>
                                 <td className={`spend-rank-table-value body-text emphasized ${contract >= 0 ? "jc-margin-high" : "jc-margin-critical"}`}>
                                   {contract > 0 ? "+" : ""}{formatMoneyFull(contract)}
@@ -931,22 +1042,24 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                   <table className="spend-rank-table inv-table">
                     <thead>
                       <tr>
-                        <th className="spend-rank-table-name jcd-co-th-num">Phase #</th>
-                        <th className="spend-rank-table-name">Name</th>
-                        <th className="spend-rank-table-name inv-th-status">Status</th>
-                        <th className="spend-rank-table-name inv-th-date">PM</th>
-                        <th className="spend-rank-table-value">Units</th>
-                        <th className="spend-rank-table-value">Contract</th>
-                        <th className="spend-rank-table-value">Committed + Spent</th>
-                        <th className="spend-rank-table-value">Margin</th>
+                        <SortableHeader label="Phase #" columnKey="num" activeKey={phaseSort.key} dir={phaseSort.dir} onSort={phaseSort.toggle} className="jcd-co-th-num" />
+                        <SortableHeader label="Name" columnKey="name" activeKey={phaseSort.key} dir={phaseSort.dir} onSort={phaseSort.toggle} />
+                        <SortableHeader label="Status" columnKey="status" activeKey={phaseSort.key} dir={phaseSort.dir} onSort={phaseSort.toggle} className="inv-th-status" />
+                        <SortableHeader label="PM" columnKey="pm" activeKey={phaseSort.key} dir={phaseSort.dir} onSort={phaseSort.toggle} className="inv-th-date" />
+                        <SortableHeader label="Units" columnKey="units" activeKey={phaseSort.key} dir={phaseSort.dir} onSort={phaseSort.toggle} align="right" />
+                        <SortableHeader label="Contract" columnKey="contract" activeKey={phaseSort.key} dir={phaseSort.dir} onSort={phaseSort.toggle} align="right" />
+                        <SortableHeader label="Committed + Spent" columnKey="cost" activeKey={phaseSort.key} dir={phaseSort.dir} onSort={phaseSort.toggle} align="right" />
+                        <SortableHeader label="Margin" columnKey="margin" activeKey={phaseSort.key} dir={phaseSort.dir} onSort={phaseSort.toggle} align="right" />
                       </tr>
                     </thead>
                     <tbody>
-                      {phases.map(ph => {
+                      {sortedPhases.map(ph => {
                         const phMargin = ph.margin == null ? null : Number(ph.margin)
                         const phUnits = Number(ph.unitCount) || 0
                         return (
-                          <tr key={ph.recnum} className="spend-rank-table-row">
+                          // -plain: phase rows are informational, not links —
+                          // no pointer cursor promising a click that goes nowhere.
+                          <tr key={ph.recnum} className="spend-rank-table-row-plain">
                             <td className="spend-rank-table-name body-text emphasized jcd-co-th-num">#{ph.recnum}</td>
                             <td className="spend-rank-table-name body-text">{ph.name}</td>
                             <td className="spend-rank-table-name inv-th-status">
@@ -981,8 +1094,12 @@ function JobcostDetail({ recnum }: { recnum: string }) {
         open={drill != null}
         onClose={() => setDrill(null)}
         title={drill?.title ?? ""}
-        items={drill?.items ?? []}
-        valueFormat={formatMoneyFull}
+        subtitle={drill?.subtitle}
+        labelHeader={drill?.labelHeader ?? ""}
+        rows={drill?.rows ?? []}
+        // Category view: clicking a vendor row swaps the modal to that
+        // vendor's line items (same drill-through as clicking their slice).
+        onRowClick={drill?.canDrillVendors ? drillVendor : undefined}
       />
       <InvoiceDetailModal
         invoiceId={selectedInvoiceId}

@@ -280,17 +280,27 @@ function SortTh({ col, label, align = "left", sortKey, sortDir, onSort, classNam
 // Label/value row inside a summary card; `total` bolds it as the card's
 // bottom-line figure. Shared with the detail page's Contract/Cost Summary
 // cards so the two render identically.
-export function SummaryRow({ label, value, total, valueColor, valueClass }: {
+export function SummaryRow({ label, value, note, total, valueColor, valueClass }: {
   label: string
   value: string
+  /** Muted secondary figure (e.g. the variance's % form) left of the value. */
+  note?: string
   total?: boolean
   valueColor?: string
   valueClass?: string
 }) {
+  const valueSpan = (
+    <span className={`jc-summary-value${valueClass ? ` ${valueClass}` : ""}`} style={valueColor ? { color: valueColor } : undefined}>{value}</span>
+  )
   return (
     <div className={`jc-summary-row${total ? " jc-summary-total" : ""}`}>
       <span className="jc-summary-label">{label}</span>
-      <span className={`jc-summary-value${valueClass ? ` ${valueClass}` : ""}`} style={valueColor ? { color: valueColor } : undefined}>{value}</span>
+      {note ? (
+        <span className="jc-summary-values">
+          <span className="jc-summary-note">{note}</span>
+          {valueSpan}
+        </span>
+      ) : valueSpan}
     </div>
   )
 }

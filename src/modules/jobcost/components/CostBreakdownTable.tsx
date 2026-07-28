@@ -129,11 +129,17 @@ export function CostBreakdownTable({
     return 0
   })
 
+  // Three-state cycle matching useTableSort: first click sorts (text asc,
+  // numbers desc), second flips, third restores the natural cost-type order.
   function handleCostSort(key: CostSortKey) {
-    if (costSortKey === key) setCostSortDir((d) => (d === "asc" ? "desc" : "asc"))
-    else {
+    const firstDir: SortDir = key === "costGroup" ? "asc" : "desc"
+    if (costSortKey !== key) {
       setCostSortKey(key)
-      setCostSortDir(key === "costGroup" ? "asc" : "desc")
+      setCostSortDir(firstDir)
+    } else if (costSortDir === firstDir) {
+      setCostSortDir(firstDir === "asc" ? "desc" : "asc")
+    } else {
+      setCostSortKey(null)
     }
   }
 
