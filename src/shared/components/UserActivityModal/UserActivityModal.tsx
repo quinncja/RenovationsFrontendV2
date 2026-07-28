@@ -481,52 +481,47 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                       />
                     </div>
                   )}
+                  {/* Onboarding (advanced view): a compact strip inside the
+                      activity card — one row, dates live in the tooltips. */}
+                  {engagementVisible && (
+                    <div className="usr-onb-strip">
+                      <span className="usr-onb-strip-label">Onboarding</span>
+                      {onbLoading ? (
+                        <div className="widget-skeleton usr-onb-skeleton" />
+                      ) : (
+                        <div className="usr-onb-row">
+                          <span
+                            className={`usr-onb-chip${onbSetupDone ? " usr-onb-chip--done" : ""}`}
+                            title={
+                              onboarding?.onboardedAt
+                                ? `Completed setup ${milestoneDate(onboarding.onboardedAt) ?? ""}`.trim()
+                                : onbSetupDone
+                                  ? "Completed setup (before completion dates were recorded)"
+                                  : "Has not completed initial setup"
+                            }
+                          >
+                            {onbSetupDone ? <Check size={13} /> : <span className="usr-onb-dot" />}
+                            Initial setup
+                          </span>
+                          {onbMilestoneKeys.map((key) => {
+                            const seenAt = onboarding?.milestones?.[key]
+                            const date = seenAt ? milestoneDate(seenAt) : null
+                            return (
+                              <span
+                                key={key}
+                                className={`usr-onb-chip${seenAt ? " usr-onb-chip--done" : ""}`}
+                                title={seenAt ? `Seen${date ? ` ${date}` : ""}` : "Not seen yet"}
+                              >
+                                {seenAt ? <Check size={13} /> : <span className="usr-onb-dot" />}
+                                {milestoneLabel(key)}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
-
-                {/* Onboarding (advanced view): has this user finished setup and
-                    seen the one-time explainers? */}
-                {engagementVisible && (
-                  <div className="usr-onb-section">
-                    <p className="invoice-modal-section-label">Onboarding</p>
-                    {onbLoading ? (
-                      <div className="widget-skeleton" style={{ height: "2rem" }} />
-                    ) : (
-                      <div className="usr-onb-row">
-                        <span
-                          className={`usr-onb-chip${onbSetupDone ? " usr-onb-chip--done" : ""}`}
-                          title={
-                            onboarding?.onboardedAt
-                              ? `Completed setup ${milestoneDate(onboarding.onboardedAt) ?? ""}`.trim()
-                              : onbSetupDone
-                                ? "Completed setup (before completion dates were recorded)"
-                                : "Has not completed initial setup"
-                          }
-                        >
-                          {onbSetupDone ? <Check size={13} /> : <span className="usr-onb-dot" />}
-                          Initial setup
-                          {onboarding?.onboardedAt && milestoneDate(onboarding.onboardedAt) && (
-                            <span className="usr-onb-date">{milestoneDate(onboarding.onboardedAt)}</span>
-                          )}
-                        </span>
-                        {onbMilestoneKeys.map((key) => {
-                          const seenAt = onboarding?.milestones?.[key]
-                          const date = seenAt ? milestoneDate(seenAt) : null
-                          return (
-                            <span
-                              key={key}
-                              className={`usr-onb-chip${seenAt ? " usr-onb-chip--done" : ""}`}
-                              title={seenAt ? `Seen${date ? ` ${date}` : ""}` : "Not seen yet"}
-                            >
-                              {seenAt ? <Check size={13} /> : <span className="usr-onb-dot" />}
-                              {milestoneLabel(key)}
-                              {date && <span className="usr-onb-date">{date}</span>}
-                            </span>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
                   </>
                 )
 
