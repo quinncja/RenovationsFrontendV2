@@ -1560,6 +1560,15 @@ body{
   letter-spacing: 0.04em;
 }
 
+/* Title row: title on the left, optional corner badge (e.g. a YoY pill)
+   pinned to the right. */
+.stat-widget-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .stat-widget-value {
   color: var(--primary-text);
 }
@@ -9611,20 +9620,146 @@ svg.placeholder-illustration {
 .mbp-table-widget .widget-body { padding: 0; gap: 0; }
 
 /* ── Overhead Expense Report ── */
-/* YoY delta line under a stat value; the signed span inside carries the color. */
-.ohr-stat-caption {
-  display: block;
-  margin-top: 0.25rem;
-  font-size: 0.72rem;
-  color: var(--secondary-text);
-  line-height: 1.3;
+/* Give the four summary tiles a touch more room than the dense default so the
+   value + delta chip don't feel packed. */
+.ohr-kpi-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.875rem;
 }
 
-/* Top-movers reuses the donut legend's list styling; left-align it since
-   there's no pie beside it, and let rows breathe a little more. */
-.ohr-movers-list {
-  width: 100%;
-  max-width: none;
+/* Monthly / Running total toggle in the trend widget's header. Mirrors the
+   Job Costing command-bar segmented control (.jc-seg on the jobcost branch):
+   recessed well + a copper thumb that slides between segments (framer
+   layoutId). Values are self-contained here because this one sits on a white
+   widget card rather than the command bar's ink deck. */
+.ohr-seg {
+  display: flex;
+  align-items: stretch;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgb(from var(--primary-text) r g b / 0.06);
+  box-shadow: inset 0 1px 2px light-dark(rgb(from var(--primary-text) r g b / 0.1), rgba(0, 0, 0, 0.25));
+  flex-shrink: 0;
+}
+
+.ohr-seg-btn {
+  position: relative;
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0.3rem 0.8rem;
+  border-radius: 8px;
+  font-family: var(--font-family);
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  color: var(--secondary-text);
+  transition: color 160ms ease;
+}
+
+.ohr-seg-btn:hover { color: var(--primary-text); }
+.ohr-seg-btn-active,
+.ohr-seg-btn-active:hover { color: #fff; }
+
+.ohr-seg-thumb {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--primary-color-hover) 0%, var(--primary-color) 100%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.ohr-seg-label { position: relative; z-index: 1; }
+
+/* YoY pill in the top-right corner of each summary tile ("▼ 4% vs ’25").
+   The inline style carries the color + tinted background. */
+.ohr-kpi-pill {
+  font-size: 0.7rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rows in the "Other categories" drill-down modal are clickable (each opens
+   that category's cost modal on top). */
+.ohr-other-row {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.ohr-other-row:hover {
+  background: var(--hover-bg);
+}
+
+/* ── Top Movers list ──
+   Each row: a soft tinted trend badge, the category name, and a right-aligned
+   figure stack (signed amount over its % change). Restrained and scannable —
+   the badge carries the up/down read so the numbers can stay calm. */
+.ohr-movers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.ohr-mover {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  padding: 0.55rem 0.5rem;
+  border-radius: 10px;
+  transition: background-color 0.15s;
+}
+
+.ohr-mover:hover {
+  background: var(--hover-bg);
+}
+
+.ohr-mover-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+}
+
+.ohr-mover-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--primary-text);
+  font-size: var(--body-size);
+  font-weight: var(--font-weight-medium);
+}
+
+.ohr-mover-figures {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.05rem;
+  line-height: 1.2;
+}
+
+.ohr-mover-amt {
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.ohr-mover-pct {
+  font-size: 0.72rem;
+  color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Monthly Detail Table (shared component) ── */
@@ -9637,16 +9772,23 @@ svg.placeholder-illustration {
 }
 
 .mdt-month-col { width: 40%; }
-.mdt-total-col { width: 60%; text-align: right; }
-.mdt-table th.mdt-total-col { text-align: right; }
+.mdt-total-col { width: 60%; }
 
-/* In this drill-down popup the row hover reads neutral, not copper. The base
-   .jc-group-row / .jc-txn-row hovers tint with --primary-color (kept for the
-   Job Cost page), so scope a gray override to the mdt- tables only. The extra
-   class here outranks the base single-class hover rules. */
-.mdt-table .jc-group-row:hover,
-.mdt-line-table .jc-txn-row:hover {
-  background: var(--hover-bg);
+/* Expand chevron on a month row. */
+.mdt-chevron {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+  color: var(--secondary-text);
+  transition: color 120ms;
+}
+.mdt-month-row:hover .mdt-chevron { color: var(--primary-text); }
+
+/* Open month + its line-item panel read as one recessed block. */
+.mdt-month-row-expanded,
+.mdt-items-row > .mdt-items-cell {
+  background: light-dark(rgba(0, 0, 0, 0.02), rgba(255, 255, 255, 0.02));
 }
 
 .mdt-loading,
@@ -9681,41 +9823,16 @@ svg.placeholder-illustration {
   border-collapse: collapse;
 }
 
-.mdt-line-table .jc-txn-th,
-.mdt-line-table .jc-txn-row td {
+.mdt-line-table th,
+.mdt-line-table td {
   white-space: nowrap;
 }
 
-/* Sort header button inside the line-item table. */
-.mdt-line-table .jc-txn-th { padding: 0; }
-
-.mdt-sort-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  width: 100%;
-  padding: 0.5rem 1.125rem;
-  background: transparent;
-  border: none;
-  font-family: var(--font-family);
-  font-size: 0.5938rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--secondary-text);
-  cursor: pointer;
-  text-align: left;
-  white-space: nowrap;
-  transition: color 0.12s ease, background 0.12s ease;
-}
-
-.mdt-sort-btn:hover {
-  color: var(--primary-text);
-  background: color-mix(in srgb, var(--primary-color) 5%, transparent);
-}
-
-.mdt-sort-btn.active {
-  color: var(--primary-color);
+/* The last line-item row keeps its border — it doubles as the divider between
+   the open panel and the next month row (the outer :last-child rule only
+   applies to the outer table's own final row). */
+.mdt-items-row:not(:last-child) .mdt-line-table tbody tr:last-child td {
+  border-bottom: 1px solid var(--border-color);
 }
 
 /* ── Widget Search ── */
@@ -12346,6 +12463,17 @@ svg.placeholder-illustration {
 @keyframes navHintIn {
   from { opacity: 0; transform: translateY(calc(-50% - 6px)) scale(0.97); }
   to { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+
+/* New-section announcement variant (NavSectionHint): same card, but framer
+   drives entrance/exit and centering is measured in JS — so the CSS keyframe
+   and the translateY(-50%) both switch off. z drops below the arrival/admin
+   screens (190) and the modal base (200): if a full-screen overlay is up, the
+   hint waits underneath it instead of floating on top. */
+.nav-hint--motion {
+  z-index: 150;
+  transform: none;
+  animation: none;
 }
 
 .nav-hint-arrow {

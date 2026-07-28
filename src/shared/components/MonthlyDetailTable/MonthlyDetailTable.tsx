@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
-import { ChevronDown, ChevronRight, ChevronUp, ChevronsUpDown } from "lucide-react"
+import { ChevronDown, ChevronRight } from "lucide-react"
+import { SortableHeader } from "../SortableHeader"
 import { fullMonth, formatMoneyFull, formatDate } from "../../utils/format"
 
 // Generic month-grouped GL line-item table — built for the dashboard
@@ -310,11 +311,11 @@ export function MonthlyDetailTable({
   }
 
   return (
-    <table className="jc-cost-table mdt-table">
+    <table className="data-table mdt-table">
       <thead>
         <tr>
-          <th className="jc-cost-th mdt-month-col">Month</th>
-          <th className="jc-cost-th mdt-total-col">{totalLabel}</th>
+          <th className="mdt-month-col">Month</th>
+          <th className="num mdt-total-col">{totalLabel}</th>
         </tr>
       </thead>
       <tbody>
@@ -324,25 +325,25 @@ export function MonthlyDetailTable({
           return [
             <tr
               key={`m-${row.month}`}
-              className={`jc-group-row${isExpanded ? " expanded" : ""}`}
+              className={`clickable-row mdt-month-row${isExpanded ? " mdt-month-row-expanded" : ""}`}
               onClick={() => toggleMonth(row.month)}
               role={filterMonth != null ? undefined : "button"}
               tabIndex={filterMonth != null ? undefined : 0}
               onKeyDown={(e) => e.key === "Enter" && toggleMonth(row.month)}
             >
-              <td className="mdt-month-col">
+              <td className="mdt-month-col cell-primary">
                 {filterMonth == null && (
-                  <span className="jc-group-chevron">
-                    {isExpanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+                  <span className="mdt-chevron">
+                    {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                   </span>
                 )}
                 {fullMonth(row.month)}
               </td>
-              <td className="mdt-total-col">{formatMoneyFull(row.value)}</td>
+              <td className="num">{formatMoneyFull(row.value)}</td>
             </tr>,
             ...(isExpanded
               ? [
-                  <tr key={`m-${row.month}-items`} className="jc-txn-container-row mdt-items-row">
+                  <tr key={`m-${row.month}-items`} className="mdt-items-row">
                     <td colSpan={2} className="mdt-items-cell">
                       {lineItems === null && isLoading ? (
                         <div className="mdt-loading">Loading line items…</div>
@@ -352,36 +353,34 @@ export function MonthlyDetailTable({
                         <div className="mdt-loading">No line items for this month.</div>
                       ) : (
                         <div className="mdt-scroll">
-                          <table className="jc-txn-table mdt-line-table">
+                          <table className="data-table mdt-line-table">
                             <thead>
                               <tr>
-                                {columns.map((col) => {
-                                  const active = sortKey === col
-                                  const Icon = active
-                                    ? sortDir === "asc"
-                                      ? ChevronUp
-                                      : ChevronDown
-                                    : ChevronsUpDown
-                                  return (
-                                    <th key={col} className="jc-txn-th">
-                                      <button
-                                        type="button"
-                                        className={`mdt-sort-btn${active ? " active" : ""}`}
-                                        onClick={() => handleSort(col)}
-                                      >
-                                        {labelFor(col)}
-                                        <Icon size={11} />
-                                      </button>
-                                    </th>
-                                  )
-                                })}
+                                {columns.map((col) => (
+                                  <SortableHeader
+                                    key={col}
+                                    label={labelFor(col)}
+                                    columnKey={col}
+                                    activeKey={sortKey}
+                                    dir={sortKey === col ? sortDir : null}
+                                    onSort={handleSort}
+                                    align={NUMERIC_KEYS.has(col.toLowerCase()) ? "right" : "left"}
+                                  />
+                                ))}
                               </tr>
                             </thead>
                             <tbody>
                               {monthItems.map((item, i) => (
-                                <tr key={i} className="jc-txn-row">
+                                <tr key={i}>
                                   {columns.map((col) => (
-                                    <td key={col}>{formatCell(col, item[col])}</td>
+                                    <td
+                                      key={col}
+                                      className={
+                                        NUMERIC_KEYS.has(col.toLowerCase()) ? "num" : undefined
+                                      }
+                                    >
+                                      {formatCell(col, item[col])}
+                                    </td>
                                   ))}
                                 </tr>
                               ))}

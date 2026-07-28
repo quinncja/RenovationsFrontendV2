@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
-import { motion, AnimatePresence } from "framer-motion"
-import { ArrowLeft, Download, X } from "lucide-react"
+import { motion, AnimatePresence, type Transition } from "framer-motion"
+import { ArrowLeft, ArrowUpRight, ArrowDownRight, Download, X } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData, usePageYear } from "../../shared/context/PageContext"
@@ -11,8 +11,10 @@ import { StatWidget } from "../../shared/components/StatWidget/StatWidget"
 import { Chart } from "../../shared/components/Chart/Chart"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
-import { MonthlyDetailTable, collapseValue } from "../../shared/components/MonthlyDetailTable/MonthlyDetailTable"
-import { MonthlyYearComparisonWidget } from "./widgets/MonthlyYearComparisonWidget"
+import {
+  MonthlyDetailTable,
+  collapseValue,
+} from "../../shared/components/MonthlyDetailTable/MonthlyDetailTable"
 import { SortableHeader } from "../../shared/components/SortableHeader"
 import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
 import { useModalLayer } from "../../shared/hooks/useModalLayer"
@@ -21,6 +23,8 @@ import { shortMonth, fullMonth, formatMoneyFull, formatDate } from "../../shared
 import { downloadXlsx } from "../../shared/utils/exportXlsx"
 import { buildMonthlyBreakdownXlsx } from "./exportMonthlyBreakdownXlsx"
 import type { LineMarker, SpendItem } from "../../shared/components/Chart/chart.types"
+import { useOnboarding } from "../../core/onboarding/OnboardingProvider"
+import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
 
 // Full overhead-spending report (Finances → Overhead Report). Where the
 // dashboard's /dashboard/breakdown/overhead drill-down shows one chart and
@@ -29,10 +33,29 @@ import type { LineMarker, SpendItem } from "../../shared/components/Chart/chart.
 // years of every comparison are capped at the same month on the backend
 // (overheadCategoryComparison) so mid-year deltas are apples-to-apples.
 
+// Thumb slide for the trend toggle — same spring as the Job Costing
+// command-bar segmented controls, which this toggle mirrors.
+const SEG_SPRING: Transition = {
+  type: "spring",
+  bounce: 0.15,
+  visualDuration: 0.35,
+}
+
+// Row travel when the Top Movers ranking flips between $ and % — the same
+// soft-landing spring as the jobcost pinned-property reorder glide.
+const REORDER_SPRING: Transition = {
+  type: "spring",
+  bounce: 0.18,
+  visualDuration: 0.45,
+}
+
 const BRAND_ORANGE = "#c27c3e"
 const PREVIOUS_YEAR_COLOR = "#94a3b8"
-const UP_COLOR = "#ef4444" // overhead growing = bad
-const DOWN_COLOR = "#22c55e" // overhead shrinking = good
+// Muted clay / sage rather than alert red / green: on a report where most
+// numbers grow most years, full-saturation red made the whole page read as an
+// alarm. Direction still reads, but as information, not a siren.
+const UP_COLOR = "#b3574f" // overhead growing = worth attention
+const DOWN_COLOR = "#4d8f66" // overhead shrinking = good
 
 interface MonthRow {
   month: number
@@ -100,17 +123,41 @@ function openMonthMarkers(
   ]
 }
 
-/** Signed YoY caption under a stat: red when overhead is up, green when down. */
-function DeltaCaption({ current, previous, label }: { current: number; previous: number; label: string }) {
-  if (previous === 0) return null
+/** YoY pill pinned to a stat card's top-right corner ("▼ 4% vs ’25").
+ *  Overhead growing reads red, shrinking green; values within a rounding
+ *  whisker read neutral. `unit: "points"` compares two percentages directly
+ *  ("▼ 0.8 pt vs ’25"). `hint` carries the precise comparison as a tooltip. */
+function DeltaPill({
+  current,
+  previous,
+  lastYear,
+  hint,
+  unit = "percent",
+}: {
+  current: number
+  previous: number
+  lastYear: number
+  hint: string
+  unit?: "percent" | "points"
+}) {
+  if (!previous) return null
   const delta = current - previous
-  const pct = (delta / Math.abs(previous)) * 100
+  const magnitude =
+    unit === "percent" ? Math.abs(delta / Math.abs(previous)) * 100 : Math.abs(delta)
+  const up = delta > 0
+  const flat = unit === "percent" ? magnitude < 0.5 : magnitude < 0.05
+  const color = flat ? "var(--secondary-text)" : up ? UP_COLOR : DOWN_COLOR
+  const figure = unit === "percent" ? `${magnitude.toFixed(0)}%` : `${magnitude.toFixed(1)} pt`
   return (
-    <span className="ohr-stat-caption">
-      <span style={{ color: delta > 0 ? UP_COLOR : DOWN_COLOR }}>
-        {delta > 0 ? "↑" : "↓"} {formatMoneyFull(Math.abs(delta))} ({Math.abs(pct).toFixed(1)}%)
-      </span>{" "}
-      {label}
+    <span
+      className="ohr-kpi-pill"
+      style={{
+        color,
+        background: `color-mix(in srgb, ${color} 12%, transparent)`,
+      }}
+      title={hint}
+    >
+      {flat ? "±" : up ? "▲" : "▼"} {figure} vs ’{String(lastYear).slice(-2)}
     </span>
   )
 }
@@ -195,8 +242,8 @@ function OverheadCategoryModal({
                   <div>
                     <h2 className="title2 emphasized">{category?.name}</h2>
                     <span className="reports-modal-subtitle">
-                      Account {category?.id} · {rows.length} cost{rows.length === 1 ? "" : "s"} ·{" "}
-                      {formatMoneyFull(total)}
+                      Account {category?.id} · {rows.length} cost
+                      {rows.length === 1 ? "" : "s"} · {formatMoneyFull(total)}
                     </span>
                   </div>
                 </div>
@@ -214,11 +261,42 @@ function OverheadCategoryModal({
                   <table className="data-table billings-invoice-table">
                     <thead>
                       <tr>
-                        <SortableHeader label="Date" columnKey="date" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-                        <SortableHeader label="Trans #" columnKey="trnnum" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-                        <SortableHeader label="Description" columnKey="description" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-                        <SortableHeader label="Month" columnKey="month" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-                        <SortableHeader label="Amount" columnKey="amount" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} align="right" />
+                        <SortableHeader
+                          label="Date"
+                          columnKey="date"
+                          activeKey={sort.key}
+                          dir={sort.dir}
+                          onSort={sort.toggle}
+                        />
+                        <SortableHeader
+                          label="Trans #"
+                          columnKey="trnnum"
+                          activeKey={sort.key}
+                          dir={sort.dir}
+                          onSort={sort.toggle}
+                        />
+                        <SortableHeader
+                          label="Description"
+                          columnKey="description"
+                          activeKey={sort.key}
+                          dir={sort.dir}
+                          onSort={sort.toggle}
+                        />
+                        <SortableHeader
+                          label="Month"
+                          columnKey="month"
+                          activeKey={sort.key}
+                          dir={sort.dir}
+                          onSort={sort.toggle}
+                        />
+                        <SortableHeader
+                          label="Amount"
+                          columnKey="amount"
+                          activeKey={sort.key}
+                          dir={sort.dir}
+                          onSort={sort.toggle}
+                          align="right"
+                        />
                       </tr>
                     </thead>
                     <tbody>
@@ -226,11 +304,15 @@ function OverheadCategoryModal({
                         const month = Number(collapseValue(li.month))
                         return (
                           <tr key={i}>
-                            <td className="text-secondary">{formatDate(collapseValue(li.trndte))}</td>
+                            <td className="text-secondary">
+                              {formatDate(collapseValue(li.trndte))}
+                            </td>
                             <td>{String(collapseValue(li.trnnum) ?? "—")}</td>
                             <td>{String(collapseValue(li.dscrpt) ?? "") || "—"}</td>
                             <td>{month >= 1 && month <= 12 ? fullMonth(month) : "Adjustment"}</td>
-                            <td className="num">{formatMoneyFull(Number(collapseValue(li.net) ?? 0))}</td>
+                            <td className="num">
+                              {formatMoneyFull(Number(collapseValue(li.net) ?? 0))}
+                            </td>
                           </tr>
                         )
                       })}
@@ -253,12 +335,113 @@ function OverheadCategoryModal({
   )
 }
 
+/**
+ * The "Other" tail of the category donut: every account past the top 7, as a
+ * ranked list. Clicking a row drills into that category's cost modal, which
+ * stacks ON TOP of this one (useModalLayer), so the user can dip into a
+ * category's costs and pop back to the full list.
+ */
+function OtherCategoriesModal({
+  open,
+  categories,
+  total,
+  onSelect,
+  onClose,
+}: {
+  open: boolean
+  categories: CategoryRow[]
+  total: number
+  onSelect: (id: string) => void
+  onClose: () => void
+}) {
+  const { overlayZ, contentZ } = useModalLayer(open)
+  const otherTotal = categories.reduce((s, c) => s + (c.current_amount || 0), 0)
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            className="modal-overlay"
+            style={{ zIndex: overlayZ }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
+            <motion.div
+              className="modal reports-modal"
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <div className="modal-header">
+                <div className="reports-modal-title">
+                  <div>
+                    <h2 className="title2 emphasized">Other Categories</h2>
+                    <span className="reports-modal-subtitle">
+                      {categories.length} account
+                      {categories.length === 1 ? "" : "s"} · {formatMoneyFull(otherTotal)}
+                    </span>
+                  </div>
+                </div>
+                <button className="button modal-close" onClick={onClose}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="reports-modal-body">
+                <table className="data-table billings-invoice-table">
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      <th className="num">Amount</th>
+                      <th className="num">% of Overhead</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map((c) => {
+                      const pct = total > 0 ? (c.current_amount / total) * 100 : 0
+                      return (
+                        <tr
+                          key={c.account_number}
+                          className="ohr-other-row"
+                          onClick={() => onSelect(String(c.account_number))}
+                        >
+                          <td>{c.account_name}</td>
+                          <td className="num">{formatMoneyFull(c.current_amount)}</td>
+                          <td className="num text-secondary">{pct.toFixed(1)}%</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          </div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body,
+  )
+}
+
 function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: number) => void }) {
   const navigate = useNavigate()
   const pageYear = usePageYear()
   const lastYear = pageYear - 1
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
+  // One trend widget, two reads: month-by-month spending or the running total.
+  const [trendView, setTrendView] = useState<"monthly" | "cumulative">("monthly")
+  // Top Movers ranks by dollar swing or percent swing — one leads at a time.
+  const [moversBy, setMoversBy] = useState<"dollars" | "percent">("dollars")
   const [modalCategory, setModalCategory] = useState<ModalCategory | null>(null)
+  // The category donut rolls everything past the top 7 into one "Other" slice;
+  // clicking it opens a modal listing the remainder, each of which drills into
+  // its own cost modal on top.
+  const [otherModalOpen, setOtherModalOpen] = useState(false)
 
   const { data, isLoading } = useWidgetData<PageData>([
     "monthlyOverheadComparison",
@@ -289,24 +472,32 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
   )
   const monthsElapsed = currentMonthRows.length
   const avgMonthly = monthsElapsed > 0 ? totalCurrent / monthsElapsed : null
+  // Prior-year monthly average over the SAME elapsed months — totalPrevious is
+  // already capped at the open month by the backend, so dividing by the same
+  // count keeps the comparison apples-to-apples.
+  const avgMonthlyPrev = monthsElapsed > 0 ? totalPrevious / monthsElapsed : null
   const runRate = monthsElapsed > 0 ? (totalCurrent / monthsElapsed) * 12 : null
   const lastYearActual =
     (data?.annualOverheadTrend ?? []).find((r) => r.year === lastYear)?.overhead ?? 0
 
-  // ── Cumulative view: client-side running sum of the monthly comparison ──
-  const cumulativeSeries = useMemo(() => {
+  // ── Trend widget series: month-by-month, or the cumulative running sum,
+  //    switched by the widget's Monthly / Running total toggle ──
+  const trendSeries = useMemo(() => {
     const raw = data?.monthlyOverheadComparison
     if (!Array.isArray(raw) || raw.length === 0) return null
     const toSeries = (y: number, color: string) => {
       let sum = 0
       const points = yearRows(raw, y).map((r) => {
         sum += r.overhead ?? 0
-        return { x: shortMonth(r.month), y: sum }
+        return {
+          x: shortMonth(r.month),
+          y: trendView === "cumulative" ? sum : (r.overhead ?? 0),
+        }
       })
       return { id: String(y), color, data: points }
     }
     return [toSeries(pageYear, BRAND_ORANGE), toSeries(lastYear, PREVIOUS_YEAR_COLOR)]
-  }, [data, pageYear, lastYear])
+  }, [data, pageYear, lastYear, trendView])
 
   // ── Overhead as % of revenue, month by month for both years ──
   const pctOfRevenueSeries = useMemo(() => {
@@ -326,46 +517,89 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
     return series.some((s) => s.data.length > 0) ? series : null
   }, [data, pageYear, lastYear])
 
-  // ── Category donut ──
-  const pieItems: SpendItem[] = useMemo(
+  // ── Overhead as a share of revenue, YTD (headline KPI) ──
+  // Both years summed over the same elapsed months so the comparison is
+  // apples-to-apples, mirroring how the backend caps the category query.
+  const pctOfRevenue = useMemo(() => {
+    const sum = (rows: MonthRow[] | null | undefined, y: number, key: string) =>
+      yearRows(rows, y)
+        .filter((r) => r.month <= monthsElapsed)
+        .reduce((s, r) => s + (Number(r[key]) || 0), 0)
+    const ratio = (y: number) => {
+      const rev = sum(data?.monthlyRevenueComparison, y, "revenue")
+      return rev ? (sum(data?.monthlyOverheadComparison, y, "overhead") / rev) * 100 : null
+    }
+    return { current: ratio(pageYear), previous: ratio(lastYear) }
+  }, [data, pageYear, lastYear, monthsElapsed])
+
+  // ── Category donut: top 10 explicit, the long tail folded into "Other" ──
+  // A 20-slice donut is unreadable and a 20-row list swallows the page. The
+  // remainder rolls into one slice whose click opens the tail modal — small
+  // categories stay one tap from their costs.
+  const OTHER_ID = "__other__"
+  const sortedCats = useMemo(
     () =>
       categories
         .filter((c) => c.current_amount > 0)
-        .sort((a, b) => b.current_amount - a.current_amount)
-        .map((c) => ({
-          id: String(c.account_number),
-          label: c.account_name,
-          value: c.current_amount,
-        })),
+        .sort((a, b) => b.current_amount - a.current_amount),
     [categories],
   )
+  const topCats = sortedCats.slice(0, 10)
+  const restCats = sortedCats.slice(10)
+  const restTotal = restCats.reduce((s, c) => s + c.current_amount, 0)
+  const pieItems: SpendItem[] = useMemo(() => {
+    const top = topCats.map((c) => ({
+      id: String(c.account_number),
+      label: c.account_name,
+      value: c.current_amount,
+    }))
+    return restCats.length
+      ? [
+          ...top,
+          {
+            id: OTHER_ID,
+            label: `Other (${restCats.length} categories)`,
+            value: restTotal,
+          },
+        ]
+      : top
+  }, [topCats, restCats, restTotal])
   const { hue, drift } = RAMP_SCHEMES.orange
   const pieColors = colorRamp(hue, drift, Math.max(pieItems.length, 1))
 
   // ── Top movers vs last year ──
-  const movers = useMemo(
-    () =>
-      categories
-        .map((c) => ({
-          id: String(c.account_number),
-          name: c.account_name,
-          delta: (c.current_amount || 0) - (c.previous_amount || 0),
-          previous: c.previous_amount || 0,
-        }))
-        .filter((m) => Math.abs(m.delta) >= 1)
-        .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
-        .slice(0, 8),
-    [categories],
-  )
+  // Ranked by whichever metric the widget's toggle has in the lead. Percent
+  // mode drops categories with no prior-year spend (a change from $0 has no
+  // meaningful percentage and would rank as infinite).
+  const movers = useMemo(() => {
+    const all = categories
+      .map((c) => ({
+        id: String(c.account_number),
+        name: c.account_name,
+        delta: (c.current_amount || 0) - (c.previous_amount || 0),
+        previous: c.previous_amount || 0,
+      }))
+      .filter((m) => Math.abs(m.delta) >= 1)
+    return (
+      moversBy === "percent"
+        ? all
+            .filter((m) => m.previous !== 0)
+            .sort(
+              (a, b) =>
+                Math.abs(b.delta / Math.abs(b.previous)) - Math.abs(a.delta / Math.abs(a.previous)),
+            )
+        : all.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+    ).slice(0, 6)
+  }, [categories, moversBy])
 
-  // ── Annual YoY bars ──
-  const annualBars = useMemo(
-    () =>
-      (data?.annualOverheadTrend ?? [])
-        .filter((r) => r.year > 0)
-        .map((r) => ({ label: String(r.year), value: r.overhead })),
-    [data],
-  )
+  // ── Annual overhead, as a trend line across years ──
+  const annualSeries = useMemo(() => {
+    const points = (data?.annualOverheadTrend ?? [])
+      .filter((r) => r.year > 0)
+      .sort((a, b) => a.year - b.year)
+      .map((r) => ({ x: String(r.year), y: r.overhead }))
+    return points.length ? [{ id: "Overhead", color: BRAND_ORANGE, data: points }] : null
+  }, [data])
 
   // ── Monthly table + export (same machinery as the breakdown page) ──
   const monthlyTotals = useMemo(
@@ -387,6 +621,35 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
       year: pageYear,
       monthlyTotals,
       lineItems,
+      kpis: [
+        {
+          label: `Total Overhead (${pageYear})`,
+          value: totalCurrent,
+          format: "money",
+        },
+        {
+          label: `Total Overhead (${lastYear}, same period)`,
+          value: totalPrevious,
+          format: "money",
+        },
+        { label: "Avg / Month", value: avgMonthly, format: "money" },
+        { label: "Projected Run Rate", value: runRate, format: "money" },
+        {
+          label: "Overhead Share of Revenue",
+          value: pctOfRevenue.current,
+          format: "percent",
+        },
+      ],
+      monthlyPrevious: yearRows(data?.monthlyOverheadComparison, lastYear).map((r) => ({
+        month: r.month,
+        value: r.overhead ?? 0,
+      })),
+      categories: categories.map((c) => ({
+        accountNumber: c.account_number,
+        accountName: c.account_name,
+        current: c.current_amount || 0,
+        previous: c.previous_amount || 0,
+      })),
     })
     const date = new Date().toISOString().slice(0, 10)
     downloadXlsx(rows, `Overhead_Expense_Report_${pageYear}_${date}.xlsx`, `Overhead ${pageYear}`, {
@@ -400,6 +663,10 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
     if (cat) setModalCategory({ id, name: cat.account_name })
   }
 
+  // Donut/list click: the synthetic "Other" slice opens the tail modal; a real
+  // category opens its cost modal.
+  const handleCatClick = (id: string) => (id === OTHER_ID ? setOtherModalOpen(true) : openModal(id))
+
   // Line items span the full posted year while the pie is capped at the open
   // month — cap the modal the same way so its total matches the slice.
   const modalMonthCap = pageYear === openYear && openMonth != null ? openMonth : null
@@ -411,7 +678,11 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
       title="Overhead Expense Report"
       actions={
         <>
-          <button className="jc-export-btn" onClick={() => navigate("/dashboard")} title="Back to dashboard">
+          <button
+            className="jc-export-btn"
+            onClick={() => navigate("/dashboard")}
+            title="Back to dashboard"
+          >
             <ArrowLeft size={14} /> Dashboard
           </button>
           <button
@@ -427,64 +698,227 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
       }
     >
       <MotionList className="widget-grid widget-grid-2">
+        {/* ── Summary strip ─────────────────────────────────────────────── */}
         <MotionItem className="col-span-full">
-          <div className="stat-grid">
+          <div className="stat-grid ohr-kpi-grid">
             <StatWidget
-              title={`Total Overhead — ${pageYear}`}
+              title={`${pageYear} Overhead`}
               value={noData ? null : totalCurrent}
               loading={isLoading}
-              caption={
-                <DeltaCaption
-                  current={totalCurrent}
-                  previous={totalPrevious}
-                  label={`vs same period ${lastYear}`}
-                />
+              badge={
+                totalPrevious ? (
+                  <DeltaPill
+                    current={totalCurrent}
+                    previous={totalPrevious}
+                    lastYear={lastYear}
+                    hint={`Compared with ${lastYear} through the same month`}
+                  />
+                ) : undefined
               }
             />
-            <StatWidget title="Avg Monthly Overhead" value={avgMonthly} loading={isLoading} />
             <StatWidget
-              title={`Projected ${pageYear} Run Rate`}
+              title="Avg / Month"
+              value={avgMonthly}
+              loading={isLoading}
+              badge={
+                avgMonthly != null && avgMonthlyPrev ? (
+                  <DeltaPill
+                    current={avgMonthly}
+                    previous={avgMonthlyPrev}
+                    lastYear={lastYear}
+                    hint={`Compared with the ${lastYear} monthly average over the same months`}
+                  />
+                ) : undefined
+              }
+            />
+            <StatWidget
+              title="Projected Run Rate"
               value={runRate}
               loading={isLoading}
-              caption={
+              badge={
                 runRate != null && lastYearActual !== 0 ? (
-                  <DeltaCaption current={runRate} previous={lastYearActual} label={`vs ${lastYear} actual`} />
+                  <DeltaPill
+                    current={runRate}
+                    previous={lastYearActual}
+                    lastYear={lastYear}
+                    hint={`Compared with actual ${lastYear} full-year overhead`}
+                  />
+                ) : undefined
+              }
+            />
+            <StatWidget
+              title="Share of Revenue"
+              value={pctOfRevenue.current}
+              loading={isLoading}
+              format={(v) => `${v.toFixed(1)}%`}
+              badge={
+                pctOfRevenue.current != null && pctOfRevenue.previous != null ? (
+                  <DeltaPill
+                    current={pctOfRevenue.current}
+                    previous={pctOfRevenue.previous}
+                    lastYear={lastYear}
+                    unit="points"
+                    hint={`Overhead ÷ revenue, both years through the same month (${lastYear}: ${pctOfRevenue.previous.toFixed(1)}%)`}
+                  />
                 ) : undefined
               }
             />
           </div>
         </MotionItem>
 
+        {/* ── Trend + biggest changes ───────────────────────────────────── */}
         <MotionItem>
-          <MonthlyYearComparisonWidget
+          <Widget
             title="Overhead by Month"
-            queryName="monthlyOverheadComparison"
-            valueKey="overhead"
-            onPointClick={handlePointClick}
-            highlightedX={selectedMonth != null ? shortMonth(selectedMonth) : null}
-          />
-        </MotionItem>
-
-        <MotionItem>
-          <Widget title="Cumulative Overhead" loading={isLoading} noData={!cumulativeSeries}>
-            {cumulativeSeries && (
+            loading={isLoading}
+            noData={!trendSeries}
+            actions={
+              <div className="ohr-seg" role="tablist" aria-label="Trend view">
+                {(
+                  [
+                    ["monthly", "Monthly"],
+                    ["cumulative", "Running total"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={trendView === key}
+                    className={`ohr-seg-btn${trendView === key ? " ohr-seg-btn-active" : ""}`}
+                    onClick={() => setTrendView(key)}
+                  >
+                    {trendView === key && (
+                      <motion.span
+                        layoutId="ohrTrendThumb"
+                        className="ohr-seg-thumb"
+                        transition={SEG_SPRING}
+                      />
+                    )}
+                    <span className="ohr-seg-label">{label}</span>
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            {trendSeries && (
               <Chart
                 config={{
                   type: "line",
-                  series: cumulativeSeries,
+                  series: trendSeries,
                   legend: true,
                   enableArea: true,
                   markers: openMonthMarkers(openMonth, openYear, pageYear),
                   pulsePoint:
                     openMonth != null && openYear === pageYear
-                      ? { seriesId: String(pageYear), xValue: shortMonth(openMonth), color: BRAND_ORANGE }
+                      ? {
+                          seriesId: String(pageYear),
+                          xValue: shortMonth(openMonth),
+                          color: BRAND_ORANGE,
+                        }
                       : undefined,
+                  onPointClick: handlePointClick,
+                  highlightedX: selectedMonth != null ? shortMonth(selectedMonth) : null,
                 }}
               />
             )}
           </Widget>
         </MotionItem>
 
+        <MotionItem>
+          <Widget
+            title={`Top Movers vs ${lastYear}`}
+            loading={isLoading}
+            noData={!isLoading && movers.length === 0}
+            actions={
+              <div className="ohr-seg" role="tablist" aria-label="Rank movers by">
+                {(
+                  [
+                    ["dollars", "By $"],
+                    ["percent", "By %"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={moversBy === key}
+                    className={`ohr-seg-btn${moversBy === key ? " ohr-seg-btn-active" : ""}`}
+                    onClick={() => setMoversBy(key)}
+                  >
+                    {moversBy === key && (
+                      <motion.span
+                        layoutId="ohrMoversThumb"
+                        className="ohr-seg-thumb"
+                        transition={SEG_SPRING}
+                      />
+                    )}
+                    <span className="ohr-seg-label">{label}</span>
+                  </button>
+                ))}
+              </div>
+            }
+          >
+            <ol className="ohr-movers">
+              {/* Rows glide to their new rank when the toggle flips; rows
+                  falling out of / into the top 6 fade while the rest travel. */}
+              <AnimatePresence initial={false} mode="popLayout">
+                {movers.map((m) => {
+                  const up = m.delta > 0
+                  const sign = up ? "+" : "−"
+                  const color = up ? UP_COLOR : DOWN_COLOR
+                  const pct =
+                    m.previous !== 0 ? Math.abs((m.delta / Math.abs(m.previous)) * 100) : null
+                  const amount = `${sign}${formatMoneyFull(Math.abs(m.delta))}`
+                  const percent = pct != null ? `${sign}${pct.toFixed(0)}%` : null
+                  // The toggled metric leads in color; the other drops to the
+                  // muted context line so the two never compete.
+                  const primary = moversBy === "percent" ? percent : amount
+                  const secondary = moversBy === "percent" ? amount : percent
+                  return (
+                    <motion.li
+                      key={m.id}
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{
+                        layout: REORDER_SPRING,
+                        opacity: { duration: 0.18 },
+                      }}
+                      className="ohr-mover"
+                      onClick={() => openModal(m.id)}
+                    >
+                      <span
+                        className="ohr-mover-icon"
+                        style={{
+                          color,
+                          background: `color-mix(in srgb, ${color} 14%, transparent)`,
+                        }}
+                      >
+                        {up ? <ArrowUpRight size={15} /> : <ArrowDownRight size={15} />}
+                      </span>
+                      <span className="ohr-mover-name">{m.name}</span>
+                      <span className="ohr-mover-figures">
+                        {/* Ink, not delta-colored — the tinted arrow badge
+                            already carries direction; six colored amounts in a
+                            column turned the list into a wall of red. */}
+                        <span className="ohr-mover-amt">{primary}</span>
+                        {secondary != null && (
+                          <span className="ohr-mover-pct">
+                            {secondary} vs {lastYear}
+                          </span>
+                        )}
+                      </span>
+                    </motion.li>
+                  )
+                })}
+              </AnimatePresence>
+            </ol>
+          </Widget>
+        </MotionItem>
+
+        {/* ── Composition: where the money goes ─────────────────────────── */}
         <MotionItem className="col-span-full">
           <Widget
             title="Overhead by Category"
@@ -501,86 +935,20 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                 colors: pieColors,
                 chartSize: "lg",
                 showPercent: true,
-                onItemClick: openModal,
+                onItemClick: handleCatClick,
               }}
             />
           </Widget>
         </MotionItem>
 
-        <MotionItem>
-          <Widget
-            title={`Top Movers vs ${lastYear}`}
-            description="Largest category changes, both years through the same month"
-            loading={isLoading}
-            noData={!isLoading && movers.length === 0}
-          >
-            <ol className="spend-list ohr-movers-list">
-              {movers.map((m) => (
-                <li
-                  key={m.id}
-                  className="spend-list-item spend-list-item-clickable"
-                  onClick={() => openModal(m.id)}
-                >
-                  <span
-                    className="spend-list-dot"
-                    style={{ background: m.delta > 0 ? UP_COLOR : DOWN_COLOR }}
-                  />
-                  <span className="spend-list-name body-text">{m.name}</span>
-                  {m.previous !== 0 && (
-                    <span className="spend-list-percent body-text">
-                      {m.delta > 0 ? "+" : "−"}
-                      {Math.abs((m.delta / Math.abs(m.previous)) * 100).toFixed(0)}%
-                    </span>
-                  )}
-                  <span
-                    className="spend-list-value body-text emphasized"
-                    style={{ color: m.delta > 0 ? UP_COLOR : DOWN_COLOR }}
-                  >
-                    {m.delta > 0 ? "+" : "−"}{formatMoneyFull(Math.abs(m.delta))}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </Widget>
-        </MotionItem>
-
-        <MotionItem>
-          <Widget title="Overhead as % of Revenue" loading={isLoading} noData={!pctOfRevenueSeries}>
-            {pctOfRevenueSeries && (
-              <Chart
-                config={{
-                  type: "line",
-                  series: pctOfRevenueSeries,
-                  legend: true,
-                  yFormat: (v) => `${v.toFixed(1)}%`,
-                  markers: openMonthMarkers(openMonth, openYear, pageYear),
-                }}
-              />
-            )}
-          </Widget>
-        </MotionItem>
-
+        {/* Every dollar, month by month. Clicking a month on "Overhead by
+            Month" filters this table to that month. */}
         <MotionItem className="col-span-full">
           <Widget
-            title="Annual Overhead"
-            description="Year over year, all closed + open periods"
-            loading={isLoading}
-            noData={!isLoading && annualBars.length === 0}
-          >
-            <Chart
-              config={{
-                type: "bar",
-                data: annualBars,
-                color: BRAND_ORANGE,
-                yFormat: formatMoneyFull,
-              }}
-            />
-          </Widget>
-        </MotionItem>
-
-        <MotionItem className="col-span-full">
-          <Widget
-            title="Monthly breakdown"
+            title="Monthly Spending"
+            description={
+              selectedMonth != null ? `Showing ${fullMonth(selectedMonth)} only` : undefined
+            }
             loading={isLoading && lineItems === null}
             className="mbp-table-widget"
             actions={
@@ -604,7 +972,69 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
             />
           </Widget>
         </MotionItem>
+
+        <MotionItem>
+          <Widget
+            title="Share of Revenue by Month"
+            loading={isLoading}
+            noData={!pctOfRevenueSeries}
+          >
+            {pctOfRevenueSeries && (
+              <Chart
+                config={{
+                  type: "line",
+                  series: pctOfRevenueSeries,
+                  legend: true,
+                  yFormat: (v) => `${v.toFixed(1)}%`,
+                  markers: openMonthMarkers(openMonth, openYear, pageYear),
+                  pulsePoint:
+                    openMonth != null && openYear === pageYear
+                      ? {
+                          seriesId: String(pageYear),
+                          xValue: shortMonth(openMonth),
+                          color: BRAND_ORANGE,
+                        }
+                      : undefined,
+                }}
+              />
+            )}
+          </Widget>
+        </MotionItem>
+
+        {/* ── Long view (shares the row with Share of Revenue above) ─────── */}
+        <MotionItem>
+          <Widget title="Annual Overhead" loading={isLoading} noData={!isLoading && !annualSeries}>
+            {annualSeries && (
+              <Chart
+                config={{
+                  type: "line",
+                  series: annualSeries,
+                  enableArea: true,
+                  curve: "monotoneX",
+                  yFormat: formatMoneyFull,
+                  // The open/in-progress year is the "you are here" point.
+                  pulsePoint:
+                    openYear != null && annualSeries[0].data.some((p) => p.x === String(openYear))
+                      ? {
+                          seriesId: "Overhead",
+                          xValue: String(openYear),
+                          color: BRAND_ORANGE,
+                        }
+                      : undefined,
+                }}
+              />
+            )}
+          </Widget>
+        </MotionItem>
       </MotionList>
+
+      <OtherCategoriesModal
+        open={otherModalOpen}
+        categories={restCats}
+        total={totalCurrent}
+        onSelect={openModal}
+        onClose={() => setOtherModalOpen(false)}
+      />
 
       <OverheadCategoryModal
         category={modalCategory}
@@ -618,6 +1048,14 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
 
 export default function OverheadReportPage() {
   const [year, setYear] = useState(new Date().getFullYear())
+
+  // Visiting the report is the strongest possible acknowledgment of its
+  // "new section" nav hint — clear the milestone so the hint never shows
+  // (or stops showing) once the user has found the page.
+  const { seen, acknowledge } = useOnboarding()
+  useEffect(() => {
+    if (!seen(SECTION_OVERHEAD_REPORT)) acknowledge(SECTION_OVERHEAD_REPORT)
+  }, [seen, acknowledge])
 
   return (
     <PageDataProvider module="dashboard" queries={PAGE_QUERIES.overheadReport} params={{ year }}>

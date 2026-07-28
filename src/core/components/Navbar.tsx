@@ -9,6 +9,9 @@ import { SettingsModal } from "../../shared/components/SettingsModal/SettingsMod
 import { useDailyReport } from "../../modules/dashboard/report/DailyReportContext"
 import { NavReportsHint } from "../../modules/dashboard/report/NavReportsHint"
 import { registerCoachTarget } from "../onboarding/coachTargets"
+import { useOnboarding } from "../onboarding/OnboardingProvider"
+import { SECTION_OVERHEAD_REPORT } from "../onboarding/markers"
+import { NavSectionHint } from "../onboarding/NavSectionHint"
 import type { NavbarVeil } from "../../modules/dashboard/onboarding/AdminOnboarding"
 import Logo from "./Logo"
 import LogoText from "./LogoText"
@@ -20,12 +23,17 @@ function NavGroupItem({
   group,
   isOpen: sidebarOpen,
   active,
+  attention,
+  buttonRef,
   onOpenFlyout,
   onScheduleClose,
 }: {
   group: NavGroup
   isOpen: boolean
   active: boolean
+  /** Pulse ring while a new-section hint points at this group. */
+  attention?: boolean
+  buttonRef?: (el: HTMLButtonElement | null) => void
   onOpenFlyout: (group: NavGroup, anchor: DOMRect) => void
   onScheduleClose: () => void
 }) {
@@ -34,7 +42,8 @@ function NavGroupItem({
 
   return (
     <button
-      className={`button nav-button nav-group-header${active ? " nav-button-active" : ""}`}
+      ref={buttonRef}
+      className={`button nav-button nav-group-header${active ? " nav-button-active" : ""}${attention ? " nav-button-attention" : ""}`}
       onMouseEnter={open}
       onMouseLeave={onScheduleClose}
       onFocus={open}
@@ -64,6 +73,33 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
   const jobcostRef = useCallback((el: HTMLButtonElement | null) => {
     registerCoachTarget("nav-jobcost", el)
   }, [])
+  const financesRef = useCallback((el: HTMLButtonElement | null) => {
+    registerCoachTarget("nav-finances", el)
+  }, [])
+
+  // Overhead Expense Report announcement — an incremental milestone (§4.5) on
+  // the Finances group, for established users only (phase gates it off during
+  // setup; introStep off during the intro coachmarks; veil off during the admin
+  // tour). `?overhead-hint` previews without stamping the milestone, mirroring
+  // `?arrival` / `?tour`.
+  const { phase, resolving, seen, acknowledge } = useOnboarding()
+  const [overheadHintPreview] = useState(
+    () => new URLSearchParams(window.location.search).has("overhead-hint")
+  )
+  const [previewDismissed, setPreviewDismissed] = useState(false)
+  const hasFinancesGroup = navItems.some((item) => isNavGroup(item) && item.label === "Finances")
+  const overheadHintOn = overheadHintPreview
+    ? !previewDismissed && hasFinancesGroup
+    : hasFinancesGroup &&
+      veil === "off" &&
+      introStep === 0 &&
+      phase === "onboarded" &&
+      !resolving &&
+      !seen(SECTION_OVERHEAD_REPORT)
+  const dismissOverheadHint = useCallback(() => {
+    if (overheadHintPreview) setPreviewDismissed(true)
+    else acknowledge(SECTION_OVERHEAD_REPORT)
+  }, [overheadHintPreview, acknowledge])
 
   // Flyout panel for nav groups: hover/click a group → its children float out to
   // the right, anchored to the group row. Works the same open or collapsed.
@@ -141,6 +177,8 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
                 group={item}
                 isOpen={isOpen}
                 active={item.items.some(child => location.pathname.startsWith(child.path))}
+                attention={item.label === "Finances" && overheadHintOn}
+                buttonRef={item.label === "Finances" ? financesRef : undefined}
                 onOpenFlyout={openFlyout}
                 onScheduleClose={scheduleClose}
               />
@@ -218,6 +256,15 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
       )}
 
       <NavReportsHint />
+
+      <NavSectionHint
+        targetId="nav-finances"
+        active={overheadHintOn}
+        veiled={flyout != null}
+        title="New in Finances"
+        body="Overhead Expense Report now available."
+        onDismiss={dismissOverheadHint}
+      />
 
       <SettingsModal
         open={settingsOpen}

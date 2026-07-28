@@ -16,6 +16,11 @@ const legacyIntroSeenKey = (uid: string) => `daily-report-intro-seen:${uid}`
 /** The milestone key the legacy intro-seen flag maps to. */
 export const INTRO_TOUR = "intro-tour"
 
+/** Incremental milestone (§4.5): the Overhead Expense Report announcement —
+ *  a one-time nav hint on the Finances group, acknowledged via "Got it" or by
+ *  visiting /overhead-report. */
+export const SECTION_OVERHEAD_REPORT = "section:overhead-report"
+
 // The legacy flag records "seen" without a date; fold it in as long-ago so the
 // value is a valid ISO date and clearly predates any real acknowledgment.
 const LEGACY_SEEN_DATE = new Date(0).toISOString()
