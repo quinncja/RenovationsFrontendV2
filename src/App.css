@@ -5430,6 +5430,12 @@ button.jc-kind-chip:hover {
 .jcd-skel-sum-label { width: 42%; margin-top: 0; height: 0.8125rem; }
 .jcd-skel-sum-value { width: 22%; margin-top: 0; height: 0.8125rem; }
 
+/* Invoices widget: KPI strip above the table (always visible — no expander). */
+.jcd-invoices-kpis {
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 0.625rem;
+}
+
 /* Phases table card (consolidated projects only). */
 .jcd-phases-card { padding: 1rem 1.25rem; }
 .jcd-phases-head {
@@ -5507,106 +5513,6 @@ button.jc-kind-chip:hover {
 .jcd-inv-metrics {
   border-top: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
-}
-
-/* The invoice subsection is its own card that slides out from BEHIND the
-   (static) Billing Position widget — a negative margin tucks its top edge under
-   the billing card (which sits on top via z-index), and extra top padding on
-   the card pushes its content clear of the overlap. The negative margin is
-   animated alongside the height so it stays hidden when collapsed. */
-.jcd-billing-card {
-  position: relative;
-  z-index: 1;
-}
-/* The dropdown tucks 12px behind the billing card (which sits on top via
-   z-index, casting its shadow over the seam — the "emerging from behind" look).
-   The matching margin-bottom keeps the collapsed wrapper from shrinking the
-   parent (which would overlap the next widget). Only the height animates. */
-.jcd-invoice-drop {
-  position: relative;
-  z-index: 0;
-  /* Vertical tuck (-12 to slide behind the card) + its compensating bottom
-     margin live on `.open` ONLY — see below. A COLLAPSED drop must have zero
-     vertical footprint so the row gap under Billing Position stays uniform with
-     every other widget row. */
-  /* Bleed the wrapper 12px wider on each side (negative margin) and pad it back
-     in by the same amount, so the card stays full-width/aligned but there's room
-     inside the clip region for its box-shadow to show on the left & right. */
-  margin-left: -12px;
-  margin-right: -12px;
-  padding-left: 12px;
-  padding-right: 12px;
-  /* Do the collapse clipping here (on the wrapper) instead of on the inner, so
-     the inner can let the card's box-shadow show. When closed the grid row is
-     0fr → this wrapper is 0 tall → everything (shadow included) is clipped, so
-     nothing shows. */
-  overflow: hidden;
-  /* Stay fully transparent while closed so no sliver of the undercard (or its
-     shadow) bleeds out from behind the billing card's rounded corners. Snap to
-     visible as it opens, before the height animation reveals it. */
-  opacity: 0;
-}
-.jcd-invoice-drop.open {
-  opacity: 1;
-  /* Tuck 12px behind the billing card (it sits on top via z-index, casting its
-     shadow over the seam). Only applied while open. */
-  margin-top: -12px;
-}
-/* Let the card's shadow escape the inner; min-height:0 lets the 0fr row still
-   collapse with overflow visible. */
-.jcd-invoice-drop .det-section-body-inner {
-  overflow: visible;
-  min-height: 0;
-}
-/* Bottom-shadow room only WHILE OPEN. With `overflow: visible` the 0fr row
-   doesn't clip this padding, so applying it when collapsed left a ~10px sliver
-   below Billing Position that broke the uniform row gap. */
-.jcd-invoice-drop.open .det-section-body-inner {
-  padding-bottom: 10px;
-}
-.jcd-invoice-card {
-  padding: 0;
-  overflow: hidden;
-}
-
-/* Invoice summary shown when the list is expanded — Amount Paid & Outstanding,
-   mirroring the Billing Position hero's two-up stat language. */
-.jcd-inv-summary {
-  display: flex;
-  justify-content: flex-start;
-  gap: 1.5rem;
-  padding: 40px 1.5rem 1.5rem;
-  margin-top: 5px;
-  margin-bottom: 1.25rem;
-}
-.jcd-inv-summary-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  min-width: 11rem;
-  padding: 0.875rem 1.25rem;
-  background: var(--card-color);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-}
-.jcd-inv-summary-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-.jcd-inv-summary-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--secondary-text);
-}
-.jcd-inv-summary-value {
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--primary-text);
 }
 
 /* Invoice hero: large percentage + bar */

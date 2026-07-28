@@ -24,6 +24,7 @@ import type { SpendItem, LineMarker } from "../../shared/components/Chart/chart.
 import { computeWeeklySpend, computeCostVsBilled, thinLabels, type DailySpend } from "./weeklySpend"
 import { colorRamp, hashColor, RAMP_SCHEMES } from "../../shared/config/chartColors"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
+import { DrillDownModal } from "../../shared/components/DrillDownModal/DrillDownModal"
 import { JOBCOST_BACK_FALLBACK, type JobcostBackState } from "./useJobcostNav"
 import { trackProjectView } from "../../shared/analytics/analytics"
 
@@ -179,8 +180,10 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([])
   const [selectedCO, setSelectedCO] = useState<ChangeOrder | null>(null)
   const [changeOrdersOpen, setChangeOrdersOpen] = useState(false)
-  const [invoicesOpen, setInvoicesOpen] = useState(false)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
+  // Drill-down for the two spending pies: a category slice lists who was paid
+  // within it; a vendor slice lists what that vendor was paid for.
+  const [drill, setDrill] = useState<{ title: string; items: SpendItem[] } | null>(null)
 
   useEffect(() => {
     fetchPageData({ module: "changeOrders", queries: [], params: { jobnum: recnum } })
@@ -190,7 +193,13 @@ function JobcostDetail({ recnum }: { recnum: string }) {
 
   // Cost-type groups + totals (shared with the Cost Breakdown table and the
   // Job Costing list's inline view).
-  const { groups, totalBudget } = computeCostGroups(budget, costItems)
+  const { groups, totalBudget, totalActual } = computeCostGroups(budget, costItems)
+
+  // Spending by budget category (pie) — click a category to drill into who
+  // was paid within it.
+  const typeSpend: SpendItem[] = groups
+    .filter(g => g.actual > 0)
+    .map(g => ({ id: g.key, label: g.key, value: g.actual }))
 
   // Top vendors / sources by total cost (pie)
   const vendorSpend: SpendItem[] = (() => {
@@ -325,6 +334,35 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const grossProfit = project ? project.totalContract - project.totalCost : null
   const hasHeroFacts = Boolean(project?.clientName || pm || unitCount != null || lastActivity)
   const hasTimeline = Boolean(jobStartDate || jobCompletedDate)
+
+  // Category slice → who was paid within that cost type, ranked.
+  function drillCategory(key: string) {
+    const group = groups.find(g => g.key === key)
+    if (!group) return
+    const byVendor = new Map<string, number>()
+    for (const c of group.items) {
+      const amt = (c.committedAmount || 0) + (c.postedAmount || 0)
+      if (amt > 0) byVendor.set(c.id, (byVendor.get(c.id) ?? 0) + amt)
+    }
+    const items = Array.from(byVendor.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value]) => ({ id: label, label, value }))
+    if (items.length) setDrill({ title: `${key} Spending`, items })
+  }
+
+  // Vendor slice → what that vendor was paid for (their line items).
+  function drillVendor(vendorId: string) {
+    const items = costItems
+      .filter(c => c.id === vendorId)
+      .map((c, i) => ({
+        id: `${vendorId}-${i}`,
+        label: c.dscrpt?.trim() || c.costType,
+        value: (c.committedAmount || 0) + (c.postedAmount || 0),
+      }))
+      .filter(it => it.value > 0)
+      .sort((a, b) => b.value - a.value)
+    if (items.length) setDrill({ title: vendorId, items })
+  }
 
   const subtitleText = isMobile ? pm : [pm, `#${recnum}`].filter(Boolean).join(" · ")
   const subtitle = project ? (
@@ -534,9 +572,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
             <h2 className="jcd-section-title title2 emphasized">Costs</h2>
             <div className="widget-grid widget-grid-2">
               {/* Cost Breakdown leads the section — it sits directly under the
-                  overview's summary cards, which it itemizes. It is the single
-                  by-type view (no duplicate budget-vs-actual chart or by-type
-                  pie beside it). */}
+                  overview's summary cards, which it itemizes. */}
               <div className="col-span-full">
                 <Widget title="Cost Breakdown" loading={isLoading} noData={!isLoading && !budget} className="jcd-cost-widget">
                   <CostBreakdownTable budget={budget} costItems={costItems} />
@@ -544,49 +580,35 @@ function JobcostDetail({ recnum }: { recnum: string }) {
               </div>
 
               <Widget
-                title="Cost & Billing Trajectory"
-                description={trajDesc}
+                title="Spending by Category"
+                description="Click a category to see who was paid"
                 loading={isLoading}
-                noData={!isLoading && costVsBilled.length === 0}
-                className="jcd-chart-widget"
-                // Custom HTML legend in the header's top-right corner (colors
-                // match the series: Cost = CHART_COLORS[0], Billed = [1]).
-                actions={
-                  <ChartLegend items={[
-                    { label: "Cost", color: "#c27c3e" },
-                    { label: "Billed", color: "#22c55e" },
-                  ]} />
-                }
+                noData={!isLoading && typeSpend.length === 0}
               >
                 <Chart config={{
-                  type: "line",
-                  // `Cost` omits `color` so it falls through to CHART_COLORS[0]
-                  // (brand orange) — same line the home page revenue + directory
-                  // history charts use; `Billed` takes the next palette color.
-                  series: trajSeries,
-                  // Two cumulative lines plus a budget marker — no area fill (it
-                  // would muddy the overlap). Legend is rendered in the header
-                  // (actions) instead of nivo's in-plot legend.
-                  enableArea: false,
-                  legend: false,
-                  compactTop: true,
-                  disableGrowthTooltip: true,
-                  yFormat: formatMoneyFull,
-                  // Scaled to the plotted data, extended to the budget ceiling
-                  // only when that ceiling is actually in view (trajMaxValue).
-                  maxValue: trajMaxValue,
-                  axisBottomTickValues: trajTickValues,
-                  markers: trajMarkers,
+                  type: "pie-with-list",
+                  items: typeSpend,
+                  centerLabel: "TOTAL SPEND",
+                  centerTotal: totalActual,
+                  showPercent: true,
+                  chartSize: "md",
+                  onItemClick: drillCategory,
                 }} />
               </Widget>
 
-              <Widget title="Spending by Vendor" loading={isLoading} noData={!isLoading && vendorSpend.length === 0}>
+              <Widget
+                title="Spending by Vendor"
+                description="Click a vendor to see what they were paid for"
+                loading={isLoading}
+                noData={!isLoading && vendorSpend.length === 0}
+              >
                 <Chart config={{
                   type: "pie-with-list",
                   items: vendorSpend,
                   centerLabel: "VENDOR SPEND",
                   showPercent: true,
                   chartSize: "md",
+                  onItemClick: drillVendor,
                   // Hashed mode keeps each vendor's color consistent with the
                   // dashboard's Top Suppliers widget.
                   colors: hashedRelationColors
@@ -602,20 +624,13 @@ function JobcostDetail({ recnum }: { recnum: string }) {
         <MotionItem>
           <section className="jcd-section">
             <h2 className="jcd-section-title title2 emphasized">Billing</h2>
-            <div>
+            <div className="widget-grid widget-grid-2">
+              {/* Billing Position stands on its own — invoices are always
+                  visible in their own widget below, no expander. */}
               <div className="det-section card jcd-billing-card">
-                <div
-                  className={!isLoading && invoices.length > 0 ? "det-section-toggle" : undefined}
-                  onClick={!isLoading && invoices.length > 0 ? () => setInvoicesOpen(o => !o) : undefined}
-                >
+                <div>
                   <div className="det-section-header">
                     <span className="widget-title headline">Billing Position</span>
-                    {!isLoading && invoices.length > 0 && (
-                      <span className="det-section-action">
-                        {invoicesOpen ? "Hide Invoices" : "Show Invoices"}
-                        <ChevronDown size={13} className={`det-section-chevron${invoicesOpen ? " open" : ""}`} />
-                      </span>
-                    )}
                   </div>
 
                   {isLoading ? (
@@ -716,65 +731,109 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                 </div>
               </div>
 
-              {!isLoading && invoices.length > 0 && (
-                <div className={`det-section-body jcd-invoice-drop${invoicesOpen ? " open" : ""}`}>
-                  <div className="det-section-body-inner">
-                    <div className="card jcd-invoice-card">
-                    <div className="jcd-inv-summary">
-                      <div className="jcd-inv-summary-card">
-                        <div className="jcd-inv-summary-card-head">
-                          <span className="jcd-inv-summary-label">Amount Paid</span>
-                          <span className="invoice-status-badge invoice-status-badge--paid">Paid</span>
-                        </div>
-                        <span className="jcd-inv-summary-value">{formatMoneyFull(totalPaid)}</span>
-                      </div>
-                      <div className="jcd-inv-summary-card">
-                        <div className="jcd-inv-summary-card-head">
-                          <span className="jcd-inv-summary-label">Outstanding</span>
-                          <span className="invoice-status-badge invoice-status-badge--open">Open</span>
-                        </div>
-                        <span className="jcd-inv-summary-value">{formatMoneyFull(totalOutstanding)}</span>
-                      </div>
+              <Widget
+                title="Cost & Billing Trajectory"
+                description={trajDesc}
+                loading={isLoading}
+                noData={!isLoading && costVsBilled.length === 0}
+                className="jcd-chart-widget"
+                // Custom HTML legend in the header's top-right corner (colors
+                // match the series: Cost = CHART_COLORS[0], Billed = [1]).
+                actions={
+                  <ChartLegend items={[
+                    { label: "Cost", color: "#c27c3e" },
+                    { label: "Billed", color: "#22c55e" },
+                  ]} />
+                }
+              >
+                <Chart config={{
+                  type: "line",
+                  // `Cost` omits `color` so it falls through to CHART_COLORS[0]
+                  // (brand orange) — same line the home page revenue + directory
+                  // history charts use; `Billed` takes the next palette color.
+                  series: trajSeries,
+                  // Two cumulative lines plus a budget marker — no area fill (it
+                  // would muddy the overlap). Legend is rendered in the header
+                  // (actions) instead of nivo's in-plot legend.
+                  enableArea: false,
+                  legend: false,
+                  compactTop: true,
+                  disableGrowthTooltip: true,
+                  yFormat: formatMoneyFull,
+                  // Scaled to the plotted data, extended to the budget ceiling
+                  // only when that ceiling is actually in view (trajMaxValue).
+                  maxValue: trajMaxValue,
+                  axisBottomTickValues: trajTickValues,
+                  markers: trajMarkers,
+                }} />
+              </Widget>
+
+              {/* Invoices — always visible, KPIs up top, no expander. */}
+              <div className="col-span-full">
+                <Widget
+                  title="Invoices"
+                  description={
+                    activeInvoices.length > 0
+                      ? `${activeInvoices.length} invoice${activeInvoices.length === 1 ? "" : "s"} · ${invoicePct.toFixed(1)}% of contract invoiced`
+                      : undefined
+                  }
+                  loading={isLoading}
+                  noData={!isLoading && invoices.length === 0}
+                  className="jcd-invoices-widget"
+                >
+                  <div className="inv-metrics-row jcd-invoices-kpis">
+                    <div className="inv-metric">
+                      <span className="inv-metric-value">{formatMoneyFull(totalInvoiced)}</span>
+                      <span className="inv-metric-label">Total Invoiced</span>
                     </div>
-                    <table className="spend-rank-table inv-table">
-                      <thead>
-                        <tr>
-                          <th className="spend-rank-table-name inv-th-num">Invoice #</th>
-                          <th className="spend-rank-table-name inv-th-date">Date</th>
-                          <th className="spend-rank-table-name inv-th-status">Status</th>
-                          <th className="spend-rank-table-value">Total</th>
-                          <th className="spend-rank-table-value">Paid</th>
-                          <th className="spend-rank-table-value">Remaining</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {invoices.map(inv => (
-                          <tr
-                            key={inv.id}
-                            className="spend-rank-table-row"
-                            onClick={() => setSelectedInvoiceId(inv.id)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={e => e.key === "Enter" && setSelectedInvoiceId(inv.id)}
-                          >
-                            <td className="spend-rank-table-name body-text emphasized inv-th-num">{inv.invoiceNum}</td>
-                            <td className="spend-rank-table-name body-text text-secondary inv-th-date">{formatDate(inv.invoiceDate)}</td>
-                            <td className="spend-rank-table-name inv-th-status">
-                              <span className={`invoice-status-badge invoice-status-badge--${INV_STATUS_CLASS[inv.status] ?? "open"}`}>
-                                {INV_STATUS_LABEL[inv.status] ?? `Status ${inv.status}`}
-                              </span>
-                            </td>
-                            <td className="spend-rank-table-value body-text">{formatMoneyFull(inv.total)}</td>
-                            <td className="spend-rank-table-value body-text">{formatMoneyFull(inv.amountPaid)}</td>
-                            <td className="spend-rank-table-value body-text invoice-amount-value--remaining">{formatMoneyFull(inv.amountRemaining)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div className="inv-metric-divider" />
+                    <div className="inv-metric">
+                      <span className="inv-metric-value">{formatMoneyFull(totalPaid)}</span>
+                      <span className="inv-metric-label">Paid</span>
+                    </div>
+                    <div className="inv-metric-divider" />
+                    <div className="inv-metric">
+                      <span className="inv-metric-value">{formatMoneyFull(totalOutstanding)}</span>
+                      <span className="inv-metric-label">Outstanding</span>
                     </div>
                   </div>
-                </div>
-              )}
+                  <table className="spend-rank-table inv-table">
+                    <thead>
+                      <tr>
+                        <th className="spend-rank-table-name inv-th-num">Invoice #</th>
+                        <th className="spend-rank-table-name inv-th-date">Date</th>
+                        <th className="spend-rank-table-name inv-th-status">Status</th>
+                        <th className="spend-rank-table-value">Total</th>
+                        <th className="spend-rank-table-value">Paid</th>
+                        <th className="spend-rank-table-value">Remaining</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {invoices.map(inv => (
+                        <tr
+                          key={inv.id}
+                          className="spend-rank-table-row"
+                          onClick={() => setSelectedInvoiceId(inv.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={e => e.key === "Enter" && setSelectedInvoiceId(inv.id)}
+                        >
+                          <td className="spend-rank-table-name body-text emphasized inv-th-num">{inv.invoiceNum}</td>
+                          <td className="spend-rank-table-name body-text text-secondary inv-th-date">{formatDate(inv.invoiceDate)}</td>
+                          <td className="spend-rank-table-name inv-th-status">
+                            <span className={`invoice-status-badge invoice-status-badge--${INV_STATUS_CLASS[inv.status] ?? "open"}`}>
+                              {INV_STATUS_LABEL[inv.status] ?? `Status ${inv.status}`}
+                            </span>
+                          </td>
+                          <td className="spend-rank-table-value body-text">{formatMoneyFull(inv.total)}</td>
+                          <td className="spend-rank-table-value body-text">{formatMoneyFull(inv.amountPaid)}</td>
+                          <td className="spend-rank-table-value body-text invoice-amount-value--remaining">{formatMoneyFull(inv.amountRemaining)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Widget>
+              </div>
             </div>
           </section>
         </MotionItem>
@@ -918,6 +977,13 @@ function JobcostDetail({ recnum }: { recnum: string }) {
       </MotionList>
 
       <ChangeOrderModal order={selectedCO} onClose={() => setSelectedCO(null)} />
+      <DrillDownModal
+        open={drill != null}
+        onClose={() => setDrill(null)}
+        title={drill?.title ?? ""}
+        items={drill?.items ?? []}
+        valueFormat={formatMoneyFull}
+      />
       <InvoiceDetailModal
         invoiceId={selectedInvoiceId}
         module="clients"
