@@ -84,7 +84,7 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
   // `?arrival` / `?tour`.
   const { phase, resolving, seen, acknowledge } = useOnboarding()
   const [overheadHintPreview] = useState(
-    () => new URLSearchParams(window.location.search).has("overhead-hint")
+    () => import.meta.env.DEV && new URLSearchParams(window.location.search).has("overhead-hint")
   )
   const [previewDismissed, setPreviewDismissed] = useState(false)
   const hasFinancesGroup = navItems.some((item) => isNavGroup(item) && item.label === "Finances")
