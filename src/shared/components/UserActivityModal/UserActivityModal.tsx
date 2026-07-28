@@ -9,7 +9,7 @@ import type { LineSeries } from "../Chart/chart.types"
 import useIsMobile from "../../hooks/useIsMobile"
 import { fetchUserEngagement, type UserEngagement } from "../../analytics/engagementApi"
 import { sessionTrackingHeaders } from "../../analytics/analytics"
-import { SectionEngagementList, WidgetEngagementList, PageEngagementList, ProjectEngagementList } from "../../analytics/EngagementInsights"
+import { SectionEngagementList, WidgetEngagementList, SessionEngagementList } from "../../analytics/EngagementInsights"
 import { sectionLabel, pageLabel, formatCompactNumber } from "../../analytics/labels"
 import { ModalSectionPager } from "./ModalSectionPager"
 import { useModalLayer } from "../../hooks/useModalLayer"
@@ -525,16 +525,19 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                   </>
                 )
 
-                // Reach (page 2): most-visited pages (left) + most-viewed projects (right).
-                const reachContent = (
-                  <div className="usr-activity-eng-lists">
+                // Sessions (page 2): the user's recent individual sessions, each
+                // expandable to its per-session activity (page path, projects,
+                // widgets) — replacing the aggregate pages/projects rollup.
+                const sessionsContent = (
+                  <div className="usr-activity-sessions">
                     {engLoading ? (
                       <div className="widget-skeleton" style={{ height: "16rem" }} />
                     ) : (
-                      <div className="ceng-cols">
-                        <PageEngagementList pages={engagement?.topPages ?? []} title="Most-visited pages" subtitle="By visits" />
-                        <ProjectEngagementList projects={engagement?.topProjects ?? []} title="Most-viewed projects" subtitle="By views" />
-                      </div>
+                      <SessionEngagementList
+                        sessions={engagement?.sessions ?? []}
+                        title="Recent sessions"
+                        subtitle="Newest first · last 30 days"
+                      />
                     )}
                   </div>
                 )
@@ -560,7 +563,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                   <ModalSectionPager
                     sections={[
                       { id: "overview", label: "Overview", content: overviewContent },
-                      { id: "reach", label: "Pages & Projects", content: reachContent },
+                      { id: "sessions", label: "Recent Sessions", content: sessionsContent },
                       { id: "usage", label: "Sections & Widgets", content: usageContent },
                     ]}
                   />

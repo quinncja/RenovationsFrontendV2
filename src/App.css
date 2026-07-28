@@ -5771,6 +5771,210 @@ body{
   padding: 0.75rem 0;
 }
 
+/* ─── Recent sessions (per-user modal) ─────────────────────────────────────── */
+
+/* Sessions wrapper — mirrors .usr-activity-eng-lists' top margin, but a distinct
+   class so the pager panel does NOT get the lists' overflow:hidden rule: an
+   expanded session grows the card, and the active panel must scroll to reveal it. */
+.usr-activity-sessions {
+  margin-top: 2.25rem;
+}
+
+/* The sessions list runs edge-to-edge inside its card: zero the card's
+   horizontal padding (mirrors .widget:has(.data-table)) and re-pad the header +
+   rows, so each row's hover band and divider span the full container width. */
+.ceng-col:has(.eng-sess-list) {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ceng-col:has(.eng-sess-list) .ceng-col-head {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.eng-sess-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Hairline divider between rows — no divider above the first. The open row keeps
+   its divider so the row + detail read as one banded block. */
+.eng-sess + .eng-sess {
+  border-top: 1px solid var(--border-color);
+}
+
+/* Full-width row: when (left, fixed column so entry pages line up) · entry page
+   (grows to fill the middle) · summary counts (right). The whole row toggles the
+   detail; a session with no detail is inert (caret hidden). */
+.eng-sess-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition: background 0.14s ease;
+}
+
+.eng-sess-head:hover:not(:disabled),
+.eng-sess-head:focus-visible {
+  background: var(--hover-bg);
+}
+
+.eng-sess--open .eng-sess-head {
+  background: color-mix(in srgb, var(--secondary-text) 8%, transparent);
+}
+
+.eng-sess-head:disabled {
+  cursor: default;
+}
+
+/* When: chevron + date + time. Fixed min-width so entry pages align in a tidy
+   column down the list, table-like, without a rigid table. */
+.eng-sess-when {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  flex-shrink: 0;
+  min-width: 9.5rem;
+}
+
+/* Caret rotates to point down when open — the one moving part. */
+.eng-sess-caret {
+  align-self: center;
+  color: var(--secondary-text);
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.eng-sess--open .eng-sess-caret {
+  transform: rotate(90deg);
+  color: var(--primary-text);
+}
+
+.eng-sess-head:disabled .eng-sess-caret {
+  visibility: hidden;
+}
+
+.eng-sess-date {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+
+.eng-sess-time {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+}
+
+/* Entry page fills the middle so the row uses the full width instead of leaving
+   a hollow gap; truncates rather than pushing the summary off the right edge. */
+.eng-sess-entry {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eng-sess-summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  white-space: nowrap;
+}
+
+.eng-sess-count b {
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.eng-sess-dot {
+  color: var(--border-color);
+}
+
+/* framer-motion animates the wrapper's height/opacity; overflow clip keeps the
+   content from spilling during the collapse. */
+.eng-sess-detail-wrap {
+  overflow: hidden;
+}
+
+.eng-sess-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.35rem 1.25rem 1rem 2.9rem;
+}
+
+.eng-sess-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.eng-sess-group-label {
+  font-size: 0.625rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--secondary-text);
+}
+
+/* Ordered path: nodes separated by a small chevron, wrapping as needed. */
+.eng-sess-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.1rem;
+}
+
+.eng-sess-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.eng-sess-step-sep {
+  color: var(--secondary-text);
+  opacity: 0.55;
+  margin: 0 0.15rem;
+  flex-shrink: 0;
+}
+
+.eng-sess-node {
+  font-size: 0.78rem;
+  color: var(--primary-text);
+}
+
+.eng-sess-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.eng-sess-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.16rem 0.55rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--primary-text);
+  background: var(--card-color);
+}
+
 .eng-list {
   display: flex;
   flex-direction: column;
