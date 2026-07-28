@@ -229,7 +229,8 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const daysElapsed = jobStartDate
     ? Math.max(0, Math.round((timelineEnd.getTime() - jobStartDate.getTime()) / 86_400_000))
     : null
-  const unitCount = project?.totalUnitCount && project.totalUnitCount > 0 ? project.totalUnitCount : null
+  // Units only matter plural — at 1 unit, cost/unit merely restates total cost.
+  const unitCount = project?.totalUnitCount && project.totalUnitCount > 1 ? project.totalUnitCount : null
   const costPerUnit = unitCount && project ? project.totalCost / unitCount : null
   const budgetPerUnit = unitCount && totalBudget > 0 ? totalBudget / unitCount : null
   // Most recent cost entry or invoice — a stalled job shows its age here.
@@ -318,6 +319,13 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const showPhases = !isLoading && phases.length > 1
   const showChanges = !isLoading && changeOrders.length > 0
 
+  // Closed jobs (status > 4, matching the backend's closed rollup) report
+  // final figures — "Projected" would read as if the job were still moving.
+  const isClosed = (project?.status ?? 0) > 4
+  const grossProfit = project ? project.totalContract - project.totalCost : null
+  const hasHeroFacts = Boolean(project?.clientName || pm || unitCount != null || lastActivity)
+  const hasTimeline = Boolean(jobStartDate || jobCompletedDate)
+
   const subtitleText = isMobile ? pm : [pm, `#${recnum}`].filter(Boolean).join(" · ")
   const subtitle = project ? (
     <span className="jcd-subtitle">
@@ -385,67 +393,72 @@ function JobcostDetail({ recnum }: { recnum: string }) {
         {/* ── Overview ─────────────────────────────────────────────── */}
         <MotionItem>
           <section className="jcd-section">
-            {/* Hero: who/what/where facts + factual timeline strip. */}
-            <div className="card jcd-overview-card">
-              {isLoading ? (
-                <>
-                  <div className="jcd-facts">
-                    {[0, 1, 2, 3, 4].map(i => (
-                      <div key={i} className="jcd-fact">
-                        <div className="jcd-skel-value jcd-skel-fact-value" />
-                        <div className="jcd-skel-label jcd-skel-fact-label" />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="jcd-timeline jcd-timeline-skeleton">
-                    <div className="jcd-skel-bar" />
-                  </div>
-                </>
-              ) : project && (
-                <>
-                  <div className="jcd-facts">
-                    {project.clientName && <Fact label="Client" value={project.clientName} />}
-                    {pm && <Fact label="Project Manager" value={pm} />}
-                    {unitCount != null && <Fact label="Units" value={String(unitCount)} />}
-                    {costPerUnit != null && (
-                      <Fact
-                        label="Cost / Unit"
-                        value={formatMoneyFull(costPerUnit)}
-                        sub={budgetPerUnit != null ? `${formatMoneyFull(budgetPerUnit)} budgeted` : undefined}
-                      />
-                    )}
-                    {lastActivity && <Fact label="Last Activity" value={formatDate(lastActivity)} />}
-                  </div>
-
-                  {(jobStartDate || jobCompletedDate) && (
-                    <div className="jcd-timeline">
-                      <div className="jcd-tl-cap">
-                        <span className="jcd-tl-cap-label">Started</span>
-                        <span className="jcd-tl-cap-date">{jobStartDate ? fmtLongDate(jobStartDate) : "—"}</span>
-                      </div>
-                      <div className="jcd-tl-line">
-                        <span className="jcd-tl-dot" />
-                        <span className="jcd-tl-rule" />
-                        {daysElapsed != null && <span className="jcd-tl-days">{daysElapsed} days</span>}
-                        <span className="jcd-tl-rule" />
-                        <span className={`jcd-tl-dot ${jobCompletedDate ? "jcd-tl-dot-done" : "jcd-tl-dot-open"}`} />
-                      </div>
-                      <div className="jcd-tl-cap jcd-tl-cap-end">
-                        <span className="jcd-tl-cap-label">{jobCompletedDate ? "Completed" : "In Progress"}</span>
-                        <span className="jcd-tl-cap-date">{jobCompletedDate ? fmtLongDate(jobCompletedDate) : "Today"}</span>
-                      </div>
+            {/* Hero: who/what/where facts + factual timeline strip. Skipped
+                entirely when the job has neither (older Sage records). */}
+            {(isLoading || hasHeroFacts || hasTimeline) && (
+              <div className="card jcd-overview-card">
+                {isLoading ? (
+                  <>
+                    <div className="jcd-facts">
+                      {[0, 1, 2, 3].map(i => (
+                        <div key={i} className="jcd-fact">
+                          <div className="jcd-skel-value jcd-skel-fact-value" />
+                          <div className="jcd-skel-label jcd-skel-fact-label" />
+                        </div>
+                      ))}
                     </div>
-                  )}
-                </>
-              )}
-            </div>
+                    <div className="jcd-timeline jcd-timeline-skeleton">
+                      <div className="jcd-skel-bar" />
+                    </div>
+                  </>
+                ) : project && (
+                  <>
+                    {hasHeroFacts && (
+                      <div className="jcd-facts">
+                        {project.clientName && <Fact label="Client" value={project.clientName} />}
+                        {pm && <Fact label="Project Manager" value={pm} />}
+                        {unitCount != null && <Fact label="Units" value={String(unitCount)} />}
+                        {unitCount != null && costPerUnit != null && (
+                          <Fact
+                            label="Cost / Unit"
+                            value={formatMoneyFull(costPerUnit)}
+                            sub={budgetPerUnit != null ? `${formatMoneyFull(budgetPerUnit)} budgeted` : undefined}
+                          />
+                        )}
+                        {lastActivity && <Fact label="Last Activity" value={formatDate(lastActivity)} />}
+                      </div>
+                    )}
+
+                    {hasTimeline && (
+                      <div className={`jcd-timeline${hasHeroFacts ? "" : " jcd-timeline-only"}`}>
+                        <div className="jcd-tl-cap">
+                          <span className="jcd-tl-cap-label">Started</span>
+                          <span className="jcd-tl-cap-date">{jobStartDate ? fmtLongDate(jobStartDate) : "—"}</span>
+                        </div>
+                        <div className="jcd-tl-line">
+                          <span className="jcd-tl-dot" />
+                          <span className="jcd-tl-rule" />
+                          {daysElapsed != null && <span className="jcd-tl-days">{daysElapsed} days</span>}
+                          <span className="jcd-tl-rule" />
+                          <span className={`jcd-tl-dot ${jobCompletedDate ? "jcd-tl-dot-done" : "jcd-tl-dot-open"}`} />
+                        </div>
+                        <div className="jcd-tl-cap jcd-tl-cap-end">
+                          <span className="jcd-tl-cap-label">{jobCompletedDate ? "Completed" : "In Progress"}</span>
+                          <span className="jcd-tl-cap-date">{jobCompletedDate ? fmtLongDate(jobCompletedDate) : "Today"}</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Contract + Cost summary cards — same pair the list's expanded
                 row shows, so the two views reconcile at a glance. Skeletons
                 mirror the loaded card shape so nothing jumps on arrival. */}
             {isLoading ? (
               <div className="jc-summary-grid">
-                {[3, 5].map((rows, c) => (
+                {[4, 4].map((rows, c) => (
                   <div key={c} className="card jc-summary-card">
                     <div className="jcd-skel-label jcd-skel-sum-title" />
                     {Array.from({ length: rows }, (_, i) => (
@@ -459,36 +472,54 @@ function JobcostDetail({ recnum }: { recnum: string }) {
               </div>
             ) : project && (
               <div className="jc-summary-grid">
+                {/* Contract card carries the contract-side verdict (Gross
+                    Profit + Margin, as on the list's group cards); the cost
+                    card carries the budget-side verdict (Variance). Closed
+                    jobs report final figures, not "Projected". */}
                 <div className="card jc-summary-card">
                   <div className="jc-summary-title subheadline text-secondary">Contract Summary</div>
                   <SummaryRow label="Original Contract" value={formatMoneyFull(project.originalContract)} />
                   <SummaryRow label="Change Orders" value={project.changeOrderAmount ? formatMoneyFull(project.changeOrderAmount) : "—"} />
                   <SummaryRow label="Revised Contract" value={formatMoneyFull(project.totalContract)} total />
+                  <div className="jc-summary-totals">
+                    <SummaryRow
+                      label="Gross Profit"
+                      value={grossProfit == null ? "—" : formatMoneyFull(grossProfit)}
+                      total
+                      valueColor={marginColor ?? (grossProfit != null && grossProfit < 0 ? "#ef4444" : undefined)}
+                    />
+                    <SummaryRow
+                      label={isClosed ? "Margin" : "Projected Margin"}
+                      value={margin == null ? "—" : `${margin.toFixed(1)}%`}
+                      total
+                      valueColor={marginColor}
+                    />
+                  </div>
                 </div>
                 <div className="card jc-summary-card">
                   <div className="jc-summary-title subheadline text-secondary">Cost Summary</div>
                   <SummaryRow label="Revised Budget" value={formatMoneyFull(totalBudget)} />
                   {spentPosted != null && committed != null ? (
-                    <>
-                      <SummaryRow label="Spent to Date" value={formatMoneyFull(spentPosted)} />
-                      <SummaryRow label="Committed (Open POs + Subs)" value={formatMoneyFull(committed)} />
-                      <SummaryRow label="Total Committed + Spent" value={formatMoneyFull(project.totalCost)} />
-                    </>
+                    committed > 0 ? (
+                      <>
+                        <SummaryRow label="Spent to Date" value={formatMoneyFull(spentPosted)} />
+                        <SummaryRow label="Committed (Open POs + Subs)" value={formatMoneyFull(committed)} />
+                        <SummaryRow label="Total Committed + Spent" value={formatMoneyFull(project.totalCost)} />
+                      </>
+                    ) : (
+                      // Nothing on order — a $0 Committed row and a repeated
+                      // total are noise; one Spent line says it all.
+                      <SummaryRow label="Spent to Date" value={formatMoneyFull(project.totalCost)} />
+                    )
                   ) : (
                     <SummaryRow label="Total Committed + Spent" value={formatMoneyFull(project.totalCost)} />
                   )}
                   <div className="jc-summary-totals">
                     <SummaryRow
-                      label="Projected Variance"
+                      label={isClosed ? "Budget Variance" : "Projected Variance"}
                       value={budgetVariance == null ? "—" : formatMoneyFull(budgetVariance)}
                       total
                       valueClass={varianceClass}
-                    />
-                    <SummaryRow
-                      label="Projected Margin"
-                      value={margin == null ? "—" : `${margin.toFixed(1)}%`}
-                      total
-                      valueColor={marginColor}
                     />
                   </div>
                 </div>

@@ -5339,6 +5339,10 @@ button.jc-kind-chip:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 1rem 2.75rem;
+  /* Distribute the facts across the card's full width — a left-huddled row
+     leaves a dead right half on wide screens. */
+  justify-content: space-between;
+  padding-right: clamp(0rem, 8vw, 7rem);
 }
 .jcd-fact {
   display: flex;
@@ -5371,6 +5375,8 @@ button.jc-kind-chip:hover {
   border-top: 1px solid var(--border-color);
   padding-top: 1.125rem;
 }
+/* A hero with dates but no facts is just the strip — no divider above. */
+.jcd-timeline-only { border-top: none; padding-top: 0; }
 .jcd-tl-cap { display: flex; flex-direction: column; gap: 0.125rem; }
 .jcd-tl-cap-end { text-align: right; }
 .jcd-tl-cap-label {
@@ -5437,7 +5443,7 @@ button.jc-kind-chip:hover {
 @media (max-width: 640px) {
   .jcd-sections { gap: 2rem; }
   .jcd-overview-card { padding: 1rem 1.125rem; }
-  .jcd-facts { gap: 0.875rem 1.5rem; }
+  .jcd-facts { gap: 0.875rem 1.5rem; justify-content: flex-start; padding-right: 0; }
   .jcd-timeline { gap: 0.625rem; }
   /* Tables inside the phases card scroll like the app's other wide tables. */
   .jcd-phases-card { overflow-x: auto; }
