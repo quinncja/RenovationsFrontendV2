@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { createPortal } from "react-dom"
-import { X, ShieldCheck, Crown } from "lucide-react"
+import { X, ShieldCheck, Crown, Check } from "lucide-react"
 import { displayRole, isOwnerRole } from "../../../core/auth/roles"
 import { motion, AnimatePresence } from "framer-motion"
 import { auth } from "../../../core/auth/firebase"
@@ -33,6 +33,12 @@ interface ActivityData {
   last30Days: Array<{ date: string; count: number }>
 }
 
+interface OnboardingRecord {
+  onboardedAt: string | null
+  milestones: Record<string, string>
+  hasLayout: boolean
+}
+
 interface UserActivityModalProps {
   user: UserRecord | null
   isAdmin: boolean
@@ -62,6 +68,26 @@ const ROLE_LABEL: Record<string, string> = {
   waiting:        "Waiting Room",
 }
 
+// Friendly names for known onboarding milestone keys; unknown (future) keys
+// fall back to a prettified form of the key so they still render.
+const MILESTONE_LABEL: Record<string, string> = {
+  "intro-tour": "Intro tour",
+  "section:overhead-report": "Overhead Report hint",
+}
+
+function milestoneLabel(key: string): string {
+  if (MILESTONE_LABEL[key]) return MILESTONE_LABEL[key]
+  const slug = key.replace(/^section:/, "").replace(/-/g, " ")
+  return slug.charAt(0).toUpperCase() + slug.slice(1)
+}
+
+// Legacy intro-seen flags fold in as the epoch — a real date it is not.
+function milestoneDate(iso: string): string | null {
+  const d = new Date(iso)
+  if (isNaN(d.getTime()) || d.getFullYear() < 2000) return null
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
 const ROLE_CLASS: Record<string, string> = {
   owner:          "usr-role-badge--executive",
   executive:      "usr-role-badge--executive",
@@ -84,6 +110,8 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
   const [isLoading, setIsLoading]   = useState(false)
   const [engagement, setEngagement] = useState<UserEngagement | null>(null)
   const [engLoading, setEngLoading] = useState(false)
+  const [onboarding, setOnboarding]     = useState<OnboardingRecord | null>(null)
+  const [onbLoading, setOnbLoading]     = useState(false)
   const [changingRole, setChangingRole] = useState(false)
   const [currentRole, setCurrentRole]   = useState<string>(user?.role ?? "waiting")
   const [roleOpen, setRoleOpen]         = useState(false)
@@ -134,6 +162,28 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
     fetchUserEngagement(user.uid, 30)
       .then((data) => { if (!cancelled) { setEngagement(data); setEngLoading(false) } })
       .catch(() => { if (!cancelled) setEngLoading(false) })
+
+    return () => { cancelled = true }
+  }, [user?.uid, engagementVisible])
+
+  // Onboarding record — advanced (analytics-admin) view only, same gate as the
+  // backend route.
+  useEffect(() => {
+    if (!user || !engagementVisible) { setOnboarding(null); return }
+
+    let cancelled = false
+    setOnbLoading(true)
+    setOnboarding(null)
+
+    auth.currentUser?.getIdToken()
+      .then((token) =>
+        fetch(`${API_BASE_URL}/users/${user.uid}/onboarding`, {
+          headers: { Authorization: `Bearer ${token}`, ...sessionTrackingHeaders() },
+        })
+      )
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data: OnboardingRecord) => { if (!cancelled) { setOnboarding(data); setOnbLoading(false) } })
+      .catch(() => { if (!cancelled) setOnbLoading(false) })
 
     return () => { cancelled = true }
   }, [user?.uid, engagementVisible])
@@ -191,6 +241,14 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
     for (const [s, ms] of totals) if (ms > bestMs) { best = s; bestMs = ms }
     return best
   })()
+
+  // Onboarding checklist (advanced view): the initial-setup gate plus every
+  // known milestone, unioned with whatever keys the record actually carries so
+  // future milestones show up without a frontend release.
+  const onbSetupDone = !!(onboarding?.onboardedAt || onboarding?.hasLayout)
+  const onbMilestoneKeys = [
+    ...new Set([...Object.keys(MILESTONE_LABEL), ...Object.keys(onboarding?.milestones ?? {})]),
+  ]
 
   return createPortal(
     <AnimatePresence>
@@ -424,6 +482,51 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                     </div>
                   )}
                 </div>
+
+                {/* Onboarding (advanced view): has this user finished setup and
+                    seen the one-time explainers? */}
+                {engagementVisible && (
+                  <div className="usr-onb-section">
+                    <p className="invoice-modal-section-label">Onboarding</p>
+                    {onbLoading ? (
+                      <div className="widget-skeleton" style={{ height: "2rem" }} />
+                    ) : (
+                      <div className="usr-onb-row">
+                        <span
+                          className={`usr-onb-chip${onbSetupDone ? " usr-onb-chip--done" : ""}`}
+                          title={
+                            onboarding?.onboardedAt
+                              ? `Completed setup ${milestoneDate(onboarding.onboardedAt) ?? ""}`.trim()
+                              : onbSetupDone
+                                ? "Completed setup (before completion dates were recorded)"
+                                : "Has not completed initial setup"
+                          }
+                        >
+                          {onbSetupDone ? <Check size={13} /> : <span className="usr-onb-dot" />}
+                          Initial setup
+                          {onboarding?.onboardedAt && milestoneDate(onboarding.onboardedAt) && (
+                            <span className="usr-onb-date">{milestoneDate(onboarding.onboardedAt)}</span>
+                          )}
+                        </span>
+                        {onbMilestoneKeys.map((key) => {
+                          const seenAt = onboarding?.milestones?.[key]
+                          const date = seenAt ? milestoneDate(seenAt) : null
+                          return (
+                            <span
+                              key={key}
+                              className={`usr-onb-chip${seenAt ? " usr-onb-chip--done" : ""}`}
+                              title={seenAt ? `Seen${date ? ` ${date}` : ""}` : "Not seen yet"}
+                            >
+                              {seenAt ? <Check size={13} /> : <span className="usr-onb-dot" />}
+                              {milestoneLabel(key)}
+                              {date && <span className="usr-onb-date">{date}</span>}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
                   </>
                 )
 

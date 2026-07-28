@@ -87,6 +87,15 @@ flags are pushed up after merge.
 - `.nav-button-attention` — copper `coachPulse` ring on the nav item being
   pointed at.
 
+## Observability
+
+Owner/tech can inspect any user's onboarding state in the Users page's advanced
+modal view: an "Onboarding" checklist (initial setup + every milestone, with
+seen dates) fed by `GET /users/:uid/onboarding` (analytics-admin gated). The
+checklist unions `MILESTONE_LABEL` in `UserActivityModal.tsx` with the record's
+actual keys — add a label there when shipping a new milestone so it reads
+nicely.
+
 ## Dev previews (all DEV-only, none stamp markers)
 
 | Param | Shows |

@@ -5663,6 +5663,67 @@ body{
   margin-bottom: 0.5rem;
 }
 
+/* ── Onboarding checklist (advanced view) ──
+   Same card treatment as the chart section; contained neutral pills, done vs
+   pending carried by fill + the check/dot mark, not color shouting. */
+.usr-onb-section {
+  margin-top: 1rem;
+  padding: 0.9rem 1.15rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--card-color);
+}
+
+.usr-onb-section .invoice-modal-section-label {
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 0.6rem;
+}
+
+.usr-onb-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.usr-onb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.65rem;
+  border: 1px dashed var(--border-color);
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--secondary-text);
+  cursor: default;
+}
+
+.usr-onb-chip--done {
+  border-style: solid;
+  background: var(--hover-bg);
+  color: var(--primary-text);
+}
+
+.usr-onb-chip--done svg {
+  color: #4d8f66; /* the app's quiet-good sage, not alert green */
+}
+
+/* Pending marker: a hollow dot where the check would be. */
+.usr-onb-dot {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.usr-onb-date {
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+  font-weight: var(--font-weight-normal);
+}
+
 .usr-activity-chart {
   height: 16rem;
   display: flex;
