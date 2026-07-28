@@ -5311,6 +5311,122 @@ button.jc-kind-chip:hover {
 /* ─── Jobcost Detail Page ── */
 
 /* Metrics card: no border-top on the metrics row, no extra padding */
+/* ── Jobcost detail: sectioned layout ────────────────────────────────
+   The detail page reads as stacked sections (Project Overview → Budget &
+   Costs → Cash & Billing → Changes & Phases), echoing the home page's
+   section stack. Headers are plain left-aligned title2s on the page
+   surface — neutral, no accent. */
+.jcd-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+.jcd-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.jcd-section-title { margin: 0; }
+
+/* Overview hero: identity/pace facts row + factual timeline strip. */
+.jcd-overview-card {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+}
+.jcd-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2.75rem;
+}
+.jcd-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+  min-width: 6.5rem;
+}
+.jcd-fact-value {
+  font-size: 1.0625rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+.jcd-fact-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--secondary-text);
+}
+.jcd-fact-sub { font-size: 0.75rem; color: var(--secondary-text); }
+
+/* Timeline strip: start cap — rule — elapsed-days pill — rule — end cap.
+   Strictly factual (actrec.sttdte / cmpdte); the open-end dot is hollow,
+   a completed job's dot fills green. */
+.jcd-timeline {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 1.125rem;
+}
+.jcd-tl-cap { display: flex; flex-direction: column; gap: 0.125rem; }
+.jcd-tl-cap-end { text-align: right; }
+.jcd-tl-cap-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--secondary-text);
+  white-space: nowrap;
+}
+.jcd-tl-cap-date {
+  font-size: 0.9375rem;
+  font-weight: 650;
+  color: var(--primary-text);
+  white-space: nowrap;
+}
+.jcd-tl-line {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 3rem;
+}
+.jcd-tl-rule { flex: 1; height: 2px; border-radius: 1px; background: var(--border-color); }
+.jcd-tl-days {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--secondary-text);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 0.1875rem 0.6875rem;
+  white-space: nowrap;
+}
+.jcd-tl-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--secondary-text); flex: none; }
+.jcd-tl-dot-open { background: transparent; border: 2px solid var(--secondary-text); }
+.jcd-tl-dot-done { background: #22c55e; }
+
+/* Phases table card (consolidated projects only). */
+.jcd-phases-card { padding: 1rem 1.25rem; }
+.jcd-phases-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+.jcd-phases-count { font-size: 0.8125rem; color: var(--secondary-text); }
+
+@media (max-width: 640px) {
+  .jcd-sections { gap: 2rem; }
+  .jcd-overview-card { padding: 1rem 1.125rem; }
+  .jcd-facts { gap: 0.875rem 1.5rem; }
+  .jcd-timeline { gap: 0.625rem; }
+  /* Tables inside the phases card scroll like the app's other wide tables. */
+  .jcd-phases-card { overflow-x: auto; }
+}
+
 .jcd-metrics-card {
   padding: 0;
 }

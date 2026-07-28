@@ -278,8 +278,9 @@ function SortTh({ col, label, align = "left", sortKey, sortDir, onSort, classNam
 }
 
 // Label/value row inside a summary card; `total` bolds it as the card's
-// bottom-line figure.
-function SummaryRow({ label, value, total, valueColor, valueClass }: {
+// bottom-line figure. Shared with the detail page's Contract/Cost Summary
+// cards so the two render identically.
+export function SummaryRow({ label, value, total, valueColor, valueClass }: {
   label: string
   value: string
   total?: boolean

@@ -17,6 +17,7 @@ import useIsMobile from "../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import useHashedRelationColors from "../../shared/hooks/useHashedRelationColors"
 import { JOB_STATUS_LABELS } from "../directory/directoryShared"
+import { SummaryRow } from "./Jobcost"
 import { ChangeOrderModal } from "../change-orders/components/ChangeOrderModal"
 import type { ChangeOrder } from "../change-orders/types"
 import type { SpendItem, LineMarker } from "../../shared/components/Chart/chart.types"
@@ -30,7 +31,21 @@ const INV_STATUS_LABEL: Record<number, string> = { 1: "Open", 2: "Review", 3: "D
 const INV_STATUS_CLASS: Record<number, string> = { 1: "open", 2: "review", 3: "dispute", 4: "paid", 5: "void" }
 
 // ─── Backend shapes ──────────────────────────────────────────────────
-interface Phase { recnum: string; name: string; status: number; pmName: string | null }
+interface Phase {
+  recnum: string
+  name: string
+  status: number
+  pmName: string | null
+  // Enriched fields carried through consolidatePhasesIntoProjects — optional
+  // until the backend that emits them is deployed.
+  unitCount?: number | string | null
+  startDate?: string | null
+  completedDate?: string | null
+  totalContract?: number
+  totalCost?: number
+  budget?: number
+  margin?: number | null
+}
 interface Project {
   recnum: string
   name: string
@@ -43,6 +58,13 @@ interface Project {
   totalIncome: number
   totalMargin: number | null
   phases: Phase[]
+  // Consolidated rollups (actrec.usrdf1 units; sttdte/cmpdte dates; committed
+  // POs + subs; client) — optional until the emitting backend is deployed.
+  totalUnitCount?: number
+  totalCommitted?: number
+  clientName?: string | null
+  startDate?: string | null
+  completedDate?: string | null
 }
 interface MonthlyCost { year: number; month: number; spending: number }
 interface JobInvoice {
@@ -69,6 +91,30 @@ interface ProgressBilling {
   expectedPct: number // earned ÷ contract (0–1) = % complete
   variance: number
   hasBudget: boolean
+}
+
+// Sage stores unset dates as null (or a pre-2000 sentinel on old rows) — treat
+// both as "no date".
+function parseValidDate(raw: string | null | undefined): Date | null {
+  if (!raw) return null
+  const d = new Date(raw)
+  if (isNaN(d.getTime()) || d.getFullYear() < 2000) return null
+  return d
+}
+
+function fmtLongDate(d: Date): string {
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+}
+
+// One identity/pace stat in the overview card's facts row.
+function Fact({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="jcd-fact">
+      <span className="jcd-fact-value">{value}</span>
+      <span className="jcd-fact-label">{label}</span>
+      {sub && <span className="jcd-fact-sub">{sub}</span>}
+    </div>
+  )
 }
 
 export default function JobcostDetailPage() {
@@ -177,6 +223,41 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const totalPaid = activeInvoices.reduce((s, i) => s + (i.amountPaid || 0), 0)
   const totalOutstanding = activeInvoices.reduce((s, i) => s + (i.amountRemaining || 0), 0)
 
+  // ── Overview facts ──
+  // Identity + pace figures for the hero card. Timeline is strictly factual —
+  // actrec.sttdte / actrec.cmpdte only. No projected finish: an expected-end
+  // field is coming to Sage via project scheduling; extrapolating one from burn
+  // would read as a commitment.
+  const jobStartDate = parseValidDate(project?.startDate)
+  const jobCompletedDate = parseValidDate(project?.completedDate)
+  const timelineEnd = jobCompletedDate ?? new Date()
+  const daysElapsed = jobStartDate
+    ? Math.max(0, Math.round((timelineEnd.getTime() - jobStartDate.getTime()) / 86_400_000))
+    : null
+  const unitCount = project?.totalUnitCount && project.totalUnitCount > 0 ? project.totalUnitCount : null
+  const costPerUnit = unitCount && project ? project.totalCost / unitCount : null
+  const budgetPerUnit = unitCount && totalBudget > 0 ? totalBudget / unitCount : null
+  // Recent pace: average weekly spend over the last 4 week buckets. Only shown
+  // while the job is open — a completed job's "burn" is noise.
+  const recentWeeks = weeks.slice(-4)
+  const weeklyBurn = !jobCompletedDate && recentWeeks.length >= 2
+    ? recentWeeks.reduce((s, w) => s + w.spending, 0) / recentWeeks.length
+    : null
+  const pctComplete = pb?.hasBudget ? Math.round(pb.expectedPct * 100) : null
+  // Most recent cost entry or invoice — a stalled job shows its age here.
+  // YYYY-MM-DD prefixes compare lexicographically.
+  const lastActivity = (() => {
+    const days = [
+      ...dailySpend.map(d => d.day?.slice(0, 10)),
+      ...activeInvoices.map(i => i.invoiceDate?.slice(0, 10)),
+    ].filter((s): s is string => !!s)
+    return days.length ? days.reduce((a, b) => (a > b ? a : b)) : null
+  })()
+  // Committed vs posted split (list-panel parity). Null until the backend
+  // that rolls totalCommitted into the consolidated project is deployed.
+  const committed = project?.totalCommitted ?? null
+  const spentPosted = committed != null && project ? project.totalCost - committed : null
+
   // ── Cost & Billing Trajectory ──
   // One chart that answers all three "how is this job tracking" questions at
   // once: cumulative cost (are we burning fast?), the budget ceiling (will we
@@ -249,23 +330,24 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const margin = project && project.totalContract > 0
     ? ((project.totalContract - project.totalCost) / project.totalContract) * 100
     : project?.totalMargin ?? null
+  const marginColor = !marginColorsOn || margin == null ? undefined : marginTextColor(margin)
   // Budget Variance = revised budget − spend to date. POSITIVE = under budget
-  // (good, green); NEGATIVE = over budget (bad, red). Colored by its own sign —
-  // NOT by `margin` (a different metric on a percentage scale), which is what
-  // made an over-budget job read green.
+  // (good); NEGATIVE = over budget (bad). Class-colored by its own sign — same
+  // treatment as the list's expanded panel.
   const budgetVariance = project ? totalBudget - project.totalCost : null
-  const budgetVarianceColor =
-    budgetVariance == null || budgetVariance === 0
-      ? undefined
-      : budgetVariance > 0
-        ? "#22c55e" // under budget — green (matches marginTextColor)
-        : "#ef4444" // over budget — red (matches marginTextColor)
+  const varianceClass = budgetVariance == null || budgetVariance === 0
+    ? undefined
+    : budgetVariance > 0 ? "jc-variance-under" : "jc-variance-over"
   const originalContract = project?.originalContract ?? 0
   const revisedContract = project?.totalContract ?? 0
   const invoicePct = revisedContract > 0 ? (totalInvoiced / revisedContract) * 100 : 0
   const coTotalBudget = changeOrders.reduce((s, co) => s + (Number(co.budget) || 0), 0)
   const coTotalContract = changeOrders.reduce((s, co) => s + (Number(co.total) || 0), 0)
   const coPctOfContract = originalContract > 0 ? (coTotalContract / originalContract) * 100 : 0
+
+  const phases = project?.phases ?? []
+  const showPhases = !isLoading && phases.length > 1
+  const showChanges = !isLoading && changeOrders.length > 0
 
   const subtitleText = isMobile ? pm : [pm, `#${recnum}`].filter(Boolean).join(" · ")
   const subtitle = project ? (
@@ -329,119 +411,528 @@ function JobcostDetail({ recnum }: { recnum: string }) {
         )
       }
     >
-      <MotionList className="widget-grid widget-grid-2">
+      <MotionList className="jcd-sections">
 
-        {/* ── Project summary metrics ── */}
-        <MotionItem className="col-span-full">
-          <div className="card jcd-metrics-card">
-            {isLoading ? (
-              <div className="jcd-metrics-skeleton">
-                {[0, 1, 2, 3].map(i => (
-                  <div key={i} className="jcd-metrics-skeleton-cell"><div className="jcd-skel-value" /><div className="jcd-skel-label" /></div>
-                ))}
-              </div>
-            ) : project && (
-              <div className="inv-metrics-row jcd-metrics-row">
-                <div className="inv-metric">
-                  <span className="inv-metric-value">{formatMoneyFull(project.totalContract)}</span>
-                  <span className="inv-metric-label">Revised Contract</span>
+        {/* ── Project Overview ─────────────────────────────────────── */}
+        <MotionItem>
+          <section className="jcd-section">
+            <h2 className="jcd-section-title title2 emphasized">Project Overview</h2>
+
+            {/* Hero: identity/pace facts + factual timeline strip. */}
+            <div className="card jcd-overview-card">
+              {isLoading ? (
+                <div className="jcd-metrics-skeleton">
+                  {[0, 1, 2, 3].map(i => (
+                    <div key={i} className="jcd-metrics-skeleton-cell"><div className="jcd-skel-value" /><div className="jcd-skel-label" /></div>
+                  ))}
                 </div>
-                <div className="inv-metric-divider" />
-                <div className="inv-metric">
-                  <span className="inv-metric-value">{formatMoneyFull(totalBudget)}</span>
-                  <span className="inv-metric-label">Revised Budget</span>
+              ) : project && (
+                <>
+                  <div className="jcd-facts">
+                    {project.clientName && <Fact label="Client" value={project.clientName} />}
+                    {pm && <Fact label="Project Manager" value={pm} />}
+                    {unitCount != null && <Fact label="Units" value={String(unitCount)} />}
+                    {costPerUnit != null && (
+                      <Fact
+                        label="Cost / Unit"
+                        value={formatMoneyFull(costPerUnit)}
+                        sub={budgetPerUnit != null ? `${formatMoneyFull(budgetPerUnit)} budgeted` : undefined}
+                      />
+                    )}
+                    {weeklyBurn != null && <Fact label="Weekly Burn" value={formatMoneyFull(weeklyBurn)} sub="4-week average" />}
+                    {pctComplete != null && <Fact label="Complete" value={`${pctComplete}%`} sub="cost-to-cost" />}
+                    {lastActivity && <Fact label="Last Activity" value={formatDate(lastActivity)} />}
+                  </div>
+
+                  {(jobStartDate || jobCompletedDate) && (
+                    <div className="jcd-timeline">
+                      <div className="jcd-tl-cap">
+                        <span className="jcd-tl-cap-label">Started</span>
+                        <span className="jcd-tl-cap-date">{jobStartDate ? fmtLongDate(jobStartDate) : "—"}</span>
+                      </div>
+                      <div className="jcd-tl-line">
+                        <span className="jcd-tl-dot" />
+                        <span className="jcd-tl-rule" />
+                        {daysElapsed != null && <span className="jcd-tl-days">{daysElapsed} days</span>}
+                        <span className="jcd-tl-rule" />
+                        <span className={`jcd-tl-dot ${jobCompletedDate ? "jcd-tl-dot-done" : "jcd-tl-dot-open"}`} />
+                      </div>
+                      <div className="jcd-tl-cap jcd-tl-cap-end">
+                        <span className="jcd-tl-cap-label">{jobCompletedDate ? "Completed" : "In Progress"}</span>
+                        <span className="jcd-tl-cap-date">{jobCompletedDate ? fmtLongDate(jobCompletedDate) : "Today"}</span>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Contract + Cost summary cards — same pair the list's expanded
+                row shows, so the two views reconcile at a glance. */}
+            {!isLoading && project && (
+              <div className="jc-summary-grid">
+                <div className="jc-summary-card">
+                  <div className="jc-summary-title subheadline text-secondary">Contract Summary</div>
+                  <SummaryRow label="Original Contract" value={formatMoneyFull(project.originalContract)} />
+                  <SummaryRow label="Change Orders" value={project.changeOrderAmount ? formatMoneyFull(project.changeOrderAmount) : "—"} />
+                  <SummaryRow label="Revised Contract" value={formatMoneyFull(project.totalContract)} total />
                 </div>
-                <div className="inv-metric-divider" />
-                <div className="inv-metric">
-                  <span className="inv-metric-value">{formatMoneyFull(project.totalCost)}</span>
-                  <span className="inv-metric-label">Spending to Date</span>
-                </div>
-                <div className="inv-metric-divider" />
-                <div className="inv-metric">
-                  <span className="inv-metric-value" style={!marginColorsOn || budgetVarianceColor == null ? undefined : { color: budgetVarianceColor }}>
-                    {formatMoneyFull(totalBudget - project.totalCost)}
-                  </span>
-                  <span className="inv-metric-label">Budget Variance</span>
-                </div>
-                <div className="inv-metric-divider" />
-                <div className="inv-metric">
-                  <span className="inv-metric-value" style={!marginColorsOn || margin == null ? undefined : { color: marginTextColor(margin) }}>
-                    {margin == null ? "—" : `${margin.toFixed(1)}%`}
-                  </span>
-                  <span className="inv-metric-label">Projected Margin</span>
+                <div className="jc-summary-card">
+                  <div className="jc-summary-title subheadline text-secondary">Cost Summary</div>
+                  <SummaryRow label="Revised Budget" value={formatMoneyFull(totalBudget)} />
+                  {spentPosted != null && committed != null ? (
+                    <>
+                      <SummaryRow label="Spent to Date" value={formatMoneyFull(spentPosted)} />
+                      <SummaryRow label="Committed (Open POs + Subs)" value={formatMoneyFull(committed)} />
+                      <SummaryRow label="Total Committed + Spent" value={formatMoneyFull(project.totalCost)} />
+                    </>
+                  ) : (
+                    <SummaryRow label="Total Committed + Spent" value={formatMoneyFull(project.totalCost)} />
+                  )}
+                  <div className="jc-summary-totals">
+                    <SummaryRow
+                      label="Projected Variance"
+                      value={budgetVariance == null ? "—" : formatMoneyFull(budgetVariance)}
+                      total
+                      valueClass={varianceClass}
+                    />
+                    <SummaryRow
+                      label="Projected Margin"
+                      value={margin == null ? "—" : `${margin.toFixed(1)}%`}
+                      total
+                      valueColor={marginColor}
+                    />
+                  </div>
                 </div>
               </div>
             )}
-          </div>
+          </section>
         </MotionItem>
 
-        {/* ── Change Orders ── */}
-        {!isLoading && changeOrders.length > 0 && (
-          <MotionItem className="col-span-full">
-            <div className="det-section card">
-              <div className="det-section-toggle" onClick={() => setChangeOrdersOpen(o => !o)}>
-                <div className="det-section-header">
-                  <span className="widget-title headline">Change Orders</span>
-                  <span className="det-section-action">
-                    {changeOrdersOpen ? "Hide" : "Show"}
-                    <ChevronDown size={13} className={`det-section-chevron${changeOrdersOpen ? " open" : ""}`} />
-                  </span>
-                </div>
-                <div className="inv-metrics-row jcd-inv-metrics">
-                  <div className="inv-metric">
-                    <span className={`inv-metric-value ${coTotalContract >= 0 ? "jc-margin-high" : "jc-margin-critical"}`}>
-                      {coTotalContract > 0 ? "+" : ""}{formatMoneyFull(coTotalContract)}
-                    </span>
-                    <span className="inv-metric-label">Total Change Orders</span>
+        {/* ── Budget & Costs ───────────────────────────────────────── */}
+        <MotionItem>
+          <section className="jcd-section">
+            <h2 className="jcd-section-title title2 emphasized">Budget &amp; Costs</h2>
+            <div className="widget-grid widget-grid-2">
+              {/* Cost Breakdown leads the section — it sits directly under the
+                  overview's summary cards, which it itemizes. */}
+              <div className="col-span-full">
+                <Widget title="Cost Breakdown" loading={isLoading} noData={!isLoading && !budget} className="jcd-cost-widget">
+                  <CostBreakdownTable budget={budget} costItems={costItems} />
+                </Widget>
+              </div>
+
+              <Widget
+                title="Cost & Billing Trajectory"
+                description={trajDesc}
+                loading={isLoading}
+                noData={!isLoading && costVsBilled.length === 0}
+                className="jcd-chart-widget"
+                // Custom HTML legend in the header's top-right corner (colors
+                // match the series: Cost = CHART_COLORS[0], Billed = [1]).
+                actions={
+                  <ChartLegend items={[
+                    { label: "Cost", color: "#c27c3e" },
+                    { label: "Billed", color: "#22c55e" },
+                  ]} />
+                }
+              >
+                <Chart config={{
+                  type: "line",
+                  // `Cost` omits `color` so it falls through to CHART_COLORS[0]
+                  // (brand orange) — same line the home page revenue + directory
+                  // history charts use; `Billed` takes the next palette color.
+                  series: trajSeries,
+                  // Two cumulative lines plus a budget marker — no area fill (it
+                  // would muddy the overlap). Legend is rendered in the header
+                  // (actions) instead of nivo's in-plot legend.
+                  enableArea: false,
+                  legend: false,
+                  compactTop: true,
+                  disableGrowthTooltip: true,
+                  yFormat: formatMoneyFull,
+                  // Scaled to the plotted data, extended to the budget ceiling
+                  // only when that ceiling is actually in view (trajMaxValue).
+                  maxValue: trajMaxValue,
+                  axisBottomTickValues: trajTickValues,
+                  markers: trajMarkers,
+                }} />
+              </Widget>
+
+              <Widget
+                title="Budget vs Actual by Type"
+                description={bvaDesc}
+                loading={isLoading}
+                noData={!isLoading && budgetVsActual.length === 0}
+                className="jcd-chart-widget"
+                // Custom HTML legend in the header's top-right corner (colors
+                // match the bar `colors` below).
+                actions={
+                  <ChartLegend items={[
+                    { label: "Budget", color: "#94a3b8" },
+                    { label: "Actual", color: "#c27c3e" },
+                  ]} />
+                }
+              >
+                <Chart config={{
+                  type: "bar",
+                  data: budgetVsActual,
+                  keys: ["Budget", "Actual"],
+                  indexBy: "type",
+                  groupMode: "grouped",
+                  // Align the plot with the trajectory line chart beside it.
+                  compactTop: true,
+                  // Legend is rendered in the header (actions) instead of nivo's.
+                  hideLegend: true,
+                  // Hovering a category shows one card with both Budget and
+                  // Actual plus the variance (budget − actual) for that type.
+                  groupTooltip: true,
+                  tooltipTotalLabel: "Variance",
+                  // Thin the y-axis to ~5 ticks so its label density matches the
+                  // line chart's (which uses everyOtherYTicks) instead of ~11.
+                  axisLeftTickValues: 5,
+                  // Budget reads as a neutral reference bar; actual takes brand
+                  // orange so an over-budget trade pops against its budget peer.
+                  colors: ["#94a3b8", "#c27c3e"],
+                  yFormat: formatMoneyFull,
+                }} />
+              </Widget>
+
+              <Widget title="Spending by Type" loading={isLoading} noData={!isLoading && typeSpend.length === 0}>
+                <Chart config={{
+                  type: "pie-with-list",
+                  items: typeSpend,
+                  centerLabel: "TOTAL SPEND",
+                  centerTotal: totalActual,
+                  showPercent: true,
+                  chartSize: "md",
+                }} />
+              </Widget>
+
+              <Widget title="Spending by Vendor" loading={isLoading} noData={!isLoading && vendorSpend.length === 0}>
+                <Chart config={{
+                  type: "pie-with-list",
+                  items: vendorSpend,
+                  centerLabel: "VENDOR SPEND",
+                  showPercent: true,
+                  chartSize: "md",
+                  // Hashed mode keeps each vendor's color consistent with the
+                  // dashboard's Top Suppliers widget.
+                  colors: hashedRelationColors
+                    ? vendorSpend.map(v => hashColor(v.label))
+                    : colorRamp(RAMP_SCHEMES.orange.hue, RAMP_SCHEMES.orange.drift, 5),
+                }} />
+              </Widget>
+            </div>
+          </section>
+        </MotionItem>
+
+        {/* ── Cash & Billing ───────────────────────────────────────── */}
+        <MotionItem>
+          <section className="jcd-section">
+            <h2 className="jcd-section-title title2 emphasized">Cash &amp; Billing</h2>
+            <div>
+              <div className="det-section card jcd-billing-card">
+                <div
+                  className={!isLoading && invoices.length > 0 ? "det-section-toggle" : undefined}
+                  onClick={!isLoading && invoices.length > 0 ? () => setInvoicesOpen(o => !o) : undefined}
+                >
+                  <div className="det-section-header">
+                    <span className="widget-title headline">Billing Position</span>
+                    {!isLoading && invoices.length > 0 && (
+                      <span className="det-section-action">
+                        {invoicesOpen ? "Hide Invoices" : "Show Invoices"}
+                        <ChevronDown size={13} className={`det-section-chevron${invoicesOpen ? " open" : ""}`} />
+                      </span>
+                    )}
                   </div>
-                  <div className="inv-metric-divider" />
-                  <div className="inv-metric">
-                    <span className="inv-metric-value">{coTotalBudget > 0 ? "+" : ""}{formatMoneyFull(coTotalBudget)}</span>
-                    <span className="inv-metric-label">Total Budget Increase</span>
-                  </div>
-                  <div className="inv-metric-divider" />
-                  <div className="inv-metric">
-                    <span className="inv-metric-value">{changeOrders.length}</span>
-                    <span className="inv-metric-label">Count</span>
-                  </div>
-                  <div className="inv-metric-divider" />
-                  <div className="inv-metric">
-                    <span className="inv-metric-value">{coPctOfContract.toFixed(1)}%</span>
-                    <span className="inv-metric-label">of Original Contract</span>
-                  </div>
+
+                  {isLoading ? (
+                    <div className="jcd-inv-skeleton">
+                      <div className="jcd-skel-bar" />
+                      <div className="jcd-inv-skeleton-metrics">
+                        {[0, 1, 2].map(i => (
+                          <div key={i} className="jcd-metrics-skeleton-cell"><div className="jcd-skel-value" /><div className="jcd-skel-label" /></div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {pb && pb.contract > 0 ? (
+                        (() => {
+                          const dir = pb.variance > 0 ? "under" : pb.variance < 0 ? "over" : "even"
+                          const label = dir === "under" ? "Under-billed" : dir === "over" ? "Over-billed" : "On track"
+                          const billedW = Math.min(pb.billedPct * 100, 100)
+                          const earnedW = Math.min(pb.expectedPct * 100, 100)
+                          return (
+                            <div className="jcd-billing-pos">
+                              <div className="jcd-bp-hero">
+                                <div className="jcd-bp-stat">
+                                  <span className="jcd-bp-stat-label">Billed</span>
+                                  <span className="jcd-bp-stat-value">{formatMoneyFull(pb.billed)}</span>
+                                  <span className="jcd-bp-stat-sub">{Math.round(pb.billedPct * 100)}% of contract</span>
+                                </div>
+                                <div className="jcd-bp-stat-divider" />
+                                <div className="jcd-bp-stat">
+                                  <span className="jcd-bp-stat-label">Earned</span>
+                                  <span className="jcd-bp-stat-value">{formatMoneyFull(pb.expected)}</span>
+                                  <span className="jcd-bp-stat-sub">
+                                    {pb.hasBudget ? `${Math.round(pb.expectedPct * 100)}% complete` : "no budget — est."}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* One combined meter: billed fill against the contract track,
+                                  with a marker at the earned (% complete) position. */}
+                              <div className="jcd-bp-meter-wrap">
+                                <div
+                                  className="jcd-bp-meter"
+                                  tabIndex={0}
+                                  onMouseMove={e => {
+                                    const meter = e.currentTarget
+                                    const rect = meter.getBoundingClientRect()
+                                    const x = e.clientX - rect.left
+                                    const tip = meter.querySelector<HTMLElement>(".jcd-bp-meter-tip")
+                                    const half = (tip?.offsetWidth ?? 0) / 2
+                                    const clamped = Math.max(half, Math.min(x, rect.width - half))
+                                    meter.style.setProperty("--bp-tip-x", `${clamped}px`)
+                                    meter.style.setProperty("--bp-arrow-x", `${x - clamped}px`)
+                                  }}
+                                >
+                                  <div className="jcd-bp-meter-fill" style={{ width: `${billedW}%` }} />
+                                  <div className="jcd-bp-meter-marker" style={{ left: `${earnedW}%` }} />
+                                  <div className="jcd-bp-meter-tip" role="tooltip">
+                                    <div className="jcd-bp-tip-row"><span>Billed</span><strong>{formatMoneyFull(pb.billed)}</strong></div>
+                                    <div className="jcd-bp-tip-row"><span>Earned</span><strong>{formatMoneyFull(pb.expected)}</strong></div>
+                                    <div className="jcd-bp-tip-row"><span>Contract</span><strong>{formatMoneyFull(pb.contract)}</strong></div>
+                                  </div>
+                                </div>
+                                <div className="jcd-bp-earned-label" style={{ left: `${earnedW}%` }}>Earned</div>
+                              </div>
+
+                              <div className={`jcd-bp-variance jcd-bp-variance--${dir}`}>
+                                <span className={`pb-dir-pill pb-dir-pill--${dir}`}>{label}</span>
+                                <span className="jcd-bp-variance-amt">{formatMoneyFull(Math.abs(pb.variance))}</span>
+                                <span className="jcd-bp-variance-sub">
+                                  {dir === "under"
+                                    ? "earned but not yet billed"
+                                    : dir === "over"
+                                    ? "billed ahead of work earned"
+                                    : "billing matches work earned"}
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })()
+                      ) : (
+                        <div className="jcd-inv-hero">
+                          <div className="jcd-inv-hero-left">
+                            <span className="jcd-inv-pct">{invoicePct.toFixed(1)}%</span>
+                            <span className="jcd-inv-pct-label">of contract invoiced</span>
+                          </div>
+                          <div className="jcd-inv-hero-right">
+                            <span className="jcd-inv-amounts subheadline">
+                              {formatMoneyFull(totalInvoiced)} <span className="text-secondary">of</span> {formatMoneyFull(revisedContract)}
+                            </span>
+                            <div className="jc-invoice-progress-bar">
+                              <div className="jc-invoice-progress-fill" style={{ width: `${Math.min(invoicePct, 100)}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
-              <div className={`det-section-body${changeOrdersOpen ? " open" : ""}`}>
-                <div className="det-section-body-inner">
+
+              {!isLoading && invoices.length > 0 && (
+                <div className={`det-section-body jcd-invoice-drop${invoicesOpen ? " open" : ""}`}>
+                  <div className="det-section-body-inner">
+                    <div className="card jcd-invoice-card">
+                    <div className="jcd-inv-summary">
+                      <div className="jcd-inv-summary-card">
+                        <div className="jcd-inv-summary-card-head">
+                          <span className="jcd-inv-summary-label">Amount Paid</span>
+                          <span className="invoice-status-badge invoice-status-badge--paid">Paid</span>
+                        </div>
+                        <span className="jcd-inv-summary-value">{formatMoneyFull(totalPaid)}</span>
+                      </div>
+                      <div className="jcd-inv-summary-card">
+                        <div className="jcd-inv-summary-card-head">
+                          <span className="jcd-inv-summary-label">Outstanding</span>
+                          <span className="invoice-status-badge invoice-status-badge--open">Open</span>
+                        </div>
+                        <span className="jcd-inv-summary-value">{formatMoneyFull(totalOutstanding)}</span>
+                      </div>
+                    </div>
+                    <table className="spend-rank-table inv-table">
+                      <thead>
+                        <tr>
+                          <th className="spend-rank-table-name inv-th-num">Invoice #</th>
+                          <th className="spend-rank-table-name inv-th-date">Date</th>
+                          <th className="spend-rank-table-name inv-th-status">Status</th>
+                          <th className="spend-rank-table-value">Total</th>
+                          <th className="spend-rank-table-value">Paid</th>
+                          <th className="spend-rank-table-value">Remaining</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoices.map(inv => (
+                          <tr
+                            key={inv.id}
+                            className="spend-rank-table-row"
+                            onClick={() => setSelectedInvoiceId(inv.id)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={e => e.key === "Enter" && setSelectedInvoiceId(inv.id)}
+                          >
+                            <td className="spend-rank-table-name body-text emphasized inv-th-num">{inv.invoiceNum}</td>
+                            <td className="spend-rank-table-name body-text text-secondary inv-th-date">{formatDate(inv.invoiceDate)}</td>
+                            <td className="spend-rank-table-name inv-th-status">
+                              <span className={`invoice-status-badge invoice-status-badge--${INV_STATUS_CLASS[inv.status] ?? "open"}`}>
+                                {INV_STATUS_LABEL[inv.status] ?? `Status ${inv.status}`}
+                              </span>
+                            </td>
+                            <td className="spend-rank-table-value body-text">{formatMoneyFull(inv.total)}</td>
+                            <td className="spend-rank-table-value body-text">{formatMoneyFull(inv.amountPaid)}</td>
+                            <td className="spend-rank-table-value body-text invoice-amount-value--remaining">{formatMoneyFull(inv.amountRemaining)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        </MotionItem>
+
+        {/* ── Changes & Phases ─────────────────────────────────────── */}
+        {(showChanges || showPhases) && (
+          <MotionItem>
+            <section className="jcd-section">
+              <h2 className="jcd-section-title title2 emphasized">Changes &amp; Phases</h2>
+
+              {showChanges && (
+                <div className="det-section card">
+                  <div className="det-section-toggle" onClick={() => setChangeOrdersOpen(o => !o)}>
+                    <div className="det-section-header">
+                      <span className="widget-title headline">Change Orders</span>
+                      <span className="det-section-action">
+                        {changeOrdersOpen ? "Hide" : "Show"}
+                        <ChevronDown size={13} className={`det-section-chevron${changeOrdersOpen ? " open" : ""}`} />
+                      </span>
+                    </div>
+                    <div className="inv-metrics-row jcd-inv-metrics">
+                      <div className="inv-metric">
+                        <span className={`inv-metric-value ${coTotalContract >= 0 ? "jc-margin-high" : "jc-margin-critical"}`}>
+                          {coTotalContract > 0 ? "+" : ""}{formatMoneyFull(coTotalContract)}
+                        </span>
+                        <span className="inv-metric-label">Total Change Orders</span>
+                      </div>
+                      <div className="inv-metric-divider" />
+                      <div className="inv-metric">
+                        <span className="inv-metric-value">{coTotalBudget > 0 ? "+" : ""}{formatMoneyFull(coTotalBudget)}</span>
+                        <span className="inv-metric-label">Total Budget Increase</span>
+                      </div>
+                      <div className="inv-metric-divider" />
+                      <div className="inv-metric">
+                        <span className="inv-metric-value">{changeOrders.length}</span>
+                        <span className="inv-metric-label">Count</span>
+                      </div>
+                      <div className="inv-metric-divider" />
+                      <div className="inv-metric">
+                        <span className="inv-metric-value">{coPctOfContract.toFixed(1)}%</span>
+                        <span className="inv-metric-label">of Original Contract</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className={`det-section-body${changeOrdersOpen ? " open" : ""}`}>
+                    <div className="det-section-body-inner">
+                      <table className="spend-rank-table inv-table">
+                        <thead>
+                          <tr>
+                            <th className="spend-rank-table-name jcd-co-th-num">CO #</th>
+                            <th className="spend-rank-table-name">Description</th>
+                            <th className="spend-rank-table-value">Budget</th>
+                            <th className="spend-rank-table-value">Contract</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {changeOrders.map(co => {
+                            const coBudget = co.budget == null ? null : Number(co.budget)
+                            const contract = Number(co.total) || 0
+                            return (
+                              <tr
+                                key={co.recnum}
+                                className="spend-rank-table-row"
+                                onClick={() => setSelectedCO(co)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={e => e.key === "Enter" && setSelectedCO(co)}
+                              >
+                                <td className="spend-rank-table-name body-text emphasized jcd-co-th-num">#{co.chgnum ?? co.recnum}</td>
+                                <td className="spend-rank-table-name body-text">{co.name}</td>
+                                <td className="spend-rank-table-value body-text emphasized">
+                                  {coBudget == null ? "-" : formatMoneyFull(coBudget)}
+                                </td>
+                                <td className={`spend-rank-table-value body-text emphasized ${contract >= 0 ? "jc-margin-high" : "jc-margin-critical"}`}>
+                                  {contract > 0 ? "+" : ""}{formatMoneyFull(contract)}
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Per-phase rollup — the consolidated project's members, which
+                  were previously fetched but never shown. */}
+              {showPhases && (
+                <div className="card jcd-phases-card">
+                  <div className="jcd-phases-head">
+                    <span className="widget-title headline">Phases</span>
+                    <span className="jcd-phases-count">{phases.length} phases</span>
+                  </div>
                   <table className="spend-rank-table inv-table">
                     <thead>
                       <tr>
-                        <th className="spend-rank-table-name jcd-co-th-num">CO #</th>
-                        <th className="spend-rank-table-name">Description</th>
-                        <th className="spend-rank-table-value">Budget</th>
+                        <th className="spend-rank-table-name jcd-co-th-num">Phase #</th>
+                        <th className="spend-rank-table-name">Name</th>
+                        <th className="spend-rank-table-name inv-th-status">Status</th>
+                        <th className="spend-rank-table-name inv-th-date">PM</th>
+                        <th className="spend-rank-table-value">Units</th>
                         <th className="spend-rank-table-value">Contract</th>
+                        <th className="spend-rank-table-value">Committed + Spent</th>
+                        <th className="spend-rank-table-value">Margin</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {changeOrders.map(co => {
-                        const budget = co.budget == null ? null : Number(co.budget)
-                        const contract = Number(co.total) || 0
+                      {phases.map(ph => {
+                        const phMargin = ph.margin == null ? null : Number(ph.margin)
+                        const phUnits = Number(ph.unitCount) || 0
                         return (
-                          <tr
-                            key={co.recnum}
-                            className="spend-rank-table-row"
-                            onClick={() => setSelectedCO(co)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={e => e.key === "Enter" && setSelectedCO(co)}
-                          >
-                            <td className="spend-rank-table-name body-text emphasized jcd-co-th-num">#{co.chgnum ?? co.recnum}</td>
-                            <td className="spend-rank-table-name body-text">{co.name}</td>
-                            <td className="spend-rank-table-value body-text emphasized">
-                              {budget == null ? "-" : formatMoneyFull(budget)}
+                          <tr key={ph.recnum} className="spend-rank-table-row">
+                            <td className="spend-rank-table-name body-text emphasized jcd-co-th-num">#{ph.recnum}</td>
+                            <td className="spend-rank-table-name body-text">{ph.name}</td>
+                            <td className="spend-rank-table-name inv-th-status">
+                              <span className={`status-badge status-${ph.status}`}>
+                                {JOB_STATUS_LABELS[ph.status] ?? ph.status}
+                              </span>
                             </td>
-                            <td className={`spend-rank-table-value body-text emphasized ${contract >= 0 ? "jc-margin-high" : "jc-margin-critical"}`}>
-                              {contract > 0 ? "+" : ""}{formatMoneyFull(contract)}
+                            <td className="spend-rank-table-name body-text text-secondary inv-th-date">{ph.pmName?.trim() || "—"}</td>
+                            <td className="spend-rank-table-value body-text">{phUnits > 0 ? phUnits : "—"}</td>
+                            <td className="spend-rank-table-value body-text">{formatMoneyFull(ph.totalContract ?? 0)}</td>
+                            <td className="spend-rank-table-value body-text">{formatMoneyFull(ph.totalCost ?? 0)}</td>
+                            <td
+                              className="spend-rank-table-value body-text emphasized"
+                              style={!marginColorsOn || phMargin == null ? undefined : { color: marginTextColor(phMargin) }}
+                            >
+                              {phMargin == null ? "—" : `${phMargin.toFixed(1)}%`}
                             </td>
                           </tr>
                         )
@@ -449,303 +940,10 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                     </tbody>
                   </table>
                 </div>
-              </div>
-            </div>
+              )}
+            </section>
           </MotionItem>
         )}
-
-        {/* ── Invoiced vs Contract ── */}
-        <MotionItem className="col-span-full">
-          <div className="det-section card jcd-billing-card">
-            <div
-              className={!isLoading && invoices.length > 0 ? "det-section-toggle" : undefined}
-              onClick={!isLoading && invoices.length > 0 ? () => setInvoicesOpen(o => !o) : undefined}
-            >
-              <div className="det-section-header">
-                <span className="widget-title headline">Billing Position</span>
-                {!isLoading && invoices.length > 0 && (
-                  <span className="det-section-action">
-                    {invoicesOpen ? "Hide Invoices" : "Show Invoices"}
-                    <ChevronDown size={13} className={`det-section-chevron${invoicesOpen ? " open" : ""}`} />
-                  </span>
-                )}
-              </div>
-
-              {isLoading ? (
-                <div className="jcd-inv-skeleton">
-                  <div className="jcd-skel-bar" />
-                  <div className="jcd-inv-skeleton-metrics">
-                    {[0, 1, 2].map(i => (
-                      <div key={i} className="jcd-metrics-skeleton-cell"><div className="jcd-skel-value" /><div className="jcd-skel-label" /></div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {pb && pb.contract > 0 ? (
-                    (() => {
-                      const dir = pb.variance > 0 ? "under" : pb.variance < 0 ? "over" : "even"
-                      const label = dir === "under" ? "Under-billed" : dir === "over" ? "Over-billed" : "On track"
-                      const billedW = Math.min(pb.billedPct * 100, 100)
-                      const earnedW = Math.min(pb.expectedPct * 100, 100)
-                      return (
-                        <div className="jcd-billing-pos">
-                          <div className="jcd-bp-hero">
-                            <div className="jcd-bp-stat">
-                              <span className="jcd-bp-stat-label">Billed</span>
-                              <span className="jcd-bp-stat-value">{formatMoneyFull(pb.billed)}</span>
-                              <span className="jcd-bp-stat-sub">{Math.round(pb.billedPct * 100)}% of contract</span>
-                            </div>
-                            <div className="jcd-bp-stat-divider" />
-                            <div className="jcd-bp-stat">
-                              <span className="jcd-bp-stat-label">Earned</span>
-                              <span className="jcd-bp-stat-value">{formatMoneyFull(pb.expected)}</span>
-                              <span className="jcd-bp-stat-sub">
-                                {pb.hasBudget ? `${Math.round(pb.expectedPct * 100)}% complete` : "no budget — est."}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* One combined meter: billed fill against the contract track,
-                              with a marker at the earned (% complete) position. */}
-                          <div className="jcd-bp-meter-wrap">
-                            <div
-                              className="jcd-bp-meter"
-                              tabIndex={0}
-                              onMouseMove={e => {
-                                const meter = e.currentTarget
-                                const rect = meter.getBoundingClientRect()
-                                const x = e.clientX - rect.left
-                                const tip = meter.querySelector<HTMLElement>(".jcd-bp-meter-tip")
-                                const half = (tip?.offsetWidth ?? 0) / 2
-                                const clamped = Math.max(half, Math.min(x, rect.width - half))
-                                meter.style.setProperty("--bp-tip-x", `${clamped}px`)
-                                meter.style.setProperty("--bp-arrow-x", `${x - clamped}px`)
-                              }}
-                            >
-                              <div className="jcd-bp-meter-fill" style={{ width: `${billedW}%` }} />
-                              <div className="jcd-bp-meter-marker" style={{ left: `${earnedW}%` }} />
-                              <div className="jcd-bp-meter-tip" role="tooltip">
-                                <div className="jcd-bp-tip-row"><span>Billed</span><strong>{formatMoneyFull(pb.billed)}</strong></div>
-                                <div className="jcd-bp-tip-row"><span>Earned</span><strong>{formatMoneyFull(pb.expected)}</strong></div>
-                                <div className="jcd-bp-tip-row"><span>Contract</span><strong>{formatMoneyFull(pb.contract)}</strong></div>
-                              </div>
-                            </div>
-                            <div className="jcd-bp-earned-label" style={{ left: `${earnedW}%` }}>Earned</div>
-                          </div>
-
-                          <div className={`jcd-bp-variance jcd-bp-variance--${dir}`}>
-                            <span className={`pb-dir-pill pb-dir-pill--${dir}`}>{label}</span>
-                            <span className="jcd-bp-variance-amt">{formatMoneyFull(Math.abs(pb.variance))}</span>
-                            <span className="jcd-bp-variance-sub">
-                              {dir === "under"
-                                ? "earned but not yet billed"
-                                : dir === "over"
-                                ? "billed ahead of work earned"
-                                : "billing matches work earned"}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })()
-                  ) : (
-                    <div className="jcd-inv-hero">
-                      <div className="jcd-inv-hero-left">
-                        <span className="jcd-inv-pct">{invoicePct.toFixed(1)}%</span>
-                        <span className="jcd-inv-pct-label">of contract invoiced</span>
-                      </div>
-                      <div className="jcd-inv-hero-right">
-                        <span className="jcd-inv-amounts subheadline">
-                          {formatMoneyFull(totalInvoiced)} <span className="text-secondary">of</span> {formatMoneyFull(revisedContract)}
-                        </span>
-                        <div className="jc-invoice-progress-bar">
-                          <div className="jc-invoice-progress-fill" style={{ width: `${Math.min(invoicePct, 100)}%` }} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-            {!isLoading && invoices.length > 0 && (
-              <div className={`det-section-body jcd-invoice-drop${invoicesOpen ? " open" : ""}`}>
-                <div className="det-section-body-inner">
-                  <div className="card jcd-invoice-card">
-                  <div className="jcd-inv-summary">
-                    <div className="jcd-inv-summary-card">
-                      <div className="jcd-inv-summary-card-head">
-                        <span className="jcd-inv-summary-label">Amount Paid</span>
-                        <span className="invoice-status-badge invoice-status-badge--paid">Paid</span>
-                      </div>
-                      <span className="jcd-inv-summary-value">{formatMoneyFull(totalPaid)}</span>
-                    </div>
-                    <div className="jcd-inv-summary-card">
-                      <div className="jcd-inv-summary-card-head">
-                        <span className="jcd-inv-summary-label">Outstanding</span>
-                        <span className="invoice-status-badge invoice-status-badge--open">Open</span>
-                      </div>
-                      <span className="jcd-inv-summary-value">{formatMoneyFull(totalOutstanding)}</span>
-                    </div>
-                  </div>
-                  <table className="spend-rank-table inv-table">
-                    <thead>
-                      <tr>
-                        <th className="spend-rank-table-name inv-th-num">Invoice #</th>
-                        <th className="spend-rank-table-name inv-th-date">Date</th>
-                        <th className="spend-rank-table-name inv-th-status">Status</th>
-                        <th className="spend-rank-table-value">Total</th>
-                        <th className="spend-rank-table-value">Paid</th>
-                        <th className="spend-rank-table-value">Remaining</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {invoices.map(inv => (
-                        <tr
-                          key={inv.id}
-                          className="spend-rank-table-row"
-                          onClick={() => setSelectedInvoiceId(inv.id)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={e => e.key === "Enter" && setSelectedInvoiceId(inv.id)}
-                        >
-                          <td className="spend-rank-table-name body-text emphasized inv-th-num">{inv.invoiceNum}</td>
-                          <td className="spend-rank-table-name body-text text-secondary inv-th-date">{formatDate(inv.invoiceDate)}</td>
-                          <td className="spend-rank-table-name inv-th-status">
-                            <span className={`invoice-status-badge invoice-status-badge--${INV_STATUS_CLASS[inv.status] ?? "open"}`}>
-                              {INV_STATUS_LABEL[inv.status] ?? `Status ${inv.status}`}
-                            </span>
-                          </td>
-                          <td className="spend-rank-table-value body-text">{formatMoneyFull(inv.total)}</td>
-                          <td className="spend-rank-table-value body-text">{formatMoneyFull(inv.amountPaid)}</td>
-                          <td className="spend-rank-table-value body-text invoice-amount-value--remaining">{formatMoneyFull(inv.amountRemaining)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  </div>
-                </div>
-              </div>
-            )}
-        </MotionItem>
-
-        {/* ── Cost & Billing Trajectory + Budget vs Actual by Type ── */}
-        <MotionItem>
-          <Widget
-            title="Cost & Billing Trajectory"
-            description={trajDesc}
-            loading={isLoading}
-            noData={!isLoading && costVsBilled.length === 0}
-            className="jcd-chart-widget"
-            // Custom HTML legend in the header's top-right corner (colors match
-            // the series: Cost = CHART_COLORS[0], Billed = CHART_COLORS[1]).
-            actions={
-              <ChartLegend items={[
-                { label: "Cost", color: "#c27c3e" },
-                { label: "Billed", color: "#22c55e" },
-              ]} />
-            }
-          >
-            <Chart config={{
-              type: "line",
-              // `Cost` omits `color` so it falls through to CHART_COLORS[0]
-              // (brand orange) — same line the home page revenue + directory
-              // history charts use; `Billed` takes the next palette color.
-              series: trajSeries,
-              // Two cumulative lines plus a budget marker — no area fill (it
-              // would muddy the overlap). Legend is rendered in the header
-              // (actions) instead of nivo's in-plot legend.
-              enableArea: false,
-              legend: false,
-              compactTop: true,
-              disableGrowthTooltip: true,
-              yFormat: formatMoneyFull,
-              // Scaled to the plotted data, extended to the budget ceiling only
-              // when that ceiling is actually in view (see trajMaxValue).
-              maxValue: trajMaxValue,
-              axisBottomTickValues: trajTickValues,
-              markers: trajMarkers,
-            }} />
-          </Widget>
-        </MotionItem>
-        <MotionItem>
-          <Widget
-            title="Budget vs Actual by Type"
-            description={bvaDesc}
-            loading={isLoading}
-            noData={!isLoading && budgetVsActual.length === 0}
-            className="jcd-chart-widget"
-            // Custom HTML legend in the header's top-right corner (colors match
-            // the bar `colors` below).
-            actions={
-              <ChartLegend items={[
-                { label: "Budget", color: "#94a3b8" },
-                { label: "Actual", color: "#c27c3e" },
-              ]} />
-            }
-          >
-            <Chart config={{
-              type: "bar",
-              data: budgetVsActual,
-              keys: ["Budget", "Actual"],
-              indexBy: "type",
-              groupMode: "grouped",
-              // Align the plot with the trajectory line chart beside it.
-              compactTop: true,
-              // Legend is rendered in the header (actions) instead of nivo's.
-              hideLegend: true,
-              // Hovering a category shows one card with both Budget and Actual
-              // plus the variance (budget − actual) for that cost type.
-              groupTooltip: true,
-              tooltipTotalLabel: "Variance",
-              // Thin the y-axis to ~5 ticks so its label density matches the
-              // line chart's (which uses everyOtherYTicks) instead of ~11.
-              axisLeftTickValues: 5,
-              // Budget reads as a neutral reference bar; actual takes brand
-              // orange so an over-budget trade pops against its budget peer.
-              colors: ["#94a3b8", "#c27c3e"],
-              yFormat: formatMoneyFull,
-            }} />
-          </Widget>
-        </MotionItem>
-
-        {/* ── Spending by Type + Spending by Vendor ── */}
-        <MotionItem>
-          <Widget title="Spending by Type" loading={isLoading} noData={!isLoading && typeSpend.length === 0}>
-            <Chart config={{
-              type: "pie-with-list",
-              items: typeSpend,
-              centerLabel: "TOTAL SPEND",
-              centerTotal: totalActual,
-              showPercent: true,
-              chartSize: "md",
-            }} />
-          </Widget>
-        </MotionItem>
-        <MotionItem>
-          <Widget title="Spending by Vendor" loading={isLoading} noData={!isLoading && vendorSpend.length === 0}>
-            <Chart config={{
-              type: "pie-with-list",
-              items: vendorSpend,
-              centerLabel: "VENDOR SPEND",
-              showPercent: true,
-              chartSize: "md",
-              // Hashed mode keeps each vendor's color consistent with the
-              // dashboard's Top Suppliers widget.
-              colors: hashedRelationColors
-                ? vendorSpend.map(v => hashColor(v.label))
-                : colorRamp(RAMP_SCHEMES.orange.hue, RAMP_SCHEMES.orange.drift, 5),
-            }} />
-          </Widget>
-        </MotionItem>
-
-        {/* ── Cost Breakdown (groups → line items) ── */}
-        <MotionItem className="col-span-full">
-          <Widget title="Cost Breakdown" loading={isLoading} noData={!isLoading && !budget} className="jcd-cost-widget">
-            <CostBreakdownTable budget={budget} costItems={costItems} />
-          </Widget>
-        </MotionItem>
       </MotionList>
 
       <ChangeOrderModal order={selectedCO} onClose={() => setSelectedCO(null)} />
