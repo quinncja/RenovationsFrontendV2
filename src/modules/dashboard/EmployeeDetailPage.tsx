@@ -603,8 +603,8 @@ export function EmployeeDetail({
               loading={isLoading}
               onClick={() => setActiveModal("closed")}
             />
-            {/* GM home: the four data-validation reports (admin home's Reports
-                section) as a 2x2 pill cluster inside a fourth card, so the
+            {/* GM home: the data-validation reports (admin home's Reports
+                section) as a pill cluster inside a fourth card, so the
                 strip belongs to the stat-card family instead of floating. */}
             {gmHome && (
               <div className="gm-reports-card">
@@ -614,6 +614,7 @@ export function EmployeeDetail({
                   <ReportWidget reportId="dataQuality" compact />
                   <ReportWidget reportId="missingContracts" compact />
                   <ReportWidget reportId="openProjectsNoBudget" compact />
+                  <ReportWidget reportId="missingUnitCounts" compact />
                 </div>
               </div>
             )}

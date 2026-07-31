@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { createPortal } from "react-dom"
 import { useJobcostNav } from "../../../jobcost/useJobcostNav"
-import { X, TriangleAlert, Calculator } from "lucide-react"
+import { X, TriangleAlert, Calculator, Hash } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useWidgetData, usePageDisconnected } from "../../../../shared/context/PageContext"
 import { useModalLayer } from "../../../../shared/hooks/useModalLayer"
@@ -19,6 +19,7 @@ interface ValidationCounts {
   wrong: number
   subcontracts: number
   noBudget: number
+  noUnitCount: number
 }
 
 interface ValidationDetailRow {
@@ -29,9 +30,14 @@ interface ValidationDetailRow {
   detail: string
 }
 
-type ReportVariant = "red" | "orange" | "gray" | "navy"
+type ReportVariant = "red" | "orange" | "gray" | "navy" | "teal"
 
-type ReportWidgetId = "reconciliation" | "dataQuality" | "missingContracts" | "openProjectsNoBudget"
+type ReportWidgetId =
+  | "reconciliation"
+  | "dataQuality"
+  | "missingContracts"
+  | "openProjectsNoBudget"
+  | "missingUnitCounts"
 
 interface ReportDefinition {
   /** Field on the counts row, also the `category` tag on detail rows. */
@@ -78,6 +84,14 @@ const REPORT_DEFINITIONS: Record<ReportWidgetId, ReportDefinition> = {
     title: "Missing Budgets Report",
     shortTitle: "Missing Budgets",
     subtitle: "Open Projects With a Contract but No Budget",
+  },
+  missingUnitCounts: {
+    accessor: "noUnitCount",
+    variant: "teal",
+    glyph: <Hash size={16} strokeWidth={2.5} />,
+    title: "Missing Unit Counts Report",
+    shortTitle: "Missing Unit Counts",
+    subtitle: "Phase Jobs Without a Unit Count",
   },
 }
 
@@ -260,4 +274,8 @@ export function MissingContractsWidget() {
 
 export function OpenProjectsNoBudgetWidget() {
   return <ReportWidget reportId="openProjectsNoBudget" />
+}
+
+export function MissingUnitCountsWidget() {
+  return <ReportWidget reportId="missingUnitCounts" />
 }
