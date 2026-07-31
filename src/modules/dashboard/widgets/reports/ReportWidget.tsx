@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { createPortal } from "react-dom"
 import { useJobcostNav } from "../../../jobcost/useJobcostNav"
-import { X, TriangleAlert, Calculator, Hash, Tag } from "lucide-react"
+import { X, TriangleAlert, Calculator, Hash, Type } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useWidgetData, usePageDisconnected } from "../../../../shared/context/PageContext"
 import { useModalLayer } from "../../../../shared/hooks/useModalLayer"
@@ -98,7 +98,7 @@ const REPORT_DEFINITIONS: Record<ReportWidgetId, ReportDefinition> = {
   missingOneOffNames: {
     accessor: "noOneOffName",
     variant: "plum",
-    glyph: <Tag size={16} strokeWidth={2.5} />,
+    glyph: <Type size={16} strokeWidth={2.5} />,
     title: "Missing One-Off Names Report",
     shortTitle: "Missing One-Off Names",
     subtitle: "One-Off Jobs Without a One-Off Name",
