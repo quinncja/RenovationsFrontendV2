@@ -28,6 +28,7 @@ import {
   MissingContractsWidget,
   OpenProjectsNoBudgetWidget,
   MissingUnitCountsWidget,
+  MissingOneOffNamesWidget,
 } from "../widgets/reports/ReportWidget"
 import { BankingOverdueWidget } from "../widgets/banking/BankingOverdueWidget"
 import { UpcomingBillingsWidget } from "../widgets/billings/UpcomingBillingsWidget"
@@ -93,6 +94,13 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
     id: "missingUnitCounts",
     component: MissingUnitCountsWidget,
     label: "Missing Unit Counts Report",
+    visualType: "stat",
+    defaultColSpan: 1,
+  },
+  missingOneOffNames: {
+    id: "missingOneOffNames",
+    component: MissingOneOffNamesWidget,
+    label: "Missing One-Off Names Report",
     visualType: "stat",
     defaultColSpan: 1,
   },

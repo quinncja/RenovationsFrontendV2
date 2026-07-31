@@ -615,6 +615,7 @@ export function EmployeeDetail({
                   <ReportWidget reportId="missingContracts" compact />
                   <ReportWidget reportId="openProjectsNoBudget" compact />
                   <ReportWidget reportId="missingUnitCounts" compact />
+                  <ReportWidget reportId="missingOneOffNames" compact />
                 </div>
               </div>
             )}
