@@ -14597,6 +14597,13 @@ svg.placeholder-illustration {
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 2rem;
+  /* The window picker is the jobcost segmented control (.jc-seg), hosted here
+     without a command bar around it — so the surface vars the seg reads are
+     defined on this row instead (same values as .jc-command-bar). */
+  --jcb-text: light-dark(var(--primary-text), rgba(240, 232, 222, 0.93));
+  --jcb-muted: light-dark(var(--secondary-text), rgba(240, 232, 222, 0.55));
+  --jcb-well: light-dark(rgb(from var(--primary-text) r g b / 0.06), rgba(240, 232, 222, 0.08));
+  --jcb-inset: light-dark(rgb(from var(--primary-text) r g b / 0.1), rgba(0, 0, 0, 0.25));
 }
 
 .rpt-cal-anchor {
@@ -14604,6 +14611,7 @@ svg.placeholder-illustration {
   display: inline-flex;
 }
 
+/* Icon + label inside the day-select seg button (sits on .jc-seg-label). */
 .rpt-cal-btn {
   display: inline-flex;
   align-items: center;
@@ -14710,6 +14718,17 @@ svg.placeholder-illustration {
   /* The header clock is hidden with the other .btn-icon controls; its hint goes
      with it (mobile reopen path is the Reports page). */
   .report-hint { display: none; }
+
+  /* Six presets outgrow a phone: let the seg well shrink and side-scroll
+     instead of pushing the row past the viewport (scrollbar hidden — the
+     cut-off last pill is the affordance). */
+  .rpt-controls .jc-seg {
+    flex-shrink: 1;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .rpt-controls .jc-seg::-webkit-scrollbar { display: none; }
 
   .rpt-modal-footer {
     flex-direction: column-reverse;

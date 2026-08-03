@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react"
+import { motion } from "framer-motion"
 import Page from "../../../shared/components/Page"
+import { SEG_SPRING } from "../../jobcost/Jobcost"
 import { Widget } from "../../../shared/components/Widget/Widget"
 import { MotionList, MotionItem } from "../../../shared/components/MotionList/MotionList"
 import { useAuth } from "../../../core/auth/AuthProvider"
@@ -76,18 +78,23 @@ export default function ReportsPage() {
     >
       <MotionList>
         <MotionItem className="rpt-controls">
-          <div className="period-selector" role="radiogroup" aria-label="Report window">
+          {/* Same recessed-well segmented control as the jobcost command bar
+              (.jc-seg + sliding copper thumb); the day-select pill shares the
+              thumb's layoutId so picking a day glides it over there. */}
+          <div className="jc-seg" role="tablist" aria-label="Report window">
             {PRESETS.map(({ key, label }) => {
               const active = sel.kind === "preset" && sel.preset === key
               return (
                 <button
                   key={key}
-                  className={`period-selector-btn${active ? " period-selector-btn--active" : ""}`}
-                  role="radio"
-                  aria-checked={active}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  className={`jc-seg-btn${active ? " jc-seg-btn-active" : ""}`}
                   onClick={() => setSel({ kind: "preset", preset: key })}
                 >
-                  {label}
+                  {active && <motion.span layoutId="rptRangeThumb" className="jc-seg-thumb" transition={SEG_SPRING} />}
+                  <span className="jc-seg-label">{label}</span>
                 </button>
               )
             })}

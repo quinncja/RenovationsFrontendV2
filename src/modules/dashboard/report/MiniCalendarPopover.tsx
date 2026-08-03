@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react"
+import { motion } from "framer-motion"
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react"
+import { SEG_SPRING } from "../../jobcost/Jobcost"
 import { addDays } from "./chicagoDate"
 
 // ─── Month grid ──────────────────────────────────────────────────────────────
@@ -83,16 +85,24 @@ export function MiniCalendarPopover({
 
   return (
     <span className="rpt-cal-anchor" ref={rootRef}>
-      <button
-        type="button"
-        className={`over-under-toggle rpt-cal-btn${active ? " over-under-toggle--active" : ""}`}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        onClick={toggle}
-      >
-        <CalendarDays size={14} />
-        {active && value ? pillLabel(value, max) : "Day select"}
-      </button>
+      {/* Own single-button well in the Reports segmented style (.jc-seg); the
+          thumb shares the preset row's layoutId so activating a day slides it
+          across from whichever preset was lit. */}
+      <span className="jc-seg">
+        <button
+          type="button"
+          className={`jc-seg-btn${active ? " jc-seg-btn-active" : ""}`}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          onClick={toggle}
+        >
+          {active && <motion.span layoutId="rptRangeThumb" className="jc-seg-thumb" transition={SEG_SPRING} />}
+          <span className="jc-seg-label rpt-cal-btn">
+            <CalendarDays size={14} />
+            {active && value ? pillLabel(value, max) : "Day select"}
+          </span>
+        </button>
+      </span>
       {open && (
         <div className="rpt-cal" role="dialog" aria-label="Pick a day">
           <div className="rpt-cal-head">
