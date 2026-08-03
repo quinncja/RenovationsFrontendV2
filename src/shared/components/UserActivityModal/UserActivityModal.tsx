@@ -73,6 +73,7 @@ const ROLE_LABEL: Record<string, string> = {
 const MILESTONE_LABEL: Record<string, string> = {
   "intro-tour": "Intro tour",
   "section:overhead-report": "Overhead Report hint",
+  "jobcost-intro": "Job Costing intro",
 }
 
 function milestoneLabel(key: string): string {
@@ -209,7 +210,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
 
   const series: LineSeries[] = activity
     ? [{
-        id: "API Calls",
+        id: "Actions",
         color: "var(--primary-color)",
         data: activity.last30Days.map((d) => {
           const date = new Date(d.date + "T12:00:00")
@@ -387,11 +388,14 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                 // body otherwise.
                 const overviewContent = (
                   <>
-                {/* Overview: metrics grouped into labeled cards (Requests,
-                    Sessions, Focus) so each reads as a unit — total vs. last-30. */}
+                {/* Overview: metrics grouped into labeled cards (Activity,
+                    Sessions, Focus) so each reads as a unit — total vs. last-30.
+                    "Activity" counts API calls + engagement events combined —
+                    preloaded/cached pages produce few API calls, so requests
+                    alone undercount real usage. */}
                 <div className="usr-overview">
                   <div className="usr-stat-group">
-                    <span className="usr-stat-group-label">Requests</span>
+                    <span className="usr-stat-group-label">Activity</span>
                     <div className="usr-stat-group-body">
                       <div className="usr-substat">
                         <span
@@ -463,7 +467,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
 
                 {/* Chart */}
                 <div className="usr-activity-chart-section">
-                  <p className="invoice-modal-section-label">API Activity · Last 30 Days</p>
+                  <p className="invoice-modal-section-label">Activity · Last 30 Days</p>
                   {isLoading ? (
                     <div className="widget-skeleton" style={{ height: "10rem" }} />
                   ) : (

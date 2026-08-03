@@ -174,9 +174,14 @@ export function ItemDetailModal({
   // `item` (not `shown`) so the fetch cancels when the modal closes.
   const { lines, loading: linesLoading } = useDetailLines(item, window)
 
-  // Costs, POs, and subcontracts carry a line-item breakdown; others are header-only.
+  // Costs, POs, and subcontracts carry a line-item breakdown; others are
+  // header-only. A cost with no job (a single payroll/journal posting from the
+  // Cost Breakdown table) has no rollup to list — the fetch above already
+  // skips it, so skip the ledger section too instead of showing it empty.
   const hasLedger = shown
-    ? shown.kind === "cost" || shown.kind === "purchaseOrder" || shown.kind === "subcontract"
+    ? (shown.kind === "cost" && Boolean(shown.jobId)) ||
+      shown.kind === "purchaseOrder" ||
+      shown.kind === "subcontract"
     : false
   const ledger: DetailLedger | null = hasLedger
     ? {

@@ -16,7 +16,11 @@ import { WIDGET_REGISTRY } from "./widgetRegistry"
 //        /reports page). No migration body: reconcileLayout's unknown-id
 //        stripping removes the section/widgets from saved docs; the version
 //        bump just re-persists them clean.
-export const LAYOUT_VERSION = 6
+//   v7 — New Missing Unit Counts report card in the Reports section. No
+//        migration body: reconcileLayout auto-appends the registered-but-
+//        missing widget to saved layouts.
+//   v8 — New Missing One-Off Names report card, same auto-append migration.
+export const LAYOUT_VERSION = 8
 
 // Default sectioned home layout. Derived from the section registry so it
 // can never drift from WIDGET_HOME_SECTION / WIDGET_REGISTRY:

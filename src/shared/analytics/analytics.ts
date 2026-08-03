@@ -108,6 +108,18 @@ export function sessionTrackingHeaders(): Record<string, string> {
   return sessionActive ? { "X-RD-Session-Active": "1" } : {}
 }
 
+/**
+ * Externally begin the session, ahead of any gesture. The daily-arrival
+ * takeover calls this on activation: the greeting only shows for a real
+ * once-per-day visit, and the report fetch + entry-page preloads it dispatches
+ * ARE that session's API usage — the destination pages then mount onto the
+ * warmed cache without fetching again, so if the preload burst fired before
+ * the gate opened, an arrival-day session could record zero API calls.
+ */
+export function markSessionActive() {
+  sessionActive = true
+}
+
 export function trackPageView(page: string) {
   track({ type: "page_view", page })
 }

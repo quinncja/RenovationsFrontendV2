@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom"
+import { propertySlug } from "./jobcostShared"
 
 // Shared router-state contract for the Job Cost detail page's back button.
 // Every entry point into /jobcost/:recnum stashes { backTo, backLabel } so the
@@ -14,6 +15,7 @@ export const JOBCOST_BACK_FALLBACK = { to: "/jobcost", label: "Job Costing" } as
 // Prefix-matched route → label map. Ordered most-specific-first so a longer
 // path (e.g. /dashboard/employees) wins over a broader catch-all (/dashboard).
 const BACK_LABELS: Array<[string, string]> = [
+  ["/jobcost/property", "Property"],
   ["/jobcost", "Job Costing"],
   ["/reports", "Activity"],
   ["/clients", "Clients"],
@@ -48,5 +50,16 @@ export function useJobcostNav() {
     navigate(`/jobcost/${recnum}`, { state })
   }
 
-  return { goToJobcost }
+  // Property detail page (/jobcost/property/:parent). The key is the Sage
+  // actr_u.parent free-text address string, slugged so the URL carries dashes
+  // instead of %20s; the page re-slugs candidates to match.
+  const goToProperty = (parent: string, opts?: { backLabel?: string }) => {
+    const state: JobcostBackState = {
+      backTo: location.pathname + location.search,
+      backLabel: opts?.backLabel ?? deriveBackLabel(location.pathname),
+    }
+    navigate(`/jobcost/property/${encodeURIComponent(propertySlug(parent))}`, { state })
+  }
+
+  return { goToJobcost, goToProperty }
 }

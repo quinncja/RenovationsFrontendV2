@@ -60,7 +60,7 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
 
   const series: LineSeries[] = activity
     ? [{
-        id: "API Calls",
+        id: "Actions",
         color: "var(--primary-color)",
         data: activity.last30Days.map((d) => {
           const date = new Date(d.date + "T12:00:00")
@@ -80,7 +80,7 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
     <>
       <div className="usr-overview">
         <div className="usr-stat-group">
-          <span className="usr-stat-group-label">Requests</span>
+          <span className="usr-stat-group-label">Activity</span>
           <div className="usr-stat-group-body">
             <div className="usr-substat">
               <span className="usr-substat-value" title={activity ? activity.total.toLocaleString() : undefined}>
@@ -135,7 +135,7 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
       </div>
 
       <div className="usr-activity-chart-section">
-        <p className="invoice-modal-section-label">API Activity · Last 30 Days</p>
+        <p className="invoice-modal-section-label">Activity · Last 30 Days</p>
         {loading ? (
           <div className="widget-skeleton" style={{ height: "10rem" }} />
         ) : (

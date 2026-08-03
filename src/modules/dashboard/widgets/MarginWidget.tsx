@@ -165,6 +165,7 @@ export function MarginWidget() {
             data: chart.bars,
             yFormat: formatPercent,
             colorBy: marginColorsOn ? marginTextColor : undefined,
+            barGradient: true,
             scaleType: "symlog",
             scaleConstant: chart.scaleConstant,
             minValue: chart.minValue,
@@ -174,6 +175,20 @@ export function MarginWidget() {
             emphasizeZero: true,
             markers,
             wipMonthLabel: wipActive && openMonth != null ? shortMonth(openMonth) : null,
+            // Same card the default per-bar tooltip renders (incl. the WIP
+            // header on the open month) — supplying it as barTooltip switches
+            // the chart to full-height column hover, so a low-margin sliver of
+            // a bar is as easy to inspect as a tall one.
+            barTooltip: (label, value) => (
+              <div className="chart-tooltip">
+                <span>
+                  {wipActive && openMonth != null && label === shortMonth(openMonth)
+                    ? `${label} Billed + WIP`
+                    : label}
+                </span>
+                <strong>{formatPercent(value)}</strong>
+              </div>
+            ),
           }}
         />
       )}

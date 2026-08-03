@@ -43,7 +43,7 @@ function NavGroupItem({
   return (
     <button
       ref={buttonRef}
-      className={`button nav-button nav-group-header${active ? " nav-button-active" : ""}${attention ? " nav-button-attention" : ""}`}
+      className={`button nav-button nav-group-header${active ? " nav-button-active" : ""}${attention ? " nav-button-attention nav-button-attention--announce" : ""}`}
       onMouseEnter={open}
       onMouseLeave={onScheduleClose}
       onFocus={open}
@@ -182,7 +182,12 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
 
   return (
     <>
-      <div className={`navbar ${isOpen ? "navbar-open" : ""}${veil !== "off" ? " navbar--tour" : ""}${veil === "veiled" ? " navbar--veiled" : ""}`}>
+      <div
+        // Measured (never spotlighted) by content-area overlays — see the
+        // "navbar" coach-target id.
+        ref={(el) => registerCoachTarget("navbar", el)}
+        className={`navbar ${isOpen ? "navbar-open" : ""}${veil !== "off" ? " navbar--tour" : ""}${veil === "veiled" ? " navbar--veiled" : ""}`}
+      >
         <div className="logo-wrapper" onClick={() => navigate("/dashboard", { state: { resetHome: true } })}>
           <div className="logo-icon">
             <Logo size={32} />

@@ -1,5 +1,6 @@
 import { useState } from "react"
-import { ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ChevronDown } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import { ArrowUpDown, ArrowUp, ArrowDown, ChevronRight } from "lucide-react"
 import { formatMoneyFull } from "../../../shared/utils/format"
 import { useItemDrilldown } from "../../dashboard/report/ActivityFeed"
 import type { RecentChangeItem } from "../../dashboard/widgets/recent/recentTypes"
@@ -64,20 +65,22 @@ type SortDir = "asc" | "desc"
 // Maps a line item to the recap-style drill-down it opens (same modals as the
 // Daily Recap feed): PO rows → purchase-order modal, subcontract rows →
 // subcontract modal, invoice-backed posted costs → the AP invoice modal.
-// Returns null for rows with nothing behind them (payroll/journal postings,
-// or a backend that predates itemType/linkRecnum) — those aren't clickable.
-function toDrilldownItem(t: CostItem, job: { id: string; name: string } | null | undefined): RecentChangeItem | null {
-  if (!t.linkRecnum) return null
+// Rows with no document behind them (payroll/journal postings, or a backend
+// that predates itemType/linkRecnum) still open a header-only "Posted cost"
+// card with the posting's own details. Their jobId stays null on purpose:
+// the modal's cost ledger describes a job × cost-type rollup, not this
+// single posting, so a null jobId skips that fetch.
+function toDrilldownItem(t: CostItem, job: { id: string; name: string } | null | undefined): RecentChangeItem {
   const kind =
+    !t.linkRecnum ? null :
     t.itemType === "po" ? "purchaseOrder" :
     t.itemType === "sub" ? "subcontract" :
     t.itemType === "cost" ? "apInvoice" :
     null
-  if (kind == null) return null
   return {
-    kind,
-    id: String(t.linkRecnum),
-    jobId: job?.id ?? null,
+    kind: kind ?? "cost",
+    id: kind == null ? `cost-${t.recnum}` : String(t.linkRecnum),
+    jobId: kind == null ? null : job?.id ?? null,
     jobName: job?.name ?? null,
     title: t.dscrpt?.trim() || t.id,
     party: t.id,
@@ -184,24 +187,24 @@ export function CostBreakdownTable({
           {sortHead("variancePct", "Variance %")}
         </tr>
       </thead>
-      <tbody>
-        {sortedGroups.flatMap((group) => {
-          const expanded = expandedGroups.has(group.key)
-          const varClass = group.variance < 0 ? "jc-variance-over" : group.variance > 0 ? "jc-variance-under" : ""
-          return [
+      {sortedGroups.map((group) => {
+        const expanded = expandedGroups.has(group.key)
+        const varClass = group.variance < 0 ? "jc-variance-over" : group.variance > 0 ? "jc-variance-under" : ""
+        return (
+          <tbody key={group.key}>
             <tr
-              key={group.key}
-              className="spend-rank-table-row"
+              className={`spend-rank-table-row${expanded ? " jc-row-open" : ""}`}
               onClick={() => toggleGroup(group.key)}
               role="button"
               tabIndex={0}
+              aria-expanded={expanded}
               onKeyDown={(e) => e.key === "Enter" && toggleGroup(group.key)}
             >
               <td className="spend-rank-table-name body-text emphasized">
                 {/* Flex keeps the label beside the chevron even when a longer
                     name (e.g. Subcontractor) wraps on narrow screens. */}
                 <span className="jc-group-label">
-                  <span className="jc-group-chevron">{expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}</span>
+                  <span className="jc-group-chevron"><ChevronRight size={11} className={`jc-expand-chevron${expanded ? " open" : ""}`} /></span>
                   {group.key}
                 </span>
               </td>
@@ -209,47 +212,66 @@ export function CostBreakdownTable({
               <td className="spend-rank-table-value body-text">{formatMoneyFull(group.actual)}</td>
               <td className={`spend-rank-table-value body-text ${varClass}`}>{group.variance > 0 ? "+" : ""}{formatMoneyFull(group.variance)}</td>
               <td className={`spend-rank-table-value body-text ${varClass}`}>{group.variancePct == null ? "—" : `${group.variance > 0 ? "+" : ""}${group.variancePct.toFixed(1)}%`}</td>
-            </tr>,
-            ...(expanded ? [
-              <tr key={`${group.key}-txns`} className="jc-txn-container-row">
-                <td colSpan={5}>
-                  <table className="jc-txn-table">
-                    <thead>
-                      <tr>
-                        <th className="jc-txn-th">Vendor / Source</th>
-                        <th className="jc-txn-th">Description</th>
-                        <th className="jc-txn-th jc-txn-amount-col">Committed</th>
-                        <th className="jc-txn-th jc-txn-amount-col">Posted</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {group.items.length === 0 ? (
-                        <tr><td colSpan={4} className="jc-txn-empty">No line items</td></tr>
-                      ) : group.items.map((t, i) => {
-                        const drillItem = toDrilldownItem(t, job)
-                        return (
-                          <tr
-                            key={`${t.recnum}-${i}`}
-                            className={`jc-txn-row${drillItem ? " jc-txn-row-link" : ""}`}
-                            onClick={drillItem ? () => openItem(drillItem) : undefined}
-                            role={drillItem ? "button" : undefined}
-                            tabIndex={drillItem ? 0 : undefined}
-                            onKeyDown={drillItem ? (e) => e.key === "Enter" && openItem(drillItem) : undefined}
-                          >
-                            <td className="jc-txn-vendor">{t.id}</td>
-                            <td className="text-secondary">{t.dscrpt || "—"}</td>
-                            <td className="jc-txn-amount-col">{t.committedAmount ? formatMoneyFull(t.committedAmount) : "—"}</td>
-                            <td className="jc-txn-amount-col emphasized">{t.postedAmount ? formatMoneyFull(t.postedAmount) : "—"}</td>
+            </tr>
+            {/* Same open treatment as the Job Costing project table: the row
+                and its line items lift out as one rounded, softly-shadowed
+                card, the panel revealing with the same height animation. A
+                <tr> can't animate height, so the motion div lives inside the
+                cell; the tr stays mounted through AnimatePresence until the
+                exit finishes, keeping the ink frame around the shrinking
+                panel. */}
+            <AnimatePresence initial={false}>
+              {expanded && (
+                <tr key="txns" className="jc-txn-container-row">
+                  <td colSpan={5}>
+                    <motion.div
+                      className="jc-txn-reveal"
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
+                    >
+                      <table className="jc-txn-table">
+                        <thead>
+                          <tr>
+                            <th className="jc-txn-th">Vendor / Source</th>
+                            <th className="jc-txn-th">Description</th>
+                            <th className="jc-txn-th jc-txn-amount-col">Committed</th>
+                            <th className="jc-txn-th jc-txn-amount-col">Posted</th>
                           </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </td>
-              </tr>,
-            ] : []),
-          ]
-        })}
+                        </thead>
+                        <tbody>
+                          {group.items.length === 0 ? (
+                            <tr><td colSpan={4} className="jc-txn-empty">No line items</td></tr>
+                          ) : group.items.map((t, i) => {
+                            const drillItem = toDrilldownItem(t, job)
+                            return (
+                              <tr
+                                key={`${t.recnum}-${i}`}
+                                className="jc-txn-row jc-txn-row-link"
+                                onClick={() => openItem(drillItem)}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => e.key === "Enter" && openItem(drillItem)}
+                              >
+                                <td className="jc-txn-vendor">{t.id}</td>
+                                <td className="text-secondary">{t.dscrpt || "—"}</td>
+                                <td className="jc-txn-amount-col">{t.committedAmount ? formatMoneyFull(t.committedAmount) : "—"}</td>
+                                <td className="jc-txn-amount-col emphasized">{t.postedAmount ? formatMoneyFull(t.postedAmount) : "—"}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    </motion.div>
+                  </td>
+                </tr>
+              )}
+            </AnimatePresence>
+          </tbody>
+        )
+      })}
+      <tbody>
         <tr className="jc-total-row">
           <td className="spend-rank-table-name body-text emphasized">
             <span className="jc-group-chevron jc-group-chevron-spacer"><ChevronRight size={11} /></span>

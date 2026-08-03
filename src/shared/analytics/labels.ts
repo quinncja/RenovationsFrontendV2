@@ -6,6 +6,8 @@ export const WIDGET_LABELS: Record<string, string> = {
   dataQuality: "Data Quality Report",
   missingContracts: "Missing Contracts Report",
   openProjectsNoBudget: "Missing Budgets Report",
+  missingUnitCounts: "Missing Unit Counts Report",
+  missingOneOffNames: "Missing One-Off Names Report",
   currentYearRevenue: "Current Year Revenue",
   allTimeRevenue: "All-Time Revenue",
   annualRevenue: "Annual Revenue Trend",

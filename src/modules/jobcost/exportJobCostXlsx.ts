@@ -242,7 +242,7 @@ export function buildJobCostXlsx(
   const margin = project.totalContract > 0
     ? ((project.totalContract - project.totalCost) / project.totalContract) * 100
     : null
-  rows.push(kvPct("Projected Margin", margin))
+  rows.push(kvPct(project.status != null && project.status >= 5 ? "Final Margin" : "Current Margin", margin))
   rows.push(emptyRow())
 
   // ── Invoice Summary ──

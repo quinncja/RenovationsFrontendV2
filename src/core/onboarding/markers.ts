@@ -21,6 +21,12 @@ export const INTRO_TOUR = "intro-tour"
  *  visiting /overhead-report. */
 export const SECTION_OVERHEAD_REPORT = "section:overhead-report"
 
+/** Incremental milestone: the Job Costing interactive tour — a full-screen
+ *  welcome that melts into a guided, hands-on walkthrough of the live board
+ *  on the first desktop visit to /jobcost, acknowledged on finish or skip
+ *  (see modules/jobcost/onboarding/JobcostIntro.tsx). */
+export const JOBCOST_INTRO = "jobcost-intro"
+
 // The legacy flag records "seen" without a date; fold it in as long-ago so the
 // value is a valid ISO date and clearly predates any real acknowledgment.
 const LEGACY_SEEN_DATE = new Date(0).toISOString()

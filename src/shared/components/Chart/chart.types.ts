@@ -81,6 +81,11 @@ export type ChartConfig =
       compactTop?: boolean
       /** Bar fill color for single-series bars (defaults to primary chart color) */
       color?: string
+      /** Give bars a vertical gradient (brighter crown fading into a deeper
+       *  base) plus a faint matching border, instead of a flat fill. The
+       *  gradient inherits each bar's assigned color, so it composes with
+       *  `color`, `colors`, and `colorBy`. */
+      barGradient?: boolean
       /** Color palette for stacked keys (defaults to the chart palette) */
       colors?: string[]
       /** Per-bar color from its value (simple { label, value } bars only) */
@@ -187,6 +192,15 @@ export type ChartConfig =
       /** Called when the user clicks a point. Receives the x value as a
        *  string (matches whatever the data points use for `x`). */
       onPointClick?: (xValue: string) => void
+      /** Color the line and its points by y value (e.g. margin thresholds):
+       *  the solid series stroke becomes a vertical gradient sampled from
+       *  this function across the y axis, and each point fills with its own
+       *  value's color. Meant for single-series charts. */
+      valueColor?: (v: number) => string
+      /** Draw a dashed connector across runs of null points, so isolated
+       *  data points on a sparse axis still read as part of one trend
+       *  while the gap itself stays visibly "no data". */
+      bridgeGaps?: boolean
     }
   | {
       type: "pie-with-list"

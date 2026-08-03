@@ -13,6 +13,7 @@ const Dashboard = lazy(() => import("../../modules/dashboard/Dashboard.tsx"))
 const BusinessSummary = lazy(() => import("../../modules/business-summary/BusinessSummaryPage.tsx"))
 const Jobcost = lazy(() => import("../../modules/jobcost/Jobcost.tsx"))
 const JobcostDetailPage = lazy(() => import("../../modules/jobcost/JobcostDetailPage.tsx"))
+const PropertyDetailPage = lazy(() => import("../../modules/jobcost/PropertyDetailPage.tsx"))
 const ChangeOrders = lazy(() => import("../../modules/change-orders/ChangeOrdersPage.tsx"))
 const ReportsPage = lazy(() => import("../../modules/dashboard/report/ReportsPage.tsx"))
 const NewChangeOrder = lazy(() => import("../../modules/change-orders/components/NewChangeOrder.tsx"))
@@ -69,6 +70,7 @@ export default function Router() {
             {/* Job Costing — all roles */}
             <Route path="/jobcost" element={<SuspenseWrapper><Jobcost /></SuspenseWrapper>} />
             <Route path="/jobcost/:recnum" element={<SuspenseWrapper><JobcostDetailPage /></SuspenseWrapper>} />
+            <Route path="/jobcost/property/:parent" element={<SuspenseWrapper><PropertyDetailPage /></SuspenseWrapper>} />
 
             {/* Reports — daily/weekly/monthly activity; all roles (managers
                 get the token-scoped variant, GMs the company-wide one) */}

@@ -107,11 +107,13 @@ const executiveNav: NavEntry[] = [
   navItems.users,
 ]
 
-// A project manager's non-admin layout.
+// A project manager's non-admin layout: their own pages first (home + the
+// job costing table that now lives there), then the company-wide pages.
 const managerNav: NavEntry[] = [
   navItems.home,
-  navItems.businessSummary,
   navItems.jobcost,
+  NAV_DIVIDER,
+  navItems.businessSummary,
   navItems.dailyReports,
 ]
 

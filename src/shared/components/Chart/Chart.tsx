@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ComponentType } from "react"
+import { useEffect, useId, useMemo, useRef, useState, type ComponentType } from "react"
 import { Line } from "@nivo/line"
 import { Pie } from "@nivo/pie"
 import { Bar } from "@nivo/bar"
@@ -255,8 +255,26 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
 
 // ─── Bar chart ────────────────────────────────────────────────────────────────
 
+// Lighten (amt > 0) or darken (amt < 0) a hex color by mixing toward
+// white/black. Non-hex inputs (CSS vars etc.) pass through untouched, which
+// degrades a gradient built from them to a flat fill instead of breaking.
+function shadeHex(hex: string, amt: number): string {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex)
+  if (!m) return hex
+  const n = parseInt(m[1], 16)
+  const mix = (c: number) => {
+    const target = amt >= 0 ? 255 : 0
+    const t = Math.abs(amt)
+    return Math.round(c + (target - c) * t)
+  }
+  const r = mix((n >> 16) & 0xff)
+  const g = mix((n >> 8) & 0xff)
+  const b = mix(n & 0xff)
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`
+}
+
 function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> }) {
-  const { data, keys, indexBy, groupMode = "stacked", compactTop = false, color = CHART_COLORS[0], colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, axisBottomTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, wipMonthLabel, onBarClick, barTooltip, oppositeAxisLabels } = config
+  const { data, keys, indexBy, groupMode = "stacked", compactTop = false, color = CHART_COLORS[0], barGradient, colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, axisBottomTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, wipMonthLabel, onBarClick, barTooltip, oppositeAxisLabels } = config
 
   const dark = useDarkMode()
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
@@ -450,7 +468,16 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
     const valueToY = yScale as (v: number) => number
     const { showTooltipFromEvent, hideTooltip } = useTooltip()
     const [hovered, setHovered] = useState<string | null>(null)
-    if (!groupTooltipOn && !onBarClick) return null
+    // Simple bars with a custom tooltip get the same full-height hover bands:
+    // a tiny bar is a hopeless hover target, the whole column shouldn't be.
+    const simpleTooltipOn = Boolean(barTooltip) && !stacked
+    if (!groupTooltipOn && !onBarClick && !simpleTooltipOn) return null
+    const bandTooltip = (key: string, row: Record<string, unknown>) =>
+      groupTooltipOn ? (
+        <GroupTooltip indexValue={key} row={row} />
+      ) : simpleTooltipOn ? (
+        <><TooltipPing />{barTooltip!(key, Number(row.value) || 0)}</>
+      ) : null
     // Collapse the per-key bars into one transparent full-height band per
     // category, carrying the original data row so the tooltip can read every
     // key at once. The band spans the union of its segments — for stacked bars
@@ -496,12 +523,20 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
             style={onBarClick ? { cursor: "pointer" } : undefined}
             onMouseEnter={(e) => {
               setHovered(key)
-              if (groupTooltipOn) showTooltipFromEvent(<GroupTooltip indexValue={key} row={band.row} />, e)
+              const tip = bandTooltip(key, band.row)
+              if (tip) showTooltipFromEvent(tip, e)
             }}
-            onMouseMove={groupTooltipOn ? (e) => showTooltipFromEvent(<GroupTooltip indexValue={key} row={band.row} />, e) : undefined}
+            onMouseMove={
+              groupTooltipOn || simpleTooltipOn
+                ? (e) => {
+                    const tip = bandTooltip(key, band.row)
+                    if (tip) showTooltipFromEvent(tip, e)
+                  }
+                : undefined
+            }
             onMouseLeave={() => {
               setHovered(null)
-              if (groupTooltipOn) hideTooltip()
+              if (groupTooltipOn || simpleTooltipOn) hideTooltip()
             }}
             onClick={
               onBarClick
@@ -579,6 +614,43 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
       margin={{ top: marginTop, right: 24, bottom: !topLegend && stacked && !hideLegend ? 56 : 40, left: 68 }}
       padding={0.35}
       borderRadius={3}
+      // barGradient: brighter crown fading into a deeper base, with a faint
+      // matching border for edge definition. Stops are computed here from the
+      // resolved palette hex — nivo's `inherit:*` color syntax isn't supported
+      // inside gradient defs (it lands in SVG verbatim and paints black).
+      // Under colorBy, one gradient per distinct value-color, matched per bar.
+      defs={
+        barGradient
+          ? (colorBy && !stacked
+              ? [...new Set(rows.map((d) => colorBy(Number(d.value) || 0)))]
+              : stacked
+                ? barKeys.map((_, i) => stackedPalette[i % stackedPalette.length])
+                : [color]
+            ).map((c, i) => ({
+              id: `barDepth${i}`,
+              type: "linearGradient",
+              colors: [
+                { offset: 0, color: shadeHex(c, 0.22) },
+                { offset: 100, color: shadeHex(c, -0.18) },
+              ],
+            }))
+          : undefined
+      }
+      fill={
+        barGradient
+          ? colorBy && !stacked
+            ? [...new Set(rows.map((d) => colorBy(Number(d.value) || 0)))].map((c, i) => ({
+                match: (bar: { data: { data: Record<string, unknown> } }) =>
+                  colorBy(Number(bar.data.data.value) || 0) === c,
+                id: `barDepth${i}`,
+              }))
+            : stacked
+              ? barKeys.map((k, i) => ({ match: { id: k }, id: `barDepth${i}` }))
+              : [{ match: "*" as const, id: "barDepth0" }]
+          : undefined
+      }
+      borderWidth={barGradient ? 1 : 0}
+      borderColor={barGradient ? { from: "color", modifiers: [["darker", 0.5]] } : undefined}
       valueScale={
         scaleType === "symlog"
           ? { type: "symlog", constant: scaleConstant, min: minValue, max: maxValue }
@@ -852,8 +924,127 @@ function buildMarkerLabelsLayer(markers: LineMarker[] | undefined) {
   }
 }
 
+// valueColor mode: replaces nivo's "lines" + "points" layers with one that
+// strokes the path with a vertical gradient sampled from the value→color
+// function across the y scale, and fills each point with its own value's
+// color. Null points split the path into segments (same as nivo's defined()).
+type ComputedLinePoint = { data: { x: string | number; y: number | null }; position: { x: number; y: number | null } }
+type ComputedLineSerie = { id: string | number; data: ComputedLinePoint[] }
+function buildValueColorLayer(valueColor: (v: number) => string) {
+  // Loosely typed and cast: nivo's LineCustomSvgLayerProps carries readonly
+  // generics this layer only reads a slice of (same pattern as the other
+  // custom layers in this file).
+  return function ValueColorLayer(props: unknown) {
+    const { series, lineGenerator, innerHeight, yScale } = props as {
+      series: readonly ComputedLineSerie[]
+      lineGenerator: (pts: { x: number; y: number }[]) => string | null
+      innerHeight: number
+      yScale: unknown
+    }
+    const gid = useId()
+    const invert = (yScale as { invert: (px: number) => number }).invert
+    const STOPS = 16
+    const stops = Array.from({ length: STOPS + 1 }, (_, i) => {
+      const t = i / STOPS
+      return { offset: t * 100, color: valueColor(invert(t * innerHeight)) }
+    })
+    return (
+      <g>
+        <defs>
+          <linearGradient id={gid} gradientUnits="userSpaceOnUse" x1={0} y1={0} x2={0} y2={innerHeight}>
+            {stops.map((s, i) => (
+              <stop key={i} offset={`${s.offset}%`} stopColor={s.color} />
+            ))}
+          </linearGradient>
+        </defs>
+        {series.map((serie) => {
+          const segments: { x: number; y: number }[][] = []
+          let cur: { x: number; y: number }[] = []
+          for (const p of serie.data) {
+            if (p.data.y == null || p.position.y == null) {
+              if (cur.length) segments.push(cur)
+              cur = []
+            } else {
+              cur.push({ x: p.position.x, y: p.position.y })
+            }
+          }
+          if (cur.length) segments.push(cur)
+          return (
+            <g key={serie.id}>
+              {segments.map((seg, i) => (
+                <path key={i} d={lineGenerator(seg) ?? undefined} fill="none" stroke={`url(#${gid})`} strokeWidth={2} />
+              ))}
+              {serie.data.map((p, i) =>
+                p.data.y == null || p.position.y == null ? null : (
+                  <circle
+                    key={i}
+                    cx={p.position.x}
+                    cy={p.position.y}
+                    r={4}
+                    fill={valueColor(p.data.y)}
+                    stroke="var(--card-color)"
+                    strokeWidth={2}
+                  />
+                )
+              )}
+            </g>
+          )
+        })}
+      </g>
+    )
+  }
+}
+
+// bridgeGaps mode: a dashed straight segment between the two valid points
+// flanking each run of nulls. The solid line still breaks at the gap (nivo's
+// defined() behavior), so the dash reads as "no data here, but the trend
+// continues" rather than faking a measurement across the gap.
+function buildGapBridgeLayer() {
+  return function GapBridgeLayer(props: unknown) {
+    const { series } = props as {
+      series: readonly (ComputedLineSerie & { color?: string })[]
+    }
+    return (
+      <g pointerEvents="none">
+        {series.map((serie) => {
+          const bridges: { x1: number; y1: number; x2: number; y2: number }[] = []
+          let prev: { x: number; y: number; idx: number } | null = null
+          serie.data.forEach((p, idx) => {
+            if (p.data.y == null || p.position.y == null) return
+            if (prev && idx - prev.idx > 1) {
+              bridges.push({ x1: prev.x, y1: prev.y, x2: p.position.x, y2: p.position.y })
+            }
+            prev = { x: p.position.x, y: p.position.y, idx }
+          })
+          return (
+            <g key={serie.id}>
+              {bridges.map((b, i) => (
+                <line
+                  key={i}
+                  x1={b.x1}
+                  y1={b.y1}
+                  x2={b.x2}
+                  y2={b.y2}
+                  stroke="var(--secondary-text)"
+                  strokeWidth={2}
+                  strokeOpacity={0.35}
+                  // Dot chain (zero-length dashes + round caps), not dashes —
+                  // reference markers (e.g. an average line) already own the
+                  // dashed-line look and the bridge must not impersonate them.
+                  strokeDasharray="0.1 7"
+                  strokeLinecap="round"
+                />
+              ))}
+            </g>
+          )
+        })}
+      </g>
+    )
+  }
+}
+
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
-  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick } = config
+  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps } = config
 
   const dark = useDarkMode()
   const isMobile = window.innerWidth <= 768
@@ -988,8 +1179,12 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
         "axes",
         "areas",
         "crosshair",
-        "lines",
-        "points",
+        // Gap bridges go under the solid line/points so dash ends tuck
+        // beneath the flanking dots.
+        ...(bridgeGaps ? [buildGapBridgeLayer()] : []),
+        // valueColor mode swaps nivo's line + point layers for the gradient
+        // layer (slices/mesh stay, so tooltips are unchanged).
+        ...(valueColor ? [buildValueColorLayer(valueColor)] : (["lines", "points"] as const)),
         "slices",
         "mesh",
         "legends",

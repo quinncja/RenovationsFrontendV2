@@ -43,7 +43,34 @@ added or retired.
   nav-item hint (`NavReportsHint`, `introStep` 2). Subsequent days are the
   plain recap. Auto-open starts the day AFTER `onboardedAt`.
 
-**D — New-section announcements (incremental milestones)**
+**D — Job Costing interactive tour (incremental milestone `jobcost-intro`)**
+- `modules/jobcost/onboarding/JobcostIntro.tsx`, mounted in `App.tsx` (NOT the
+  lazy Jobcost chunk — a /jobcost refresh must paint the cover with the
+  shell, and the host must survive the mid-tour route change); engages on the
+  `/jobcost` route; while onboarding state resolves it holds the (empty)
+  welcome glass rather than flashing the board. A frosted welcome overlay
+  covers the page CONTENT only (`.jct-welcome` — its left edge rides the
+  navbar's LIVE width via the `navbar` coach target + ResizeObserver, so the
+  nav stays crisp open or closed), then hands off to the `Coachmark` in its
+  `variant="tour"` dress (lighter backdrop, spring card entrances) and the
+  user performs each taught action for real (interactive cutout, no shield):
+  open a property — the Property-view pitch, with the cutout GROWING live
+  with the card — → the Phase Work / One-Off Work split (both summaries stay
+  in focus and clickable) → pin → a closing note on the view toggle
+  ("toggle back to the previous view any time"), where the tour ends. It
+  never leaves the board: no report-page beats, no double-click/View
+  teaching. Interactive beats carry a quiet "Next" escape hatch that
+  performs the action instead. The board publishes state / registers a
+  controller via `modules/jobcost/onboarding/tourBus.ts`. On finish or skip
+  the tour RESTORES pre-tour pins/view (through the controller when the
+  board is mounted, else straight to localStorage), then acknowledges.
+  Opening a real property report mid-tour counts as graduating (finish);
+  leaving Job Costing any other way aborts without acknowledging and the
+  tour replays next visit. Mobile never engages (the taught surfaces are
+  desktop-only), so mobile-only users keep the milestone unseen until a
+  desktop visit.
+
+**E — New-section announcements (incremental milestones)**
 - Registry-driven: `sectionAnnouncements.ts` (this directory) lists every
   shipped announcement oldest → newest; `Navbar.tsx` renders at most ONE —
   the newest unseen entry — via `NavSectionHint.tsx` (one-time popover,
@@ -79,8 +106,11 @@ flags are pushed up after merge.
 ## Delivery building blocks
 
 - `Coachmark.tsx` — blurred backdrop with an animated rounded cutout + anchored
-  hint card; blocking (click shield). Targets come from `coachTargets.ts`, a
-  callback-ref registry (`registerCoachTarget` / `useCoachTarget`) — never
+  hint card; blocking (click shield) by default, or `interactive` (the hole
+  passes clicks to the real control and the CTA is a quiet "Next" escape
+  hatch — the Job Costing tour's mode). Targets come from `coachTargets.ts`,
+  a callback-ref registry (`registerCoachTarget` / `useCoachTarget`, plus
+  `coachTargetRef` for owners that swap instances) — never
   `document.querySelector` for new work.
 - `NavSectionHint.tsx` — non-blocking nav popover for `section:*` milestones
   (framer entrance/exit, ResizeObserver anchor tracking, `.nav-hint--motion`
@@ -108,6 +138,7 @@ nicely.
 | `?arrival` / `?arrival-intro` | Daily arrival / its intro variant |
 | `?report` | Daily report modal (manual-reopen surface) |
 | `?overhead-hint` | Finances new-section hint |
+| `?jobcost-intro` (on `/jobcost`, desktop) | Job Costing redesign intro |
 | `?idle` | Idle refresh overlay (not onboarding, mirrors the pattern) |
 
 ## Shipping the next `section:*` announcement

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, useDeferredValue, memo } from "react"
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, useDeferredValue, memo, type ReactNode } from "react"
 import { motion, AnimatePresence, useMotionValue, useTransform, type MotionValue, type Transition } from "framer-motion"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useJobcostNav } from "./useJobcostNav"
@@ -19,6 +19,15 @@ import { useAuth } from "../../core/auth/AuthProvider"
 import { MobileFilterSheet, activeFilterCount, type FilterGroup } from "../../shared/components/MobileFilterSheet/MobileFilterSheet"
 import { MobileFilterButton } from "../../shared/components/MobileFilterSheet/MobileFilterButton"
 import { CostBreakdownTable, CostBreakdownSkeleton } from "./components/CostBreakdownTable"
+import { oneoffFromRecnum } from "./jobcostShared"
+import { coachTargetRef, useCoachTarget } from "../../core/onboarding/coachTargets"
+import {
+  publishJobcostTourState,
+  registerJobcostTourController,
+  useTourActive,
+  useTourCardPos,
+  type JobcostTourController,
+} from "./onboarding/tourBus"
 import type { BudgetBreakdown, CostItem } from "./types"
 
 // Two views over the same fetch:
@@ -40,8 +49,8 @@ interface ProjectPhase {
   pmName: string | null
 }
 
-interface RawProject {
-  recnum: string
+export interface RawProject {
+  recnum: string | number
   name: string
   status: number
   totalContract: number
@@ -66,12 +75,17 @@ interface RawProject {
   // created actr_u row doesn't exist yet (jobs added after the backfill).
   parent?: string | null
   oneoff?: number | null
+  // actr_u.oofnme — the one-off's given display name. Only newer one-offs
+  // carry it; fall back to the job name.
+  oofnme?: string | null
   // Present when the fetch passes yearFlag: 1 = had posted revenue or cost in
   // the selected year. Absent (all-time fetch) = always active.
   yearActive?: number
+  // actrec.usrdf1 — units delivered by the phase. Sage stores it as text.
+  unitCount?: number | string | null
 }
 
-interface Job {
+export interface Job {
   recnum: string
   jobNumber: string
   name: string
@@ -91,26 +105,24 @@ interface Job {
   client: string
   parent: string
   oneoff: boolean
+  // One-off display name (actr_u.oofnme), shown in place of the Sage job
+  // name in the property view. Null for phases and unnamed one-offs.
+  oneoffName: string | null
   yearActive: boolean
+  units: number
 }
 
 // Lazily-fetched per-job cost detail for the expanded view.
-type JobDetail = { budget: BudgetBreakdown | null; costItems: CostItem[] }
+export type JobDetail = { budget: BudgetBreakdown | null; costItems: CostItem[] }
 
-// Fallback when the actr_u row is missing: the recnum's last two digits are
-// the phase month (01–12); 00 or >12 marks a one-off (see tools/
-// SAGE_PARENT_ONEOFF_NOTES.md).
-function oneoffFromRecnum(recnum: string): boolean {
-  const suffix = Number(recnum.slice(-2))
-  return !(suffix >= 1 && suffix <= 12)
-}
 
-function normalizeProject(p: RawProject): Job {
+export function normalizeProject(p: RawProject): Job {
   const contract = p.totalContract ?? 0
   const totalCost = p.totalCost ?? 0
   const budget = p.totalBudget ?? p.budget ?? 0
   const recnum = String(p.recnum)
   const parent = p.parent?.trim()
+  const oneoff = p.oneoff != null ? p.oneoff === 1 : oneoffFromRecnum(recnum)
   return {
     recnum,
     jobNumber: p.phases?.[0]?.recnum ?? recnum,
@@ -133,8 +145,12 @@ function normalizeProject(p: RawProject): Job {
     // No parent yet (new job, actr_u row not created) → the job is its own
     // single-member group under its own name.
     parent: parent || p.name,
-    oneoff: p.oneoff != null ? p.oneoff === 1 : oneoffFromRecnum(recnum),
+    oneoff,
+    oneoffName: (oneoff && p.oofnme?.trim()) || null,
     yearActive: p.yearActive == null ? true : p.yearActive === 1,
+    // One-offs (repairs, extras) aren't unit deliveries — never count them,
+    // even when Sage carries a unitCount on the record.
+    units: oneoff ? 0 : Number(p.unitCount) || 0,
   }
 }
 
@@ -152,6 +168,7 @@ interface Group {
   phases: Job[]
   oneoffs: Job[]
   yearActive: boolean
+  units: number
 }
 
 function buildGroups(jobs: Job[]): Group[] {
@@ -181,21 +198,23 @@ function buildGroups(jobs: Job[]): Group[] {
       phases: members.filter((m) => !m.oneoff),
       oneoffs: members.filter((m) => m.oneoff),
       yearActive: members.some((m) => m.yearActive),
+      units: members.reduce((s, m) => s + m.units, 0),
     }
   })
 }
 
-type SortKey = "name" | "status" | "supervisor" | "contract" | "totalCost" | "budget" | "variance" | "margin"
-type SortDir = "asc" | "desc"
+export type SortKey = "name" | "status" | "supervisor" | "contract" | "totalCost" | "budget" | "variance" | "margin"
+export type SortDir = "asc" | "desc"
 
 // Property-view sorting lives in the command bar (cards have no column
 // headers). Volume is hidden from managers, matching the contract column.
-type GroupSortKey = "name" | "client" | "volume" | "margin" | "phases" | "projects"
+type GroupSortKey = "name" | "client" | "volume" | "margin" | "units" | "phases" | "projects"
 const GROUP_SORT_OPTIONS: { key: GroupSortKey; label: string }[] = [
   { key: "name", label: "Name" },
   { key: "client", label: "Client" },
   { key: "volume", label: "Volume" },
   { key: "margin", label: "Margin" },
+  { key: "units", label: "Units" },
   { key: "phases", label: "Phase Count" },
   { key: "projects", label: "Project Count" },
 ]
@@ -234,6 +253,19 @@ const FILTER_GROUPS: FilterGroup[] = [
   },
 ]
 const FILTER_DEFAULTS = { status: "all" }
+
+// Managers also get a project-scope group in the mobile sheet, mirroring the
+// desktop Mine/All seg (the command bar doesn't render on mobile — without
+// this a phone is stuck with whatever scope was last picked on desktop).
+const SCOPE_GROUP: FilterGroup = {
+  key: "scope",
+  label: "Projects",
+  options: [
+    { value: "mine", label: "Mine" },
+    { value: "all", label: "All" },
+  ],
+}
+const MANAGER_FILTER_DEFAULTS = { ...FILTER_DEFAULTS, scope: "mine" }
 
 // Fit-driven column hiding for the LIST view. Fixed pixel breakpoints can't
 // know the real content widths, so the layout itself is the signal instead:
@@ -279,28 +311,43 @@ function SortTh({ col, label, align = "left", sortKey, sortDir, onSort, classNam
 
 // Label/value row inside a summary card; `total` bolds it as the card's
 // bottom-line figure. Shared with the detail page's Contract/Cost Summary
-// cards so the two render identically.
-export function SummaryRow({ label, value, note, total, valueColor, valueClass }: {
+// cards so the two render identically. `onClick` turns the row into a
+// drill-through (hover surface + trailing chevron beside the value).
+export function SummaryRow({ label, value, note, total, noDivider, valueColor, valueClass, onClick }: {
   label: string
-  value: string
+  /** Usually the formatted figure; the detail page's loading state passes a
+   *  SkelText shimmer so the row keeps identical geometry while loading. */
+  value: ReactNode
   /** Muted secondary figure (e.g. the variance's % form) left of the value. */
   note?: string
   total?: boolean
+  /** Drop the row's bottom rule so it reads as one block with the next row
+   *  (the budget-remaining + margin pair at the card's foot). */
+  noDivider?: boolean
   valueColor?: string
   valueClass?: string
+  onClick?: () => void
 }) {
   const valueSpan = (
     <span className={`jc-summary-value${valueClass ? ` ${valueClass}` : ""}`} style={valueColor ? { color: valueColor } : undefined}>{value}</span>
   )
+  const valueCluster = (
+    <span className="jc-summary-values">
+      {note && <span className="jc-summary-note">{note}</span>}
+      {valueSpan}
+      {onClick && <ChevronRight size={13} className="jc-summary-chevron" />}
+    </span>
+  )
   return (
-    <div className={`jc-summary-row${total ? " jc-summary-total" : ""}`}>
+    <div
+      className={`jc-summary-row${total ? " jc-summary-total" : ""}${noDivider ? " jc-summary-nodivider" : ""}${onClick ? " jc-summary-row-link" : ""}`}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? e => e.key === "Enter" && onClick() : undefined}
+    >
       <span className="jc-summary-label">{label}</span>
-      {note ? (
-        <span className="jc-summary-values">
-          <span className="jc-summary-note">{note}</span>
-          {valueSpan}
-        </span>
-      ) : valueSpan}
+      {note || onClick ? valueCluster : valueSpan}
     </div>
   )
 }
@@ -323,7 +370,9 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
           <div className="jc-summary-title subheadline text-secondary">Contract Summary</div>
           <SummaryRow label="Original Contract" value={formatMoneyFull(job.originalContract)} />
           <SummaryRow label="Change Orders" value={job.changeOrderAmount ? formatMoneyFull(job.changeOrderAmount) : "—"} />
-          <SummaryRow label="Revised Contract" value={formatMoneyFull(job.contract)} total />
+          <div className="jc-summary-totals">
+            <SummaryRow label="Revised Contract" value={formatMoneyFull(job.contract)} total />
+          </div>
         </div>
         <div className="jc-summary-card">
           <div className="jc-summary-title subheadline text-secondary">Cost Summary</div>
@@ -331,13 +380,20 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
           <SummaryRow label="Spent to Date" value={formatMoneyFull(spentToDate)} />
           <SummaryRow label="Committed (Open POs + Subs)" value={formatMoneyFull(job.totalCommitted)} />
           <SummaryRow label="Total Committed + Spent" value={formatMoneyFull(job.totalCost)} />
-          <SummaryRow label="Projected Variance" value={formatMoneyFull(projectedVariance)} valueClass={varianceClass} />
-          <SummaryRow
-            label="Projected Margin"
-            value={job.margin == null ? "—" : `${job.margin.toFixed(1)}%`}
-            total
-            valueColor={marginColor}
-          />
+          <div className="jc-summary-totals">
+            <SummaryRow
+              label={projectedVariance < 0 ? "Budget Exceeded" : "Budget Remaining"}
+              value={formatMoneyFull(Math.abs(projectedVariance))}
+              valueClass={varianceClass}
+              total
+            />
+            <SummaryRow
+              label={job.status >= 5 ? "Final Margin" : "Current Margin"}
+              value={job.margin == null ? "—" : `${job.margin.toFixed(1)}%`}
+              total
+              valueColor={marginColor}
+            />
+          </div>
         </div>
       </div>
 
@@ -382,6 +438,13 @@ function GroupKindCard({ icon, title, singular, plural, members, open, onToggle,
   const totalCost = members.reduce((s, m) => s + m.totalCost, 0)
   const margin = contract > 0 ? ((contract - totalCost) / contract) * 100 : null
   const marginColor = !marginColorsOn || margin == null ? undefined : marginTextColor(margin)
+  // Budget Remaining/Exceeded: POSITIVE = under budget (good); NEGATIVE = over
+  // (bad) — the row shows the absolute value with the label carrying the sign.
+  const budgetVariance = budget - totalCost
+  const varianceClass = budgetVariance === 0 ? undefined : budgetVariance > 0 ? "jc-variance-under" : "jc-variance-over"
+  // min(member status) — same escalation rule as the group badge: any Current
+  // member → Current; else any Complete → Complete; else Closed.
+  const status = empty ? null : Math.min(...members.map((m) => m.status))
 
   return (
     <button
@@ -395,6 +458,11 @@ function GroupKindCard({ icon, title, singular, plural, members, open, onToggle,
         <span className="jc-group-card-title subheadline text-secondary">
           {icon}
           {title}
+          {status != null && (
+            <span className={`status-badge status-${status}`}>
+              {STATUS_LABELS[status] ?? status}
+            </span>
+          )}
         </span>
         {empty ? (
           <span className="jc-group-card-none subheadline">None</span>
@@ -410,18 +478,26 @@ function GroupKindCard({ icon, title, singular, plural, members, open, onToggle,
           {showContract && <SummaryRow label="Contract" value={formatMoneyFull(contract)} />}
           <SummaryRow label="Budget" value={formatMoneyFull(budget)} />
           <SummaryRow label="Committed + Spent" value={formatMoneyFull(totalCost)} />
-          {/* Margin + Gross Profit are the card's conclusions — a recessed
-              well sets the pair apart from the plain money lines above. */}
+          {/* Margin + Gross Profit (or Budget Remaining for managers) are the
+              card's conclusions — a recessed well sets the pair apart from
+              the plain money lines above. */}
           <div className="jc-summary-totals">
             {/* Contract-derived (hidden from managers). Wears the same margin
                 color as the Margin row below — the pair reads as one verdict;
                 negative-red stays as the fallback when margin colors are off. */}
-            {showContract && (
+            {showContract ? (
               <SummaryRow
                 label="Gross Profit"
                 value={formatMoneyFull(contract - totalCost)}
                 total
                 valueColor={marginColor ?? (contract - totalCost < 0 ? "#ef4444" : undefined)}
+              />
+            ) : (
+              <SummaryRow
+                label={budgetVariance < 0 ? "Budget Exceeded" : "Budget Remaining"}
+                value={formatMoneyFull(Math.abs(budgetVariance))}
+                total
+                valueClass={varianceClass}
               />
             )}
             <SummaryRow
@@ -472,7 +548,11 @@ function GroupMemberTable({ members, showContract, marginColorsOn, onOpen }: {
               onKeyDown={(e) => e.key === "Enter" && onOpen(job)}
             >
               <td className="spend-rank-table-name">
-                <div className="body-text emphasized jc-name-text" title={job.name}>{job.name}</div>
+                {/* One-offs lead with their given name (oofnme) when Sage has
+                    one; the raw job name is the fallback. */}
+                <div className="body-text emphasized jc-name-text" title={job.oneoffName ?? job.name}>
+                  {job.oneoffName ?? job.name}
+                </div>
                 <div className="cell-secondary jc-name-sub">
                   <span className="jc-name-number">#{job.jobNumber}</span>
                 </div>
@@ -502,7 +582,8 @@ function GroupMemberTable({ members, showContract, marginColorsOn, onOpen }: {
               </td>
               <td className="spend-rank-table-name jc-view-cell">
                 <button
-                  className="button secondary-button jc-view-btn"
+                  type="button"
+                  className="jc-view-tile jc-view-tile-wide"
                   onClick={(e) => {
                     e.stopPropagation()
                     onOpen(job)
@@ -510,7 +591,7 @@ function GroupMemberTable({ members, showContract, marginColorsOn, onOpen }: {
                   title="Open full report"
                   aria-label="Open full report"
                 >
-                  <ExternalLink size={13} />
+                  View <ExternalLink size={13} />
                 </button>
               </td>
             </tr>
@@ -565,6 +646,8 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
             valueColor={group.contract - group.totalCost < 0 ? "#ef4444" : undefined}
           />
         )}
+        {/* Units trail the money stats, matching the property page's hero. */}
+        <OverviewStat label="Property Units" value={group.units > 0 ? String(group.units) : "—"} />
       </div>
       <div className="jc-group-card-grid">
         <GroupKindCard
@@ -621,8 +704,9 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
   )
 }
 
-// Thumb slide for the command-bar segmented controls.
-const SEG_SPRING: Transition = { type: "spring", bounce: 0.15, visualDuration: 0.35 }
+// Thumb slide for the segmented controls (command bar here; the property
+// page's PM filter rides the same spring).
+export const SEG_SPRING: Transition = { type: "spring", bounce: 0.15, visualDuration: 0.35 }
 
 // Animates real width (not transforms) when its child's intrinsic size
 // changes, so text never scale-stretches — used by the sort-direction toggle
@@ -650,7 +734,12 @@ function AnimatedWidth({ children }: { children: React.ReactNode }) {
 // spring so a card pinned from mid-list visibly glides to the top.
 const REORDER_SPRING: Transition = { type: "spring", bounce: 0.18, visualDuration: 0.45 }
 
-// Count tag on a property card's right side: "2 Phases ›" / "1 Project ›".
+// Window for the double-click fast path to the full report. Deliberately
+// tighter than the OS double-click threshold (~500ms) so a quick
+// expand–collapse of a row doesn't accidentally navigate.
+const QUICK_DBLCLICK_MS = 350
+
+// Count tag on a property card's right side: "2 Phases ›" / "1 One-Off ›".
 // Clicking one opens the card straight to that section (the head is a
 // role=button div, not a <button>, so these can be real buttons inside it).
 // Empty kinds read as quiet "No Phases" text with no affordance.
@@ -694,7 +783,7 @@ function KindChip({ icon, count, singular, plural, onOpen }: {
 // memo: the virtualizer re-renders the list on every scroll frame; without it
 // every mounted card re-renders per frame. Handlers take the group as an
 // argument (no per-item closures) so props stay referentially stable.
-const PropertyCard = memo(function PropertyCard({ group, open, openKind, entrance, index, tick, scrollerRef, showContract, marginColorsOn, pinned, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin }: {
+const PropertyCard = memo(function PropertyCard({ group, open, openKind, entrance, index, tick, scrollerRef, showContract, marginColorsOn, pinned, tourAnchor, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin, onOpenProperty }: {
   group: Group
   open: boolean
   openKind: "phases" | "oneoffs" | null
@@ -707,13 +796,24 @@ const PropertyCard = memo(function PropertyCard({ group, open, openKind, entranc
   showContract: boolean
   marginColorsOn: boolean
   pinned: boolean
+  // The card the Job Costing tour's coachmarks point at (the open card, else
+  // the first in the list) — registers its head/View/pin as coach targets.
+  tourAnchor: boolean
   onToggle: (group: Group) => void
   onToggleKind: (kind: "phases" | "oneoffs") => void
   onOpenKind: (group: Group, kind: "phases" | "oneoffs") => void
   onOpenJob: (job: Job) => void
   onTogglePin: (group: Group) => void
+  onOpenProperty: (group: Group) => void
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null)
+  // Instance-safe coach-target refs (the anchor moves between card instances
+  // as the open card changes; see coachTargetRef). The whole-card target is
+  // what lets the tour's cutout grow live with the card's expansion.
+  const cardTargetRef = useMemo(() => coachTargetRef("jc-card"), [])
+  const pinTargetRef = useMemo(() => coachTargetRef("jc-card-pin"), [])
+  // Timestamp of the head's last click, for the quick double-click fast path.
+  const lastClickRef = useRef(0)
   // 0 = card top at the container's bottom edge, 1 = card bottom at its top
   // edge, ~0.5 = comfortably in view. Reading rects keeps it truthful under
   // any layout shift; tick.get() subscribes this transform to the bumps.
@@ -740,6 +840,7 @@ const PropertyCard = memo(function PropertyCard({ group, open, openKind, entranc
       style={{ scale: open ? 1 : waveScale, opacity: open ? 1 : waveOpacity, willChange: "transform" }}
     >
       <motion.div
+        ref={tourAnchor ? cardTargetRef : undefined}
         className={`jc-project-card${open ? " jc-project-card-open" : ""}`}
         // App-standard MotionList entrance (same values as itemVariants),
         // continuing the header's stagger rhythm.
@@ -751,7 +852,17 @@ const PropertyCard = memo(function PropertyCard({ group, open, openKind, entranc
           className="jc-project-head"
           role="button"
           tabIndex={0}
-          onClick={() => onToggle(group)}
+          // Double-click (within the tightened QUICK_DBLCLICK_MS window) is
+          // the fast path to the full property report. The two single-click
+          // toggles it fires first cancel out (open→close), so the card is
+          // back in its original state if the user returns.
+          onClick={(e) => {
+            onToggle(group)
+            if (e.timeStamp - lastClickRef.current < QUICK_DBLCLICK_MS) onOpenProperty(group)
+            lastClickRef.current = e.timeStamp
+          }}
+          // Suppress the text selection a double-click would otherwise make.
+          onMouseDown={(e) => { if (e.detail > 1) e.preventDefault() }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault()
@@ -795,6 +906,11 @@ const PropertyCard = memo(function PropertyCard({ group, open, openKind, entranc
                 {group.margin == null ? "—" : `${group.margin.toFixed(1)}%`}
               </span>
             </span>
+            {/* Units trail the money stats, matching the property page's hero. */}
+            <span className="jc-head-stat">
+              <span className="jc-head-stat-label">Units</span>
+              <span className="jc-head-stat-value">{group.units > 0 ? group.units : "—"}</span>
+            </span>
           </span>
           <span className="jc-project-counts">
             <KindChip
@@ -807,16 +923,35 @@ const PropertyCard = memo(function PropertyCard({ group, open, openKind, entranc
             <KindChip
               icon={<Hammer size={12} />}
               count={group.oneoffs.length}
-              singular="Project"
-              plural="Projects"
+              singular="One-Off"
+              plural="One-Offs"
               onOpen={() => onOpenKind(group, "oneoffs")}
             />
           </span>
+          {/* Open the property's full report page — same borderless tile as
+              the pin beside it, widened for its "View ↗" label. View-then-Pin
+              order matches the Project list's actions cell. stopPropagation
+              on click AND keydown: the head is a role=button that would
+              otherwise toggle open. */}
+          <button
+            type="button"
+            className="jc-view-tile jc-view-tile-wide"
+            aria-label="Open property report"
+            title="Open property report"
+            onClick={(e) => {
+              e.stopPropagation()
+              onOpenProperty(group)
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            View <ExternalLink size={13} />
+          </button>
           {/* Neutral tile when unpinned, copper when pinned (active state).
               stopPropagation on click AND keydown — the head is a role=button
               that would otherwise toggle open. The icon pops on pin as the
               instant local feedback while the card itself travels. */}
           <button
+            ref={tourAnchor ? pinTargetRef : undefined}
             type="button"
             className={`jc-pin-btn${pinned ? " jc-pin-btn-active" : ""}`}
             aria-pressed={pinned}
@@ -868,7 +1003,7 @@ const PropertyCard = memo(function PropertyCard({ group, open, openKind, entranc
 // them all at once is what made the view toggle lag). Items are absolutely
 // positioned by measured offset inside a spacer of the total height; card
 // expand/collapse is picked up live by the virtualizer's ResizeObserver.
-function PropertyList({ groups, openGroupKey, openKind, entrance, showContract, marginColorsOn, pins, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin }: {
+function PropertyList({ groups, openGroupKey, openKind, entrance, showContract, marginColorsOn, pins, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin, onOpenProperty }: {
   groups: Group[]
   openGroupKey: string | null
   openKind: "phases" | "oneoffs" | null
@@ -884,6 +1019,7 @@ function PropertyList({ groups, openGroupKey, openKind, entrance, showContract, 
   onOpenKind: (group: Group, kind: "phases" | "oneoffs") => void
   onOpenJob: (job: Job) => void
   onTogglePin: (group: Group) => void
+  onOpenProperty: (group: Group) => void
 }) {
   const listRef = useRef<HTMLDivElement | null>(null)
   const scrollerRef = useRef<HTMLElement | null>(null)
@@ -972,6 +1108,9 @@ function PropertyList({ groups, openGroupKey, openKind, entrance, showContract, 
     groups.forEach((g, i) => m.set(g.key, i))
   })
 
+  // The tour's coach anchor: the open card, else the first card in the list.
+  const tourAnchorKey = openGroupKey ?? groups[0]?.key ?? null
+
   return (
     <div ref={setListEl} className="jc-project-list" style={{ height: virtualizer.getTotalSize() }}>
       {virtualizer.getVirtualItems().map((vi) => {
@@ -1008,11 +1147,13 @@ function PropertyList({ groups, openGroupKey, openKind, entrance, showContract, 
               showContract={showContract}
               marginColorsOn={marginColorsOn}
               pinned={pins.includes(group.key)}
+              tourAnchor={group.key === tourAnchorKey}
               onToggle={onToggle}
               onToggleKind={onToggleKind}
               onOpenKind={onOpenKind}
               onOpenJob={onOpenJob}
               onTogglePin={onTogglePin}
+              onOpenProperty={onOpenProperty}
             />
           </motion.div>
         )
@@ -1049,11 +1190,14 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
   traveled: boolean
   onToggle: (job: Job) => void
   onOpen: (job: Job) => void
-  onTogglePin: (job: Job) => void
+  /** Absent on embedded reuses (property detail page) — hides the pin tile. */
+  onTogglePin?: (job: Job) => void
 }) {
   // True while a reorder glide is in flight — rows turn opaque so crossing
   // rows don't read through each other.
   const [flying, setFlying] = useState(false)
+  // Timestamp of the row's last click, for the quick double-click fast path.
+  const lastClickRef = useRef(0)
   return (
     <motion.tbody
       data-index={index}
@@ -1072,7 +1216,16 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
           quiet ink wash as an open property card and the chevron rotates. */}
       <tr
         className={`spend-rank-table-row${isOpen ? " jc-row-open" : ""}${pinned ? " jc-row-pinned" : ""}`}
-        onClick={() => onToggle(job)}
+        // Double-click (within the tightened QUICK_DBLCLICK_MS window) is the
+        // fast path to the full jobcost report (the two toggle clicks before
+        // it cancel out, leaving the row as it was).
+        onClick={(e) => {
+          onToggle(job)
+          if (e.timeStamp - lastClickRef.current < QUICK_DBLCLICK_MS) onOpen(job)
+          lastClickRef.current = e.timeStamp
+        }}
+        // Suppress the text selection a double-click would otherwise make.
+        onMouseDown={(e) => { if (e.detail > 1) e.preventDefault() }}
         role="button"
         tabIndex={0}
         aria-expanded={isOpen}
@@ -1140,34 +1293,9 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
           {job.margin == null ? "—" : `${job.margin.toFixed(1)}%`}
         </td>
         <td className="spend-rank-table-name jc-view-cell">
-          {/* Same pin control as the property cards: neutral tile, copper
-              when pinned, icon pop on pin while the row travels to the top.
-              stopPropagation on click AND keydown — the row itself is a
-              role=button that would otherwise toggle open. */}
           <button
             type="button"
-            className={`jc-pin-btn jc-row-pin${pinned ? " jc-pin-btn-active" : ""}`}
-            aria-pressed={pinned}
-            aria-label={pinned ? "Unpin project" : "Pin project to top"}
-            title={pinned ? "Pinned — click to unpin" : "Pin to top"}
-            onClick={(e) => {
-              e.stopPropagation()
-              onTogglePin(job)
-            }}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            <motion.span
-              className="jc-pin-icon"
-              initial={false}
-              animate={{ scale: pinned ? [1, 1.35, 1] : 1 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-            >
-              <Pin size={13} />
-            </motion.span>
-          </button>
-          <button
-            type="button"
-            className="jc-view-tile"
+            className="jc-view-tile jc-view-tile-wide"
             onClick={(e) => {
               e.stopPropagation()
               onOpen(job)
@@ -1177,6 +1305,33 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
           >
             View <ExternalLink size={13} />
           </button>
+          {/* Same pin control as the property cards: neutral tile, copper
+              when pinned, icon pop on pin while the row travels to the top.
+              stopPropagation on click AND keydown — the row itself is a
+              role=button that would otherwise toggle open. */}
+          {onTogglePin && (
+            <button
+              type="button"
+              className={`jc-pin-btn jc-row-pin${pinned ? " jc-pin-btn-active" : ""}`}
+              aria-pressed={pinned}
+              aria-label={pinned ? "Unpin project" : "Pin project to top"}
+              title={pinned ? "Pinned — click to unpin" : "Pin to top"}
+              onClick={(e) => {
+                e.stopPropagation()
+                onTogglePin(job)
+              }}
+              onKeyDown={(e) => e.stopPropagation()}
+            >
+              <motion.span
+                className="jc-pin-icon"
+                initial={false}
+                animate={{ scale: pinned ? [1, 1.35, 1] : 1 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+              >
+                <Pin size={13} />
+              </motion.span>
+            </button>
+          )}
         </td>
       </tr>
       {/* The detail panel opens/closes as an animated reveal (same timing as
@@ -1209,7 +1364,7 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
 // scroll-driven re-renders stay inside it — when it lived in Jobcost, every
 // scroll frame re-rendered the whole page (command bar included), and the
 // inline wrapper ref re-wired the width ResizeObserver per frame.
-function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, onSort, openJobKey, details, pins, onToggleExpand, onOpenJob, onTogglePin }: {
+export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, onSort, openJobKey, details, pins, onToggleExpand, onOpenJob, onTogglePin }: {
   jobs: Job[]
   isManager: boolean
   marginColorsOn: boolean
@@ -1218,10 +1373,11 @@ function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, onSort, o
   onSort: (key: SortKey) => void
   openJobKey: string | null
   details: Record<string, JobDetail | "loading">
-  pins: string[]
+  /** Pinning is a list-page affordance; omit both to hide the pin tiles. */
+  pins?: string[]
   onToggleExpand: (job: Job) => void
   onOpenJob: (job: Job) => void
-  onTogglePin: (job: Job) => void
+  onTogglePin?: (job: Job) => void
 }) {
   // Fit-driven column visibility (see HIDE_ORDER above): `hiddenCount` is how
   // deep into the hide order we currently are.
@@ -1435,7 +1591,7 @@ function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, onSort, o
               showVariance={showVariance}
               visibleColumnCount={visibleColumnCount}
               marginColorsOn={marginColorsOn}
-              pinned={pins.includes(job.recnum)}
+              pinned={pins?.includes(job.recnum) ?? false}
               onToggle={onToggleExpand}
               onOpen={onOpenJob}
               onTogglePin={onTogglePin}
@@ -1451,7 +1607,7 @@ function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, onSort, o
 }
 
 export default function Jobcost() {
-  const { goToJobcost } = useJobcostNav()
+  const { goToJobcost, goToProperty } = useJobcostNav()
   const marginColorsOn = useMarginColorsEnabled()
   // Mobile: the table collapses to a simple tap-through list — name + status
   // on the left, margin + chevron on the right, tap → full project report.
@@ -1592,6 +1748,34 @@ export default function Jobcost() {
     goToJobcost(job.jobNumber)
   }
 
+  // Opening a report navigates away from the board — mid-tour that would
+  // otherwise silently graduate/abort the flow, so it's blocked with a nudge
+  // back to finishing it instead.
+  const tourActive = useTourActive()
+  const tourCardEl = useCoachTarget("jc-card")
+  // The coachmark card's own centerX (published by JobcostIntro) — aligning
+  // to this instead of re-deriving the card's rect keeps the nudge in exact
+  // horizontal lockstep with the tooltip beneath it.
+  const tourCardPos = useTourCardPos()
+  const [tourBlockedTip, setTourBlockedTip] = useState<{ left: number; top: number } | null>(null)
+  const tourBlockedTipTimer = useRef<number | null>(null)
+  useEffect(() => () => {
+    if (tourBlockedTipTimer.current != null) window.clearTimeout(tourBlockedTipTimer.current)
+  }, [])
+
+  function openProperty(group: Group) {
+    if (tourActive) {
+      const r = tourCardEl?.getBoundingClientRect()
+      const left = tourCardPos?.centerX ?? (r ? r.left + r.width / 2 : window.innerWidth / 2)
+      const top = r ? r.top - 10 : 80
+      setTourBlockedTip({ left, top })
+      if (tourBlockedTipTimer.current != null) window.clearTimeout(tourBlockedTipTimer.current)
+      tourBlockedTipTimer.current = window.setTimeout(() => setTourBlockedTip(null), 2200)
+      return
+    }
+    goToProperty(group.key)
+  }
+
   function toggleGroup(group: Group) {
     setOpenGroupKey((k) => (k === group.key ? null : group.key))
     setOpenKind(null)
@@ -1624,6 +1808,30 @@ export default function Jobcost() {
       prev.includes(job.recnum) ? prev.filter((k) => k !== job.recnum) : [...prev, job.recnum],
     )
   }
+
+  // ── Job Costing tour (JobcostIntro) integration ──────────────────────────
+  // The tour host lives in App.tsx, outside this lazy chunk; it watches the
+  // board through tourBus and drives it through a registered controller
+  // (escape-hatch "Next" actions + the end-of-tour restore). The controller
+  // is a one-time delegator over a latest-values ref so its calls never see
+  // stale closures.
+  const segTargetRef = useMemo(() => coachTargetRef("jc-view-seg"), [])
+  const tourCtlRef = useRef<JobcostTourController | null>(null)
+  useEffect(() => {
+    const delegator: JobcostTourController = {
+      setView: (m) => tourCtlRef.current?.setView(m),
+      openFirstGroup: () => tourCtlRef.current?.openFirstGroup(),
+      openKind: (k) => tourCtlRef.current?.openKind(k),
+      openProperty: () => tourCtlRef.current?.openProperty(),
+      togglePinFirst: () => tourCtlRef.current?.togglePinFirst(),
+      restore: (b) => tourCtlRef.current?.restore(b),
+    }
+    registerJobcostTourController(delegator)
+    return () => {
+      registerJobcostTourController(null)
+      publishJobcostTourState(null)
+    }
+  }, [])
 
   function handleSort(key: SortKey) {
     // Text columns default asc, numeric columns default desc.
@@ -1725,13 +1933,17 @@ export default function Jobcost() {
           g.key.toLowerCase().includes(q) ||
           g.client.toLowerCase().includes(q) ||
           [...g.phases, ...g.oneoffs].some(
-            (m) => m.name?.toLowerCase().includes(q) || m.jobNumber?.toLowerCase().includes(q),
+            (m) =>
+              m.name?.toLowerCase().includes(q) ||
+              m.oneoffName?.toLowerCase().includes(q) ||
+              m.jobNumber?.toLowerCase().includes(q),
           ),
       )
     const sorted = [...list].sort((a, b) => {
       const dir = groupSortDir === "asc" ? 1 : -1
       let cmp = 0
       if (groupSort === "volume") cmp = a.contract - b.contract
+      else if (groupSort === "units") cmp = a.units - b.units
       else if (groupSort === "phases") cmp = a.phases.length - b.phases.length
       else if (groupSort === "projects") cmp = a.oneoffs.length - b.oneoffs.length
       else if (groupSort === "client") {
@@ -1760,6 +1972,50 @@ export default function Jobcost() {
     return [...pinned, ...rest]
   }, [jobs, search, statusFilter, groupSort, groupSortDir, hideClosed, pins, isDefaultView])
 
+  // Fresh controller each render (closures see current state); the registered
+  // delegator forwards into it. Restore reinstates the pre-tour view/pins and
+  // collapses whatever the tour opened.
+  tourCtlRef.current = {
+    setView: (m) => setViewMode(m),
+    openFirstGroup: () => {
+      const g = filteredGroups[0]
+      if (g) {
+        setOpenGroupKey(g.key)
+        setOpenKind(null)
+      }
+    },
+    openKind: (k) => {
+      setOpenGroupKey((key) => key ?? filteredGroups[0]?.key ?? null)
+      setOpenKind(k)
+    },
+    openProperty: () => {
+      const g = filteredGroups.find((x) => x.key === openGroupKey) ?? filteredGroups[0]
+      if (g) goToProperty(g.key)
+    },
+    togglePinFirst: () => {
+      const g = filteredGroups[0]
+      if (g) togglePin(g)
+    },
+    restore: (b) => {
+      setViewMode(b.view === "grouped" ? "grouped" : "list")
+      setPins(b.pins)
+      setOpenGroupKey(null)
+      setOpenKind(null)
+    },
+  }
+
+  // Publish the snapshot the tour advances on (shallow-eq guarded in the bus).
+  useEffect(() => {
+    publishJobcostTourState({
+      view: grouped ? "grouped" : "list",
+      loading,
+      groupCount: filteredGroups.length,
+      openGroupKey,
+      openKind,
+      pins,
+    })
+  })
+
   const resultCount = groupedContent ? filteredGroups.length : filtered.length
   const resultNoun = groupedContent
     ? resultCount === 1 ? "Property" : "Properties"
@@ -1775,7 +2031,7 @@ export default function Jobcost() {
         {!isMobile && (
           <MotionItem>
             <div className="jc-command-bar">
-              <div className="jc-seg" role="tablist" aria-label="View mode">
+              <div ref={segTargetRef} className="jc-seg" role="tablist" aria-label="View mode">
                 <button
                   type="button"
                   role="tab"
@@ -1933,7 +2189,12 @@ export default function Jobcost() {
                 />
               </div>
               <MobileFilterButton
-                count={activeFilterCount({ status: String(statusFilter) }, FILTER_DEFAULTS)}
+                count={activeFilterCount(
+                  isManager
+                    ? { status: String(statusFilter), scope: showAllProjects ? "all" : "mine" }
+                    : { status: String(statusFilter) },
+                  isManager ? MANAGER_FILTER_DEFAULTS : FILTER_DEFAULTS,
+                )}
                 onClick={() => setFilterSheetOpen(true)}
               />
               <span className="co-count subheadline text-secondary">
@@ -2107,6 +2368,7 @@ export default function Jobcost() {
                       onOpenKind={openWithKind}
                       onOpenJob={openJob}
                       onTogglePin={togglePin}
+                      onOpenProperty={openProperty}
                     />
                   )}
                 </motion.div>
@@ -2165,18 +2427,48 @@ export default function Jobcost() {
         <MobileFilterSheet
           open={filterSheetOpen}
           onClose={() => setFilterSheetOpen(false)}
-          groups={
-            hideClosed
+          groups={(() => {
+            const base = hideClosed
               ? FILTER_GROUPS.map((g) =>
                   g.key === "status" ? { ...g, options: g.options.filter((o) => o.value !== "6") } : g,
                 )
               : FILTER_GROUPS
+            return isManager ? [SCOPE_GROUP, ...base] : base
+          })()}
+          values={
+            isManager
+              ? { status: String(statusFilter), scope: showAllProjects ? "all" : "mine" }
+              : { status: String(statusFilter) }
           }
-          values={{ status: String(statusFilter) }}
-          defaults={FILTER_DEFAULTS}
-          onChange={(v) => setStatusFilter(v.status === "all" ? "all" : Number(v.status))}
+          defaults={isManager ? MANAGER_FILTER_DEFAULTS : FILTER_DEFAULTS}
+          onChange={(v) => {
+            setStatusFilter(v.status === "all" ? "all" : Number(v.status))
+            if (isManager) setShowAllProjects(v.scope === "all")
+          }}
         />
       )}
+
+      <AnimatePresence>
+        {tourBlockedTip && (
+          // Plain outer div for the centering transform: framer-motion owns
+          // `transform` entirely once it's animating x/y/scale, so a CSS
+          // `translate(-50%, -100%)` on the SAME element it animates gets
+          // silently clobbered. The inner motion.div is free to animate its
+          // own transform for the fade/slide without disturbing this anchor.
+          <div className="jc-tour-blocked-tip-anchor" style={{ left: tourBlockedTip.left, top: tourBlockedTip.top }}>
+            <motion.div
+              className="jc-tour-blocked-tip"
+              role="status"
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 4, transition: { duration: 0.18 } }}
+              transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              Finish the tour before opening a report
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </Page>
   )
 }

@@ -198,7 +198,7 @@ export function JobDetailPanel({ detail, expandedGroups, onToggleGroup }: JobDet
             valueClass={projProfit >= 0 ? "jc-margin-high" : "jc-margin-critical"}
           />
           <SummaryRow
-            label="Projected Margin"
+            label={s?.status != null && s.status >= 5 ? "Final Margin" : "Current Margin"}
             value={formatMargin(projPct)}
             valueClass={marginColorsOn ? marginClass(projPct) : undefined}
             total

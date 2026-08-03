@@ -45,6 +45,8 @@ export const WIDGET_HOME_SECTION: Record<WidgetId, SectionId> = {
   dataQuality: "reports",
   missingContracts: "reports",
   openProjectsNoBudget: "reports",
+  missingUnitCounts: "reports",
+  missingOneOffNames: "reports",
   // Business Development
   currentYearRevenue: "businessDevelopment",
   allTimeRevenue: "businessDevelopment",
@@ -85,6 +87,8 @@ export const WIDGET_DEFAULT_ORDER: WidgetId[] = [
   "dataQuality",
   "missingContracts",
   "openProjectsNoBudget",
+  "missingUnitCounts",
+  "missingOneOffNames",
   // Business Development
   "currentYearRevenue",
   "allTimeRevenue",

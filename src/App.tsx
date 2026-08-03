@@ -12,6 +12,7 @@ import AnalyticsTracker from "./shared/analytics/AnalyticsTracker"
 import IdleRefreshOverlay from "./core/components/IdleRefreshOverlay"
 import { DailyReportProvider } from "./modules/dashboard/report/DailyReportProvider"
 import { useAdminOnboardingTour } from "./modules/dashboard/onboarding/AdminOnboarding"
+import { JobcostIntro } from "./modules/jobcost/onboarding/JobcostIntro"
 import "./App.css"
 
 export default function App() {
@@ -64,6 +65,10 @@ export default function App() {
         <Outlet />
         {isMobile && <MobileNav />}
         {tour}
+        {/* One-time Job Costing redesign intro (jobcost-intro milestone).
+            Lives here, not in the lazy Jobcost chunk, so a /jobcost refresh
+            paints the takeover with the shell — never after the navbar. */}
+        <JobcostIntro />
       </div>
     </DailyReportProvider>
   )

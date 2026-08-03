@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, ChevronRight } from "lucide-react"
-import { useParams } from "react-router-dom"
+import { Link, useParams } from "react-router-dom"
 import { useJobcostNav } from "../jobcost/useJobcostNav"
 import useIsMobile from "../../shared/hooks/useIsMobile"
 import Page from "../../shared/components/Page"
@@ -326,6 +326,69 @@ function StatCard({
   )
 }
 
+// ── "Table moved" notice (manager home only) ───────────────────────────────
+// The manager home's Projects table now lives on /jobcost. In its place, a
+// centered pointer shows until the manager clicks through OR has seen it on
+// three separate visits; after that the page simply ends at the yearly charts.
+// (Admins' /employees/:id view keeps the table.) Self-contained persistence —
+// a view *count* doesn't fit the onboarding engine's seen-once milestones.
+const JC_MOVED_KEY = "jobcostTableMovedNotice"
+
+interface JcMovedState {
+  views: number
+  dismissed: boolean
+}
+
+function readJcMovedState(): JcMovedState {
+  try {
+    const raw = localStorage.getItem(JC_MOVED_KEY)
+    if (raw) return JSON.parse(raw) as JcMovedState
+  } catch {
+    /* corrupt value — treat as unseen */
+  }
+  return { views: 0, dismissed: false }
+}
+
+function JobcostMovedNotice() {
+  // Decided once at mount, from the state *before* this visit is counted —
+  // so the notice shows on visits 1–3 and never flickers away mid-session
+  // when its own view increment lands.
+  const [visible] = useState(() => {
+    const s = readJcMovedState()
+    return !s.dismissed && s.views < 3
+  })
+
+  // Count this visit once (ref guards StrictMode's double effect run).
+  const counted = useRef(false)
+  useEffect(() => {
+    if (!visible || counted.current) return
+    counted.current = true
+    const s = readJcMovedState()
+    localStorage.setItem(JC_MOVED_KEY, JSON.stringify({ ...s, views: s.views + 1 }))
+  }, [visible])
+
+  if (!visible) return null
+  return (
+    <MotionItem className="col-span-full">
+      <p className="jc-moved-notice">
+        Your projects table has moved to the{" "}
+        <Link
+          to="/jobcost"
+          onClick={() =>
+            localStorage.setItem(
+              JC_MOVED_KEY,
+              JSON.stringify({ ...readJcMovedState(), dismissed: true })
+            )
+          }
+        >
+          Job Costing
+        </Link>{" "}
+        page.
+      </p>
+    </MotionItem>
+  )
+}
+
 export default function EmployeeDetailPage() {
   const { employeeNum } = useParams<{ employeeNum: string }>()
   const numericId = Number(employeeNum)
@@ -603,8 +666,8 @@ export function EmployeeDetail({
               loading={isLoading}
               onClick={() => setActiveModal("closed")}
             />
-            {/* GM home: the four data-validation reports (admin home's Reports
-                section) as a 2x2 pill cluster inside a fourth card, so the
+            {/* GM home: the data-validation reports (admin home's Reports
+                section) as a pill cluster inside a fourth card, so the
                 strip belongs to the stat-card family instead of floating. */}
             {gmHome && (
               <div className="gm-reports-card">
@@ -614,6 +677,8 @@ export function EmployeeDetail({
                   <ReportWidget reportId="dataQuality" compact />
                   <ReportWidget reportId="missingContracts" compact />
                   <ReportWidget reportId="openProjectsNoBudget" compact />
+                  <ReportWidget reportId="missingUnitCounts" compact />
+                  <ReportWidget reportId="missingOneOffNames" compact />
                 </div>
               </div>
             )}
@@ -661,12 +726,21 @@ export function EmployeeDetail({
                   data: monthlyMarginBars.bars,
                   yFormat: formatPercent,
                   colorBy: marginColorsOn ? marginColor : undefined,
+                  barGradient: true,
                   scaleType: "symlog",
                   scaleConstant: monthlyMarginBars.scaleConstant,
                   minValue: monthlyMarginBars.minValue,
                   maxValue: monthlyMarginBars.maxValue,
                   axisLeftTickValues: monthlyMarginBars.ticks,
                   emphasizeZero: true,
+                  // Full-height column hover (same as the admin home's margin
+                  // chart) so near-zero months are as hoverable as tall bars.
+                  barTooltip: (label, value) => (
+                    <div className="chart-tooltip">
+                      <span>{label}</span>
+                      <strong>{formatPercent(value)}</strong>
+                    </div>
+                  ),
                 }}
               />
             )}
@@ -690,18 +764,30 @@ export function EmployeeDetail({
                   data: marginBars.bars,
                   yFormat: formatPercent,
                   colorBy: marginColorsOn ? marginColor : undefined,
+                  barGradient: true,
                   scaleType: "symlog",
                   scaleConstant: marginBars.scaleConstant,
                   minValue: marginBars.minValue,
                   maxValue: marginBars.maxValue,
                   axisLeftTickValues: marginBars.ticks,
                   emphasizeZero: true,
+                  barTooltip: (label, value) => (
+                    <div className="chart-tooltip">
+                      <span>{label}</span>
+                      <strong>{formatPercent(value)}</strong>
+                    </div>
+                  ),
                 }}
               />
             )}
           </Widget>
         </MotionItem>
 
+        {/* Manager home: the table moved to /jobcost — show the (self-
+            expiring) pointer instead. Admin /employees/:id keeps the table. */}
+        {isManagerHome ? (
+          <JobcostMovedNotice />
+        ) : (
         <MotionItem className="col-span-full">
           <Widget
             title="Projects"
@@ -735,6 +821,7 @@ export function EmployeeDetail({
             )}
           </Widget>
         </MotionItem>
+        )}
         </>
         )}
       </MotionList>

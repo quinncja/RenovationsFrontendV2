@@ -1,7 +1,9 @@
 import type { ReactNode } from "react"
 
 interface PageProps {
-  title: string
+  /** Usually the page name; pages that resolve their title from fetched data
+   *  can pass a SkelText shimmer while loading so the header doesn't reflow. */
+  title: ReactNode
   subtitle?: ReactNode
   actions?: ReactNode
   stickyHeader?: boolean

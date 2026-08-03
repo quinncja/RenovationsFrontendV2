@@ -5,7 +5,18 @@
 
 import { useCallback, useSyncExternalStore } from "react"
 
-export type CoachTargetId = "edit-gear" | "wip-toggle" | "nav-jobcost" | "nav-finances"
+export type CoachTargetId =
+  | "edit-gear"
+  | "wip-toggle"
+  | "nav-jobcost"
+  | "nav-finances"
+  // The navbar root — measured (not spotlighted) by overlays that cover the
+  // page content and must stop at the nav's live edge.
+  | "navbar"
+  // Job Costing interactive tour (JobcostIntro): the taught board controls.
+  | "jc-view-seg"
+  | "jc-card"
+  | "jc-card-pin"
 
 const targets = new Map<CoachTargetId, HTMLElement>()
 const listeners = new Map<CoachTargetId, Set<() => void>>()
@@ -21,6 +32,26 @@ export function registerCoachTarget(id: CoachTargetId, el: HTMLElement | null): 
     targets.delete(id)
   }
   listeners.get(id)?.forEach((fn) => fn())
+}
+
+/** Instance-safe callback ref for targets whose owner can change identity
+ *  while both instances are briefly mounted (an AnimatePresence swap: the
+ *  entering owner registers before the exiting one unmounts). The plain
+ *  register would let the old instance's trailing `null` delete the new
+ *  registration; this ref only deletes what IT registered. Memoize per
+ *  component instance (useMemo) so React sees a stable ref identity. */
+export function coachTargetRef(id: CoachTargetId): (el: HTMLElement | null) => void {
+  let mine: HTMLElement | null = null
+  return (el) => {
+    if (el) {
+      mine = el
+      targets.set(id, el)
+    } else {
+      if (mine && targets.get(id) === mine) targets.delete(id)
+      mine = null
+    }
+    listeners.get(id)?.forEach((fn) => fn())
+  }
 }
 
 export function useCoachTarget(id: CoachTargetId): HTMLElement | null {

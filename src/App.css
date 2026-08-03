@@ -1666,6 +1666,62 @@ body{
   animation: shimmer 3.2s linear infinite;
 }
 
+/* Text-shaped shimmer (SkelText.tsx): rendered inside — or carrying — the
+   loaded text's real type class, its nbsp content takes that class's exact
+   line box, so skeleton heights ride the type scale instead of hand-tuned
+   pixels. span+class specificity lets it repaint companion classes (e.g.
+   .status-badge) while staying under contextual overrides like
+   .jcd-hero .skel-text. */
+span.skel-text {
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 6px;
+  user-select: none;
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 20%,
+    color-mix(in srgb, var(--primary-text) 2%, var(--card-color)) 50%,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 80%
+  );
+  background-size: 900px 100%;
+  animation: shimmer 3.2s linear infinite;
+}
+
+/* Donut-shaped shimmer for pie skeletons (ChartSkeletons.tsx) — ring
+   proportion matches the loaded pie's innerRadius (0.55). */
+.skel-donut {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 20%,
+    color-mix(in srgb, var(--primary-text) 2%, var(--card-color)) 50%,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 80%
+  );
+  background-size: 900px 100%;
+  animation: shimmer 3.2s linear infinite;
+  -webkit-mask: radial-gradient(closest-side, transparent 57%, #000 58%);
+  mask: radial-gradient(closest-side, transparent 57%, #000 58%);
+}
+
+/* Chart-area skeleton: the shimmer stretches inside the SAME .chart-container
+   the loaded plot renders into, so per-widget min-height overrides on that
+   class (e.g. .jcd-chart-widget's) size both states identically. */
+.chart-container--skel { display: flex; }
+.chart-container--skel .skel-fill {
+  flex: 1;
+  border-radius: 8px;
+  background: linear-gradient(
+    115deg,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 20%,
+    color-mix(in srgb, var(--primary-text) 2%, var(--card-color)) 50%,
+    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 80%
+  );
+  background-size: 900px 100%;
+  animation: shimmer 3.2s linear infinite;
+}
+
 /* ─── Chart container ────────────────────────────────────────────────── */
 
 /* @nivo/core v0.99 wraps ResponsiveLine in react-virtualized-auto-sizer,
@@ -2564,6 +2620,22 @@ body{
   color: var(--primary-text);
   font-size: 2.25rem;
   line-height: 1;
+}
+
+/* Manager home — quiet centered pointer where the Projects table used to be.
+   Self-expires (click-through or three views), so it stays understated: no
+   card, just secondary text with a copper link. */
+.jc-moved-notice {
+  margin: 0;
+  padding: 1.5rem 0 0.5rem;
+  text-align: center;
+  color: var(--secondary-text);
+}
+
+.jc-moved-notice a {
+  color: var(--primary-color);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* Title stays pinned to the top line shared by every card in the row; the
@@ -3949,6 +4021,7 @@ body{
 .jc-summary-row.total {
   margin-top: 0.25rem;
   padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
 }
 
 .jc-summary-label {
@@ -4126,8 +4199,10 @@ body{
 .jc-group-row:hover .jc-group-chevron { color: var(--primary-text); }
 
 /* Variance colors */
-.jc-variance-over  { color: #dc2626; }
-.jc-variance-under { color: #16a34a; }
+/* Same hues as marginTextColor() so a variance and its margin row read as
+   one palette. */
+.jc-variance-over  { color: #ef4444; }
+.jc-variance-under { color: #22c55e; }
 
 /* Cost Breakdown uses the standard spend-rank-table look. Inside the Job
    Costing list it lives in a `.co-widget`, where the change-orders column-gap
@@ -4174,15 +4249,6 @@ body{
 .jc-expand-chevron.open { transform: rotate(90deg); }
 .jc-view-th { width: 1px; }
 .jc-view-cell { text-align: right; white-space: nowrap; }
-.jc-view-btn { font-size: 0.8125rem; padding: 0.3rem 0.7rem; }
-/* Open-project affordance hovers like the header YearSelector: quiet gray
-   fill, border unchanged (the .secondary-button border-darken read as a
-   different control language). .button. prefix outranks .secondary-button. */
-.button.jc-view-btn:hover {
-  border-color: var(--border-color);
-  background: var(--hover-bg);
-  color: var(--primary-text);
-}
 
 /* Open job — same neutral language as an open property card: the quiet 2%
    ink wash inside a rounded ink-darkened 1px frame, no copper. The frame
@@ -4272,15 +4338,7 @@ body{
 /* Pin + view tiles sit as one cluster in the actions cell; both center on
    the row's text baseline. The view tile keeps its "View" label — same tile
    surface, widened by padding instead of the fixed square. */
-.jc-row-pin { margin-right: 0.375rem; vertical-align: middle; }
-.jc-view-cell .jc-view-tile {
-  vertical-align: middle;
-  width: auto;
-  padding: 0 0.55rem;
-  gap: 0.3rem;
-  font-size: 0.8125rem;
-  font-weight: var(--font-weight-medium);
-}
+.jc-row-pin { margin-left: 0.375rem; vertical-align: middle; }
 /* Open-row backgrounds move to the cells so the corner radii clip them; the
    tr itself must stay transparent in every state or its square fill shows
    behind the rounded corners. */
@@ -4325,6 +4383,123 @@ body{
   box-shadow:
     0 1px 2px rgb(from var(--jc-shadow-ink) r g b / 0.05),
     0 18px 40px -26px rgb(from var(--jc-shadow-ink) r g b / 0.45);
+}
+
+/* ── Cost Breakdown: open category = the project table's pop-out card ── */
+/* An open category (row + its line-item sub-table) lifts out as one rounded,
+   ink-framed, softly-shadowed block — the exact jc-row-open treatment above,
+   scoped to the breakdown table so it reads identically on the detail page
+   and inside the Job Costing list's expanded rows. Rounded corners need
+   border-collapse: separate, where tr borders/backgrounds don't render — so
+   dividers and open styling move to the CELLS (transparent frame borders are
+   reserved on every row so opening only recolors them, never resizes). */
+.jc-cost-breakdown {
+  --jc-open-border: color-mix(in srgb, var(--primary-text) 18%, var(--border-color));
+  --jc-open-radius: 12px;
+  --jc-shadow-ink: light-dark(var(--primary-text), #000);
+  border-collapse: separate;
+  border-spacing: 0;
+}
+/* The base thead divider lives on the tr, which separate mode drops. */
+.jc-cost-breakdown > thead th {
+  border-bottom: 1px solid var(--border-color);
+}
+.jc-cost-breakdown > tbody > .spend-rank-table-row > td {
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 120ms ease, border-color 180ms ease, border-radius 180ms ease;
+}
+.jc-cost-breakdown > tbody > .spend-rank-table-row > td:first-child {
+  border-left: 1px solid transparent;
+}
+.jc-cost-breakdown > tbody > .spend-rank-table-row > td:last-child {
+  border-right: 1px solid transparent;
+}
+/* Dividers that would sit flush against an open block's ink border-top read
+   as a doubled seam — blank the one on the row (or header) above it. */
+.jc-cost-breakdown > tbody:has(+ tbody > .jc-row-open) > .spend-rank-table-row > td {
+  border-bottom-color: transparent;
+}
+.jc-cost-breakdown > thead:has(+ tbody > .jc-row-open) th {
+  border-bottom-color: transparent;
+}
+/* Category rows are toggle surfaces: no text selection, and neutral gray
+   press feedback — the app-wide --active-bg is copper-tinted, which read as
+   an orange flicker on click (the detail page had no override). */
+.jc-cost-breakdown .spend-rank-table-row {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.jc-cost-breakdown .spend-rank-table-row:active {
+  background: rgb(from var(--primary-text) r g b / 0.08);
+}
+/* Open-row backgrounds move to the cells so the corner radii clip them; the
+   tr itself must stay transparent in every state. */
+.jc-cost-breakdown .spend-rank-table-row.jc-row-open,
+.jc-cost-breakdown .spend-rank-table-row.jc-row-open:hover,
+.jc-cost-breakdown .spend-rank-table-row.jc-row-open:active {
+  background: transparent;
+}
+.jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open > td {
+  background: rgb(from var(--primary-text) r g b / 0.02);
+  border-top-color: var(--jc-open-border);
+}
+.jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open:hover > td {
+  background: var(--hover-bg);
+}
+.jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open:active > td {
+  background: rgb(from var(--primary-text) r g b / 0.08);
+}
+.jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open > td:first-child {
+  border-left-color: var(--jc-open-border);
+  border-top-left-radius: var(--jc-open-radius);
+}
+.jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open > td:last-child {
+  border-right-color: var(--jc-open-border);
+  border-top-right-radius: var(--jc-open-radius);
+}
+/* Line-items cell: same wash, closing the frame with side borders, rounded
+   bottom corners, and the ambient drop the open project rows get. */
+.jc-cost-breakdown tr.jc-txn-container-row > td {
+  padding: 0;
+  background: rgb(from var(--primary-text) r g b / 0.02);
+  border-left: 1px solid var(--jc-open-border);
+  border-right: 1px solid var(--jc-open-border);
+  border-bottom: 1px solid var(--jc-open-border);
+  border-bottom-left-radius: var(--jc-open-radius);
+  border-bottom-right-radius: var(--jc-open-radius);
+  box-shadow:
+    0 1px 2px rgb(from var(--jc-shadow-ink) r g b / 0.05),
+    0 18px 40px -26px rgb(from var(--jc-shadow-ink) r g b / 0.45);
+}
+/* Height-animating reveal wrapper (framer): clips the sub-table to the
+   card's bottom radii while it opens/closes. */
+.jc-cost-breakdown .jc-txn-reveal {
+  overflow: hidden;
+  border-bottom-left-radius: calc(var(--jc-open-radius) - 1px);
+  border-bottom-right-radius: calc(var(--jc-open-radius) - 1px);
+}
+/* Inside the card the sub-table inherits the cell wash instead of painting
+   its own block, and row hover stays in the neutral gray family. */
+.jc-cost-breakdown .jc-txn-table { background: transparent; }
+.jc-cost-breakdown .jc-txn-row:hover { background: var(--hover-bg); }
+/* The Total divider normally comes from the last category row's cell border;
+   when that category is open, the card's ink bottom edge takes over. */
+/* Figures cluster tight on the right: numeric columns collapse to content
+   width so Budget → Actual → Variance → Variance % read in one short scan,
+   with the Category column absorbing the spare width. */
+.jc-cost-breakdown th.spend-rank-table-value,
+.jc-cost-breakdown td.spend-rank-table-value {
+  width: 1%;
+  white-space: nowrap;
+}
+/* Breathing room between the clustered figures: padding-left widens the
+   inter-column gap without touching the right-edge alignment. Extra
+   specificity (and the total row included via the shared value class) so it
+   beats the .co-widget padding neutralizer above. */
+.spend-rank-table.jc-cost-breakdown > thead > tr > th.spend-rank-table-value,
+.spend-rank-table.jc-cost-breakdown > tbody > tr > td.spend-rank-table-value {
+  padding-left: 2.5rem;
 }
 
 .jc-expand-panel {
@@ -4375,11 +4550,10 @@ body{
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border-color);
+  padding: 0.4375rem 0;
+  border-bottom: none;
   font-size: 0.875rem;
 }
-.jc-summary-row:last-child { border-bottom: none; }
 .jc-summary-label { color: var(--secondary-text); }
 /* Value cluster: an optional muted secondary figure (e.g. a variance's %
    form) sits just left of the primary figure, so the column of $ amounts
@@ -4396,9 +4570,32 @@ body{
   color: var(--secondary-text);
 }
 .jc-summary-value { font-variant-numeric: tabular-nums; color: var(--primary-text); }
+/* Drill-through row (e.g. the detail ledger's Change Orders → list modal):
+   hover surface bleeding slightly past the text column, trailing chevron. */
+.jc-summary-row-link {
+  cursor: pointer;
+  margin-inline: -0.5rem;
+  padding-inline: 0.5rem;
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+.jc-summary-row-link:hover { background: var(--hover-bg); }
+.jc-summary-chevron {
+  align-self: center;
+  flex: none;
+  color: var(--secondary-text);
+  margin-left: -0.125rem;
+}
 .jc-summary-total { font-weight: 700; }
 .jc-summary-total .jc-summary-label,
 .jc-summary-total .jc-summary-value { color: var(--primary-text); font-weight: 700; }
+/* Budget Remaining/Exceeded + margin pair at the card's foot render as one
+   tight block: no rule between them, halved inner padding, and the variance
+   tint outranks the total row's primary-text override. */
+.jc-summary-row.jc-summary-nodivider { border-bottom: none; padding-bottom: 0.125rem; }
+.jc-summary-row.jc-summary-nodivider + .jc-summary-row { padding-top: 0.125rem; }
+.jc-summary-total .jc-summary-value.jc-variance-over  { color: #ef4444; }
+.jc-summary-total .jc-summary-value.jc-variance-under { color: #22c55e; }
 
 /* Conclusion block inside a sub-card (Margin + Gross Profit): separated
    from the plain money lines above by a single rule under Committed +
@@ -4896,7 +5093,7 @@ body{
   box-sizing: border-box;
   gap: 0.4375rem;
   padding: 0.4375rem 0.375rem;
-  border: 1px solid var(--border-color);
+  border: 1px solid transparent;
   border-radius: 9px;
   background: rgb(from var(--primary-text) r g b / 0.03);
   color: var(--primary-text);
@@ -4906,10 +5103,9 @@ body{
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   cursor: pointer;
-  transition: border-color 160ms ease, background-color 160ms ease;
+  transition: background-color 160ms ease;
 }
 button.jc-kind-chip:hover {
-  border-color: color-mix(in srgb, var(--primary-text) 35%, var(--border-color));
   background: rgb(from var(--primary-text) r g b / 0.06);
 }
 .jc-kind-chip svg { color: var(--secondary-text); flex-shrink: 0; }
@@ -4946,6 +5142,17 @@ button.jc-kind-chip:hover {
 .jc-view-tile:focus-visible {
   outline: none;
   border-color: rgb(from var(--primary-color) r g b / 0.6);
+}
+/* Labeled variant of the tile: same borderless surface as the pin beside it,
+   widened by padding for the "View ↗" label instead of the fixed square.
+   Used in the Project list's actions cell and the property card head. */
+.jc-view-tile.jc-view-tile-wide {
+  vertical-align: middle;
+  width: auto;
+  padding: 0 0.55rem;
+  gap: 0.3rem;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
 }
 .jc-pin-btn-active {
   color: var(--primary-color);
@@ -5166,6 +5373,12 @@ button.jc-kind-chip:hover {
   /* Active title color eases in with the card's border/shadow shift. */
   transition: color 150ms ease;
 }
+/* The kind's rolled-up status badge escapes the title's uppercase voice so
+   it reads like every other status badge. */
+.jc-group-card-title .status-badge {
+  text-transform: none;
+  letter-spacing: normal;
+}
 .jc-group-card-count {
   display: inline-flex;
   align-items: center;
@@ -5336,6 +5549,9 @@ button.jc-kind-chip:hover {
   gap: 1rem;
 }
 .jcd-section-title { margin: 0; }
+/* Overview section: hero + ledger stack tighter than the page's standard
+   section rhythm, so the pair reads as one composed instrument. */
+.jcd-overview-section { gap: 0.875rem; }
 
 /* ── Overview hero ───────────────────────────────────────────────────
    The page's single opening instrument, on the shared ink-deck recipe
@@ -5374,17 +5590,17 @@ button.jc-kind-chip:hover {
 /* Live/done endpoint colors re-asserted over the muted recolor above. */
 .jcd-hero .jcd-tl-dot-open { background: var(--primary-color); }
 .jcd-hero .jcd-tl-dot-done { background: #22c55e; }
-/* Deck-surface shimmer stand-ins (the card-toned .jcd-skel-* mixes read
-   wrong on the ink deck) — recessed-well blocks at the loaded text sizes. */
-.jcd-verdict-skel {
-  display: inline-block;
-  border-radius: 4px;
-  background: var(--jcb-well);
+/* Hero skeleton bars ride the deck's recessed-well tone — the card-toned
+   .skel-text mixes read wrong on the ink surface. */
+.jcd-hero .skel-text {
+  background: linear-gradient(
+    115deg,
+    var(--jcb-well) 20%,
+    color-mix(in srgb, var(--jcb-text) 7%, var(--jcb-well)) 50%,
+    var(--jcb-well) 80%
+  );
+  background-size: 900px 100%;
 }
-.jcd-verdict-skel-label { width: 6.5rem; height: 0.6875rem; }
-.jcd-verdict-skel-fact { width: 5.5rem; height: 1.0625rem; }
-.jcd-verdict-skel-value { width: 5.5rem; height: 1.625rem; }
-.jcd-verdict-skel-bar { width: 100%; height: 14px; border-radius: 999px; }
 
 @media (max-width: 640px) {
   .jc-group-overview.jcd-hero {
@@ -5400,11 +5616,137 @@ button.jc-kind-chip:hover {
   gap: 1rem 3.5rem;
   justify-content: flex-start;
 }
-/* Identity register: hairline above it, since the verdict figures always
-   precede it. */
-.jcd-facts-identity {
+/* Identity register: one quiet inline line under the verdicts — inline
+   label·value pairs instead of a second rank of stacked facts, so only the
+   verdict figures read as figures and the hero keeps a single big register.
+   Uses the deck vars directly (the row only ever lives on the hero). */
+.jcd-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.375rem 2.25rem;
   border-top: 1px solid var(--jcb-line);
-  padding-top: 1.125rem;
+  padding-top: 1rem;
+}
+.jcd-meta {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5625rem;
+  min-width: 0;
+}
+.jcd-meta-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--jcb-muted);
+  white-space: nowrap;
+}
+.jcd-meta-value {
+  color: var(--jcb-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Drill-through meta values (Client → /clients/:id, PM → /employees/:id).
+   Affordance is a soft gray pill that fades in behind the value on hover —
+   negative margins cancel the padding so the resting layout doesn't shift. */
+.jcd-meta-link {
+  cursor: pointer;
+  padding: 0.25rem 0.5625rem;
+  margin: -0.25rem -0.5625rem;
+  border-radius: 999px;
+  transition: background-color 0.15s ease;
+}
+.jcd-meta-link:hover {
+  background: color-mix(in srgb, var(--jcb-text) 9%, transparent);
+}
+/* ── Property strip + phase rail ─────────────────────────────────────
+   The hero register between identity and timeline: prev/next neighbor
+   chevrons at the register's edges, the property centered as the anchor —
+   one quiet line in the deck's meta voice, hover-pill fades for
+   affordance, no contained buttons and no copper (the timeline's open dot
+   stays the hero's one accent). */
+/* Left-aligned like the meta row above: prev · property · next reading as
+   one inline cluster, not spread to the register's edges. */
+.jcd-prop-strip {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.375rem;
+  border-top: 1px solid var(--jcb-line);
+  padding-top: 1rem;
+}
+.jcd-rail-end,
+.jcd-prop-link {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: none;
+  font-family: var(--font-family);
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background-color 160ms ease;
+}
+.jcd-rail-end:hover:not(:disabled),
+.jcd-prop-link:hover {
+  background: color-mix(in srgb, var(--jcb-text) 9%, transparent);
+}
+.jcd-rail-end:focus-visible,
+.jcd-prop-link:focus-visible {
+  outline: 1.5px solid rgb(from var(--primary-color) r g b / 0.6);
+  outline-offset: 1px;
+}
+.jcd-rail-end {
+  gap: 0.4375rem;
+  padding: 0.25rem 0.5625rem;
+}
+/* At the sequence's ends the control rests as a dimmed chevron — quiet
+   punctuation, not a dead button. */
+.jcd-rail-end:disabled { cursor: default; }
+.jcd-rail-end:disabled .jcd-rail-chevron { opacity: 0.3; }
+.jcd-rail-chevron { color: var(--jcb-muted); flex-shrink: 0; }
+.jcd-rail-end:hover:not(:disabled) .jcd-rail-chevron { color: var(--jcb-text); }
+/* Neighbors stay muted at rest so the property anchor owns the line. */
+.jcd-rail-end-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  color: var(--jcb-muted);
+  transition: color 160ms ease;
+}
+.jcd-rail-end:hover:not(:disabled) .jcd-rail-end-label { color: var(--jcb-text); }
+.jcd-rail-end-text {
+  display: inline-block;
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.jcd-prop-link {
+  gap: 0.4375rem;
+  padding: 0.25rem 0.75rem;
+  min-width: 0;
+}
+.jcd-prop-name {
+  color: var(--jcb-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 24rem;
+}
+.jcd-prop-count {
+  color: var(--jcb-muted);
+  white-space: nowrap;
+}
+.jcd-prop-icon {
+  color: var(--jcb-muted);
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .jcd-prop-strip { gap: 0.5rem; }
+  .jcd-prop-name { max-width: 11rem; }
+  .jcd-rail-end-text { max-width: 4.5rem; }
 }
 .jcd-fact {
   display: flex;
@@ -5476,64 +5818,501 @@ button.jc-kind-chip:hover {
 }
 .jcd-tl-dot-done { background: #22c55e; }
 
-/* Summary-card skeletons — shaped like the loaded content so the layout
-   doesn't jump when data lands. Shimmer comes from the shared .jcd-skel-*
-   primitives. */
-.jcd-timeline-skeleton { padding-top: 1.375rem; }
-.jcd-skel-sum-title { width: 8.5rem; height: 0.75rem; margin: 0.125rem 0 0.875rem; }
-.jcd-skel-sum-label { width: 42%; margin-top: 0; height: 0.8125rem; }
-.jcd-skel-sum-value { width: 22%; margin-top: 0; height: 0.8125rem; }
-
-/* Shared KPI cluster: the ONE stat-strip treatment for every list card on
-   the page (Invoices, Change Orders) — quiet left-aligned label-over-value
-   pairs with hairline dividers, replacing the old full-width KPI thirds.
-   Double-class specificity beats the generic mobile inv-metrics-row grid. */
-.jcd-invoices-widget.widget { min-height: 0; }
-.jcd-section .jcd-kpis {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: stretch;
-  gap: 0.75rem 1.75rem;
-  border-top: none;
-  border-bottom: 1px solid var(--border-color);
-  background: none;
-  margin-bottom: 0.25rem;
-  padding: 0.125rem 0 1rem;
+/* ── Overview ledger ─────────────────────────────────────────────────
+   The hero's itemization: contract build-up | cost build-up in ONE card
+   split by a center hairline, on the hero's 14px radius and 1.75rem side
+   gutters so the two stack as a single composed unit (one shadow, not
+   two competing cards). */
+.card.jcd-ledger {
+  border-radius: 14px;
+  padding: 1.5rem 1.75rem 1.625rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
-.jcd-section .jcd-kpis .inv-metric {
-  flex: 0 0 auto;
-  padding: 0;
-  background: none;
-  gap: 0.25rem;
+.jcd-ledger-col { min-width: 0; }
+.jcd-ledger-col:first-child { padding-right: 2.25rem; }
+.jcd-ledger-col + .jcd-ledger-col {
+  border-left: 1px solid var(--border-color);
+  padding-left: 2.25rem;
 }
-.jcd-section .jcd-kpis .inv-metric-divider {
-  display: block;
-  width: 1px;
-  align-self: stretch;
-  background: var(--border-color);
+@media (max-width: 720px) {
+  .card.jcd-ledger { grid-template-columns: 1fr; padding: 1.125rem 1.25rem; }
+  .jcd-ledger-col:first-child { padding-right: 0; padding-bottom: 1rem; }
+  .jcd-ledger-col + .jcd-ledger-col {
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+    padding-left: 0;
+    padding-top: 1rem;
+  }
 }
-.jcd-section .jcd-kpis .inv-metric-value {
-  font-size: 1.1875rem;
-  letter-spacing: -0.01em;
-}
-/* Change Orders variant: lives inside the card's clickable toggle header,
-   so it aligns to the header's 1.25rem gutter; no bottom rule (the
-   collapsible body draws its own edge). */
-.jcd-section .jcd-kpis.jcd-co-kpis {
-  padding: 0 1.25rem 1.125rem;
+/* Detail-page refinement (scoped so the list's expanded-panel cards keep
+   their ruled look): the build-up lines run quiet with no hairlines, and
+   each column closes accountant-style — a single sum rule above its total
+   row. The variance well's own top rule then reads as the classic double
+   rule under the bottom line. */
+.jcd-ledger .jc-summary-title { margin-bottom: 0.875rem; }
+.jcd-ledger .jc-summary-row {
   border-bottom: none;
-  margin-bottom: 0;
+  padding: 0.4375rem 0;
+}
+.jcd-ledger .jc-summary-total {
+  border-top: 1px solid var(--border-color);
+  margin-top: 0.375rem;
+  padding-top: 0.6875rem;
+}
+/* The ledger draws its total rule as a border-TOP, so the budget-remaining +
+   margin pair needs its own scoped fix: keep the rule above the pair, drop
+   the one between them, and tighten the gap to match the list page. */
+.jcd-ledger .jc-summary-row.jc-summary-nodivider { padding-bottom: 0.125rem; }
+.jcd-ledger .jc-summary-nodivider + .jc-summary-total {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0.125rem;
+}
+/* The variance total sits inside the well, which already draws the rule. */
+.jcd-ledger .jc-summary-totals { margin-top: 0.5rem; padding-top: 0.5rem; }
+.jcd-ledger .jc-summary-totals .jc-summary-total {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0.25rem;
 }
 
-/* Phases table card (consolidated projects only). */
-.jcd-phases-card { padding: 1rem 1.25rem; }
+/* ─── Billing Position: invoice disclosure strip + drawer ──
+   The invoice records live inside the Billing Position card behind a
+   flush full-width strip: label + count on the left, chevron on the
+   right, the whole strip is the toggle. The drawer height-animates and
+   holds the same flush sortable table the standalone widget used
+   (.inv-table cells carry their own 1.25rem inline padding). */
+.jcd-inv-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.875rem 1.25rem;
+  border: none;
+  border-top: 1px solid var(--border-color);
+  background: none;
+  font: inherit;
+  color: var(--primary-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.jcd-inv-strip:hover { background: color-mix(in srgb, var(--primary-text) 3%, transparent); }
+.jcd-inv-strip:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
+}
+.jcd-inv-strip-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  min-width: 0;
+}
+.jcd-inv-strip-title {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+}
+.jcd-inv-strip-count {
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  white-space: nowrap;
+}
+.jcd-inv-strip-chevron {
+  flex: none;
+  color: var(--secondary-text);
+  transition: transform 0.25s ease;
+}
+.jcd-inv-strip[aria-expanded="true"] .jcd-inv-strip-chevron { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .jcd-inv-strip-chevron { transition: none; }
+}
+/* framer-motion animates the drawer's height; the inner wrapper owns the
+   horizontal scroll so the wide table works on phones. */
+.jcd-inv-drawer { overflow: hidden; }
+.jcd-inv-drawer-scroll { overflow-x: auto; }
+/* No-invoices, no-position state: one quiet line on the card gutter. */
+.jcd-inv-empty {
+  padding: 0.375rem 1.25rem 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+}
+/* Phases table card (consolidated projects only) — flush table like the
+   invoices card: the head keeps the gutter, cells pad themselves. */
+.jcd-phases-card { padding: 1rem 0 0; overflow: hidden; }
 .jcd-phases-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 0.5rem;
+  padding: 0 1.25rem;
 }
 .jcd-phases-count { font-size: 0.8125rem; color: var(--secondary-text); }
+
+/* ─── Property detail page (PropertyDetailPage.tsx) ──
+   Rides the jcd-* dress wholesale; pd-* covers what the property view adds:
+   the hero backdrop art, the job tiles strip, the kind-ledger drill columns,
+   the PM history pills, and the Kind cell in the jobs table. */
+
+/* ── Hero backdrop art ──
+   Both detail heroes wear a big recessed brand-orange mark — a building
+   silhouette on the property page, a giant phase number (or stacked ONE/OFF)
+   on the project page. The art is drawn oversized and the hero clips it, so
+   the surface reads as a mask over a larger scene. Content children get a
+   stacking level above it. */
+.jc-group-overview.jcd-hero.pd-hero {
+  position: relative;
+  overflow: hidden;
+  /* Drop the deck recipe's copper corner bloom: it sits exactly where the
+     backdrop art lives and smudged into it — on these heroes the art IS the
+     corner interest. */
+  background: linear-gradient(180deg, var(--jcb-s1) 0%, var(--jcb-s2) 100%);
+}
+.pd-hero > * { position: relative; z-index: 1; }
+.pd-hero .pd-hero-art {
+  position: absolute;
+  z-index: 0;
+  /* Full-bleed box: the fade mask below only paints INSIDE this element's
+     box, so a shrink-wrapped box would clip oversized/scaled art at its own
+     edge (the "text cut off" bug). Alignment happens inside via flex. */
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none;
+  /* light-dark() only takes colors, so the recessed strength rides the
+     color's alpha (opacity would need a number). */
+  color: light-dark(
+    rgb(from var(--primary-color) r g b / 0.11),
+    rgb(from var(--primary-color) r g b / 0.16)
+  );
+  /* Dissolve toward the hero's foot so the timeline register beneath never
+     sits on solid art. Pinned to the bottom edge with a FIXED extent (not
+     percentages): the hero's height changes between skeleton and loaded
+     states, and %-based stops would visibly slide across the art. */
+  mask-image: linear-gradient(to top, transparent 0, #000 7rem);
+}
+/* The hero's register hairlines (matrix, meta row, timeline) dissolve toward
+   the right edge instead of slicing across the building art — the rule reads
+   at full strength under the content, then hands the corner to the backdrop.
+   Property hero only: the project hero's art is centered-right type that
+   lives above its rules. */
+.pd-hero .pd-matrix,
+.pd-hero .jcd-meta-row,
+.pd-hero .jcd-timeline {
+  border-top: none;
+  position: relative;
+}
+.pd-hero .pd-matrix::before,
+.pd-hero .jcd-meta-row::before,
+.pd-hero .jcd-timeline::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(to right, var(--jcb-line) 55%, transparent 90%);
+}
+/* No backdrop art on phones — the rules stay full-strength. */
+@media (max-width: 640px) {
+  .pd-hero .pd-matrix::before,
+  .pd-hero .jcd-meta-row::before,
+  .pd-hero .jcd-timeline::before {
+    background: var(--jcb-line);
+  }
+}
+
+.pd-art-svg {
+  /* Top-anchored and FIXED-size, so the art is geometrically independent of
+     the hero's height — the skeleton→loaded resize reveals more or less of
+     it (via the hero's crop + foot fade) instead of displacing it. The
+     anchor also keeps the projecting cornice — the Chicago signature —
+     fully in view, with the crop landing on the base. */
+  align-self: flex-start;
+  margin-top: 1rem;
+  height: 30rem;
+  width: auto;
+  margin-right: 3rem;
+  flex: none;
+}
+/* Text variant: big FIXED-size type, vertically centered, oversized past
+   the hero's edges — the crop is the point (the hero reads as a mask over a
+   larger scene). Fixed sizes + centering are the look; the skeleton→loaded
+   hero resize is handled by a framer layout="position" glide on the text
+   span (JobcostDetailPage), not by compromising the geometry. */
+.pd-hero .pd-hero-art-text {
+  padding-right: 2.5rem;
+  font-weight: 900;
+  /* OPAQUE recessed color (primary pre-blended into the deck surface tone,
+     same rendered tint as the old 13%/19% alpha): the ONE/OFF stack fattens
+     its monospace glyphs with a text-stroke, and translucent fill+stroke
+     double-stack at the overlap into an outline artifact — opaque paint
+     can't. */
+  color: light-dark(
+    color-mix(in srgb, var(--primary-color) 13%, #f9f6f3),
+    color-mix(in srgb, var(--primary-color) 19%, #251f1a)
+  );
+  /* Gentle foot fade — softens the lower glyphs without erasing them. */
+  mask-image: linear-gradient(to bottom, #000 55%, rgb(0 0 0 / 0.3) 100%);
+}
+/* NOTE: the oversize scales (1.12 / 1.08) live in the motion style prop on
+   these spans (JobcostDetailPage) — framer's layout projection owns the
+   inline transform, so a CSS transform here would be overridden. */
+.pd-art-big {
+  font-size: 13rem;
+  line-height: 1;
+  letter-spacing: -0.06em;
+  font-variant-numeric: tabular-nums;
+}
+.pd-art-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-transform: uppercase;
+  /* Monospace: ONE and OFF are both three glyphs, so the lines land at
+     exactly the same width. The stroke fattens the glyphs to match the
+     sans-900 P# art (system monospaces top out visually lighter). */
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  /* Sized to the P# art's register — the two-line block deliberately
+     overruns the hero's top and bottom edges into the crop. */
+  font-size: 8.25rem;
+  line-height: 0.88;
+  letter-spacing: -0.035em;
+  -webkit-text-stroke: 0.03em currentColor;
+}
+.pd-art-stack span { display: block; }
+
+/* ── Job tiles: the property's composition inside the hero ──
+   One small recessed-well tile per job (phase number or one-off hammer, with
+   the job's margin beneath), reading chronologically behind quiet year
+   chips. Same register separation as the timeline: a deck hairline above. */
+/* ── Phase matrix: years × phase numbers inside the hero ──
+   A compact calendar-like grid: P1–P12 column heads, one row per year
+   (newest first), each filled cell that job's margin. Scales cleanly however
+   many years the relationship spans — every year is one tidy row. */
+.pd-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3125rem;
+  padding-top: 1.125rem;
+  border-top: 1px solid var(--jcb-line);
+}
+.pd-matrix-row {
+  display: grid;
+  grid-template-columns: 1.75rem repeat(12, 2.75rem) auto;
+  gap: 0.3125rem;
+  align-items: center;
+}
+/* Kind counts captioning the matrix — deck-toned, one register below the
+   hero facts, so the grid beneath reads as their breakdown. */
+.pd-matrix-counts {
+  display: flex;
+  gap: 1.375rem;
+  margin-bottom: 0.6875rem;
+}
+.pd-matrix-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--jcb-text);
+  font-variant-numeric: tabular-nums;
+}
+.pd-matrix-count svg { color: var(--jcb-muted); flex-shrink: 0; }
+.pd-matrix-head { margin-bottom: 0.0625rem; }
+.pd-matrix-col-label {
+  text-align: center;
+  font-size: 0.65625rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--jcb-muted);
+  font-variant-numeric: tabular-nums;
+}
+/* The one-off cluster stands off from the phase grid (extras margin below +
+   this label inset track together). */
+.pd-matrix-extra-label { text-align: left; padding-left: 1.5rem; }
+.pd-matrix-year {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--jcb-muted);
+  font-variant-numeric: tabular-nums;
+}
+.pd-cell {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  height: 1.625rem;
+  padding: 0;
+  border: 1px solid var(--jcb-line);
+  border-radius: 7px;
+  background: var(--jcb-well);
+  color: var(--jcb-text);
+  font-family: var(--font-family);
+  font-size: 0.71875rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.pd-cell:hover {
+  border-color: color-mix(in srgb, var(--jcb-text) 30%, var(--jcb-line));
+  background: color-mix(in srgb, var(--jcb-text) 5%, var(--jcb-well));
+}
+/* Months without a phase keep the slot but recede — the gaps ARE the story
+   (a skipped month at a rolling property). */
+.pd-cell-empty {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--jcb-well) 45%, transparent);
+  cursor: default;
+}
+.pd-matrix-extras {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.3125rem;
+  margin-left: 1.1875rem;
+}
+.pd-cell-extra { padding: 0 0.5625rem; }
+.pd-cell-extra svg { color: var(--jcb-muted); flex-shrink: 0; }
+
+/* Matrix hover tooltip: dark ink pill above the cell, fed by data-tip
+   (newline-separated lines, pre-line keeps them stacked). Pure CSS so it
+   works inside the hero without a portal. */
+.pd-cell[data-tip] { position: relative; }
+.pd-cell[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: calc(100% + 0.4375rem);
+  left: 50%;
+  translate: -50% 0;
+  z-index: 3;
+  width: max-content;
+  max-width: 15rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 8px;
+  background: var(--primary-text);
+  color: var(--card-color);
+  font-size: 0.71875rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.35;
+  text-align: center;
+  white-space: pre-line;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 140ms ease;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
+}
+.pd-cell[data-tip]:hover::after { opacity: 1; }
+.pd-cell[data-tip]:hover { z-index: 4; }
+
+/* ── Kind-ledger drill columns ── */
+.pd-kind-title { display: flex; align-items: center; gap: 0.4375rem; }
+.pd-kind-title svg { flex-shrink: 0; }
+/* The kind's rolled-up status badge escapes the title's uppercase voice so
+   it reads like every other status badge. */
+.pd-kind-title .status-badge {
+  text-transform: none;
+  letter-spacing: normal;
+}
+.pd-kind-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+  /* Sits inside the uppercase subheadline title row — undo that dress so the
+     count reads like the jobcost table's ("3 One-Offs"), not like the label. */
+  text-transform: none;
+  letter-spacing: normal;
+}
+.pd-kind-chevron { transition: transform 160ms ease; }
+.pd-kind-none { padding: 0.375rem 0 0.75rem; }
+/* Hover wash rides an inset pseudo-element instead of the column's own box:
+   a background + radius on the column itself rounded into the ledger's
+   center divider and bent it. The pseudo stays clear of the divider. */
+.pd-ledger-col-link {
+  position: relative;
+  cursor: pointer;
+}
+.pd-ledger-col-link::after {
+  content: "";
+  position: absolute;
+  inset: -0.4375rem -0.6875rem;
+  border-radius: 12px;
+  background: rgb(from var(--primary-text) r g b / 0.03);
+  opacity: 0;
+  transition: opacity 160ms ease;
+  pointer-events: none;
+}
+/* The wash must stop short of the ledger's center divider: each column's
+   box edge sits ON the divider, so the side facing it pulls in instead of
+   bleeding out (the columns' 2.25rem inner gutters keep content covered). */
+.pd-ledger-col-link:first-child::after { right: 1rem; }
+.pd-ledger-col-link:not(:first-child)::after { left: 1rem; }
+.pd-ledger-col-link:hover::after { opacity: 1; }
+.pd-ledger-col-link:hover .pd-kind-chevron { transform: translateX(2px); }
+
+/* Kind-jobs modal: the full column set needs more room than the stock
+   reports-modal, and scrolls sideways rather than clipping when it still
+   can't fit. */
+.reports-modal.pd-jobs-modal { max-width: min(980px, 94vw); }
+.pd-jobs-modal-body { overflow-x: auto; }
+
+/* Jobs command bar: the list page's control deck above the table widget, so
+   the property page's Jobs section is the SAME instrument as /jobcost — PM
+   filter seg on the left (drill-through fading in beside it), count trailing
+   right-anchored. Wraps freely: a long PM roster stacks rows instead of
+   overflowing the deck. */
+.pd-jobs-bar { flex-wrap: wrap; }
+.pd-jobs-bar .jc-cb-count { margin-left: auto; }
+.pd-pm-seg { flex-wrap: wrap; }
+/* Drill-through beside the seg control: permanently in the flow (its slot is
+   reserved even when hidden, so appearing never shifts a sibling), toggled by
+   a compositor-driven opacity fade. Visibility flips after the fade-out so
+   the hidden button can't catch clicks or focus. */
+.pd-pm-goto {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 150ms ease, visibility 0s linear 150ms;
+}
+.pd-pm-goto-visible {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 150ms ease;
+}
+/* Each PM segment is one quiet line: name + their margin. The margin wears
+   the margin scale only OFF the copper thumb (inline style); on it, this
+   soft white keeps it legible. */
+.pd-pm-seg-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4375rem;
+  font-variant-numeric: tabular-nums;
+}
+.pd-pm-seg-margin {
+  font-size: 0.71875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--jcb-muted);
+  transition: color 160ms ease;
+}
+.jc-seg-btn-active .pd-pm-seg-margin { color: rgba(255, 255, 255, 0.85); }
+
+/* Kind cell in the jobs table: quiet icon + word, not a badge. */
+.pd-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--secondary-text);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.pd-kind svg { flex-shrink: 0; }
 
 @media (max-width: 640px) {
   .jcd-sections { gap: 2rem; }
@@ -5543,58 +6322,17 @@ button.jc-kind-chip:hover {
   .jcd-phases-card { overflow-x: auto; }
 }
 
-/* ─── Shared skeleton building blocks ── */
-@keyframes jcd-shimmer {
-  0%   { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
-}
-.jcd-skel-value,
-.jcd-skel-label,
-.jcd-skel-bar {
-  border-radius: 4px;
-  background: linear-gradient(
-    115deg,
-    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 20%,
-    color-mix(in srgb, var(--primary-text) 2%, var(--card-color)) 50%,
-    color-mix(in srgb, var(--primary-text) 5%, var(--card-color)) 80%
-  );
-  background-size: 800px 100%;
-  animation: jcd-shimmer 3.2s linear infinite;
-}
-.jcd-skel-value { height: 1.5rem; width: 55%; }
-.jcd-skel-label { height: 0.65rem; width: 75%; margin-top: 0.4rem; }
-.jcd-skel-bar   { height: 10px; width: 100%; }
+/* ─── Detail-page skeletons ──
+   No sized blocks here: every loading state on this page renders the SAME
+   markup and classes as its loaded counterpart, with SkelText bars standing
+   in for values (see JobcostDetailPage.tsx). Heights therefore come from the
+   real layout rules above — restyle the loaded page and the skeleton follows. */
 
-/* ─── Metrics card skeleton ── */
-.jcd-metrics-skeleton {
-  display: flex;
-  align-items: stretch;
-}
-.jcd-metrics-skeleton-cell {
-  flex: 1;
-  padding: 1rem 1.5rem;
-  display: flex;
-  flex-direction: column;
-}
-.jcd-metrics-skeleton-cell + .jcd-metrics-skeleton-cell {
-  border-left: 1px solid var(--border-color);
-}
-
-/* ─── Invoice section skeleton ── */
-.jcd-inv-skeleton {
-  padding: 0 1.25rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-.jcd-inv-skeleton-metrics {
-  display: flex;
-  align-items: stretch;
-  border-top: 1px solid var(--border-color);
-  margin: 0 -1.25rem;
-}
-.jcd-inv-skeleton-metrics .jcd-metrics-skeleton-cell + .jcd-metrics-skeleton-cell {
-  border-left: 1px solid var(--border-color);
+/* Loading twin of the invoice disclosure strip: same geometry, none of the
+   button affordances. */
+.jcd-inv-strip-skel {
+  cursor: default;
+  pointer-events: none;
 }
 
 /* Invoice hero: large percentage + bar */
@@ -5602,7 +6340,9 @@ button.jc-kind-chip:hover {
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: 0.25rem 1.25rem 1.25rem;
+  /* Breathing room between the card's "Billing Position" header and the
+     big percentage figure. */
+  padding: 1rem 1.25rem 1.25rem;
 }
 .jcd-inv-hero-left {
   display: flex;
@@ -5650,76 +6390,65 @@ button.jc-kind-chip:hover {
   transition: width 0.5s ease;
 }
 
-/* Billing Position: lead with the Billed & Earned amounts; a single combined
-   meter (billed fill + earned marker) carries the visual, contract is context.
-   The card is grid-stretched to its chart neighbor's height, so the content
-   centers in the leftover room instead of huddling at the top over a slab of
-   white. */
-.jcd-billing-card {
-  display: flex;
-  flex-direction: column;
-}
-.jcd-billing-card > div {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
+/* Billing Position: a full-width band — the short-and-wide footprint the
+   meter design was built for. Verdict block on the left behind a hairline,
+   then the three swatch-keyed figures riding above the meter, which spans
+   the rest of the page width. */
+.jcd-billing-card .det-section-header { padding: 1.25rem 1.25rem 0; }
 .jcd-billing-pos {
+  display: flex;
+  align-items: stretch;
+  gap: 2rem;
+  padding: 1.125rem 1.25rem 1.25rem;
+}
+/* Right half of the band: figures row over the meter, centered against the
+   verdict's height. */
+.jcd-bp-main {
   flex: 1;
-  padding: 1rem 1.5rem 1.75rem;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 1.75rem;
+  gap: 0.875rem;
 }
-/* Same rule for the no-progress-data fallback (the big % + bar): center it
-   vertically and let the pair breathe instead of pinning under the title. */
-.jcd-billing-card .jcd-inv-hero {
-  flex: 1;
-  align-items: center;
-  gap: 2rem;
-}
-.jcd-bp-hero {
-  display: flex;
-  align-items: stretch;
-  gap: 2.5rem;
-  padding: 0.25rem 0 0.5rem;
-}
-.jcd-bp-stat {
+/* Verdict block — the band's one big figure: the variance, led by its
+   direction pill and closed by a plain-words explainer. Sign-colored the
+   same way the old variance banner was, minus the banner slab. */
+.jcd-bp-verdict {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  flex: 1;
-  min-width: 0;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.4375rem;
+  flex: 0 0 auto;
+  min-width: 13rem;
+  padding-right: 2rem;
+  border-right: 1px solid var(--border-color);
 }
-.jcd-bp-stat-divider {
-  width: 1px;
-  align-self: stretch;
-  background: color-mix(in srgb, var(--primary-text) 10%, transparent);
-}
-.jcd-bp-stat-label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--secondary-text);
-}
-.jcd-bp-stat-value {
-  /* One step below the hero's 1.625rem verdicts — the page's stat scale
-     descends hero → billing → KPI clusters → table rows. */
-  font-size: 1.5rem;
+.jcd-bp-verdict-amt {
+  /* One step below the hero's verdicts — the page's stat scale descends
+     hero → billing → KPI clusters → table rows. */
+  font-size: 1.625rem;
   font-weight: 700;
   letter-spacing: -0.01em;
-  line-height: 1.05;
+  line-height: 1;
   color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
 }
-.jcd-bp-stat-sub {
+.jcd-bp-verdict--under .jcd-bp-verdict-amt { color: #16a34a; }
+.jcd-bp-verdict--over .jcd-bp-verdict-amt { color: #dc2626; }
+/* The direction pill borrows .pb-dir-pill's family styling but its lighter
+   greens/reds clash against the verdict amount right below — pin the pill to
+   the amount's exact colors inside this band only. */
+.jcd-bp-verdict--under .pb-dir-pill { color: #16a34a; }
+.jcd-bp-verdict--over .pb-dir-pill { color: #dc2626; }
+.jcd-bp-verdict-sub {
   font-size: 0.8125rem;
   color: var(--secondary-text);
 }
 
-/* Combined meter — the track is the contract, the fill is billed, the tick is
-   earned. Hovering anywhere on the bar reveals a tooltip with all three. */
+/* Combined meter — the track is the contract, the fill is billed (split
+   into solid paid + tinted outstanding), the tick is earned. */
 .jcd-bp-meter-wrap {
   position: relative;
   padding: 0.25rem 0 1.5rem;
@@ -5731,26 +6460,43 @@ button.jc-kind-chip:hover {
   background: color-mix(in srgb, var(--primary-text) 9%, transparent);
   cursor: default;
 }
+/* Billed extent — tinted copper base; the solid paid segment layers inside
+   it, so paid + outstanding always sum to the billed edge. The overflow
+   clip squares the paid segment's right edge mid-bar and rounds it when
+   fully paid. */
 .jcd-bp-meter-fill {
   position: absolute;
   inset: 0 auto 0 0;
   height: 100%;
   border-radius: 6px;
+  background: color-mix(in srgb, var(--primary-color) 32%, transparent);
+  transition: width 0.5s ease;
+  overflow: hidden;
+}
+.jcd-bp-meter-fill-paid {
+  position: absolute;
+  inset: 0 auto 0 0;
+  height: 100%;
   background: var(--primary-color);
   transition: width 0.5s ease;
 }
+/* Both the tick and its caption position off --earned-x (set inline on the
+   wrap), clamped so neither ever overhangs the track's ends — at 0% or 100%
+   they pin to the edge instead of straddling it. */
 .jcd-bp-meter-marker {
   position: absolute;
-  top: -7px;
-  bottom: -7px;
-  width: 3px;
-  border-radius: 2px;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  border-radius: 1px;
   background: var(--primary-text);
   transform: translateX(-50%);
   z-index: 1;
+  left: clamp(1px, var(--earned-x, 0%), calc(100% - 1px));
   transition: left 0.5s ease;
 }
-/* "EARNED" caption centered under the tick. */
+/* "EARNED" caption centered under the tick; the clamp bound is half the
+   caption's rendered width. */
 .jcd-bp-earned-label {
   position: absolute;
   bottom: 0;
@@ -5761,105 +6507,85 @@ button.jc-kind-chip:hover {
   text-transform: uppercase;
   color: var(--secondary-text);
   white-space: nowrap;
+  left: clamp(1.75rem, var(--earned-x, 0%), calc(100% - 1.75rem));
   transition: left 0.5s ease;
 }
-/* Unified tooltip — fires on hovering any part of the bar. */
-.jcd-bp-meter-tip {
-  position: absolute;
-  bottom: 100%;
-  /* Follows the cursor's X (set on mousemove); fixed on Y. Falls back to centered
-     before the first move. */
-  left: var(--bp-tip-x, 50%);
-  transform: translateX(-50%);
-  margin-bottom: 0.6rem;
-  padding: 0.5rem 0.75rem;
+/* Figures row — the meter's legend and its exact figures in one line:
+   swatch keys each stat to its meter element (copper fill = billed, ink
+   tick = earned, hollow track = contract), so the band explains itself.
+   Replaces the old two-stat hero + hover tooltip. */
+.jcd-bp-ledger {
   display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  min-width: 12rem;
-  background: var(--card-color);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  box-shadow: var(--button-shadow);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease;
-  z-index: 3;
+  flex-wrap: wrap;
+  gap: 0.375rem 2.5rem;
 }
-.jcd-bp-tip-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 1.5rem;
-  font-size: 0.8125rem;
-}
-.jcd-bp-tip-row span {
-  color: var(--secondary-text);
-}
-.jcd-bp-tip-row strong {
-  color: var(--primary-text);
-  font-weight: 700;
-}
-.jcd-bp-meter-tip::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  /* Keep the arrow pointing at the true cursor X even when the body is clamped. */
-  left: calc(50% + var(--bp-arrow-x, 0px));
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: var(--card-color);
-}
-.jcd-bp-meter:hover .jcd-bp-meter-tip,
-.jcd-bp-meter:focus .jcd-bp-meter-tip {
-  opacity: 1;
-}
-.jcd-bp-variance {
-  display: flex;
+.jcd-bp-row {
+  display: inline-flex;
   align-items: center;
-  gap: 0.875rem;
-  padding: 0.875rem 1.125rem;
-  border-radius: 12px;
-  border: 1px solid transparent;
+  gap: 0.5rem;
+  font-size: 0.875rem;
 }
-.jcd-bp-variance--under {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.55);
-}
-.jcd-bp-variance--over {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.55);
-}
-.jcd-bp-variance--even {
-  background: var(--hover-bg);
-  border-color: color-mix(in srgb, var(--primary-text) 20%, transparent);
-}
-.jcd-bp-variance-amt {
-  font-size: 1.375rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--primary-text);
-}
-.jcd-bp-variance--under .jcd-bp-variance-amt {
-  color: #16a34a;
-}
-.jcd-bp-variance--over .jcd-bp-variance-amt {
-  color: #dc2626;
-}
-.jcd-bp-variance-sub {
-  font-size: 0.8125rem;
+.jcd-bp-row-label { color: var(--secondary-text); }
+.jcd-bp-row-pct {
+  font-size: var(--footnote-size);
   color: var(--secondary-text);
+  opacity: 0.8;
+  white-space: nowrap;
+}
+.jcd-bp-row-value {
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+  white-space: nowrap;
+}
+.jcd-bp-swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+/* Billed swatch mirrors the fill's state: solid copper when fully paid,
+   tinted when nothing is collected yet, two-tone when partially paid. */
+.jcd-bp-swatch--billed { background: var(--primary-color); }
+.jcd-bp-swatch--billed.is-unpaid {
+  background: color-mix(in srgb, var(--primary-color) 32%, transparent);
+}
+.jcd-bp-swatch--billed.is-split {
+  background: linear-gradient(
+    90deg,
+    var(--primary-color) 0 50%,
+    color-mix(in srgb, var(--primary-color) 32%, transparent) 50% 100%
+  );
+}
+/* Earned is the meter's vertical tick — its swatch is the same ink bar. */
+.jcd-bp-swatch--earned {
+  width: 2px;
+  height: 11px;
+  border-radius: 1px;
+  background: var(--primary-text);
+  margin-inline: 4px;
+}
+.jcd-bp-swatch--contract {
+  background: color-mix(in srgb, var(--primary-text) 9%, transparent);
 }
 
+/* Phones: the band stacks — verdict on top behind a horizontal hairline,
+   figures wrap, meter below. */
 @media (max-width: 768px) {
   .jcd-billing-pos {
-    padding: 0.25rem 1rem 1rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.125rem;
+    padding: 0.875rem 1rem 1.25rem;
   }
-  .jcd-bp-hero {
-    gap: 1rem;
+  .jcd-bp-verdict {
+    min-width: 0;
+    padding-right: 0;
+    border-right: none;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
   }
-  .jcd-bp-stat-value {
-    font-size: 1.5rem;
-  }
+  .jcd-bp-ledger { gap: 0.375rem 1.5rem; }
 }
 
 /* Chart widget: tighter padding, space between header and chart */
@@ -5877,13 +6603,8 @@ button.jc-kind-chip:hover {
      and give the x-axis labels breathing room above the card's bottom edge. */
   padding: 0 1rem 1rem;
 }
-.jcd-chart-widget .widget-skeleton {
-  min-height: 280px;
-  margin: 0.75rem 1.25rem 1.25rem;
-  border-radius: 8px;
-}
-/* Taller plot area — at half width the burn-up / cost-vs-billed charts read
-   squat at the shared 220px default; give them more vertical room. */
+/* Taller plot area — the cost-vs-billed chart spans the full page width,
+   so the shared 220px default reads as a ribbon; give it real height. */
 .jcd-chart-widget .chart-container {
   min-height: 320px;
 }
@@ -5930,11 +6651,6 @@ button.jc-kind-chip:hover {
 }
 .jcd-cost-widget .widget-no-data {
   margin: 1.25rem;
-}
-.jcd-cost-widget .widget-skeleton {
-  min-height: 160px;
-  margin: 0.75rem 1.25rem 1.25rem;
-  border-radius: 8px;
 }
 
 /* On the detail page the breakdown gets its own full-width card, so let it
@@ -8049,6 +8765,11 @@ button.jc-kind-chip:hover {
   font-size: 0.8125rem;
   padding: 0.25rem 0.75rem;
   letter-spacing: 0.01em;
+}
+/* Loading stand-in for the subtitle badge: the badge's own muted gray base
+   with no text — min-width gives the empty pill a label-ish footprint. */
+.jcd-badge-empty {
+  min-width: 4rem;
 }
 
 /* Two-line entity / description cell */
@@ -11790,6 +12511,14 @@ svg.placeholder-illustration {
   background: #19375a;
 }
 
+.report-icon-teal {
+  background: #2f7d72;
+}
+
+.report-icon-plum {
+  background: #6b4d78;
+}
+
 .report-card-count {
   font-size: 2.5rem;
   line-height: 1;
@@ -13833,6 +14562,14 @@ svg.placeholder-illustration {
   background: var(--background-color);
 }
 
+/* Announcement pulses (NavSectionHint) have no coach blur to clear — stay
+   below the full-screen takeovers (z 190, like the hint card itself at 150)
+   so a running intro fully covers them. The z 600 above is only for the
+   intro-tour coach, whose target must lift over the z 500 blur. */
+.nav-button-attention--announce {
+  z-index: 100;
+}
+
 /* No hover shift while the overlay is active — hover matches the resting chip. */
 .nav-button-attention:hover {
   background: var(--background-color);
@@ -14502,6 +15239,29 @@ svg.placeholder-illustration {
   pointer-events: none;
 }
 
+/* Nudge toast for a navigate-away blocked mid-tour (jobcost-intro). `left`/
+   `top` are set inline to the highlighted property card's rect (JS-measured,
+   viewport coordinates) — anchored just above it, centered over its width.
+   Rides above the coach layer so it reads even while a coachmark is up. */
+.jc-tour-blocked-tip-anchor {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  z-index: 600;
+  pointer-events: none;
+}
+
+.jc-tour-blocked-tip {
+  padding: 0.7rem 1.1rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: light-dark(0 14px 36px rgba(0, 0, 0, 0.18), 0 14px 36px rgba(0, 0, 0, 0.55));
+  font-size: 0.85rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--primary-text);
+  white-space: nowrap;
+}
+
 /* Same look as .rpt-coach; the clip-path cutout (set inline from motion values)
    removes both paint AND hit-testing over the hole — hence the shield below. */
 .coach-backdrop {
@@ -14529,21 +15289,34 @@ svg.placeholder-illustration {
 .coach-card {
   position: absolute;
   z-index: 2;
-  box-sizing: border-box; /* placement math assumes width == 280 incl. padding */
-  width: 280px;
-  padding: 0.95rem 1rem 1rem;
+  box-sizing: border-box; /* placement math assumes width == CARD_W (Coachmark.tsx) incl. padding */
+  width: 272px;
+  padding: 1.1rem 1.15rem 1.15rem;
   background: var(--card-color);
   border: 1px solid var(--border-color);
   border-radius: 12px;
   box-shadow: light-dark(0 14px 36px rgba(0, 0, 0, 0.18), 0 14px 36px rgba(0, 0, 0, 0.55));
   pointer-events: auto;
+  text-align: center;
   transition: left 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
     top 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
+/* No arrow tying it to a target — a standalone floating panel, so it needs
+   its own presence rather than the drop shadow shared with the pointed cards. */
+.coach-card--pinned {
+  box-shadow: light-dark(0 22px 48px rgba(0, 0, 0, 0.24), 0 22px 48px rgba(0, 0, 0, 0.65));
+}
+
+.coach-card .gear-hint-body {
+  margin-bottom: 0.45rem;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
 .coach-card-title {
-  margin: 0 0 0.4rem;
-  font-size: 0.9rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
   font-weight: 650;
   color: var(--primary-text);
 }
@@ -14556,7 +15329,9 @@ svg.placeholder-illustration {
   width: 13px;
   height: 13px;
   background: var(--card-color);
-  transform: rotate(45deg);
+  /* `left` is the target's centerX (JS); shift back by the diamond's own
+     half-width so its point — not its unrotated box edge — lands there. */
+  transform: translateX(-50%) rotate(45deg);
 }
 .coach-card-arrow--below {
   top: -7px;
@@ -15382,3 +16157,93 @@ svg.placeholder-illustration {
     transition: width 0.3s ease-in-out, opacity 0.2s ease;
   }
 }
+/* ═══ Job Costing intro — interactive tour (anchor: jobcost-intro-css) ═══ */
+/* The tour runs on the LIVE board through the shared Coachmark; only these
+   pieces are its own. */
+
+/* Interactive coach steps: the cutout passes clicks through to the real
+   control, so the shield stands down (the pulse stays). */
+.coach-ring--open {
+  pointer-events: none;
+}
+
+/* Tour dress: a lighter veil than the admin coach — presence, not curtains.
+   The spotlight contrast comes from the cutout and the copper pulse. */
+.coach-layer--tour .coach-backdrop {
+  background: rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(1.5px);
+  -webkit-backdrop-filter: blur(1.5px);
+}
+
+/* The escape hatch: a quiet text button, never competing with the real
+   control the card is pointing at. */
+.coach-card-next {
+  margin-top: 0.7rem;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font-family);
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--secondary-text);
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+.coach-card-next:hover {
+  color: var(--primary-text);
+}
+
+/* Explainer beats advance on the app's copper button. */
+.coach-card-cta {
+  margin-top: 0.3rem;
+  font-family: var(--font-family);
+  cursor: pointer;
+}
+
+/* ── Welcome glass ── */
+/* Covers the page CONTENT only — starts at the navbar's border so the nav
+   stays crisp (JS rides `left` on the nav's LIVE width; this is the
+   fallback). Frosted rather than solid: the board glows through beneath. */
+.jct-welcome {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: calc(var(--navbar-closed-width) + 1px);
+  z-index: 190;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--background-color) 62%, transparent);
+  backdrop-filter: blur(10px) saturate(1.05);
+  -webkit-backdrop-filter: blur(10px) saturate(1.05);
+}
+
+.jct-welcome-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 2rem;
+  max-width: 34rem;
+}
+
+.jct-welcome-logo {
+  margin-bottom: 1.1rem;
+}
+
+.jct-welcome-title {
+  margin: 0;
+  font-size: calc(var(--large-title-size) * 1.12);
+  line-height: 1.3;
+  font-weight: var(--large-title-weight-emphasized);
+  color: var(--primary-text);
+}
+
+.jct-welcome-line {
+  margin: 0.9rem 0 1.7rem;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--secondary-text);
+}
+
