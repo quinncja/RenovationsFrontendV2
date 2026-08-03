@@ -77,8 +77,13 @@ added or retired.
   non-blocking, veils under an open flyout). Older unseen entries are silently
   acknowledged while a newer one shows (superseded — a user who missed several
   releases gets one hint, never a queue), and visiting the announced section
-  acknowledges it too. First instance: `section:overhead-report` on the
-  Finances group (page-visit acknowledge in `OverheadReportPage.tsx`).
+  acknowledges it too. An entry can anchor to a nav GROUP (`navGroup`) or a
+  leaf nav item (`navPath`), and can defer to an older hint via `requiresSeen`
+  (until that milestone is seen, the entry isn't eligible — the older hint
+  shows and nothing is retired). Instances: `section:overhead-report` on the
+  Finances group (page-visit acknowledge in `OverheadReportPage.tsx`);
+  `section:jobcost-redesign` on the Job Cost item (requires the overhead hint
+  seen first; page-visit acknowledge in `Jobcost.tsx`).
 
 ## Engine surface (`useOnboarding()` — OnboardingProvider.tsx)
 
@@ -138,6 +143,7 @@ nicely.
 | `?arrival` / `?arrival-intro` | Daily arrival / its intro variant |
 | `?report` | Daily report modal (manual-reopen surface) |
 | `?overhead-hint` | Finances new-section hint |
+| `?jobcost-hint` | Job Cost redesign nav hint |
 | `?jobcost-intro` (on `/jobcost`, desktop) | Job Costing redesign intro |
 | `?idle` | Idle refresh overlay (not onboarding, mirrors the pattern) |
 

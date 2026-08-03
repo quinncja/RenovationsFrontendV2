@@ -73,6 +73,7 @@ const ROLE_LABEL: Record<string, string> = {
 const MILESTONE_LABEL: Record<string, string> = {
   "intro-tour": "Intro tour",
   "section:overhead-report": "Overhead Report hint",
+  "section:jobcost-redesign": "Job Costing redesign hint",
   "jobcost-intro": "Job Costing intro",
 }
 

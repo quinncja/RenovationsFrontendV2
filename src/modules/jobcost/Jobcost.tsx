@@ -21,6 +21,8 @@ import { MobileFilterButton } from "../../shared/components/MobileFilterSheet/Mo
 import { CostBreakdownTable, CostBreakdownSkeleton } from "./components/CostBreakdownTable"
 import { oneoffFromRecnum } from "./jobcostShared"
 import { coachTargetRef, useCoachTarget } from "../../core/onboarding/coachTargets"
+import { useOnboarding } from "../../core/onboarding/OnboardingProvider"
+import { SECTION_JOBCOST_REDESIGN } from "../../core/onboarding/markers"
 import {
   publishJobcostTourState,
   registerJobcostTourController,
@@ -1609,6 +1611,13 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
 export default function Jobcost() {
   const { goToJobcost, goToProperty } = useJobcostNav()
   const marginColorsOn = useMarginColorsEnabled()
+  // Visiting the board is the strongest possible acknowledgment of its
+  // "new way to jobcost" nav hint — clear the milestone so the hint never
+  // shows (or stops showing) once the user has found the page.
+  const { seen, acknowledge } = useOnboarding()
+  useEffect(() => {
+    if (!seen(SECTION_JOBCOST_REDESIGN)) acknowledge(SECTION_JOBCOST_REDESIGN)
+  }, [seen, acknowledge])
   // Mobile: the table collapses to a simple tap-through list — name + status
   // on the left, margin + chevron on the right, tap → full project report.
   // (Grouped view is desktop-only for now; mobile always shows the flat list.)

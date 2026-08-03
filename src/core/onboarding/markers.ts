@@ -21,6 +21,12 @@ export const INTRO_TOUR = "intro-tour"
  *  visiting /overhead-report. */
 export const SECTION_OVERHEAD_REPORT = "section:overhead-report"
 
+/** Incremental milestone (§4.5): the Job Costing redesign announcement — a
+ *  one-time nav hint on the Job Cost nav item, acknowledged via "Got it" or by
+ *  visiting /jobcost. Gated behind SECTION_OVERHEAD_REPORT being seen so the
+ *  older hint gets its turn first instead of being silently retired. */
+export const SECTION_JOBCOST_REDESIGN = "section:jobcost-redesign"
+
 /** Incremental milestone: the Job Costing interactive tour — a full-screen
  *  welcome that melts into a guided, hands-on walkthrough of the live board
  *  on the first desktop visit to /jobcost, acknowledged on finish or skip

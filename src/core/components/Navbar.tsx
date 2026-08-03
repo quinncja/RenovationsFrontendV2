@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom"
 import { Settings, ChevronsRight, ChevronsLeft, ChevronRight } from "lucide-react"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import useNavItems from "../auth/hooks/useNavItems"
-import { isNavGroup, isNavDivider, type NavGroup } from "../auth/roles"
+import { isNavGroup, isNavDivider, type NavGroup, type NavItem } from "../auth/roles"
 import { SettingsModal } from "../../shared/components/SettingsModal/SettingsModal"
 import { useDailyReport } from "../../modules/dashboard/report/DailyReportContext"
 import { NavReportsHint } from "../../modules/dashboard/report/NavReportsHint"
@@ -73,11 +73,13 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
   const jobcostRef = useCallback((el: HTMLButtonElement | null) => {
     registerCoachTarget("nav-jobcost", el)
   }, [])
-  // Stable per-group callback refs for announcement coach targets.
+  // Stable per-group callback refs for announcement coach targets. Leaf-item
+  // (navPath) announcements reuse an already-registered target (e.g.
+  // nav-jobcost above), so only group anchors register here.
   const announcementRefs = useMemo(() => {
     const refs = new Map<string, (el: HTMLButtonElement | null) => void>()
     for (const a of SECTION_ANNOUNCEMENTS) {
-      if (!refs.has(a.navGroup)) refs.set(a.navGroup, (el) => registerCoachTarget(a.targetId, el))
+      if (a.navGroup && !refs.has(a.navGroup)) refs.set(a.navGroup, (el) => registerCoachTarget(a.targetId, el))
     }
     return refs
   }, [])
@@ -96,12 +98,22 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
   const [previewDismissed, setPreviewDismissed] = useState(false)
   const eligible = veil === "off" && introStep === 0 && phase === "onboarded" && !resolving
   const navGroupLabels = new Set(navItems.filter(isNavGroup).map((g) => g.label))
+  const navPaths = new Set(
+    navItems.filter((it): it is NavItem => !isNavGroup(it) && !isNavDivider(it)).map((it) => it.path),
+  )
   const announcement = previewAnnouncement
     ? previewDismissed
       ? null
       : previewAnnouncement
     : (eligible
-        ? SECTION_ANNOUNCEMENTS.filter((a) => navGroupLabels.has(a.navGroup) && !seen(a.milestone))
+        ? SECTION_ANNOUNCEMENTS.filter(
+            (a) =>
+              (a.navGroup ? navGroupLabels.has(a.navGroup) : a.navPath != null && navPaths.has(a.navPath)) &&
+              !seen(a.milestone) &&
+              // Not eligible yet ≠ superseded: an unmet requiresSeen keeps the
+              // older hint showing without retiring it.
+              (!a.requiresSeen || seen(a.requiresSeen)),
+          )
         : []
       ).at(-1) ?? null
 
@@ -214,7 +226,7 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
                 key={item.path}
                 ref={item.path === "/jobcost" ? jobcostRef : undefined}
                 data-nav={item.path}
-                className={`button nav-button${location.pathname === item.path || location.pathname.startsWith(`${item.path}/`) ? " nav-button-active" : ""}${introStep === 2 && item.path === "/reports" ? " nav-button-attention" : ""}`}
+                className={`button nav-button${location.pathname === item.path || location.pathname.startsWith(`${item.path}/`) ? " nav-button-active" : ""}${(introStep === 2 && item.path === "/reports") || announcement?.navPath === item.path ? " nav-button-attention" : ""}`}
                 onClick={() => {
                   // Home button → reset the section pager to the top; other routes navigate as-is.
                   navigate(item.path, item.path === "/dashboard" ? { state: { resetHome: true } } : {})
