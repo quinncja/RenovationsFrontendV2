@@ -349,6 +349,16 @@ function readJcMovedState(): JcMovedState {
   return { views: 0, dismissed: false }
 }
 
+// setItem throws in storage-restricted contexts (Safari private mode) — the
+// notice bookkeeping is best-effort, never worth an error boundary trip.
+function writeJcMovedState(next: JcMovedState) {
+  try {
+    localStorage.setItem(JC_MOVED_KEY, JSON.stringify(next))
+  } catch {
+    /* storage unavailable — the notice just shows again next visit */
+  }
+}
+
 function JobcostMovedNotice() {
   // Decided once at mount, from the state *before* this visit is counted —
   // so the notice shows on visits 1–3 and never flickers away mid-session
@@ -364,7 +374,7 @@ function JobcostMovedNotice() {
     if (!visible || counted.current) return
     counted.current = true
     const s = readJcMovedState()
-    localStorage.setItem(JC_MOVED_KEY, JSON.stringify({ ...s, views: s.views + 1 }))
+    writeJcMovedState({ ...s, views: s.views + 1 })
   }, [visible])
 
   if (!visible) return null
@@ -374,12 +384,7 @@ function JobcostMovedNotice() {
         Your projects table has moved to the{" "}
         <Link
           to="/jobcost"
-          onClick={() =>
-            localStorage.setItem(
-              JC_MOVED_KEY,
-              JSON.stringify({ ...readJcMovedState(), dismissed: true })
-            )
-          }
+          onClick={() => writeJcMovedState({ ...readJcMovedState(), dismissed: true })}
         >
           Job Costing
         </Link>{" "}

@@ -10,10 +10,15 @@ export function oneoffFromRecnum(recnum: string): boolean {
 }
 
 // Sage stores unset dates as null (or a pre-2000 sentinel on old rows) — treat
-// both as "no date".
+// both as "no date". SQL dates arrive as "YYYY-MM-DD..." which a bare
+// `new Date()` parses as UTC midnight — the previous day in Chicago — so pull
+// the Y-M-D parts out as a LOCAL date instead.
 export function parseValidDate(raw: string | null | undefined): Date | null {
   if (!raw) return null
-  const d = new Date(raw)
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw)
+  const d = m
+    ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+    : new Date(raw)
   if (isNaN(d.getTime()) || d.getFullYear() < 2000) return null
   return d
 }

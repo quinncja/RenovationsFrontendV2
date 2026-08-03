@@ -405,9 +405,15 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const phaseSort = useTableSort<PhaseSortKey>()
 
   useEffect(() => {
+    // Reset immediately: the phase rail / arrow keys make rapid job swaps easy,
+    // and a stale list must not show (or export) under the new job. The flag
+    // also drops an out-of-order resolve from a previous recnum.
+    setChangeOrders([])
+    let stale = false
     fetchPageData({ module: "changeOrders", queries: [], params: { jobnum: recnum } })
-      .then(result => { if (Array.isArray(result)) setChangeOrders(result as ChangeOrder[]) })
-      .catch(() => setChangeOrders([]))
+      .then(result => { if (!stale && Array.isArray(result)) setChangeOrders(result as ChangeOrder[]) })
+      .catch(() => { if (!stale) setChangeOrders([]) })
+    return () => { stale = true }
   }, [recnum])
 
   // ── Phase rail data ──

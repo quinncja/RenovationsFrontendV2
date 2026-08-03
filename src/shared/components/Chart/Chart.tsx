@@ -278,6 +278,10 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
 
   const dark = useDarkMode()
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
+  // SVG gradient ids resolve document-wide, so two mounted bar charts sharing
+  // `barDepth0` would both paint with the FIRST chart's gradient — namespace
+  // the defs per instance (same fix as ValueColorLayer's useId gradient).
+  const gradId = useId()
 
   // Stacked/multi-series mode when explicit keys are provided; otherwise treat
   // the data as simple { label, value } points.
@@ -627,7 +631,7 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
                 ? barKeys.map((_, i) => stackedPalette[i % stackedPalette.length])
                 : [color]
             ).map((c, i) => ({
-              id: `barDepth${i}`,
+              id: `${gradId}barDepth${i}`,
               type: "linearGradient",
               colors: [
                 { offset: 0, color: shadeHex(c, 0.22) },
@@ -642,11 +646,11 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
             ? [...new Set(rows.map((d) => colorBy(Number(d.value) || 0)))].map((c, i) => ({
                 match: (bar: { data: { data: Record<string, unknown> } }) =>
                   colorBy(Number(bar.data.data.value) || 0) === c,
-                id: `barDepth${i}`,
+                id: `${gradId}barDepth${i}`,
               }))
             : stacked
-              ? barKeys.map((k, i) => ({ match: { id: k }, id: `barDepth${i}` }))
-              : [{ match: "*" as const, id: "barDepth0" }]
+              ? barKeys.map((k, i) => ({ match: { id: k }, id: `${gradId}barDepth${i}` }))
+              : [{ match: "*" as const, id: `${gradId}barDepth0` }]
           : undefined
       }
       borderWidth={barGradient ? 1 : 0}

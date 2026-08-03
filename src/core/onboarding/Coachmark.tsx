@@ -334,7 +334,9 @@ export function Coachmark({ target, active, title, body, ctaLabel, onAdvance, pr
                 key={boxKey}
                 ref={cardRef}
                 className={`coach-card${pinCard ? " coach-card--pinned" : ""}`}
-                style={{ left: pos.left, top: pos.top }}
+                // width inline so a non-default `width` prop and the placement
+                // math (which already uses it) can't disagree with the CSS.
+                style={{ left: pos.left, top: pos.top, width }}
                 // The tour's card pops in on a spring (a small arrival, not a
                 // slide); the default keeps the admin tour's calmer fade.
                 initial={{ opacity: 0, y: reduced ? 0 : 10, scale: reduced || !variant ? 1 : 0.94 }}

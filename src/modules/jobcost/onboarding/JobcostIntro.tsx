@@ -100,20 +100,39 @@ const STEPS: Record<CoachStage, StepDef> = {
   },
 }
 
-// The pre-tour state restore falls back to localStorage when the board is
-// unmounted (a mid-tour report open graduates the tour off-board). Same keys
-// + synthetic StorageEvent as useLocalStorage, so mounted hooks sync.
-function restoreViaStorage(base: { view: "grouped" | "list"; pins: string[] }) {
+// Same keys + synthetic StorageEvent as useLocalStorage, so mounted hooks sync.
+function writeStored(key: string, value: unknown) {
   try {
-    const write = (key: string, value: unknown) => {
-      const json = JSON.stringify(value)
-      localStorage.setItem(key, json)
-      window.dispatchEvent(new StorageEvent("storage", { key, newValue: json }))
-    }
-    write("jobcostViewMode", base.view === "grouped" ? "grouped" : "list")
-    write("jobcostPinnedProperties", base.pins)
+    const json = JSON.stringify(value)
+    localStorage.setItem(key, json)
+    window.dispatchEvent(new StorageEvent("storage", { key, newValue: json }))
   } catch {
     // storage unavailable — the tour's pin simply stands
+  }
+}
+
+// The pre-tour state restore falls back to localStorage when the board is
+// unmounted (a mid-tour report open graduates the tour off-board).
+function restoreViaStorage(base: { view: "grouped" | "list"; pins: string[] }) {
+  writeStored("jobcostViewMode", base.view === "grouped" ? "grouped" : "list")
+  writeStored("jobcostPinnedProperties", base.pins)
+}
+
+// Baseline source when the board hasn't mounted/published yet (cold refresh on
+// /jobcost: the welcome glass paints from the App shell while the lazy Jobcost
+// chunk is still loading). The board's view/pins are localStorage-backed, so
+// reading the keys directly gives the same truth — fabricating `{grouped, []}`
+// here would let finish() wipe the user's real pins.
+function readStoredBaseline(): { view: "grouped" | "list"; pins: string[] } {
+  try {
+    const view = JSON.parse(localStorage.getItem("jobcostViewMode") ?? '"grouped"')
+    const pins = JSON.parse(localStorage.getItem("jobcostPinnedProperties") ?? "[]")
+    return {
+      view: view === "list" ? "list" : "grouped",
+      pins: Array.isArray(pins) ? (pins as string[]) : [],
+    }
+  } catch {
+    return { view: "grouped", pins: [] }
   }
 }
 
@@ -150,7 +169,15 @@ export function JobcostIntro() {
   ) {
     setStage("welcome")
   }
-  if (isMobile && stage !== "idle" && stage !== "done") setStage("done")
+  // Crossing under 768px mid-tour (tablet rotation) bails out — restore the
+  // pre-tour state too, or the forced grouped flip / lesson-pin would stick.
+  // Effect, not render-phase: restore writes localStorage + dispatches.
+  useEffect(() => {
+    if (isMobile && stage !== "idle" && stage !== "done") {
+      restoreBaseline()
+      setStage("done")
+    }
+  }, [isMobile, stage])
 
   // Onboarding state not settled yet, but this user may be owed the intro:
   // hold the (empty) welcome glass so the board never reads first.
@@ -183,40 +210,57 @@ export function JobcostIntro() {
   // localStorage-backed view/pins on mount, before data lands).
   const baselineRef = useRef<{ view: "grouped" | "list"; pins: string[] } | null>(null)
 
-  const finish = () => {
+  const restoreBaseline = () => {
     const base = baselineRef.current
-    if (base) {
-      const ctrl = getJobcostTourController()
-      if (ctrl) ctrl.restore(base)
-      else restoreViaStorage(base)
-    }
+    if (!base) return
+    baselineRef.current = null
+    const ctrl = getJobcostTourController()
+    if (ctrl) ctrl.restore(base)
+    else restoreViaStorage(base)
+  }
+
+  const finish = () => {
+    restoreBaseline()
     if (!preview) acknowledge(JOBCOST_INTRO)
     setStage("done")
   }
 
   const beginCoach = () => {
-    baselineRef.current = {
-      view: boardState?.view ?? "grouped",
-      pins: boardState?.pins ?? [],
-    }
+    // The board publishes its localStorage-backed view/pins on mount; until
+    // then (welcome clicked before the lazy chunk lands) read the same keys
+    // directly — never fabricate an empty baseline.
+    const base = boardState
+      ? { view: boardState.view, pins: boardState.pins }
+      : readStoredBaseline()
+    baselineRef.current = base
     // The tour teaches from the Property view; a list-preferring returner is
-    // flipped there for the lesson and restored at the end.
-    if (boardState?.view === "list") getJobcostTourController()?.setView("grouped")
+    // flipped there for the lesson and restored at the end. With the board
+    // not yet mounted, flip the stored key so it MOUNTS grouped.
+    if (base.view === "list") {
+      const ctrl = getJobcostTourController()
+      if (ctrl) ctrl.setView("grouped")
+      else writeStored("jobcostViewMode", "grouped")
+    }
     setStage("open-card")
   }
 
   // ── Route tolerance ──────────────────────────────────────────────────────
-  // Opening a real property report mid-tour is graduating, not escaping —
-  // finish (restore + acknowledge) rather than nag with a replay. Leaving
-  // Job Costing any other way aborts without acknowledging.
+  // Opening a real report mid-tour — property page or a job's full report —
+  // is graduating, not escaping: finish (restore + acknowledge) rather than
+  // nag with a replay. Leaving Job Costing any other way aborts without
+  // acknowledging, but still restores the pre-tour view/pins so the forced
+  // grouped flip and any lesson-pin don't poison the replay's baseline.
   useEffect(() => {
     if (stage === "welcome" && !onBoard) {
       setStage("idle")
       return
     }
     if (!isCoach) return
-    if (onPropertyPage) finish()
-    else if (!onBoard) setStage("idle")
+    if (onPropertyPage || location.pathname.startsWith("/jobcost/")) finish()
+    else if (!onBoard) {
+      restoreBaseline()
+      setStage("idle")
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname])
 

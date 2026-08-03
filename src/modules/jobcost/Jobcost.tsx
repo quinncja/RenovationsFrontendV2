@@ -1653,6 +1653,9 @@ export default function Jobcost() {
   // (phases OR one-offs).
   const [openJobKey, setOpenJobKey] = useState<string | null>(null)
   const [details, setDetails] = useState<Record<string, JobDetail | "loading">>({})
+  // Bumped whenever `details` is wholesale-cleared (year/scope change) so
+  // in-flight loadDetail resolves from the old epoch discard themselves.
+  const detailEpochRef = useRef(0)
   const [openGroupKey, setOpenGroupKey] = useState<string | null>(null)
   const [openKind, setOpenKind] = useState<"phases" | "oneoffs" | null>(null)
   // The property cards' blur-in stagger plays once per page visit; re-entering
@@ -1677,7 +1680,11 @@ export default function Jobcost() {
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true)
-    // A new year reloads the list, so drop any open rows + cached detail.
+    // A new year reloads the list, so drop any open rows + cached detail. The
+    // epoch bump makes any in-flight loadDetail resolve a no-op — without it a
+    // previous-year breakdown could land after this clear and stick in the
+    // cache (toggleExpand skips the refetch when an entry exists).
+    detailEpochRef.current++
     setOpenJobKey(null)
     setDetails({})
     setOpenGroupKey(null)
@@ -1710,6 +1717,7 @@ export default function Jobcost() {
   }, [year, isManager, showAllProjects])
 
   function loadDetail(job: Job) {
+    const epoch = detailEpochRef.current
     setDetails((d) => ({ ...d, [job.recnum]: "loading" }))
     fetchPageData({
       module: "jobcost",
@@ -1719,6 +1727,7 @@ export default function Jobcost() {
       params: { recnum: Number(job.jobNumber), year },
     })
       .then((result) => {
+        if (epoch !== detailEpochRef.current) return
         setDetails((d) => ({
           ...d,
           [job.recnum]: {
@@ -1728,6 +1737,7 @@ export default function Jobcost() {
         }))
       })
       .catch(() => {
+        if (epoch !== detailEpochRef.current) return
         setDetails((d) => ({ ...d, [job.recnum]: { budget: null, costItems: [] } }))
       })
   }
