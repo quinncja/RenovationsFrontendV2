@@ -82,7 +82,7 @@ const STEPS: Record<CoachStage, StepDef> = {
   },
   pin: {
     target: "jc-card-pin",
-    title: "Pinning",
+    title: "Pin to the top",
     body: "Pin a property to keep it at the top of the list.",
     travel: false,
     cta: "primary",

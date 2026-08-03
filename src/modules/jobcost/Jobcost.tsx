@@ -1754,10 +1754,6 @@ export default function Jobcost() {
     setOpenJobKey(willOpen ? job.recnum : null)
   }
 
-  function openJob(job: Job) {
-    goToJobcost(job.jobNumber)
-  }
-
   // Opening a report navigates away from the board — mid-tour that would
   // otherwise silently graduate/abort the flow, so it's blocked with a nudge
   // back to finishing it instead.
@@ -1773,14 +1769,26 @@ export default function Jobcost() {
     if (tourBlockedTipTimer.current != null) window.clearTimeout(tourBlockedTipTimer.current)
   }, [])
 
+  function showTourBlockedTip() {
+    const r = tourCardEl?.getBoundingClientRect()
+    const left = tourCardPos?.centerX ?? (r ? r.left + r.width / 2 : window.innerWidth / 2)
+    const top = r ? r.top - 10 : 80
+    setTourBlockedTip({ left, top })
+    if (tourBlockedTipTimer.current != null) window.clearTimeout(tourBlockedTipTimer.current)
+    tourBlockedTipTimer.current = window.setTimeout(() => setTourBlockedTip(null), 2200)
+  }
+
+  function openJob(job: Job) {
+    if (tourActive) {
+      showTourBlockedTip()
+      return
+    }
+    goToJobcost(job.jobNumber)
+  }
+
   function openProperty(group: Group) {
     if (tourActive) {
-      const r = tourCardEl?.getBoundingClientRect()
-      const left = tourCardPos?.centerX ?? (r ? r.left + r.width / 2 : window.innerWidth / 2)
-      const top = r ? r.top - 10 : 80
-      setTourBlockedTip({ left, top })
-      if (tourBlockedTipTimer.current != null) window.clearTimeout(tourBlockedTipTimer.current)
-      tourBlockedTipTimer.current = window.setTimeout(() => setTourBlockedTip(null), 2200)
+      showTourBlockedTip()
       return
     }
     goToProperty(group.key)
