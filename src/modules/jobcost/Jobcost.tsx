@@ -2431,8 +2431,17 @@ export default function Jobcost() {
           <motion.div
             /* The property view keeps one key across loading → loaded so the
                ghost cards resolve in place (inner stack below) instead of
-               exiting through this crossfade first. */
-            key={groupedContent ? "property" : loading ? "loading" : "project"}
+               exiting through this crossfade first. The "when" pair rides the
+               key so a year or phase change fades the old content out and the
+               new content (or the ghosts, for a year refetch) in, instead of
+               teleporting rows mid-frame. */
+            key={
+              groupedContent
+                ? `property|${year}|${phaseFilter}`
+                : loading
+                  ? "loading"
+                  : `project|${year}|${phaseFilter}`
+            }
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
