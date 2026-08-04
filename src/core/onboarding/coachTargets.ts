@@ -17,6 +17,8 @@ export type CoachTargetId =
   | "jc-view-seg"
   | "jc-card"
   | "jc-card-pin"
+  // The command bar's joined Year + Phase pair (the "when" control).
+  | "jc-when"
 
 const targets = new Map<CoachTargetId, HTMLElement>()
 const listeners = new Map<CoachTargetId, Set<() => void>>()

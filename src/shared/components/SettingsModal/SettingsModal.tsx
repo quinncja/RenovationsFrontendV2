@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, type ReactNode } from "react"
 import { X, Sun, Moon, Database, LogOut } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { signOut } from "firebase/auth"
@@ -7,6 +7,7 @@ import { useAuth } from "../../../core/auth/AuthProvider"
 import { fetchSqlStatus, connectSql, disconnectSql } from "../../api/sqlApi"
 import useLocalStorage from "../../hooks/useLocalStorage"
 import { HASHED_RELATION_COLORS_KEY } from "../../hooks/useHashedRelationColors"
+import useJobcostDefaultRange, { JOBCOST_DEFAULT_RANGE_OPTIONS } from "../../hooks/useJobcostDefaultRange"
 import { useModalLayer } from "../../hooks/useModalLayer"
 
 interface SettingsModalProps {
@@ -15,6 +16,50 @@ interface SettingsModalProps {
   theme: "light" | "dark"
   onThemeChange: (theme: "light" | "dark") => void
 }
+
+// Same spring as the Job Costing board's segmented thumbs (SEG_SPRING in
+// Jobcost.tsx) — duplicated rather than imported so the settings modal doesn't
+// pull the lazy Jobcost chunk into the shell bundle.
+const SEG_SPRING = { type: "spring", bounce: 0.15, visualDuration: 0.35 } as const
+
+// One segmented toggle in the settings' deck grammar: recessed well, sliding
+// copper thumb (each control owns a layoutId so thumbs glide independently).
+function SettingsSeg<K extends string>({
+  label,
+  layoutId,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  layoutId: string
+  value: K
+  options: readonly { key: K; label: ReactNode }[]
+  onChange: (key: K) => void
+}) {
+  return (
+    <div className="settings-seg" role="radiogroup" aria-label={label}>
+      {options.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          role="radio"
+          aria-checked={value === o.key}
+          className={`settings-seg-btn${value === o.key ? " settings-seg-btn-active" : ""}`}
+          onClick={() => onChange(o.key)}
+        >
+          {value === o.key && <motion.span layoutId={layoutId} className="settings-seg-thumb" transition={SEG_SPRING} />}
+          <span className="settings-seg-label">{o.label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+const ON_OFF = [
+  { key: "on", label: "On" },
+  { key: "off", label: "Off" },
+] as const
 
 export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsModalProps) {
   const { user, claims } = useAuth()
@@ -27,6 +72,7 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
 
   const [marginColorsEnabled, setMarginColorsEnabled] = useLocalStorage("marginColorsEnabled", true)
   const [hashedRelationColors, setHashedRelationColors] = useLocalStorage(HASHED_RELATION_COLORS_KEY, false)
+  const [jobcostDefaultRange, setJobcostDefaultRange] = useJobcostDefaultRange()
   const [sqlConnected, setSqlConnected] = useState<boolean | null>(null)
   const [sqlLoading, setSqlLoading] = useState(false)
   const { overlayZ, contentZ } = useModalLayer(open)
@@ -87,102 +133,131 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                 </button>
               </div>
 
-              <div className="settings-section">
-                <div className="settings-row">
-                  <div className="settings-row-info">
-                    <span className="settings-row-label">Appearance</span>
-                    <span className="settings-row-description">Switch between light and dark mode</span>
-                    <span className="settings-row-shortcut"><kbd className="settings-kbd">⌘</kbd> <kbd className="settings-kbd">/</kbd></span>
-                  </div>
-                  <button
-                    className="settings-toggle"
-                    onClick={() => onThemeChange(theme === "dark" ? "light" : "dark")}
-                  >
-                    {theme === "light" ? <Sun size={16} /> : <Moon size={16} />}
-                    <span>{theme === "light" ? "Light" : "Dark"}</span>
-                  </button>
-                </div>
-              </div>
-
-              <div className="settings-section">
-                <div className="settings-row">
-                  <div className="settings-row-info">
-                    <span className="settings-row-label">Margin Colors</span>
-                    <span className="settings-row-description">Color margin values green / amber / red by health</span>
-                  </div>
-                  <button
-                    className={`settings-sql-toggle ${marginColorsEnabled ? "settings-sql-connected" : "settings-sql-disconnected"}`}
-                    onClick={() => setMarginColorsEnabled(!marginColorsEnabled)}
-                  >
-                    {marginColorsEnabled ? "On" : "Off"}
-                  </button>
-                </div>
-              </div>
-
-              <div className="settings-section">
-                <div className="settings-row">
-                  <div className="settings-row-info">
-                    <span className="settings-row-label">Randomize Relation Colors</span>
-                    <span className="settings-row-description">Give each client, subcontractor and supplier its own consistent color instead of shades of one hue</span>
-                  </div>
-                  <button
-                    className={`settings-sql-toggle ${hashedRelationColors ? "settings-sql-connected" : "settings-sql-disconnected"}`}
-                    onClick={() => setHashedRelationColors(!hashedRelationColors)}
-                  >
-                    {hashedRelationColors ? "On" : "Off"}
-                  </button>
-                </div>
-              </div>
-
-              {isAdmin && (
-                <div className="settings-section">
-                  <div className="settings-section-header">
-                    <span className="settings-section-title headline">Administration</span>
-                  </div>
-                  <div className="settings-row">
-                    <div className="settings-row-info">
-                      <span className="settings-row-label">
-                        <Database size={15} />
-                        Data Source Connection
-                      </span>
-                      <span className="settings-row-description">
-                        {sqlConnected
-                          ? "Click to disconnect the dashboard server from SAGE"
-                          : "Click to reconnect the dashboard server to SAGE"}
-                      </span>
+              {/* Grouped inspector: eyebrow-titled porcelain cards in the
+                  command deck's material language — hairline seams between
+                  rows, recessed wells, copper only on the active thumb. */}
+              <div className="settings-body">
+                <section>
+                  <span className="settings-group-title">Display</span>
+                  <div className="settings-group">
+                    <div className="settings-row">
+                      <div className="settings-row-info">
+                        <span className="settings-row-label">
+                          Appearance
+                          <span className="settings-row-shortcut">
+                            <kbd className="settings-kbd">⌘</kbd>
+                            <kbd className="settings-kbd">/</kbd>
+                          </span>
+                        </span>
+                        <span className="settings-row-description">Switch between light and dark mode</span>
+                      </div>
+                      <SettingsSeg
+                        label="Appearance"
+                        layoutId="settingsThemeThumb"
+                        value={theme}
+                        options={[
+                          { key: "light", label: <><Sun size={13} /> Light</> },
+                          { key: "dark", label: <><Moon size={13} /> Dark</> },
+                        ]}
+                        onChange={onThemeChange}
+                      />
                     </div>
-                    <button
-                      className={`settings-sql-toggle ${sqlConnected ? "settings-sql-connected" : "settings-sql-disconnected"}`}
-                      onClick={handleSqlToggle}
-                      disabled={sqlConnected === null || sqlLoading}
-                    >
-                      {sqlLoading ? (
-                        "..."
-                      ) : sqlConnected === null ? (
-                        "Checking..."
-                      ) : sqlConnected ? (
-                        "Connected"
-                      ) : (
-                        "Disconnected"
-                      )}
-                    </button>
+                    <div className="settings-row">
+                      <div className="settings-row-info">
+                        <span className="settings-row-label">Margin Colors</span>
+                        <span className="settings-row-description">Color margin values green / amber / red by health</span>
+                      </div>
+                      <SettingsSeg
+                        label="Margin colors"
+                        layoutId="settingsMarginThumb"
+                        value={marginColorsEnabled ? "on" : "off"}
+                        options={ON_OFF}
+                        onChange={(k) => setMarginColorsEnabled(k === "on")}
+                      />
+                    </div>
+                    <div className="settings-row">
+                      <div className="settings-row-info">
+                        <span className="settings-row-label">Randomize Relation Colors</span>
+                        <span className="settings-row-description">
+                          Give each client, subcontractor and supplier its own consistent color instead of shades of one hue
+                        </span>
+                      </div>
+                      <SettingsSeg
+                        label="Randomize relation colors"
+                        layoutId="settingsRelationThumb"
+                        value={hashedRelationColors ? "on" : "off"}
+                        options={ON_OFF}
+                        onChange={(k) => setHashedRelationColors(k === "on")}
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
+                </section>
 
-              <div className="settings-section settings-section--divided">
-                <div className="settings-row">
-                  <div className="settings-row-info">
-                    <span className="settings-row-label">Sign out</span>
-                    <span className="settings-row-description">
-                      {user?.email ? `Signed in as ${user.email}` : "Sign out of your account"}
-                    </span>
+                <section>
+                  <span className="settings-group-title">Job Costing</span>
+                  <div className="settings-group">
+                    <div className="settings-row settings-row--wrap">
+                      <div className="settings-row-info">
+                        <span className="settings-row-label">Opens to</span>
+                        <span className="settings-row-description">Where the year and phase filters start each visit</span>
+                      </div>
+                      <SettingsSeg
+                        label="Job Costing default range"
+                        layoutId="settingsJcRangeThumb"
+                        value={jobcostDefaultRange}
+                        options={JOBCOST_DEFAULT_RANGE_OPTIONS}
+                        onChange={setJobcostDefaultRange}
+                      />
+                    </div>
                   </div>
-                  <button className="settings-toggle" onClick={handleSignOut}>
-                    <LogOut size={16} />
-                    <span>Sign out</span>
-                  </button>
-                </div>
+                </section>
+
+                {isAdmin && (
+                  <section>
+                    <span className="settings-group-title">Administration</span>
+                    <div className="settings-group">
+                      <div className="settings-row">
+                        <div className="settings-row-info">
+                          <span className="settings-row-label">
+                            <Database size={15} />
+                            Data Source Connection
+                          </span>
+                          <span className="settings-row-description">
+                            {sqlConnected
+                              ? "Disconnect the dashboard server from Sage"
+                              : "Reconnect the dashboard server to Sage"}
+                          </span>
+                        </div>
+                        <button
+                          className={`settings-pill${
+                            sqlConnected === null ? "" : sqlConnected ? " settings-pill--ok" : " settings-pill--bad"
+                          }`}
+                          onClick={handleSqlToggle}
+                          disabled={sqlConnected === null || sqlLoading}
+                        >
+                          {sqlLoading ? "..." : sqlConnected === null ? "Checking..." : sqlConnected ? "Connected" : "Disconnected"}
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                <section>
+                  <span className="settings-group-title">Account</span>
+                  <div className="settings-group">
+                    <div className="settings-row">
+                      <div className="settings-row-info">
+                        <span className="settings-row-label settings-row-label--truncate">
+                          {user?.email ?? "Your account"}
+                        </span>
+                      </div>
+                      <button className="settings-toggle" onClick={handleSignOut}>
+                        <LogOut size={14} />
+                        <span>Sign out</span>
+                      </button>
+                    </div>
+                  </div>
+                </section>
               </div>
             </motion.div>
           </div>

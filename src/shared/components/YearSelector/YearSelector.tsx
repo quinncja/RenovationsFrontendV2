@@ -1,4 +1,4 @@
-const MIN_YEAR = 2019
+export const MIN_YEAR = 2019
 
 type YearSelectorProps =
   | { allowAllTime?: false; value: number; onChange: (year: number) => void }

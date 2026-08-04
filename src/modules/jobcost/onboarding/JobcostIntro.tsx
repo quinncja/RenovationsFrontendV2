@@ -19,8 +19,10 @@ import { useJobcostTourState, getJobcostTourController, publishTourActive, publi
 //
 //   welcome → open a property (the Property view IS the pitch; the spotlight
 //   GROWS with the card) → its Phase Work / One-Off Work split (summaries
-//   stay in focus and clickable) → pin → a closing note on the view toggle
-//   ("toggle back to the previous view any time"), where the tour ends.
+//   stay in focus and clickable) → pin → the year + phase filters (they
+//   default to the current phase; changeable any time in Settings) → a
+//   closing note on the view toggle (the previous board lives on as the
+//   Project view), where the tour ends.
 //
 // The tour never leaves the board — no report-page beats. Interactive beats
 // carry a quiet "Next" escape hatch that performs the action instead;
@@ -41,10 +43,11 @@ type CoachStage =
   | "open-card" // the Property-view pitch: click a property open
   | "explore-card" // the opened card: Phase Work / One-Off Work, all live
   | "pin" // pin a property
+  | "when-filter" // the Year + Phase pair and its Settings-set default
   | "views-end" // closing note on the toggle; the tour ends here
 type Stage = "idle" | "welcome" | CoachStage | "done"
 
-const COACH_ORDER: CoachStage[] = ["open-card", "explore-card", "pin", "views-end"]
+const COACH_ORDER: CoachStage[] = ["open-card", "explore-card", "pin", "when-filter", "views-end"]
 
 interface StepDef {
   target: CoachTargetId
@@ -89,12 +92,21 @@ const STEPS: Record<CoachStage, StepDef> = {
     ctaLabel: "Continue",
     advanceDelay: 1200,
   },
+  "when-filter": {
+    target: "jc-when",
+    title: "Filters",
+    body: "Filter your board by year and phase.\nIt defaults to the current phase. Change this at any time in the settings.",
+    shielded: true,
+    travel: false,
+    cta: "primary",
+    ctaLabel: "Continue",
+  },
   "views-end": {
     target: "jc-view-seg",
     title: "Switching Views",
-    body: "Toggle back to the previous view at any time.",
+    body: "The previous board still exists, now called the Project view.\nToggle between them both here.",
     shielded: true,
-    travel: false,
+    // Glides over from the adjacent Year + Phase control, one bar over.
     cta: "primary",
     ctaLabel: "Done",
   },
@@ -276,7 +288,7 @@ export function JobcostIntro() {
           ? base != null && JSON.stringify(boardState.pins) !== JSON.stringify(base.pins)
           : false
     if (!satisfied) return
-    const next: Stage = s === "open-card" ? "explore-card" : "views-end"
+    const next: Stage = s === "open-card" ? "explore-card" : "when-filter"
     const t = window.setTimeout(() => setStage(next), reduced ? 250 : (STEPS[s].advanceDelay ?? 400))
     return () => window.clearTimeout(t)
   }, [isCoach, stage, boardState, reduced])
@@ -294,6 +306,7 @@ export function JobcostIntro() {
   const segEl = useCoachTarget("jc-view-seg")
   const cardEl = useCoachTarget("jc-card")
   const pinEl = useCoachTarget("jc-card-pin")
+  const whenEl = useCoachTarget("jc-when")
   const targetFor: Record<CoachTargetId, HTMLElement | null> = {
     "edit-gear": null,
     "wip-toggle": null,
@@ -303,6 +316,7 @@ export function JobcostIntro() {
     "jc-view-seg": segEl,
     "jc-card": cardEl,
     "jc-card-pin": pinEl,
+    "jc-when": whenEl,
   }
   const target = step ? targetFor[step.target] : null
 
@@ -334,7 +348,8 @@ export function JobcostIntro() {
     const s = stage as CoachStage
     if (s === "open-card") getJobcostTourController()?.openFirstGroup() // advances via the watched state
     else if (s === "explore-card") setStage("pin")
-    else if (s === "pin") setStage("views-end")
+    else if (s === "pin") setStage("when-filter")
+    else if (s === "when-filter") setStage("views-end")
     else if (s === "views-end") finish()
   }
 

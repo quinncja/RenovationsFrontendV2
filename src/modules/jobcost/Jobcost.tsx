@@ -6,7 +6,7 @@ import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ChevronDown, Ext
 import Page from "../../shared/components/Page"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
-import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
+import { YearSelector, MIN_YEAR } from "../../shared/components/YearSelector/YearSelector"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { takePreloadedPageData } from "../../shared/api/pageDataCache"
 import { trackProjectView } from "../../shared/analytics/analytics"
@@ -15,11 +15,19 @@ import useIsMobile from "../../shared/hooks/useIsMobile"
 import useElementWidth from "../../shared/hooks/useElementWidth"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
+import useSessionStorage, { hasSessionValue } from "../../shared/hooks/useSessionStorage"
+import {
+  cacheOpenPeriod,
+  readJobcostDefaultRange,
+  resolveDefaultRange,
+  JOBCOST_PHASE_SESSION_KEY,
+  JOBCOST_YEAR_SESSION_KEY,
+} from "./defaultRange"
 import { useAuth } from "../../core/auth/AuthProvider"
 import { MobileFilterSheet, activeFilterCount, type FilterGroup } from "../../shared/components/MobileFilterSheet/MobileFilterSheet"
 import { MobileFilterButton } from "../../shared/components/MobileFilterSheet/MobileFilterButton"
 import { CostBreakdownTable, CostBreakdownSkeleton } from "./components/CostBreakdownTable"
-import { oneoffFromRecnum } from "./jobcostShared"
+import { oneoffFromRecnum, phaseFromRecnum } from "./jobcostShared"
 import { coachTargetRef, useCoachTarget } from "../../core/onboarding/coachTargets"
 import { useOnboarding } from "../../core/onboarding/OnboardingProvider"
 import { SECTION_JOBCOST_REDESIGN } from "../../core/onboarding/markers"
@@ -83,6 +91,14 @@ export interface RawProject {
   // Present when the fetch passes yearFlag: 1 = had posted revenue or cost in
   // the selected year. Absent (all-time fetch) = always active.
   yearActive?: number
+  // Phase month derived in SQL from the recnum suffix (01–12); absent for
+  // one-offs (FOR JSON PATH drops NULL columns) and on pre-phase-column
+  // backends. Only sent on yearFlag fetches.
+  phase?: number | null
+  // CSV of accounting periods (jobcst.actprd) with posted costs, scoped to
+  // the selected year (all-time when year is null). Only on yearFlag fetches;
+  // absent when the job has no posted costs.
+  activePeriods?: string | null
   // actrec.usrdf1 — units delivered by the phase. Sage stores it as text.
   unitCount?: number | string | null
 }
@@ -112,6 +128,11 @@ export interface Job {
   oneoffName: string | null
   yearActive: boolean
   units: number
+  // Phase month (1–12); null for one-offs.
+  phase: number | null
+  // Periods with posted costs in the selected year — the one-off side of the
+  // phase filter (a one-off has no phase of its own).
+  activePeriods: number[]
 }
 
 // Lazily-fetched per-job cost detail for the expanded view.
@@ -153,6 +174,10 @@ export function normalizeProject(p: RawProject): Job {
     // One-offs (repairs, extras) aren't unit deliveries — never count them,
     // even when Sage carries a unitCount on the record.
     units: oneoff ? 0 : Number(p.unitCount) || 0,
+    // FOR JSON PATH drops NULLs, so absent = null here; derive from the
+    // recnum when the backend predates the phase column.
+    phase: p.phase ?? (oneoff ? null : phaseFromRecnum(recnum)),
+    activePeriods: p.activePeriods ? p.activePeriods.split(",").map(Number) : [],
   }
 }
 
@@ -239,6 +264,20 @@ const STATUS_OPTIONS: { key: StatusFilter; label: string }[] = [
   { key: 6, label: "Closed" },
 ]
 
+type PhaseFilter = "all" | number
+
+const PHASE_OPTIONS: { key: PhaseFilter; label: string }[] = [
+  { key: "all", label: "All Phases" },
+  ...Array.from({ length: 12 }, (_, i) => ({ key: i + 1, label: `Phase ${i + 1}` })),
+]
+
+// Phase membership: phase jobs match on their own phase month (from the
+// recnum suffix, first and foremost); one-offs have no phase, so they match
+// when they had posted costs in that accounting period instead.
+function jobMatchesPhase(j: Job, phase: number): boolean {
+  return j.oneoff ? j.activePeriods.includes(phase) : j.phase === phase
+}
+
 type ViewMode = "grouped" | "list"
 
 // Mobile sheet group mirrors the desktop dropdown (single-select).
@@ -253,8 +292,16 @@ const FILTER_GROUPS: FilterGroup[] = [
       { value: "6", label: "Closed", colorClass: "jc-filter-closed" },
     ],
   },
+  {
+    key: "phase",
+    label: "Phase",
+    options: [
+      { value: "all", label: "All" },
+      ...Array.from({ length: 12 }, (_, i) => ({ value: String(i + 1), label: String(i + 1) })),
+    ],
+  },
 ]
-const FILTER_DEFAULTS = { status: "all" }
+const FILTER_DEFAULTS = { status: "all", phase: "all" }
 
 // Managers also get a project-scope group in the mobile sheet, mirroring the
 // desktop Mine/All seg (the command bar doesn't render on mobile — without
@@ -1627,7 +1674,17 @@ export default function Jobcost() {
   const { claims } = useAuth()
   const isManager = claims["role"] === "manager"
   const [showAllProjects, setShowAllProjects] = useLocalStorage("jobcostShowAllProjects", false)
-  const [year, setYear] = useLocalStorage<number | null>("jobcostYear", new Date().getFullYear())
+  // The "when" pair (year + phase) starts each session from the user's
+  // default-range preference (Settings: open phase / this month / all phases)
+  // and is session-scoped from there: picks survive route changes within the
+  // tab, a new session starts back at the default. While the pair is untouched
+  // (no session key yet), the fetch below may still snap it to the real open
+  // period when the cached guess was stale.
+  const [year, setYear] = useSessionStorage<number | null>(JOBCOST_YEAR_SESSION_KEY, () => resolveDefaultRange().year)
+  const [phaseFilter, setPhaseFilter] = useSessionStorage<PhaseFilter>(
+    JOBCOST_PHASE_SESSION_KEY,
+    () => resolveDefaultRange().phase,
+  )
   const [viewMode, setViewMode] = useLocalStorage<ViewMode>("jobcostViewMode", "grouped")
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
@@ -1702,28 +1759,47 @@ export default function Jobcost() {
     // of a server-filtered year subset (see the header comment). allProjects
     // is a manager-only hint: when on, the backend drops the PM scoping and
     // returns the whole company list. Ignored for other roles.
-    // Params must keep this exact shape/order so a daily-arrival preload's
-    // cache key matches (see pageDataCache).
+    // Params and queries must keep this exact shape/order so a daily-arrival
+    // preload's cache key matches (see pageDataCache). getOpenPeriod rides
+    // along to keep the cached open period fresh for the default-range
+    // preference — same round-trip, keyed alongside getPhases.
     const params = { year, yearFlag: true, allProjects: isManager ? showAllProjects : null }
-    const preloaded = takePreloadedPageData("jobcost", ["getPhases"], params)
+    const queries = ["getPhases", "getOpenPeriod"]
+    const preloaded = takePreloadedPageData("jobcost", queries, params)
     const request = preloaded
       ? // A failed preload shouldn't strand the page — fall back to a real fetch.
         preloaded.catch(() =>
-          fetchPageData({ module: "jobcost", queries: ["getPhases"], params, signal: controller.signal })
+          fetchPageData({ module: "jobcost", queries, params, signal: controller.signal })
         )
-      : fetchPageData({ module: "jobcost", queries: ["getPhases"], params, signal: controller.signal })
+      : fetchPageData({ module: "jobcost", queries, params, signal: controller.signal })
     request
       .then((result) => {
         if (controller.signal.aborted) return
         const data = result.getPhases
         if (Array.isArray(data)) setJobs((data as RawProject[]).map(normalizeProject))
         setLoading(false)
+        // When this visit's start was GUESSED (open-phase preference, pair
+        // still untouched) and the real open period disagrees, snap to it —
+        // the setters no-op when the guess was already right. A backend that
+        // doesn't serve getOpenPeriod yet returns null here, and the calendar
+        // guess simply stands.
+        const open = cacheOpenPeriod(result.getOpenPeriod)
+        if (
+          open &&
+          readJobcostDefaultRange() === "open-phase" &&
+          !hasSessionValue(JOBCOST_YEAR_SESSION_KEY) &&
+          !hasSessionValue(JOBCOST_PHASE_SESSION_KEY)
+        ) {
+          setYear(open.postyr)
+          setPhaseFilter(open.actprd)
+        }
       })
       .catch((err) => {
         if (err.name !== "AbortError") setLoading(false)
       })
     return () => controller.abort()
-  }, [year, isManager, showAllProjects])
+    // The setters are useCallback-stable — listed only to satisfy the lint.
+  }, [year, isManager, showAllProjects, setYear, setPhaseFilter])
 
   function loadDetail(job: Job) {
     const epoch = detailEpochRef.current
@@ -1843,6 +1919,7 @@ export default function Jobcost() {
   // is a one-time delegator over a latest-values ref so its calls never see
   // stale closures.
   const segTargetRef = useMemo(() => coachTargetRef("jc-view-seg"), [])
+  const whenTargetRef = useMemo(() => coachTargetRef("jc-when"), [])
   const tourCtlRef = useRef<JobcostTourController | null>(null)
   useEffect(() => {
     const delegator: JobcostTourController = {
@@ -1893,6 +1970,7 @@ export default function Jobcost() {
     const q = search.toLowerCase()
     let list = jobs.filter((j) => j.yearActive && !(hideClosed && j.status === 6))
     if (statusFilter !== "all") list = list.filter((j) => j.status === statusFilter)
+    if (phaseFilter !== "all") list = list.filter((j) => jobMatchesPhase(j, phaseFilter))
     if (q)
       list = list.filter(
         (j) =>
@@ -1928,14 +2006,21 @@ export default function Jobcost() {
     for (const j of sorted) (rank.has(j.recnum) ? pinnedRows : rest).push(j)
     pinnedRows.sort((a, b) => rank.get(a.recnum)! - rank.get(b.recnum)!)
     return [...pinnedRows, ...rest]
-  }, [jobs, search, statusFilter, sortKey, sortDir, hideClosed, projectPins])
+  }, [jobs, search, statusFilter, phaseFilter, sortKey, sortDir, hideClosed, projectPins])
 
   // Pins only privilege ordering while the command bar sits at its defaults.
   // Any sort/search/filter dissolves them into the list as ordinary rows
   // (still marked); the Reset button returns here and floats them back up.
-  const isDefaultView = groupSort === "name" && groupSortDir === "asc" && search === "" && statusFilter === "all"
+  // The "when" pair (year + phase) is deliberately NOT part of this: like the
+  // year always was, phase now scopes WHEN you're looking at — it starts on
+  // the user's preferred default, so it can't count against "default view"
+  // and Reset leaves it alone.
+  const isDefaultView =
+    groupSort === "name" && groupSortDir === "asc" && search === "" && statusFilter === "all"
   const isListDefaultView =
-    (sortKey == null || (sortKey === "name" && sortDir === "asc")) && search === "" && statusFilter === "all"
+    (sortKey == null || (sortKey === "name" && sortDir === "asc")) &&
+    search === "" &&
+    statusFilter === "all"
 
   function resetView() {
     setGroupSort("name")
@@ -1954,6 +2039,10 @@ export default function Jobcost() {
     // member Closed) can't belong to the current calendar year.
     let list = buildGroups(jobs).filter((g) => g.yearActive && !(hideClosed && g.status === 6))
     if (statusFilter !== "all") list = list.filter((g) => g.status === statusFilter)
+    // Same rule as yearActive: a property stays visible if ANY member matches
+    // the phase (its card still shows the full membership).
+    if (phaseFilter !== "all")
+      list = list.filter((g) => [...g.phases, ...g.oneoffs].some((m) => jobMatchesPhase(m, phaseFilter)))
     if (q)
       list = list.filter(
         (g) =>
@@ -1997,7 +2086,7 @@ export default function Jobcost() {
     for (const g of sorted) (rank.has(g.key) ? pinned : rest).push(g)
     pinned.sort((a, b) => rank.get(a.key)! - rank.get(b.key)!)
     return [...pinned, ...rest]
-  }, [jobs, search, statusFilter, groupSort, groupSortDir, hideClosed, pins, isDefaultView])
+  }, [jobs, search, statusFilter, phaseFilter, groupSort, groupSortDir, hideClosed, pins, isDefaultView])
 
   // Fresh controller each render (closures see current state); the registered
   // delegator forwards into it. Restore reinstates the pre-tour view/pins and
@@ -2049,8 +2138,16 @@ export default function Jobcost() {
     : resultCount === 1 ? "Project" : "Projects"
   const searchPlaceholder = grouped ? "Search properties..." : "Search projects..."
 
+  // Desktop home of the year control is the command bar (below); the shared
+  // header YearSelector only renders on mobile, where the bar doesn't exist.
+  const yearOptions: number[] = []
+  for (let y = thisYear; y >= MIN_YEAR; y--) yearOptions.push(y)
+
   return (
-    <Page title="Job Costing" actions={<YearSelector value={year} onChange={handleYearChange} allowAllTime />}>
+    <Page
+      title="Job Costing"
+      actions={isMobile ? <YearSelector value={year} onChange={handleYearChange} allowAllTime /> : undefined}
+    >
       <MotionList className="inv-page-stack">
         {/* Desktop command bar: a dark control deck, deliberately a different
             surface from the white property cards below it. Stays mounted
@@ -2109,6 +2206,43 @@ export default function Jobcost() {
                   </button>
                 </div>
               )}
+              {/* Year + phase share one joined control (same seam treatment
+                  as the sort) — together they answer "when". Starts on the
+                  user's default-range preference (see defaultRange.ts); also
+                  a coach target for the tour's when-filter beat. */}
+              <span ref={whenTargetRef} className="jc-cb-join">
+                <span className="jc-cb-select-wrap">
+                  <select
+                    className="jc-cb-select"
+                    value={year == null ? "all" : String(year)}
+                    onChange={(e) => handleYearChange(e.target.value === "all" ? null : Number(e.target.value))}
+                    aria-label="Select year"
+                  >
+                    <option value="all">All Time</option>
+                    {yearOptions.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} className="jc-cb-select-arrow" />
+                </span>
+                <span className="jc-cb-select-wrap">
+                  <select
+                    className="jc-cb-select"
+                    value={String(phaseFilter)}
+                    onChange={(e) => setPhaseFilter(e.target.value === "all" ? "all" : Number(e.target.value))}
+                    aria-label="Filter by phase"
+                  >
+                    {PHASE_OPTIONS.map((o) => (
+                      <option key={String(o.key)} value={String(o.key)}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={12} className="jc-cb-select-arrow" />
+                </span>
+              </span>
               <span className="jc-cb-select-wrap">
                 <select
                   className="jc-cb-select"
@@ -2218,8 +2352,8 @@ export default function Jobcost() {
               <MobileFilterButton
                 count={activeFilterCount(
                   isManager
-                    ? { status: String(statusFilter), scope: showAllProjects ? "all" : "mine" }
-                    : { status: String(statusFilter) },
+                    ? { status: String(statusFilter), phase: String(phaseFilter), scope: showAllProjects ? "all" : "mine" }
+                    : { status: String(statusFilter), phase: String(phaseFilter) },
                   isManager ? MANAGER_FILTER_DEFAULTS : FILTER_DEFAULTS,
                 )}
                 onClick={() => setFilterSheetOpen(true)}
@@ -2236,7 +2370,7 @@ export default function Jobcost() {
                 <ChartNoAxesColumn size={24} className="widget-no-data-icon" />
                 <span className="body-text">No data available</span>
               </div>
-            ) : resultCount === 0 && (search || statusFilter !== "all") ? (
+            ) : resultCount === 0 && (search || statusFilter !== "all" || phaseFilter !== "all") ? (
               <div className="co-no-results body-text text-secondary">
                 {search ? `No projects match "${search}"` : "No projects match your filters"}
               </div>
@@ -2375,7 +2509,7 @@ export default function Jobcost() {
                         <span className="body-text">No data available</span>
                       </div>
                     </Widget>
-                  ) : resultCount === 0 && (search || statusFilter !== "all") ? (
+                  ) : resultCount === 0 && (search || statusFilter !== "all" || phaseFilter !== "all") ? (
                     <div className="jc-empty-note body-text text-secondary">
                       {search
                         ? `No properties match "${search}"`
@@ -2421,7 +2555,7 @@ export default function Jobcost() {
                 <span className="body-text">No data available</span>
               </div>
             </Widget>
-          ) : resultCount === 0 && (search || statusFilter !== "all") ? (
+          ) : resultCount === 0 && (search || statusFilter !== "all" || phaseFilter !== "all") ? (
             <div className="jc-empty-note body-text text-secondary">
               {search
                 ? `No projects match "${search}"`
@@ -2464,12 +2598,13 @@ export default function Jobcost() {
           })()}
           values={
             isManager
-              ? { status: String(statusFilter), scope: showAllProjects ? "all" : "mine" }
-              : { status: String(statusFilter) }
+              ? { status: String(statusFilter), phase: String(phaseFilter), scope: showAllProjects ? "all" : "mine" }
+              : { status: String(statusFilter), phase: String(phaseFilter) }
           }
           defaults={isManager ? MANAGER_FILTER_DEFAULTS : FILTER_DEFAULTS}
           onChange={(v) => {
             setStatusFilter(v.status === "all" ? "all" : Number(v.status))
+            setPhaseFilter(v.phase === "all" ? "all" : Number(v.phase))
             if (isManager) setShowAllProjects(v.scope === "all")
           }}
         />

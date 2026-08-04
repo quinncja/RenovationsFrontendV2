@@ -1,6 +1,7 @@
 import { preloadPageData } from "../../../../shared/api/pageDataCache"
 import { PAGE_QUERIES } from "../../../../shared/config/pageQueries"
 import { ALL_JOBS_DETAIL_ID } from "../../../../core/auth/roles"
+import { getJobcostRangeInit } from "../../../jobcost/defaultRange"
 
 /**
  * Fires the destination pages' data fetches while the daily-arrival welcome
@@ -52,13 +53,16 @@ export function preloadEntryPages(source: "admin" | "pm", employeeId: number | n
     })
   }
 
-  // Job Costing list — mirrors the list effect in Jobcost.tsx.
+  // Job Costing list — mirrors the list effect in Jobcost.tsx. The "when"
+  // pair is session-scoped with a preference-derived default, so ask the same
+  // resolver the board's mount uses (getJobcostRangeInit) rather than reading
+  // a raw key; getOpenPeriod rides along there too.
   const isManager = source === "pm"
-  const jobcostYear = readStored<number | null>("jobcostYear", currentYear)
+  const jobcostYear = getJobcostRangeInit().year
   const showAllProjects = readStored<boolean>("jobcostShowAllProjects", false)
   preloadPageData({
     module: "jobcost",
-    queries: ["getPhases"],
+    queries: ["getPhases", "getOpenPeriod"],
     params: { year: jobcostYear, yearFlag: true, allProjects: isManager ? showAllProjects : null },
   })
 

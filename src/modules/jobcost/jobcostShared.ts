@@ -9,6 +9,13 @@ export function oneoffFromRecnum(recnum: string): boolean {
   return !(suffix >= 1 && suffix <= 12)
 }
 
+// The phase month itself (1–12) from the same suffix; null for one-offs.
+// Fallback for when the backend hasn't sent its SQL-derived `phase` column.
+export function phaseFromRecnum(recnum: string): number | null {
+  const suffix = Number(recnum.slice(-2))
+  return suffix >= 1 && suffix <= 12 ? suffix : null
+}
+
 // Sage stores unset dates as null (or a pre-2000 sentinel on old rows) — treat
 // both as "no date". SQL dates arrive as "YYYY-MM-DD..." which a bare
 // `new Date()` parses as UTC midnight — the previous day in Chicago — so pull

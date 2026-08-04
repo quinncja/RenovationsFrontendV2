@@ -56,8 +56,10 @@ added or retired.
   user performs each taught action for real (interactive cutout, no shield):
   open a property — the Property-view pitch, with the cutout GROWING live
   with the card — → the Phase Work / One-Off Work split (both summaries stay
-  in focus and clickable) → pin → a closing note on the view toggle
-  ("toggle back to the previous view any time"), where the tour ends. It
+  in focus and clickable) → pin → the year + phase filters (shielded beat:
+  they default to the current phase, changeable any time in Settings —
+  `useJobcostDefaultRange`) → a closing note on the view toggle (the previous
+  board lives on as the Project view), where the tour ends. It
   never leaves the board: no report-page beats, no double-click/View
   teaching. Interactive beats carry a quiet "Next" escape hatch that
   performs the action instead. The board publishes state / registers a
