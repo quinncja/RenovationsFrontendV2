@@ -2039,10 +2039,16 @@ export default function Jobcost() {
     // member Closed) can't belong to the current calendar year.
     let list = buildGroups(jobs).filter((g) => g.yearActive && !(hideClosed && g.status === 6))
     if (statusFilter !== "all") list = list.filter((g) => g.status === statusFilter)
-    // Same rule as yearActive: a property stays visible if ANY member matches
-    // the phase (its card still shows the full membership).
+    // A property stays visible if ANY member would survive the list view's
+    // filters for this year + phase (its card still shows the full
+    // membership). The yearActive check matters: the fetch is the ALL-TIME
+    // membership, so a bare phase match would keep a property alive on a
+    // phase-11 job from some PAST year even though the selected year has
+    // nothing in phase 11.
     if (phaseFilter !== "all")
-      list = list.filter((g) => [...g.phases, ...g.oneoffs].some((m) => jobMatchesPhase(m, phaseFilter)))
+      list = list.filter((g) =>
+        [...g.phases, ...g.oneoffs].some((m) => m.yearActive && jobMatchesPhase(m, phaseFilter)),
+      )
     if (q)
       list = list.filter(
         (g) =>
