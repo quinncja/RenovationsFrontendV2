@@ -16,7 +16,6 @@ const JobcostDetailPage = lazy(() => import("../../modules/jobcost/JobcostDetail
 const PropertyDetailPage = lazy(() => import("../../modules/jobcost/PropertyDetailPage.tsx"))
 const ChangeOrders = lazy(() => import("../../modules/change-orders/ChangeOrdersPage.tsx"))
 const ReportsPage = lazy(() => import("../../modules/dashboard/report/ReportsPage.tsx"))
-const NewChangeOrder = lazy(() => import("../../modules/change-orders/components/NewChangeOrder.tsx"))
 const CashFlow = lazy(() => import("../../modules/cash-flow/CashFlowPage.tsx"))
 const RevenueMap = lazy(() => import("../../modules/revenue-map/RevenueMapPage.tsx"))
 const OrgChart = lazy(() => import("../../modules/org-chart/OrgChartPage.tsx"))
@@ -80,15 +79,13 @@ export default function Router() {
               </RequireRole>
             } />
 
-            {/* Change Orders — admin/executive + GM (company-wide tier) */}
+            {/* Change Orders — admin/executive + GM (company-wide tier) get
+                the full list with create/delete; managers get a view-only
+                list the backend scopes to their own jobs. Creation happens
+                in the page's wizard modal — there is no /new route. */}
             <Route path="/change-orders" element={
-              <RequireRole allowed={["executive", "admin", "generalManager"]}>
+              <RequireRole allowed={["executive", "admin", "generalManager", "manager"]}>
                 <SuspenseWrapper><ChangeOrders /></SuspenseWrapper>
-              </RequireRole>
-            } />
-            <Route path="/change-orders/new" element={
-              <RequireRole allowed={["executive", "admin", "generalManager"]}>
-                <SuspenseWrapper><NewChangeOrder /></SuspenseWrapper>
               </RequireRole>
             } />
 

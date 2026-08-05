@@ -9398,15 +9398,12 @@ button.jc-kind-chip:hover {
   margin-top: 0.5rem;
 }
 
-/* Clickable project that opens its job-costing page (CO table + modal). */
+/* Clickable project that opens its job-costing page (CO table). The modal's
+   project link is a contained pill instead — see .co-modal-project-pill. */
 .co-project-link {
   cursor: pointer;
 }
 .co-project-link:hover .body-text.emphasized {
-  color: var(--primary-color);
-  text-decoration: underline;
-}
-.co-modal-subtitle.co-project-link:hover {
   color: var(--primary-color);
   text-decoration: underline;
 }
@@ -12784,21 +12781,39 @@ svg.placeholder-illustration {
   outline-offset: -2px;
 }
 
-/* Change order detail modal — same edge-to-edge table treatment as a widget. */
+/* Change order detail modal — reads as a clean document: eyebrow-titled
+   identity, edge-to-edge line items, and an invoice-style close where the
+   Amount column flows into a Contract-Summary-voice ledger (labels left,
+   figures flush right, one sum rule above the bottom line). */
 .co-modal {
-  min-width: min(720px, 92vw);
-  max-width: 880px;
+  /* The sheet sizes to its document: narrow orders draw a narrow modal
+     (the table's natural width sets it), long descriptions wrap at the cap
+     instead of stretching white space between the columns. */
+  width: auto;
+  min-width: min(600px, 92vw);
+  max-width: min(92vw, 880px);
   padding: 0;
   gap: 0;
   overflow: hidden;
 }
 
-.co-modal .modal-header {
-  padding: 1.25rem 1.25rem 0.75rem;
+.co-modal-header {
+  padding: 1.375rem 1.5rem 1.125rem;
   align-items: flex-start;
   border-bottom: 1px solid var(--border-color);
 }
 
+.co-modal-eyebrow {
+  display: block;
+  margin-bottom: 0.3125rem;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--secondary-text);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.co-modal-title { min-width: 0; }
 .co-modal-title h2 {
   margin: 0;
   line-height: 1.2;
@@ -12806,22 +12821,118 @@ svg.placeholder-illustration {
 
 .co-modal-subtitle {
   display: block;
-  margin-top: 0.25rem;
+  margin-top: 0.375rem;
   font-size: var(--callout-size);
   color: var(--secondary-text);
 }
 
+/* Project drill-through in the jobcost hero's meta voice — a soft pill that
+   fades in behind the text on hover; negative margins cancel the padding so
+   the resting layout stays flush with the title. */
+.co-modal-project-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  margin: 0.4375rem -0.5625rem -0.25rem;
+  padding: 0.25rem 0.5625rem;
+  border-radius: 999px;
+  background: none;
+  color: var(--secondary-text);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  min-width: 0;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.co-modal-project-link svg { color: color-mix(in srgb, var(--secondary-text) 70%, transparent); }
+.co-modal-project-link:hover {
+  background: var(--hover-bg);
+  color: var(--primary-text);
+}
+.co-modal-project-link:hover svg { color: inherit; }
+.co-modal-project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The job number steps back so the property name carries the link. */
+.co-modal-project-num {
+  white-space: nowrap;
+  font-weight: var(--font-weight-regular, 400);
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in srgb, var(--secondary-text) 78%, transparent);
+}
+.co-modal-project-link:hover .co-modal-project-num { color: inherit; }
+
+/* On narrow screens the table scrolls sideways inside its own strip, so the
+   modal (and the ledger close below) hold their width. */
+.co-modal-table-scroll { overflow-x: auto; }
+
+/* Invoice discipline for the line items: description owns the width while
+   the money columns shrink to their figures and cluster right on a fixed
+   rhythm; column labels drop to the ledger's uppercase voice, and the inner
+   hairlines sit lighter than the sheet's outer rules. */
+.co-modal .data-table th {
+  padding-top: 0.6875rem;
+  padding-bottom: 0.6875rem;
+  font-size: var(--footnote-size);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.co-modal .data-table td {
+  padding-top: 0.6875rem;
+  padding-bottom: 0.6875rem;
+  border-bottom-color: color-mix(in srgb, var(--border-color) 62%, transparent);
+}
+/* The ledger band below carries the closing rule; the last row stays open. */
+.co-modal .data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.co-modal .co-col-unit {
+  width: 1%;
+  white-space: nowrap;
+  padding-left: 1.75rem;
+  color: var(--secondary-text);
+}
+.co-modal .co-col-num {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+  padding-left: 1.875rem;
+  font-variant-numeric: tabular-nums;
+}
+/* Description never collapses below a readable column even on terse orders. */
+.co-modal .data-table td:first-child,
+.co-modal .data-table th:first-child { min-width: 11rem; }
+.co-cell-empty {
+  color: color-mix(in srgb, var(--secondary-text) 40%, transparent);
+}
+/* Row totals sit a half-step firmer than the category figures. */
+.co-modal td.co-col-amount { font-weight: var(--font-weight-medium); }
+
+/* Totals deck shared by the New Change Order preview strip and the detail
+   modal's bottom line, read as a literal sum: Budget + Markup = Total Cost.
+   Muted operators stand in for seams so the Total never strands away from
+   its parts; a porcelain wash and a single rule tie the deck to its sheet.
+   Emphasis on the Total comes from size and copper alone. */
 .co-modal-totals {
   display: flex;
-  gap: 2rem;
-  padding: 1rem 1.25rem;
+  align-items: flex-start;
+  gap: 1.125rem;
+  padding: 1.125rem 1.5rem;
   border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(
+    180deg,
+    light-dark(#fbf9f6, rgba(240, 232, 222, 0.06)) 0%,
+    light-dark(#f7f4ef, rgba(240, 232, 222, 0.03)) 100%
+  );
 }
 
 .co-modal-total {
   display: flex;
   flex-direction: column;
-  gap: 0.125rem;
+  gap: 0.1875rem;
 }
 
 .co-modal-total-label {
@@ -12835,11 +12946,36 @@ svg.placeholder-illustration {
   font-size: 1.125rem;
   font-weight: var(--font-weight-semibold);
   color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .co-modal-total-primary .co-modal-total-value {
   font-size: 1.375rem;
   color: var(--primary-color);
+}
+
+/* Operators sit on the figures' line, a half-tone quieter than the labels. */
+.co-modal-op {
+  margin-top: 1.3125rem;
+  color: color-mix(in srgb, var(--secondary-text) 55%, transparent);
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-medium);
+}
+
+/* Closing variant for the detail modal: the deck sits under the line items
+   instead of above them, so the rule flips to the top. */
+.co-modal-totals--close {
+  border-bottom: none;
+  border-top: 1px solid var(--border-color);
+}
+
+@media (max-width: 600px) {
+  .co-modal-totals {
+    padding: 1rem 1.125rem;
+    flex-wrap: wrap;
+    gap: 0.875rem;
+    row-gap: 0.625rem;
+  }
 }
 
 .co-modal-body {
@@ -12850,12 +12986,12 @@ svg.placeholder-illustration {
 
 .co-modal .data-table th:first-child,
 .co-modal .data-table td:first-child {
-  padding-left: 1.25rem;
+  padding-left: 1.5rem;
 }
 
 .co-modal .data-table th:last-child,
 .co-modal .data-table td:last-child {
-  padding-right: 1.25rem;
+  padding-right: 1.5rem;
 }
 
 .co-modal-foot td {
@@ -12866,12 +13002,355 @@ svg.placeholder-illustration {
 
 .co-modal-meta {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.875rem 1.25rem;
+  padding: 0.75rem 1.25rem 0.75rem 1.5rem;
   border-top: 1px solid var(--border-color);
   font-size: var(--callout-size);
   color: var(--secondary-text);
+}
+
+/* Delete lives quietly in the footer — the settings panel's outline-pill
+   restraint, warming to the danger red only on hover. */
+.co-modal-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: none;
+  color: var(--secondary-text);
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.co-modal-delete:hover {
+  color: #ef4444;
+  border-color: color-mix(in srgb, #ef4444 45%, var(--border-color));
+  background: rgba(239, 68, 68, 0.06);
+}
+
+@media (max-width: 600px) {
+  .co-modal-header { padding: 1.125rem 1.125rem 1rem; }
+  .co-modal .data-table th:first-child,
+  .co-modal .data-table td:first-child { padding-left: 1.125rem; }
+  .co-modal .data-table th:last-child,
+  .co-modal .data-table td:last-child { padding-right: 1.125rem; }
+  .co-modal-meta { padding: 0.75rem 1.125rem; }
+}
+
+/* ─── Change order: shared strips (view + wizard review) ─────────────── */
+
+/* The gold fact bar: ONE washed surface owns everything that identifies the
+   order — the meta line (project · units) up top, the summed money beneath.
+   The wrapper carries the wash and the closing rule; the totals deck inside
+   goes transparent so the two rows read as one instrument. */
+.co-hero {
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(
+    180deg,
+    light-dark(#fbf9f6, rgba(240, 232, 222, 0.06)) 0%,
+    light-dark(#f7f4ef, rgba(240, 232, 222, 0.03)) 100%
+  );
+}
+.co-hero .co-modal-totals {
+  background: none;
+  border-bottom: none;
+  padding-top: 0.875rem;
+}
+.co-hero-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8125rem 1.5rem 0;
+}
+.co-hero-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  min-width: 0;
+  margin: -0.25rem -0.5625rem;
+  padding: 0.25rem 0.5625rem;
+  border-radius: 999px;
+  background: none;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+.co-hero-project svg { color: color-mix(in srgb, var(--secondary-text) 70%, transparent); }
+button.co-hero-project { cursor: pointer; transition: background-color 0.15s ease; }
+button.co-hero-project:hover { background: var(--hover-bg); }
+button.co-hero-project:hover svg { color: inherit; }
+.co-hero-project-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.co-hero-units {
+  font-size: var(--callout-size);
+  color: var(--secondary-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+  max-width: 45%;
+}
+.co-hero-units-count { font-weight: var(--font-weight-semibold); color: var(--primary-text); }
+.co-hero-units-list { font-variant-numeric: tabular-nums; }
+
+/* Hero variant of the totals deck: the sheet opens on the money, so the
+   figures step up a half-size from the bottom-line register. */
+.co-modal-totals--hero .co-modal-total-value { font-size: 1.25rem; }
+.co-modal-totals--hero .co-modal-total-primary .co-modal-total-value { font-size: 1.5rem; }
+
+/* The grid expander: a quiet full-width row; the count rides in a soft pill. */
+.co-grid-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.875rem 1.5rem;
+  border: none;
+  background: none;
+  color: var(--secondary-text);
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.co-grid-toggle:hover { background: var(--hover-bg); color: var(--primary-text); }
+.co-grid-toggle-open { color: var(--primary-text); }
+.co-grid-toggle-chevron {
+  display: inline-flex;
+  color: color-mix(in srgb, var(--secondary-text) 75%, transparent);
+}
+.co-grid-toggle-count {
+  padding: 0.0625rem 0.5rem;
+  border-radius: 999px;
+  background: var(--hover-bg);
+  font-size: var(--footnote-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+}
+.co-grid-reveal { overflow: hidden; }
+.co-grid-reveal .data-table { border-top: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent); }
+
+/* ─── Change order wizard (create mode) ──────────────────────────────── */
+
+/* Fixed frame: the steps glide inside it, so the sheet itself never jumps
+   size mid-flow. */
+.co-modal.co-wizard {
+  width: min(92vw, 840px);
+  min-width: 0;
+  height: min(600px, 86vh);
+  display: flex;
+  flex-direction: column;
+}
+.co-wizard-header { flex-shrink: 0; }
+.co-wizard-frame {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+}
+.co-wizard-step {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.co-wizard-step > * { flex: 1; min-height: 0; }
+
+/* Step 1 — project picker: search up top, the list owns the rest. */
+.co-project-step {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.co-project-search {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.875rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+.co-project-search-icon { color: var(--secondary-text); flex-shrink: 0; }
+.co-project-search input {
+  flex: 1;
+  border: none;
+  background: none;
+  outline: none;
+  font-size: var(--body-size);
+  color: var(--primary-text);
+}
+.co-project-search input::placeholder { color: var(--secondary-text); }
+.co-project-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.5rem 0;
+}
+.co-project-option {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.8125rem 1.5rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+.co-project-option:hover { background: var(--hover-bg); }
+.co-project-option-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--body-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--primary-text);
+}
+.co-project-option-recnum {
+  font-size: var(--callout-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+  white-space: nowrap;
+}
+.co-project-option-go {
+  color: color-mix(in srgb, var(--secondary-text) 55%, transparent);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.co-project-option:hover .co-project-option-go { opacity: 1; }
+/* Copper marks the one meaningful state — the currently chosen project. */
+.co-project-option-selected .co-project-option-name { color: var(--primary-color); }
+.co-project-option-selected .co-project-option-go { opacity: 1; color: var(--primary-color); }
+.co-project-empty { padding: 2rem 1.5rem; text-align: center; }
+
+/* Step 2 — upload: the chosen project rides along as a chip, and the drop
+   target fills everything beneath it. */
+.co-upload-step {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem 1.5rem;
+  min-height: 0;
+}
+.co-job-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5625rem;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 0.4375rem 0.875rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--hover-bg);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  flex-shrink: 0;
+}
+.co-job-chip:hover { border-color: color-mix(in srgb, var(--secondary-text) 35%, var(--border-color)); }
+.co-job-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+.co-job-chip-recnum {
+  font-size: var(--callout-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+  white-space: nowrap;
+}
+.co-job-chip-change {
+  font-size: var(--footnote-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-color);
+  white-space: nowrap;
+}
+.co-upload-zone {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 2rem;
+  border: 2px dashed var(--border-color);
+  border-radius: 12px;
+  color: var(--secondary-text);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.co-upload-zone-active {
+  border-color: var(--primary-color);
+  background: rgb(from var(--primary-color) r g b / 0.05);
+}
+.co-upload-glyph { color: color-mix(in srgb, var(--secondary-text) 70%, transparent); margin-bottom: 0.375rem; }
+.co-upload-hint { font-size: var(--callout-size); color: var(--secondary-text); }
+.co-wizard-error { margin: 0; flex-shrink: 0; }
+
+/* Step 3 — review: the staged order scrolls, the verdict bar stays put. */
+.co-review-step {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.co-review-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.co-review-idline {
+  display: flex;
+  align-items: baseline;
+  padding: 1rem 1.5rem 0.875rem;
+}
+.co-review-name {
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+.co-wizard-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+.co-wizard-footer .primary-button { margin-left: auto; }
+.co-wizard-footer-error { flex: 1; text-align: right; }
+
+@media (max-width: 600px) {
+  .co-modal.co-wizard { height: min(600px, 88vh); }
+  .co-project-search,
+  .co-project-option,
+  .co-hero-meta,
+  .co-grid-toggle,
+  .co-review-idline { padding-left: 1.125rem; padding-right: 1.125rem; }
+  .co-upload-step { padding: 1rem 1.125rem 1.125rem; }
+  .co-wizard-footer { padding: 0.875rem 1.125rem; }
 }
 
 /* ─── Job cost detail ────────────────────────────────────────────────── */

@@ -5,7 +5,7 @@ import type {
   ChangeOrderCostType,
 } from "../../../shared/api/mutationApi"
 
-interface ParsedChangeOrder {
+export interface ParsedChangeOrder {
   name: string
   total: number
   material: number

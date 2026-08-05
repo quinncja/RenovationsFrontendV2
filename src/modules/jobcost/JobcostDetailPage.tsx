@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, type CSSProperties } from "react"
 import { createPortal } from "react-dom"
 import { useParams, useNavigate, useLocation } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArrowLeft, Building2, ChevronDown, ChevronLeft, ChevronRight, Download, Hammer, X } from "lucide-react"
+import { ArrowLeft, Building2, ChevronDown, ChevronLeft, ChevronRight, Download, Hammer, Plus, X } from "lucide-react"
 import { useModalLayer } from "../../shared/hooks/useModalLayer"
 import { downloadXlsx } from "../../shared/utils/exportXlsx"
 import { buildJobCostXlsx } from "./exportJobCostXlsx"
@@ -341,6 +341,9 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const canOpenClient = role === "executive" || role === "admin"
   const canOpenEmployee = canOpenClient || role === "manager" || role === "generalManager"
   const isManager = role === "manager"
+  // "+ Change Order" mirrors the /change-orders route's create tier: managers
+  // are view-only there, so they don't get the shortcut here either.
+  const canCreateCO = canOpenClient || role === "generalManager"
   // Managers ride the same scope toggle as the list + property pages, so the
   // rail cycles exactly the membership those views show.
   const [showAllProjects] = useLocalStorage("jobcostShowAllProjects", false)
@@ -381,6 +384,10 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const [selectedCO, setSelectedCO] = useState<ChangeOrder | null>(null)
   // Change-order list modal, opened from the Contract Summary's drill row.
   const [coListOpen, setCoListOpen] = useState(false)
+  // "+ Change Order" header shortcut → the create wizard with this job
+  // preselected; a successful submit bumps coVersion to refetch the list.
+  const [creatingCO, setCreatingCO] = useState(false)
+  const [coVersion, setCoVersion] = useState(0)
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
   // Invoice records live behind the Billing Position card's disclosure strip —
   // the position is the conclusion, the invoices are its evidence on demand.
@@ -414,7 +421,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
       .then(result => { if (!stale && Array.isArray(result)) setChangeOrders(result as ChangeOrder[]) })
       .catch(() => { if (!stale) setChangeOrders([]) })
     return () => { stale = true }
-  }, [recnum])
+  }, [recnum, coVersion])
 
   // ── Phase rail data ──
   // The property's full membership, from the same all-time getPhases fetch
@@ -757,6 +764,12 @@ function JobcostDetail({ recnum }: { recnum: string }) {
               <Download size={14} />
               Export Report
             </button>
+            {canCreateCO && (
+              <button className="jc-export-btn" onClick={() => setCreatingCO(true)} disabled={isLoading || !project}>
+                <Plus size={14} />
+                Change Order
+              </button>
+            )}
           </>
         )
       }
@@ -963,7 +976,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                   <SummaryRow
                     label="Change Orders"
                     value={isLoading ? <SkelText ch={8} /> : project?.changeOrderAmount ? formatMoneyFull(project.changeOrderAmount) : "—"}
-                    note={!isLoading && changeOrders.length > 0 ? `${changeOrders.length} order${changeOrders.length === 1 ? "" : "s"}` : undefined}
+                    note={!isLoading && changeOrders.length > 0 ? `${changeOrders.length} CO${changeOrders.length === 1 ? "" : "s"}` : undefined}
                     onClick={!isLoading && changeOrders.length > 0 ? () => setCoListOpen(true) : undefined}
                   />
                   <SummaryRow
@@ -1430,7 +1443,19 @@ function JobcostDetail({ recnum }: { recnum: string }) {
         originalContract={originalContract}
         onSelect={setSelectedCO}
       />
-      <ChangeOrderModal order={selectedCO} onClose={() => setSelectedCO(null)} />
+      <ChangeOrderModal
+        order={selectedCO}
+        create={
+          creatingCO && project
+            ? { presetJob: { recnum, jobName: project.name, label: `${project.name} — ${recnum}` } }
+            : null
+        }
+        onClose={() => {
+          setSelectedCO(null)
+          setCreatingCO(false)
+        }}
+        onCreated={() => setCoVersion((v) => v + 1)}
+      />
       <DrillDownModal
         open={drill != null}
         onClose={() => setDrill(null)}

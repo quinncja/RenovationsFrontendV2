@@ -115,6 +115,9 @@ const managerNav: NavEntry[] = [
   NAV_DIVIDER,
   navItems.businessSummary,
   navItems.dailyReports,
+  // View-only for managers: the backend scopes the list to their own jobs
+  // and rejects create/delete; the page hides those affordances.
+  navItems.changeOrders,
 ]
 
 // A General Manager oversees the PMs rather than a single job: same non-admin

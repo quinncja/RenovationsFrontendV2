@@ -1,41 +1,27 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { useNavigate } from "react-router-dom"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useJobcostNav } from "../jobcost/useJobcostNav"
-import { Search, Plus, Trash2, ArrowUpDown, ArrowUp, ArrowDown, Upload } from "lucide-react"
+import { Search, Plus, ArrowUpDown, ArrowUp, ArrowDown, Upload } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { fetchPageData } from "../../shared/api/pageApi"
-import { deleteChangeOrder } from "../../shared/api/mutationApi"
 import { formatMoneyFull, formatDate } from "../../shared/utils/format"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
+import { useAuth } from "../../core/auth/AuthProvider"
+import { effectiveRole } from "../../core/auth/roles"
 import type { ChangeOrder } from "./types"
-import { ChangeOrderModal } from "./components/ChangeOrderModal"
-import { ConfirmModal } from "../../shared/components/ConfirmModal/ConfirmModal"
+import { coCost, coMarkup, unitsCsv } from "./utils/coMath"
+import { ChangeOrderModal, type CreateChangeOrderConfig } from "./components/ChangeOrderModal"
 
 // Same co-widget chrome + spend-rank-table styling the directory list
-// pages use. Action column on the right preserves the per-row delete
-// button; clicking the row body opens the change-order modal.
+// pages use. Clicking a row opens the change-order modal, which also owns
+// the delete flow (onDeleted → reload). "+ New" (or a file drop) opens the
+// same modal in create mode. Managers get the view-only variant: no create
+// affordances, no delete.
 
 type SortKey = "name" | "job" | "budget" | "markup" | "total" | "user" | "date"
 type SortDir = "asc" | "desc"
-
-// Unique, non-empty unit #s across a change order's line items, as CSV.
-function unitsCsv(co: ChangeOrder): string {
-  const units = Array.from(
-    new Set((co.lineItems ?? []).map((li) => String(li.unit ?? "").trim()).filter(Boolean)),
-  )
-  return units.length ? units.join(", ") : "—"
-}
-
-// Cost (a.k.a. budget) = the line-item subtotal before markup; markup = total − cost.
-function coCost(co: ChangeOrder): number {
-  return (co.material ?? 0) + (co.labor ?? 0) + (co.subs ?? 0) + (co.wtpm ?? 0)
-}
-function coMarkup(co: ChangeOrder): number {
-  return (co.total ?? 0) - coCost(co)
-}
 
 function SortTh({ col, label, align = "left", sortKey, sortDir, onSort }: {
   col: SortKey
@@ -61,39 +47,27 @@ function SortTh({ col, label, align = "left", sortKey, sortDir, onSort }: {
 }
 
 export default function ChangeOrdersPage() {
-  const navigate = useNavigate()
   const { goToJobcost } = useJobcostNav()
+  const { claims } = useAuth()
+  const role = effectiveRole(claims["role"] as string | undefined)
+  // Managers browse only — no create, no delete (backend enforces both too).
+  const canEdit = role !== "manager"
   const [year, setYear] = useLocalStorage("changeOrderYear", new Date().getFullYear())
   const [search, setSearch] = useState("")
   const [orders, setOrders] = useState<ChangeOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<ChangeOrder | null>(null)
-  const [pendingDelete, setPendingDelete] = useState<ChangeOrder | null>(null)
-  const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState("")
+  const [creating, setCreating] = useState<CreateChangeOrderConfig | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>("date")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
   const [dragActive, setDragActive] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  // Both the "+ New" button and a file drop hand the chosen file to the
-  // upload flow, which parses it on arrival.
-  const startUpload = useCallback(
-    (file: File) => navigate("/change-orders/new", { state: { file } }),
-    [navigate],
-  )
-
-  function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = "" // let the same file be picked again next time
-    if (file) startUpload(file)
-  }
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault()
     setDragActive(false)
+    if (!canEdit) return
     const file = e.dataTransfer.files?.[0]
-    if (file) startUpload(file)
+    if (file) setCreating({ file })
   }
 
   const loadOrders = useCallback(() => {
@@ -117,21 +91,6 @@ export default function ChangeOrdersPage() {
   useEffect(() => {
     loadOrders()
   }, [loadOrders])
-
-  async function confirmDelete() {
-    if (!pendingDelete) return
-    setDeleting(true)
-    setDeleteError("")
-    try {
-      await deleteChangeOrder(pendingDelete.recnum)
-      setPendingDelete(null)
-      loadOrders()
-    } catch {
-      setDeleteError("Failed to delete change order. Please try again.")
-    } finally {
-      setDeleting(false)
-    }
-  }
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -174,16 +133,11 @@ export default function ChangeOrdersPage() {
       actions={
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
           <YearSelector value={year} onChange={setYear} />
-          <button className="button primary-button" onClick={() => fileInputRef.current?.click()}>
-            <Plus size={16} /> New
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            style={{ display: "none" }}
-            onChange={handleFilePick}
-          />
+          {canEdit && (
+            <button className="button primary-button" onClick={() => setCreating({})}>
+              <Plus size={16} /> New
+            </button>
+          )}
         </div>
       }
     >
@@ -191,14 +145,14 @@ export default function ChangeOrdersPage() {
         <MotionItem>
           <div
             className={`co-dropzone${dragActive ? " co-dropzone-active" : ""}`}
-            onDragOver={(e) => {
+            onDragOver={canEdit ? (e) => {
               e.preventDefault()
               setDragActive(true)
-            }}
-            onDragLeave={(e) => {
+            } : undefined}
+            onDragLeave={canEdit ? (e) => {
               if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragActive(false)
-            }}
-            onDrop={handleDrop}
+            } : undefined}
+            onDrop={canEdit ? handleDrop : undefined}
           >
           <Widget loading={loading} noData={!loading && orders.length === 0} className="co-widget">
             <div className="co-widget-toolbar">
@@ -233,7 +187,6 @@ export default function ChangeOrdersPage() {
                     <th aria-hidden="true" style={{ width: "100%" }} />
                     <SortTh col="user" label="Submitted By" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh col="date" label="Date" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <th className="spend-rank-table-name" style={{ width: 40 }} aria-label="Actions" />
                   </tr>
                 </thead>
                 <tbody>
@@ -275,19 +228,6 @@ export default function ChangeOrdersPage() {
                       <td aria-hidden="true" />
                       <td className="spend-rank-table-name body-text text-secondary">{co.user}</td>
                       <td className="spend-rank-table-name subheadline text-secondary">{formatDate(co.date)}</td>
-                      <td className="spend-rank-table-name">
-                        <button
-                          className="button icon-button danger"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDeleteError("")
-                            setPendingDelete(co)
-                          }}
-                          title="Delete"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -305,28 +245,15 @@ export default function ChangeOrdersPage() {
         </MotionItem>
       </MotionList>
 
-      <ChangeOrderModal order={selected} onClose={() => setSelected(null)} />
-
-      <ConfirmModal
-        open={!!pendingDelete}
-        title="Delete change order?"
-        message={
-          pendingDelete ? (
-            <>
-              This will permanently delete <strong>{pendingDelete.name}</strong>
-              {pendingDelete.jobString ? <> for {pendingDelete.jobString}</> : null}. This can't be undone.
-            </>
-          ) : null
-        }
-        confirmLabel="Delete"
-        danger
-        loading={deleting}
-        error={deleteError || undefined}
-        onConfirm={confirmDelete}
-        onCancel={() => {
-          setPendingDelete(null)
-          setDeleteError("")
+      <ChangeOrderModal
+        order={selected}
+        create={creating}
+        onClose={() => {
+          setSelected(null)
+          setCreating(null)
         }}
+        onDeleted={canEdit ? loadOrders : undefined}
+        onCreated={loadOrders}
       />
     </Page>
   )
