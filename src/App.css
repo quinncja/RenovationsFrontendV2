@@ -16914,3 +16914,224 @@ button.co-hero-project:hover svg { color: inherit; }
   color: var(--secondary-text);
 }
 
+
+/* ─── Employees — Workload view ─────────────────────────────────────────
+   "Who can take the next job": stat tiles over a per-PM table (open count,
+   remaining backlog, progress mix, risk badges, throughput sparkline) with
+   expandable job lanes. Progress rides one blue at three strengths (early →
+   closing) so it reads as a progression and survives color blindness; red /
+   amber are reserved for the risk badges; copper stays untouched per the
+   app's active-state-only restraint rule. */
+
+.ewl-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Stat tiles — the employee-stat-card look without the button affordance
+   (these summarize; the table below is the interactive surface). */
+.ewl-stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ewl-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--button-shadow);
+}
+
+.ewl-stat-value {
+  color: var(--primary-text);
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.ewl-stat--warn .ewl-stat-value { color: #ef4444; }
+
+/* Non-sortable headers (Progress / Risk / Trend) in the co-th-btn voice,
+   minus the cursor + hover since there's nothing to sort. */
+.ewl-th-static {
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--secondary-text);
+  white-space: nowrap;
+  text-align: right;
+}
+
+/* The airy variant's 16ch money-column floor is too wide for the visual
+   columns (bar / badges / sparkline) — relax it for this table only. */
+.co-widget .ewl-table th.spend-rank-table-value:not(:last-child),
+.co-widget .ewl-table td.spend-rank-table-value:not(:last-child) {
+  min-width: 0;
+}
+
+.ewl-chevron {
+  flex-shrink: 0;
+  color: var(--secondary-text);
+  transition: transform 0.18s ease;
+}
+.ewl-chevron--open { transform: rotate(180deg); }
+
+.ewl-dormant { color: var(--secondary-text); font-weight: var(--font-weight-regular); }
+
+/* Progress mix — open phases by stretch, widths by count. */
+.ewl-mix {
+  display: inline-flex;
+  width: 110px;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--hover-bg);
+  vertical-align: middle;
+}
+.ewl-mix span { display: block; height: 100%; }
+.ewl-mix-early   { background: rgba(59, 130, 246, 0.25); }
+.ewl-mix-mid     { background: rgba(59, 130, 246, 0.55); }
+.ewl-mix-closing { background: rgba(59, 130, 246, 0.9); }
+
+.ewl-legend {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+.ewl-legend-swatch {
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 3px;
+}
+.ewl-legend .ewl-legend-swatch:not(:first-child) { margin-left: 0.5rem; }
+
+/* Risk badges — the status-badge family's soft-tinted pills. */
+.ewl-badges {
+  display: inline-flex;
+  gap: 0.375rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.ewl-badge {
+  display: inline-block;
+  font-size: var(--caption1-size);
+  font-weight: var(--font-weight-semibold);
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.ewl-badge--danger { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
+.ewl-badge--warn   { background: rgba(245, 158, 11, 0.12); color: #d97706; }
+.ewl-badge--muted  { background: var(--hover-bg); color: var(--secondary-text); }
+.ewl-badge--clear  { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
+
+.ewl-spark { color: var(--secondary-text); display: block; margin-left: auto; }
+.ewl-spark polyline { stroke: currentColor; }
+.ewl-spark circle { fill: currentColor; }
+
+/* Expanded job lanes — quiet inset panel under the PM's row. */
+.ewl-row--open td { border-bottom: none; }
+.ewl-expand-row td {
+  padding: 0 0.75rem 1rem;
+}
+.ewl-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 1rem 1.25rem;
+  background: var(--hover-bg);
+  border-radius: 12px;
+}
+.ewl-lane-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.ewl-lane-name {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-family);
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ewl-lane-name:hover { color: var(--primary-color); }
+.ewl-lane-client {
+  font-size: var(--caption1-size);
+  color: var(--secondary-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ewl-lane-body {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+/* Track width encodes job size (vs the PM's largest); fill encodes budget
+   spent. The bar sits inside a fixed-share track area so the largest job
+   (100% width) can't crowd the meta text off the row. The track needs to
+   stay visible on the tinted panel, so it uses the card surface rather
+   than hover-bg. */
+.ewl-lane-bar-area {
+  flex: 0 0 46%;
+  max-width: 460px;
+}
+.ewl-lane-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+.ewl-lane-bar--dormant { opacity: 0.55; }
+.ewl-lane-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.ewl-lane-fill--early   { background: rgba(59, 130, 246, 0.25); }
+.ewl-lane-fill--mid     { background: rgba(59, 130, 246, 0.55); }
+.ewl-lane-fill--closing { background: rgba(59, 130, 246, 0.9); }
+.ewl-lane-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.ewl-lanes-foot { display: flex; justify-content: flex-end; }
+.ewl-profile-link {
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-color);
+  text-decoration: none;
+}
+.ewl-profile-link:hover { text-decoration: underline; }
+
+@media (max-width: 900px) {
+  .ewl-stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 768px) {
+  .ewl-actions { flex-wrap: wrap; }
+  .ewl-stat { padding: 1rem 1.125rem; }
+  .ewl-stat-value { font-size: 1.625rem; }
+  .ewl-mix { width: 84px; }
+  .ewl-lane-bar-area { flex-basis: 38%; }
+  .ewl-lane-meta { white-space: normal; }
+}

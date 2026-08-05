@@ -117,10 +117,11 @@ export const PAGE_QUERIES = {
   // Invoices
   invoices: ["allInvoices"],
 
-  // Directory — Employees (uses the same query that powers the home page
-  // Employee Performance widget; this page shows the full list rather
-  // than just the top N).
-  employees: ["employeePerformance"],
+  // Directory — Employees. Performance view uses the same query that powers
+  // the home page Employee Performance widget (full list, not top N);
+  // Workload view uses the current-state employeeWorkload rollup. Both are
+  // fetched up front so the view toggle is instant.
+  employees: ["employeePerformance", "employeeWorkload"],
 
   // Directory — Clients
   clients: ["allClientsByRevenue"],
