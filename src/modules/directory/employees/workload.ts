@@ -142,33 +142,43 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): {
   // "Now" in accounting-month terms, for the burn window and sparkline. Falls
   // back to the newest month with posted costs if the open period is ever
   // missing — a bad reference here must never zero the whole view out.
-  let openIdx = payload.openPeriod ? monthIdx(payload.openPeriod.postyr, payload.openPeriod.actprd) : NaN
-  if (!Number.isFinite(openIdx)) {
-    openIdx = payload.monthly.reduce((max, r) => Math.max(max, monthIdx(r.postyr, r.actprd)), 0)
+  let openIdx = payload.openPeriod
+    ? monthIdx(Number(payload.openPeriod.postyr), Number(payload.openPeriod.actprd))
+    : NaN
+  if (!Number.isFinite(openIdx) || openIdx <= 0) {
+    openIdx = (payload.monthly ?? []).reduce(
+      (max, r) => Math.max(max, monthIdx(Number(r.postyr), Number(r.actprd))),
+      0,
+    )
   }
 
   // Dormancy cutoff in real dates, anchored to the server's "today".
   const cutoffMs = new Date(payload.asOf).getTime() - DORMANT_AFTER_DAYS * 24 * 60 * 60 * 1000
 
+  // The rollup rows select raw numeric columns, and the mssql driver hands
+  // BIGINT/NUMERIC back as STRINGS — while the phases arrive via FOR JSON
+  // with real numbers. Coerce every join key or the Map lookups silently
+  // miss and the whole board reads dormant / sparkless.
   const lastActivityByJob = new Map<number, string>()
-  for (const row of payload.lastActivity) {
-    lastActivityByJob.set(row.jobnum, row.lastActivity)
+  for (const row of payload.lastActivity ?? []) {
+    lastActivityByJob.set(Number(row.jobnum), row.lastActivity)
   }
 
   // Recent burn: mean posted cost over the three months ending at the open
   // period — the "current pace" behind the finish estimate.
   const recentCostByJob = new Map<number, number>()
-  for (const row of payload.activity) {
-    const idx = monthIdx(row.postyr, row.actprd)
+  for (const row of payload.activity ?? []) {
+    const jobnum = Number(row.jobnum)
+    const idx = monthIdx(Number(row.postyr), Number(row.actprd))
     if (idx >= openIdx - 2 && idx <= openIdx) {
-      recentCostByJob.set(row.jobnum, (recentCostByJob.get(row.jobnum) ?? 0) + row.cost)
+      recentCostByJob.set(jobnum, (recentCostByJob.get(jobnum) ?? 0) + Number(row.cost))
     }
   }
 
   const byPm = new Map<number, PmWorkload>()
 
   const pmFor = (phase: WorkloadPhase): PmWorkload => {
-    const pmId = phase.pmId ?? 0
+    const pmId = phase.pmId == null ? 0 : Number(phase.pmId)
     let pm = byPm.get(pmId)
     if (!pm) {
       const pmName = pmId === 0 ? "Unassigned Work" : (phase.pmName ?? `Employee ${pmId}`).trim()
@@ -240,19 +250,19 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): {
     if (job.missingContract) pm.missingContractCount += 1
   }
 
-  for (const row of payload.arOverdue) {
-    const pm = byPm.get(row.sprvsr ?? 0)
+  for (const row of payload.arOverdue ?? []) {
+    const pm = byPm.get(row.sprvsr == null ? 0 : Number(row.sprvsr))
     if (pm) {
-      pm.arOverdueBalance = row.overdueBalance
-      pm.arOverdueInvoices = row.overdueInvoices
+      pm.arOverdueBalance = Number(row.overdueBalance)
+      pm.arOverdueInvoices = Number(row.overdueInvoices)
     }
   }
 
-  for (const row of payload.monthly) {
-    const pm = byPm.get(row.sprvsr ?? 0)
+  for (const row of payload.monthly ?? []) {
+    const pm = byPm.get(row.sprvsr == null ? 0 : Number(row.sprvsr))
     if (!pm) continue
-    const offset = monthIdx(row.postyr, row.actprd) - (openIdx - (SPARK_MONTHS - 1))
-    if (offset >= 0 && offset < SPARK_MONTHS) pm.spark[offset] += row.cost
+    const offset = monthIdx(Number(row.postyr), Number(row.actprd)) - (openIdx - (SPARK_MONTHS - 1))
+    if (offset >= 0 && offset < SPARK_MONTHS) pm.spark[offset] += Number(row.cost)
   }
 
   const pms = [...byPm.values()]
