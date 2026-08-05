@@ -412,16 +412,22 @@ function SessCount({ n, noun }: { n: number; noun: string }) {
 }
 
 // One expandable session: a full-width row reading left-to-right — when (start),
-// where they landed (entry page, filling the middle), then the pages / projects
-// / interactions summary. Expands to the ordered page path + the projects and
-// widgets touched.
+// duration, where they landed (entry page, filling the middle), then the pages
+// / projects / interactions / requests summary. Expands to the ordered page
+// path + the projects and widgets touched. EVERY session renders — a brief
+// visit (no engagement: bare page load, arrival-greeting-only, background
+// refresh) collapses to a slim muted row, so the session list always accounts
+// for every recorded request.
 function SessionRow({ s }: { s: SessionSummary }) {
   const [open, setOpen] = useState(false)
   const { date, time } = fmtSessionWhen(s.startedAt)
   const hasDetail = s.pages.length > 0 || s.projects.length > 0 || s.widgets.length > 0
+  // Pre-cutover backends omit `engaged` — everything they return WAS engaged.
+  const engaged = s.engaged ?? true
+  const duration = s.durationMs && s.durationMs >= 1000 ? formatDuration(s.durationMs) : null
 
   return (
-    <div className={`eng-sess${open ? " eng-sess--open" : ""}`}>
+    <div className={`eng-sess${open ? " eng-sess--open" : ""}${engaged ? "" : " eng-sess--brief"}`}>
       <button
         type="button"
         className="eng-sess-head"
@@ -433,17 +439,36 @@ function SessionRow({ s }: { s: SessionSummary }) {
           <ChevronRight size={15} className="eng-sess-caret" aria-hidden />
           <span className="eng-sess-date">{date}</span>
           <span className="eng-sess-time">{time}</span>
+          {duration && <span className="eng-sess-duration">{duration}</span>}
         </span>
         <span className="eng-sess-entry" title={s.entryPage ? pageLabel(s.entryPage) : undefined}>
           {s.entryPage ? pageLabel(s.entryPage) : ""}
         </span>
-        <span className="eng-sess-summary">
-          <SessCount n={s.pageCount} noun="page" />
-          <span className="eng-sess-dot">·</span>
-          <SessCount n={s.projectCount} noun="project" />
-          <span className="eng-sess-dot">·</span>
-          <SessCount n={s.interactions} noun="interaction" />
-        </span>
+        {engaged ? (
+          <span className="eng-sess-summary">
+            <SessCount n={s.pageCount} noun="page" />
+            <span className="eng-sess-dot">·</span>
+            <SessCount n={s.projectCount} noun="project" />
+            <span className="eng-sess-dot">·</span>
+            <SessCount n={s.interactions} noun="interaction" />
+            {s.apiRequests != null && (
+              <>
+                <span className="eng-sess-dot">·</span>
+                <SessCount n={s.apiRequests} noun="request" />
+              </>
+            )}
+          </span>
+        ) : (
+          <span className="eng-sess-summary">
+            <span className="eng-sess-brief-label">Brief visit</span>
+            {s.apiRequests != null && (
+              <>
+                <span className="eng-sess-dot">·</span>
+                <SessCount n={s.apiRequests} noun="request" />
+              </>
+            )}
+          </span>
+        )}
       </button>
 
       <AnimatePresence initial={false}>

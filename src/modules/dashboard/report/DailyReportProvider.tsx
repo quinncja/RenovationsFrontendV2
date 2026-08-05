@@ -18,7 +18,6 @@ import { DailyReportModal } from "./DailyReportModal"
 import { DailyReportCoach } from "./DailyReportCoach"
 import { DailyArrival, type ArrivalDestination } from "./arrival/DailyArrival"
 import { preloadEntryPages } from "./arrival/preload"
-import { markSessionActive } from "../../../shared/analytics/analytics"
 import { DailyReportContext, type IntroStep } from "./DailyReportContext"
 
 // ─── Per-user markers ────────────────────────────────────────────────────────
@@ -212,13 +211,6 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
   // ── Report fetch + entry-page preloads, on activation ──────────────────
   useEffect(() => {
     if (!arrival.active || !source) return
-
-    // An active arrival IS a real visit — open the API-call counting gate now,
-    // before the report fetch and preloads fire, so the request burst this
-    // takeover dispatches counts toward the user's activity. Left to the
-    // gesture gate alone, it would all fire uncounted and the destination
-    // pages would then mount onto the warmed cache without fetching again.
-    markSessionActive()
 
     let settled = false
     const ctrl = new AbortController()

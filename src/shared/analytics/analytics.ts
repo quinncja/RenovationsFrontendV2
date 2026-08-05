@@ -1,10 +1,23 @@
-// Engagement analytics client — a tiny buffered event pipeline that records how
+// Engagement analytics client — a buffered event pipeline that records how
 // users actually interact with the app (page visits, intentional widget hover
-// dwell, clicks) and flushes them to the backend in batches. Mirrors the
-// auth-header handling of shared/api/* so it works under DEV_BYPASS too.
+// dwell, clicks) and flushes them to the backend in batches.
 //
-// Identity is NEVER sent from here — the backend stamps userId from the verified
-// token. We only send the event shape + a per-load sessionId.
+// Design principles (mirrors industry analytics SDKs):
+//  · SESSION = IDENTITY, NOT A QUALITY BAR. A session ID is minted on first
+//    activity, persisted in localStorage, shared across tabs, and expires after
+//    30 minutes of inactivity. Every session exists the moment its first event
+//    lands; whether it was "engaged" is classified server-side at read time.
+//  · CAPTURE IS TOTAL. Every backend API request carries the session ID via
+//    X-RD-Session-Id (see sessionTrackingHeaders) — there is no client-side
+//    "does this count" gate. The backend records requests as server-class
+//    events in the same stream, so sessions and request counts reconcile.
+//  · DELIVERY IS DURABLE. The unflushed queue mirrors to localStorage on every
+//    change; a keepalive flush fires on tab-hide, and whatever still couldn't
+//    be sent is replayed by the next app load. (sendBeacon is not usable here —
+//    it cannot carry the Authorization header the ingest endpoint requires.)
+//
+// Identity is NEVER sent from here — the backend stamps userId from the
+// verified token. We only send the event shape + session IDs.
 
 import { auth } from "../../core/auth/firebase"
 import { onIdTokenChanged } from "firebase/auth"
@@ -36,88 +49,164 @@ export interface TrackInput {
 
 interface QueuedEvent extends TrackInput {
   ts: string
+  /** Stamped per event — the session can rotate mid-load, and replayed events
+   *  belong to the session that produced them. */
+  sessionId: string
 }
 
 // ─── Tunables ───────────────────────────────────────────────────────────────
 const FLUSH_INTERVAL_MS = 15_000
-const MAX_QUEUE = 200          // hard cap; also the backend's per-batch limit and
-                               // keeps keepalive bodies under the browser's 64KB cap
+const MAX_QUEUE = 200          // hard cap; also the backend's per-batch limit
 const RETRY_BACKOFF_MS = 10_000 // after a failed flush, wait before retrying
 const ENGAGE_MS = 1_000        // dwell must exceed this to count as engagement
 const MAX_DWELL_MS = 120_000   // cap a single hover (idle-away / forgotten tab)
 const SCROLL_IDLE_MS = 150     // scrolling "ends" this long after the last event
 
-// ─── State ──────────────────────────────────────────────────────────────────
-const sessionId =
-  typeof crypto !== "undefined" && crypto.randomUUID
+const SESSION_IDLE_MS = 30 * 60 * 1000 // 30-min inactivity ends a session
+const REPLAY_STALE_MS = 60_000          // persisted queues older than this are
+                                        // orphans from a dead tab — safe to replay
+
+// ─── Session manager ────────────────────────────────────────────────────────
+// One session shared across tabs via localStorage. Any activity — a tracked
+// event or an API request going out — touches the session; 30 minutes without
+// a touch expires it and the next activity mints a fresh one (queueing a
+// session_start so the backend can count sessions from rollups alone).
+
+const SESSION_KEY = "rd.analytics.session"
+
+interface StoredSession {
+  id: string
+  startedAt: number
+  lastActivity: number
+}
+
+function uuid(): string {
+  return typeof crypto !== "undefined" && crypto.randomUUID
     ? crypto.randomUUID()
     : String(Date.now()) + Math.random().toString(36).slice(2)
+}
+
+function readSession(): StoredSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY)
+    if (!raw) return null
+    const s = JSON.parse(raw) as StoredSession
+    return typeof s?.id === "string" && typeof s?.lastActivity === "number" ? s : null
+  } catch {
+    return null
+  }
+}
+
+function writeSession(s: StoredSession) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(s)) } catch { /* private mode */ }
+}
+
+// In-memory fallback when localStorage is unavailable.
+let memorySession: StoredSession | null = null
+
+/** Current session ID, touching (extending) the session. Mints a new session —
+ *  and queues its session_start — when none exists or the last one went idle. */
+function currentSessionId(): string {
+  const now = Date.now()
+  let s = readSession() ?? memorySession
+
+  if (!s || now - s.lastActivity > SESSION_IDLE_MS) {
+    s = { id: uuid(), startedAt: now, lastActivity: now }
+    memorySession = s
+    writeSession(s)
+    // Direct enqueue (not track()) — track() would recurse into this function.
+    enqueue({
+      type: "session_start",
+      page: typeof window !== "undefined" ? window.location.pathname : null,
+      ts: new Date(now).toISOString(),
+      sessionId: s.id,
+    })
+    return s.id
+  }
+
+  s.lastActivity = now
+  memorySession = s
+  writeSession(s)
+  return s.id
+}
+
+/**
+ * Header attached to every backend API request: the current analytics session
+ * ID. The backend records each request as an `api_request` event tagged with
+ * it, so per-session request counts line up with the engagement view. Always
+ * present — capture is total; engagement is classified at read time.
+ * Synchronous so it can be spread directly into a request's header object.
+ */
+export function sessionTrackingHeaders(): Record<string, string> {
+  return { "X-RD-Session-Id": currentSessionId() }
+}
+
+// ─── Durable queue ──────────────────────────────────────────────────────────
+// The in-memory queue mirrors to a per-tab localStorage key on every change.
+// On boot, orphaned queues from dead tabs (stale beyond REPLAY_STALE_MS) are
+// replayed, so events that missed their last flush still arrive — late but
+// correctly timestamped (the backend accepts client timestamps up to a day
+// old). The per-tab key means concurrent tabs never clobber each other.
+
+const QUEUE_PREFIX = "rd.analytics.queue."
+const tabQueueKey = QUEUE_PREFIX + uuid().slice(0, 8)
 
 let queue: QueuedEvent[] = []
 let cachedToken: string | null = null
 let started = false
 
-// ─── Session "begun" gate ─────────────────────────────────────────────────────
-// A session has "begun" once the user does anything real: a tracked interaction,
-// navigation past the landing page (>1 page_view), or ANY raw gesture
-// (pointerdown/keydown — see initAnalytics). The automatic session_start + first
-// page_view of a bare page load do NOT begin a session. Until a session begins,
-// API requests are NOT counted toward the user's activity (see
-// sessionTrackingHeaders), so the initial-page-load request burst never inflates
-// the api count. The gesture path exists for touch users: they never produce
-// mouse hovers, and a phone user who scrolls and reads is still "using the app"
-// for last-seen purposes. The backend's countEngagedSessions() stays stricter —
-// it needs a tracked interaction event or a second page_view.
-const SESSION_BEGIN_TYPES: EngagementType[] = [
-  "widget_hover",
-  "widget_click",
-  "tooltip_open",
-  "project_view",
-]
-let pageViewCount = 0
-let sessionActive = false
+function persistQueue() {
+  try {
+    if (queue.length === 0) localStorage.removeItem(tabQueueKey)
+    else localStorage.setItem(tabQueueKey, JSON.stringify({ savedAt: Date.now(), events: queue }))
+  } catch { /* quota / private mode — in-memory queue still works */ }
+}
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-export function track(ev: TrackInput) {
-  if (!started) return
-  if (!sessionActive) {
-    if (ev.type === "page_view") {
-      if (++pageViewCount > 1) sessionActive = true
-    } else if (SESSION_BEGIN_TYPES.includes(ev.type)) {
-      sessionActive = true
-    }
-  }
-  queue.push({ ...ev, ts: new Date().toISOString() })
+function enqueue(ev: QueuedEvent) {
+  queue.push(ev)
   // Enforce the cap even while flushing is blocked (no token yet / backend
   // down): drop the OLDEST events so the queue can't grow unboundedly and a
   // late flush never exceeds the backend's per-batch limit.
   if (queue.length > MAX_QUEUE) queue.splice(0, queue.length - MAX_QUEUE)
+  persistQueue()
   if (queue.length >= MAX_QUEUE) void flush()
 }
 
-/**
- * Header attached to backend API requests once the analytics session has begun
- * (see the gate above). The backend only records a request toward the user's
- * activity count when this header is present, so the automatic burst fired by the
- * initial page load — before any real interaction — never inflates the count.
- * Returns an empty object until the session begins. Synchronous so it can be
- * spread directly into a request's header object.
- */
-export function sessionTrackingHeaders(): Record<string, string> {
-  return sessionActive ? { "X-RD-Session-Active": "1" } : {}
+function replayOrphanedQueues() {
+  try {
+    const now = Date.now()
+    const orphans: string[] = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith(QUEUE_PREFIX) && key !== tabQueueKey) orphans.push(key)
+    }
+    for (const key of orphans) {
+      try {
+        const raw = localStorage.getItem(key)
+        if (!raw) { localStorage.removeItem(key); continue }
+        const parsed = JSON.parse(raw) as { savedAt?: number; events?: QueuedEvent[] }
+        // A fresh key may belong to a live tab still flushing — leave it alone.
+        if (typeof parsed?.savedAt !== "number" || now - parsed.savedAt < REPLAY_STALE_MS) continue
+        localStorage.removeItem(key)
+        if (Array.isArray(parsed.events)) {
+          for (const e of parsed.events) {
+            if (e && typeof e.type === "string" && typeof e.sessionId === "string") queue.push(e)
+          }
+        }
+      } catch {
+        localStorage.removeItem(key)
+      }
+    }
+    if (queue.length > MAX_QUEUE) queue.splice(0, queue.length - MAX_QUEUE)
+    persistQueue()
+  } catch { /* localStorage unavailable */ }
 }
 
-/**
- * Externally begin the session, ahead of any gesture. The daily-arrival
- * takeover calls this on activation: the greeting only shows for a real
- * once-per-day visit, and the report fetch + entry-page preloads it dispatches
- * ARE that session's API usage — the destination pages then mount onto the
- * warmed cache without fetching again, so if the preload burst fired before
- * the gate opened, an arrival-day session could record zero API calls.
- */
-export function markSessionActive() {
-  sessionActive = true
+// ─── Public API ─────────────────────────────────────────────────────────────
+
+export function track(ev: TrackInput) {
+  if (!started) return
+  enqueue({ ...ev, ts: new Date().toISOString(), sessionId: currentSessionId() })
 }
 
 export function trackPageView(page: string) {
@@ -153,21 +242,21 @@ export function initAnalytics() {
     })
   }
 
+  // Recover events a previous load couldn't deliver, then open this session
+  // (minting + session_start if the last one went idle).
+  replayOrphanedQueues()
+  currentSessionId()
+
   setInterval(() => { void flush() }, FLUSH_INTERVAL_MS)
 
-  // Any real user gesture begins the session for API-call counting — the only
-  // signal touch users reliably produce (see the session-gate comment above).
-  const markActive = () => { sessionActive = true }
-  window.addEventListener("pointerdown", markActive, { once: true, capture: true })
-  window.addEventListener("keydown", markActive, { once: true, capture: true })
-
-  // Flush on tab-hide / unload — these are the reliable "user is leaving" signals.
+  // Flush on tab-hide / unload — these are the reliable "user is leaving"
+  // signals. Whatever the keepalive request can't deliver stays persisted for
+  // the next load's replay.
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") { endHover(); void flush(true) }
   })
   window.addEventListener("pagehide", () => { endHover(); void flush(true) })
 
-  track({ type: "session_start" })
   initWidgetTracking()
 }
 
@@ -183,6 +272,7 @@ function requeue(batch: QueuedEvent[]) {
   // Batch goes back at the front (it's the oldest); trim from the front so the
   // newest events always survive the cap.
   queue = [...batch, ...queue].slice(-MAX_QUEUE)
+  persistQueue()
 }
 
 async function flush(keepalive = false) {
@@ -201,11 +291,13 @@ async function flush(keepalive = false) {
     } catch { /* fall back to cached */ }
   }
 
-  // No identity yet (token not loaded, not dev) — keep events queued (capped).
+  // No identity yet (token not loaded, not dev) — keep events queued; they're
+  // persisted, so even a tab that dies here delivers via the next load's replay.
   if (!DEV_BYPASS && !token) return
 
   const batch = queue
   queue = []
+  persistQueue() // optimistic: clears the mirror; a failed send re-persists below
 
   const headers: Record<string, string> = { "Content-Type": "application/json" }
   if (!DEV_BYPASS && token) headers.Authorization = `Bearer ${token}`
@@ -214,7 +306,7 @@ async function flush(keepalive = false) {
     const res = await fetch(`${API_BASE_URL}usage/events`, {
       method: "POST",
       headers,
-      body: JSON.stringify({ sessionId, events: batch }),
+      body: JSON.stringify({ sessionId: batch[batch.length - 1]?.sessionId, events: batch }),
       keepalive,
     })
     if (res.ok) {

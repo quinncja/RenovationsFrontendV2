@@ -390,32 +390,72 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                 const overviewContent = (
                   <>
                 {/* Overview: metrics grouped into labeled cards (Activity,
-                    Sessions, Focus) so each reads as a unit — total vs. last-30.
-                    "Activity" counts API calls + engagement events combined —
-                    preloaded/cached pages produce few API calls, so requests
-                    alone undercount real usage. */}
+                    Sessions, Focus) so each reads as a unit. In the advanced
+                    view, Activity leads with BEHAVIOR (interactions + page
+                    views) and demotes API requests to a load metric — requests
+                    are what the app did, not what the user did. The compact
+                    view keeps the combined event totals. */}
                 <div className="usr-overview">
                   <div className="usr-stat-group">
-                    <span className="usr-stat-group-label">Activity</span>
+                    <span className="usr-stat-group-label">
+                      {engagementVisible ? "Activity · Last 30 days" : "Activity"}
+                    </span>
                     <div className="usr-stat-group-body">
-                      <div className="usr-substat">
-                        <span
-                          className="usr-substat-value"
-                          title={isLoading ? undefined : (activity?.total ?? 0).toLocaleString()}
-                        >
-                          {isLoading ? "—" : formatCompactNumber(activity?.total ?? 0)}
-                        </span>
-                        <span className="usr-substat-label">Total</span>
-                      </div>
-                      <div className="usr-substat">
-                        <span
-                          className="usr-substat-value usr-substat-value--accent"
-                          title={isLoading ? undefined : (activity?.thisMonth ?? 0).toLocaleString()}
-                        >
-                          {isLoading ? "—" : formatCompactNumber(activity?.thisMonth ?? 0)}
-                        </span>
-                        <span className="usr-substat-label">Last 30 days</span>
-                      </div>
+                      {/* The advanced layout renders from first paint — values
+                          fill in when engagement loads. Swapping card shapes
+                          after load reads as a glitch. */}
+                      {engagementVisible ? (
+                        <>
+                          <div className="usr-substat">
+                            <span
+                              className="usr-substat-value usr-substat-value--accent"
+                              title={engagement?.interactions?.toLocaleString()}
+                            >
+                              {engLoading || engagement?.interactions == null ? "—" : formatCompactNumber(engagement.interactions)}
+                            </span>
+                            <span className="usr-substat-label">Interactions</span>
+                          </div>
+                          <div className="usr-substat">
+                            <span
+                              className="usr-substat-value"
+                              title={engagement?.pageViews?.toLocaleString()}
+                            >
+                              {engLoading || engagement?.pageViews == null ? "—" : formatCompactNumber(engagement.pageViews)}
+                            </span>
+                            <span className="usr-substat-label">Page views</span>
+                          </div>
+                          <div className="usr-substat">
+                            <span
+                              className="usr-substat-value"
+                              title={engagement?.apiRequests?.toLocaleString()}
+                            >
+                              {engLoading || engagement?.apiRequests == null ? "—" : formatCompactNumber(engagement.apiRequests)}
+                            </span>
+                            <span className="usr-substat-label">API requests</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="usr-substat">
+                            <span
+                              className="usr-substat-value"
+                              title={isLoading ? undefined : (activity?.total ?? 0).toLocaleString()}
+                            >
+                              {isLoading ? "—" : formatCompactNumber(activity?.total ?? 0)}
+                            </span>
+                            <span className="usr-substat-label">Total</span>
+                          </div>
+                          <div className="usr-substat">
+                            <span
+                              className="usr-substat-value usr-substat-value--accent"
+                              title={isLoading ? undefined : (activity?.thisMonth ?? 0).toLocaleString()}
+                            >
+                              {isLoading ? "—" : formatCompactNumber(activity?.thisMonth ?? 0)}
+                            </span>
+                            <span className="usr-substat-label">Last 30 days</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -430,10 +470,23 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                           <span className="usr-substat-label">Total</span>
                         </div>
                         <div className="usr-substat">
-                          <span className="usr-substat-value usr-substat-value--accent">
+                          <span
+                            className="usr-substat-value usr-substat-value--accent"
+                            title={
+                              engagement?.engagedSessionCount != null
+                                ? `${engagement.engagedSessionCount.toLocaleString()} engaged of ${engagement.sessionCount.toLocaleString()}`
+                                : undefined
+                            }
+                          >
                             {engLoading || !engagement ? "—" : formatCompactNumber(engagement.sessionCount)}
                           </span>
                           <span className="usr-substat-label">Last 30 days</span>
+                        </div>
+                        <div className="usr-substat">
+                          <span className="usr-substat-value">
+                            {engLoading || engagement?.engagedSessionCount == null ? "—" : formatCompactNumber(engagement.engagedSessionCount)}
+                          </span>
+                          <span className="usr-substat-label">Engaged</span>
                         </div>
                       </div>
                     </div>
@@ -541,7 +594,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                       <SessionEngagementList
                         sessions={engagement?.sessions ?? []}
                         title="Recent sessions"
-                        subtitle="Newest first · last 30 days"
+                        subtitle="Every visit, newest first · last 30 days"
                       />
                     )}
                   </div>

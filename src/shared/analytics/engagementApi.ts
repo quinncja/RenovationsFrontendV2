@@ -35,12 +35,21 @@ export interface ProjectEngagement {
   userCount?: number // company view only
 }
 
-/** One reconstructed browsing session, most-recent first. Duration is omitted by
- * design (not meaningful under the 2h idle-refresh model). Counts are exact; the
- * enumerated `pages`/`projects`/`widgets` lists are capped server-side. */
+/** One reconstructed browsing session, most-recent first — ALL sessions, brief
+ * visits included; `engaged` is a classification, not an admission rule. Counts
+ * are exact; the enumerated `pages`/`projects`/`widgets` lists are capped
+ * server-side. Fields marked optional are absent from a pre-cutover backend. */
 export interface SessionSummary {
   sessionId: string
   startedAt: string
+  /** Last event's timestamp — with startedAt, bounds the session. */
+  endedAt?: string
+  /** endedAt − startedAt. 0 for a single-event session. */
+  durationMs?: number
+  /** Backend API requests made during this session. */
+  apiRequests?: number
+  /** ≥1 interaction, or navigated past the landing page (>1 page view). */
+  engaged?: boolean
   /** Total page navigations (incl. repeats). */
   pageViews: number
   /** Deliberate interaction events (widget hover/click, tooltip, project open). */
@@ -64,9 +73,16 @@ export interface UserEngagement {
   topWidgets: WidgetEngagement[]
   topPages: PageEngagement[]
   topProjects: ProjectEngagement[]
+  /** ALL sessions in the range window, brief visits included. */
   sessionCount: number
-  /** All-time sessions (bounded by 180-day raw-event retention). */
+  /** Sessions with real engagement (interaction or >1 page view). */
+  engagedSessionCount?: number
+  /** True all-time sessions (from the daily rollups — no retention bound). */
   totalSessionCount: number
+  /** Range-window activity breakdown (from rollups). */
+  interactions?: number
+  pageViews?: number
+  apiRequests?: number
   daily: Array<{ date: string; count: number }>
   /** Most recent individual sessions with per-session activity detail. */
   sessions: SessionSummary[]
@@ -84,9 +100,11 @@ export interface CompanyEngagement {
     thisMonth: number
     last30Days: Array<{ date: string; count: number }>
   }
-  /** Distinct sessions across users in the last 30 days. */
+  /** Distinct sessions across users in the last 30 days (brief included). */
   sessionCount: number
-  /** All-time distinct sessions (bounded by 180-day raw-event retention). */
+  /** Sessions with real engagement (interaction or >1 page view). */
+  engagedSessionCount?: number
+  /** True all-time distinct sessions (from the daily rollups). */
   totalSessionCount: number
 }
 

@@ -107,10 +107,23 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
               <span className="usr-substat-label">Total</span>
             </div>
             <div className="usr-substat">
-              <span className="usr-substat-value usr-substat-value--accent">
+              <span
+                className="usr-substat-value usr-substat-value--accent"
+                title={
+                  data?.engagedSessionCount != null && data?.sessionCount != null
+                    ? `${data.engagedSessionCount.toLocaleString()} engaged of ${data.sessionCount.toLocaleString()}`
+                    : undefined
+                }
+              >
                 {data?.sessionCount == null ? "—" : formatCompactNumber(data.sessionCount)}
               </span>
               <span className="usr-substat-label">Last 30 days</span>
+            </div>
+            <div className="usr-substat">
+              <span className="usr-substat-value">
+                {loading || data?.engagedSessionCount == null ? "—" : formatCompactNumber(data.engagedSessionCount)}
+              </span>
+              <span className="usr-substat-label">Engaged</span>
             </div>
           </div>
         </div>

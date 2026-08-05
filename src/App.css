@@ -7695,6 +7695,32 @@ button.jc-kind-chip:hover {
   color: var(--border-color);
 }
 
+/* Session duration rides the when-column, after date + time. */
+.eng-sess-duration {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Brief visits (no engagement — bare load, arrival greeting, background tab)
+   still render, slimmer and muted, so every recorded request has a visible
+   session accounting for it. */
+.eng-sess--brief .eng-sess-head {
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+}
+
+.eng-sess--brief .eng-sess-date {
+  font-weight: var(--font-weight-medium);
+  color: var(--secondary-text);
+}
+
+.eng-sess-brief-label {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+  font-style: italic;
+}
+
 /* framer-motion animates the wrapper's height/opacity; overflow clip keeps the
    content from spilling during the collapse. */
 .eng-sess-detail-wrap {
