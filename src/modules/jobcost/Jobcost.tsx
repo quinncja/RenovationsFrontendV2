@@ -380,11 +380,20 @@ export function SummaryRow({ label, value, note, total, noDivider, valueColor, v
   const valueSpan = (
     <span className={`jc-summary-value${valueClass ? ` ${valueClass}` : ""}`} style={valueColor ? { color: valueColor } : undefined}>{value}</span>
   )
+  // Drill-through rows carry a contained pill ("1 order ›") left of the
+  // figure instead of a trailing chevron, so the $ column stays flush right
+  // with the rows above and below.
   const valueCluster = (
     <span className="jc-summary-values">
-      {note && <span className="jc-summary-note">{note}</span>}
+      {onClick ? (
+        <span className="jc-summary-link-pill">
+          {note && <span>{note}</span>}
+          <ChevronRight size={12} />
+        </span>
+      ) : (
+        note && <span className="jc-summary-note">{note}</span>
+      )}
       {valueSpan}
-      {onClick && <ChevronRight size={13} className="jc-summary-chevron" />}
     </span>
   )
   return (
