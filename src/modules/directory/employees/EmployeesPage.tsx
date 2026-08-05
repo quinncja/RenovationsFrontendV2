@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { motion, type Transition } from "framer-motion"
 import { Search } from "lucide-react"
 import Page from "../../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../../shared/context/PageContext"
@@ -42,6 +43,11 @@ function budgetVariance(e: EmployeeRow): number {
 type SortKey = "name" | "totalIncome" | "totalCost" | "totalBudget" | "variance" | "margin"
 type ViewMode = "workload" | "performance"
 
+// Same spring as the Job Costing command bar's segmented control (defined
+// locally, like OverheadReportPage does, so this chunk doesn't pull in the
+// whole jobcost module just for a constant).
+const SEG_SPRING: Transition = { type: "spring", bounce: 0.15, visualDuration: 0.35 }
+
 export default function EmployeesPage() {
   const [year, setYear] = useLocalStorage<number | null>("employeesYear", new Date().getFullYear())
   const [view, setView] = useLocalStorage<ViewMode>("employeesView", "workload")
@@ -52,21 +58,32 @@ export default function EmployeesPage() {
         title="Employees"
         actions={
           <div className="ewl-actions">
-            <div className="period-selector period-selector--equal">
-              <button
-                className={`period-selector-btn${view === "workload" ? " period-selector-btn--active" : ""}`}
-                onClick={() => setView("workload")}
-              >
-                Workload
-              </button>
-              <button
-                className={`period-selector-btn${view === "performance" ? " period-selector-btn--active" : ""}`}
-                onClick={() => setView("performance")}
-              >
-                Performance
-              </button>
-            </div>
+            {/* YearSelector sits LEFT of the seg so mounting it (Performance
+                only) grows the actions row into the header's empty middle —
+                the toggle itself never moves. */}
             {view === "performance" && <YearSelector value={year} onChange={setYear} allowAllTime />}
+            <div className="ohr-seg" role="tablist" aria-label="Employees view">
+              {(
+                [
+                  ["workload", "Workload"],
+                  ["performance", "Performance"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={view === key}
+                  className={`ohr-seg-btn${view === key ? " ohr-seg-btn-active" : ""}`}
+                  onClick={() => setView(key)}
+                >
+                  {view === key && (
+                    <motion.span layoutId="empViewThumb" className="ohr-seg-thumb" transition={SEG_SPRING} />
+                  )}
+                  <span className="ohr-seg-label">{label}</span>
+                </button>
+              ))}
+            </div>
           </div>
         }
       >
