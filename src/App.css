@@ -17008,81 +17008,31 @@ button.co-hero-project:hover svg { color: inherit; }
 .ewl-badge--muted  { background: var(--hover-bg); color: var(--secondary-text); }
 .ewl-badge--clear  { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
 
-/* Expanded sub-table — one elevated panel under the open row, shared by
-   both lenses (Workload's open jobs, Performance's year phases). Airy on
-   purpose: roomy row padding, hairline dividers, quiet caption headers —
-   the numbers carry the surface. */
+/* Expanded region — the open row reveals the app-standard full-width
+   .data-table beneath it (same nested-table convention as EmployeeDetail's
+   ProjectsTable and the directory Jobs tables). No inset card: the td goes
+   flush so the nested table's columns span the whole widget. */
 .ewl-row--open td { border-bottom: none; }
-.ewl-expand-row td {
-  padding: 0 0.75rem 1.25rem;
-}
-.ewl-subpanel {
-  background: var(--card-color);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  box-shadow: var(--button-shadow);
-  padding: 0.375rem 1.5rem 0.875rem;
-}
-.ewl-subscroll { overflow-x: auto; }
-.ewl-subtable {
-  width: 100%;
-  border-collapse: collapse;
-  /* Column shares come from each table's <colgroup>; fixed layout keeps
-     them honest at any viewport width. */
-  table-layout: fixed;
-}
-.ewl-subtable th {
-  text-align: left;
-  font-size: var(--caption1-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--secondary-text);
-  padding: 0.75rem 0.875rem 0.45rem;
-  border-bottom: 1px solid var(--border-color);
-  white-space: nowrap;
-}
-.ewl-subtable td {
-  padding: 0.7rem 0.875rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 55%, transparent);
-  vertical-align: middle;
-  white-space: nowrap;
-}
-.ewl-subtable th:first-child,
-.ewl-subtable td:first-child { padding-left: 0.25rem; }
-.ewl-subtable th:last-child,
-.ewl-subtable td:last-child { padding-right: 0.25rem; }
-.ewl-subtable tbody tr:last-child td { border-bottom: none; }
-.ewl-subtable tbody tr { cursor: pointer; transition: background-color 0.12s; }
-.ewl-subtable tbody tr:hover td { background: var(--hover-bg); }
-.ewl-num { text-align: right; font-variant-numeric: tabular-nums; }
-.ewl-quiet { color: var(--secondary-text); font-size: var(--subheadline-size); }
-.ewl-sub-strong {
-  color: var(--primary-text);
-  font-size: var(--subheadline-size);
-  font-weight: var(--font-weight-semibold);
-}
-.ewl-sub-primary {
+.ewl-expand-row td { padding: 0; }
+.ewl-expand-row .data-table .clickable-row { cursor: pointer; }
+.ewl-name-line {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+.ewl-sub-empty { padding: 0.75rem; margin: 0; }
+.ewl-expand-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.625rem 0.75rem 1rem;
+}
+.ewl-profile-link {
   font-size: var(--subheadline-size);
   font-weight: var(--font-weight-semibold);
-  color: var(--primary-text);
-  min-width: 0;
+  color: var(--primary-color);
+  text-decoration: none;
 }
-.ewl-sub-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ewl-sub-secondary {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ewl-sub-secondary {
-  font-size: var(--caption1-size);
-  color: var(--secondary-text);
-  margin-top: 0.125rem;
-}
-.ewl-sub-empty { padding: 1rem 0.25rem 0.25rem; margin: 0; }
+.ewl-profile-link:hover { text-decoration: underline; }
 
 /* Progress cell: thin track + % readout, same bucket blues as the mix bar. */
 .ewl-progress-cell {
@@ -17106,22 +17056,8 @@ button.co-hero-project:hover svg { color: inherit; }
 }
 .ewl-progress-pct { font-variant-numeric: tabular-nums; }
 
-.ewl-subfoot {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 0.625rem;
-}
-.ewl-profile-link {
-  font-size: var(--subheadline-size);
-  font-weight: var(--font-weight-semibold);
-  color: var(--primary-color);
-  text-decoration: none;
-}
-.ewl-profile-link:hover { text-decoration: underline; }
-
 @media (max-width: 768px) {
   .ewl-actions { flex-wrap: wrap; }
   .ewl-mix { width: 84px; }
-  .ewl-subpanel { padding: 0.25rem 1rem 0.75rem; }
   .ewl-progress-track { width: 84px; }
 }

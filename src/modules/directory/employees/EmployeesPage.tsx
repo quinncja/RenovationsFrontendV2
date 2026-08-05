@@ -345,71 +345,64 @@ function PerfPhasesPanel({ employeeNum, phases }: { employeeNum: number; phases:
   const marginColorsOn = useMarginColorsEnabled()
 
   return (
-    <div className="ewl-subpanel">
+    <>
       {phases.length === 0 ? (
         <p className="ewl-sub-empty body-text text-secondary">No phases with activity this year.</p>
       ) : (
-        <div className="ewl-subscroll">
-          <table className="ewl-subtable">
-            {/* Fixed shares — see the Workload panel's colgroup note. */}
-            <colgroup>
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "12.4%" }} />
-              <col style={{ width: "12.4%" }} />
-              <col style={{ width: "12.4%" }} />
-              <col style={{ width: "12.4%" }} />
-              <col style={{ width: "12.4%" }} />
-            </colgroup>
-            <thead>
-              <tr>
-                <th>Project</th>
-                <th>Status</th>
-                <th className="ewl-num">Contract</th>
-                <th className="ewl-num">Budget</th>
-                <th className="ewl-num">Cost</th>
-                <th className="ewl-num">Variance</th>
-                <th className="ewl-num">Margin</th>
-              </tr>
-            </thead>
-            <tbody>
-              {phases.map((phase) => {
-                const variance = (phase.budget ?? 0) - (phase.totalCost ?? 0)
-                return (
-                  <tr key={phase.recnum} onClick={() => goToJobcost(phase.recnum)}>
-                    <td>
-                      <div className="ewl-sub-primary">{(phase.name || phase.jobnme || phase.recnum).trim()}</div>
-                      <div className="ewl-sub-secondary">#{phase.recnum}</div>
-                    </td>
-                    <td>
-                      <span className={`status-badge status-${phase.status}`}>
-                        {JOB_STATUS_LABELS[phase.status] ?? phase.status}
-                      </span>
-                    </td>
-                    <td className="ewl-num">{formatMoneyFull(phase.totalContract ?? 0)}</td>
-                    <td className="ewl-num">{formatMoneyFull(phase.budget ?? 0)}</td>
-                    <td className="ewl-num">{formatMoneyFull(phase.totalCost ?? 0)}</td>
-                    <td className={`ewl-num ${variance < 0 ? "jc-variance-over" : variance > 0 ? "jc-variance-under" : ""}`}>
-                      {variance > 0 ? "+" : ""}{formatMoneyFull(variance)}
-                    </td>
-                    <td
-                      className="ewl-num"
-                      style={{ color: marginColorsOn ? marginTextColor(phase.margin) : undefined }}
-                    >
-                      {phase.margin == null ? "—" : `${phase.margin.toFixed(1)}%`}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Status</th>
+              <th style={{ textAlign: "right" }}>Contract</th>
+              <th style={{ textAlign: "right" }}>Budget</th>
+              <th style={{ textAlign: "right" }}>Cost</th>
+              <th style={{ textAlign: "right" }}>Variance</th>
+              <th style={{ textAlign: "right" }}>Margin</th>
+            </tr>
+          </thead>
+          <tbody>
+            {phases.map((phase) => {
+              const variance = (phase.budget ?? 0) - (phase.totalCost ?? 0)
+              return (
+                <tr key={phase.recnum} className="clickable-row" onClick={() => goToJobcost(phase.recnum)}>
+                  <td>
+                    <div className="cell-primary">{(phase.name || phase.jobnme || phase.recnum).trim()}</div>
+                    <div className="cell-secondary">#{phase.recnum}</div>
+                  </td>
+                  <td>
+                    <span className={`status-badge status-${phase.status}`}>
+                      {JOB_STATUS_LABELS[phase.status] ?? phase.status}
+                    </span>
+                  </td>
+                  <td style={{ textAlign: "right" }}>{formatMoneyFull(phase.totalContract ?? 0)}</td>
+                  <td style={{ textAlign: "right" }}>{formatMoneyFull(phase.budget ?? 0)}</td>
+                  <td style={{ textAlign: "right" }}>{formatMoneyFull(phase.totalCost ?? 0)}</td>
+                  <td
+                    style={{ textAlign: "right" }}
+                    className={variance < 0 ? "jc-variance-over" : variance > 0 ? "jc-variance-under" : ""}
+                  >
+                    {variance > 0 ? "+" : ""}{formatMoneyFull(variance)}
+                  </td>
+                  <td
+                    style={{
+                      textAlign: "right",
+                      color: marginColorsOn ? marginTextColor(phase.margin) : undefined,
+                    }}
+                  >
+                    {phase.margin == null ? "—" : `${phase.margin.toFixed(1)}%`}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       )}
-      <div className="ewl-subfoot">
+      <div className="ewl-expand-foot">
         <Link className="ewl-profile-link" to={`/employees/${employeeNum}`}>
           View full profile →
         </Link>
       </div>
-    </div>
+    </>
   )
 }

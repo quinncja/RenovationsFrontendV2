@@ -79,71 +79,62 @@ function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
   const { goToJobcost } = useJobcostNav()
 
   return (
-    <div className="ewl-subpanel">
-      <div className="ewl-subscroll">
-        <table className="ewl-subtable">
-          {/* Fixed layout: the columns hold these shares at any viewport
-              width, so wide screens spread the data instead of dumping all
-              the slack into the name column. */}
-          <colgroup>
-            <col style={{ width: "34%" }} />
-            <col style={{ width: "17%" }} />
-            <col style={{ width: "21%" }} />
-            <col style={{ width: "14%" }} />
-            <col style={{ width: "14%" }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Project</th>
-              <th>Last activity</th>
-              <th>Progress</th>
-              <th className="ewl-num">Remaining</th>
-              <th className="ewl-num">Est. finish</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pm.jobs.map((job) => (
-              <tr key={job.recnum} onClick={() => goToJobcost(job.recnum)}>
-                <td>
-                  <div className="ewl-sub-primary">
-                    <span className="ewl-sub-name">{job.name}</span>
-                    {job.watchlist && <span className="ewl-badge ewl-badge--danger">Low margin</span>}
-                    {job.missingContract && <span className="ewl-badge ewl-badge--warn">No contract</span>}
+    <>
+      {/* The app-standard full-width data-table, exactly like every other
+          nested projects table (EmployeeDetail's ProjectsTable, directory
+          Jobs tables) — no inset card, columns span the widget. */}
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Last activity</th>
+            <th>Progress</th>
+            <th style={{ textAlign: "right" }}>Remaining</th>
+            <th style={{ textAlign: "right" }}>Est. finish</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pm.jobs.map((job) => (
+            <tr key={job.recnum} className="clickable-row" onClick={() => goToJobcost(job.recnum)}>
+              <td>
+                <div className="cell-primary ewl-name-line">
+                  {job.name}
+                  {job.watchlist && <span className="ewl-badge ewl-badge--danger">Low margin</span>}
+                  {job.missingContract && <span className="ewl-badge ewl-badge--warn">No contract</span>}
+                </div>
+                <div className="cell-secondary">{job.clientName ?? `#${job.recnum}`}</div>
+              </td>
+              <td className="text-secondary">
+                {job.lastActivity ? formatRelativeTime(job.lastActivity) : "—"}
+                {!job.active && <span className="ewl-badge ewl-badge--muted">Dormant</span>}
+              </td>
+              <td>
+                {job.pct === 0 ? (
+                  <span className="text-secondary">Not started</span>
+                ) : (
+                  <div className="ewl-progress-cell" title={`${Math.round(job.pct * 100)}% of budget spent`}>
+                    <span className="ewl-progress-track">
+                      <span
+                        className={`ewl-progress-fill ewl-mix-${job.bucket}`}
+                        style={{ width: `${job.pct * 100}%` }}
+                      />
+                    </span>
+                    <span className="text-secondary ewl-progress-pct">{Math.round(job.pct * 100)}%</span>
                   </div>
-                  <div className="ewl-sub-secondary">{job.clientName ?? `#${job.recnum}`}</div>
-                </td>
-                <td className="ewl-quiet">
-                  {job.lastActivity ? formatRelativeTime(job.lastActivity) : "—"}
-                  {!job.active && <span className="ewl-badge ewl-badge--muted">Dormant</span>}
-                </td>
-                <td>
-                  {job.pct === 0 ? (
-                    <span className="ewl-quiet">Not started</span>
-                  ) : (
-                    <div className="ewl-progress-cell" title={`${Math.round(job.pct * 100)}% of budget spent`}>
-                      <span className="ewl-progress-track">
-                        <span
-                          className={`ewl-progress-fill ewl-mix-${job.bucket}`}
-                          style={{ width: `${job.pct * 100}%` }}
-                        />
-                      </span>
-                      <span className="ewl-quiet ewl-progress-pct">{Math.round(job.pct * 100)}%</span>
-                    </div>
-                  )}
-                </td>
-                <td className="ewl-num ewl-sub-strong">{formatMoney(job.remaining)}</td>
-                <td className="ewl-num ewl-quiet">{estFinishLabel(job) ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="ewl-subfoot">
+                )}
+              </td>
+              <td style={{ textAlign: "right" }}>{formatMoney(job.remaining)}</td>
+              <td style={{ textAlign: "right" }} className="text-secondary">{estFinishLabel(job) ?? "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="ewl-expand-foot">
         <Link className="ewl-profile-link" to={`/employees/${pm.pmId}`}>
           View full profile →
         </Link>
       </div>
-    </div>
+    </>
   )
 }
 
