@@ -3,7 +3,8 @@ import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, BarChart3 } from "lucide-react"
 import { fetchCompanyEngagement, type CompanyEngagement } from "./engagementApi"
-import { SectionEngagementList, WidgetEngagementList, PageEngagementList, ProjectEngagementList } from "./EngagementInsights"
+import { SectionEngagementList, WidgetEngagementList, PageEngagementList, ProjectEngagementList, EngListCardSkeleton } from "./EngagementInsights"
+import { SkelText } from "../components/SkelText"
 import { sectionLabel, pageLabel, formatCompactNumber } from "./labels"
 import { Chart } from "../components/Chart/Chart"
 import type { LineSeries } from "../components/Chart/chart.types"
@@ -84,13 +85,13 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
           <div className="usr-stat-group-body">
             <div className="usr-substat">
               <span className="usr-substat-value" title={activity ? activity.total.toLocaleString() : undefined}>
-                {activity ? formatCompactNumber(activity.total) : "—"}
+                {loading ? <SkelText ch={4} /> : activity ? formatCompactNumber(activity.total) : "—"}
               </span>
               <span className="usr-substat-label">Total</span>
             </div>
             <div className="usr-substat">
               <span className="usr-substat-value usr-substat-value--accent" title={activity ? activity.thisMonth.toLocaleString() : undefined}>
-                {activity ? formatCompactNumber(activity.thisMonth) : "—"}
+                {loading ? <SkelText ch={4} /> : activity ? formatCompactNumber(activity.thisMonth) : "—"}
               </span>
               <span className="usr-substat-label">Last 30 days</span>
             </div>
@@ -102,7 +103,7 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
           <div className="usr-stat-group-body">
             <div className="usr-substat">
               <span className="usr-substat-value">
-                {data?.totalSessionCount == null ? "—" : formatCompactNumber(data.totalSessionCount)}
+                {loading ? <SkelText ch={3} /> : data?.totalSessionCount == null ? "—" : formatCompactNumber(data.totalSessionCount)}
               </span>
               <span className="usr-substat-label">Total</span>
             </div>
@@ -115,13 +116,13 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
                     : undefined
                 }
               >
-                {data?.sessionCount == null ? "—" : formatCompactNumber(data.sessionCount)}
+                {loading ? <SkelText ch={3} /> : data?.sessionCount == null ? "—" : formatCompactNumber(data.sessionCount)}
               </span>
               <span className="usr-substat-label">Last 30 days</span>
             </div>
             <div className="usr-substat">
               <span className="usr-substat-value">
-                {loading || data?.engagedSessionCount == null ? "—" : formatCompactNumber(data.engagedSessionCount)}
+                {loading ? <SkelText ch={3} /> : data?.engagedSessionCount == null ? "—" : formatCompactNumber(data.engagedSessionCount)}
               </span>
               <span className="usr-substat-label">Engaged</span>
             </div>
@@ -133,13 +134,13 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
           <div className="usr-stat-group-body">
             <div className="usr-substat">
               <span className="usr-substat-value usr-substat-value--text" title={topSection ? sectionLabel(topSection) : undefined}>
-                {topSection ? sectionLabel(topSection) : "—"}
+                {loading ? <SkelText ch={10} /> : topSection ? sectionLabel(topSection) : "—"}
               </span>
               <span className="usr-substat-label">Top section</span>
             </div>
             <div className="usr-substat">
               <span className="usr-substat-value usr-substat-value--text" title={topPage ? pageLabel(topPage.page) : undefined}>
-                {topPage ? pageLabel(topPage.page) : "—"}
+                {loading ? <SkelText ch={9} /> : topPage ? pageLabel(topPage.page) : "—"}
               </span>
               <span className="usr-substat-label">Most visited</span>
             </div>
@@ -150,7 +151,9 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
       <div className="usr-activity-chart-section">
         <p className="invoice-modal-section-label">Activity · Last 30 Days</p>
         {loading ? (
-          <div className="widget-skeleton" style={{ height: "10rem" }} />
+          <div className="usr-activity-chart">
+            <div className="widget-skeleton" />
+          </div>
         ) : (
           <div className="usr-activity-chart">
             <Chart
@@ -174,7 +177,10 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
   const reachContent = (
     <div className="usr-activity-eng-lists">
       {loading ? (
-        <div className="widget-skeleton" style={{ height: "16rem" }} />
+        <div className="ceng-cols">
+          <EngListCardSkeleton title="Most-visited pages" />
+          <EngListCardSkeleton title="Most-viewed projects" />
+        </div>
       ) : (
         <div className="ceng-cols">
           <PageEngagementList pages={data?.topPages ?? []} title="Most-visited pages" subtitle="By visits" showUsers />
@@ -188,7 +194,10 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
   const usageContent = (
     <div className="usr-activity-eng-lists">
       {loading ? (
-        <div className="widget-skeleton" style={{ height: "16rem" }} />
+        <div className="ceng-cols">
+          <EngListCardSkeleton title="Most-used sections" />
+          <EngListCardSkeleton title="Most-used widgets" />
+        </div>
       ) : (
         <div className="ceng-cols">
           <SectionEngagementList widgets={data?.topWidgets ?? []} title="Most-used sections" subtitle="By time spent" />

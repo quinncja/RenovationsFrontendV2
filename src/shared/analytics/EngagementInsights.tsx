@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import type { WidgetEngagement, PageEngagement, ProjectEngagement, SessionSummary } from "./engagementApi"
 import { widgetLabel, sectionLabel, pageLabel, formatDuration } from "./labels"
 import { useModalLayer } from "../hooks/useModalLayer"
+import { SkelText } from "../components/SkelText"
 
 // Ranked horizontal-bar lists for engagement insights. The bar length encodes
 // the primary metric (dwell time for widgets/sections, visits for pages, views
@@ -200,6 +201,72 @@ function EngListCard({
           {children(Infinity)}
         </EngListModal>
       )}
+    </section>
+  )
+}
+
+// ─── Skeletons ──────────────────────────────────────────────────────────────
+// Content-mirroring loading stand-ins: they render the REAL card/list classes
+// (.ceng-col, .eng-list, .eng-row, .eng-sess…) with the real titles, so the
+// skeleton and loaded states share one geometry source and the pager panel
+// doesn't restructure when data lands. Heights ride the real type classes via
+// SkelText — never sized blocks.
+
+// Varied label widths so the ghost list reads as content, not stripes.
+const SKEL_ROW_CH = [12, 9, 14, 8, 11, 10]
+
+/** Ghost of a ranked EngListCard (rank + label + metric + bar). */
+export function EngListCardSkeleton({ title, rows = 6 }: { title: string; rows?: number }) {
+  return (
+    <section className="ceng-col" aria-hidden="true">
+      <header className="ceng-col-head">
+        <h3 className="ceng-col-title">{title}</h3>
+      </header>
+      <div className="eng-list">
+        {Array.from({ length: rows }, (_, i) => (
+          <div className="eng-row" key={i}>
+            <span className="eng-rank eng-rank--rest" />
+            <div className="eng-row-main">
+              <div className="eng-row-head">
+                <div className="eng-row-titles">
+                  <span className="eng-row-label">
+                    <SkelText ch={SKEL_ROW_CH[i % SKEL_ROW_CH.length]} />
+                  </span>
+                </div>
+                <span className="eng-row-metric"><SkelText ch={5} /></span>
+              </div>
+              <div className="eng-bar-track" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** Ghost of SessionEngagementList: the card header + full-width session rows
+ *  (when · entry · summary), matching the loaded row anatomy. */
+export function SessionListSkeleton({ title, rows = 6 }: { title: string; rows?: number }) {
+  return (
+    <section className="ceng-col" aria-hidden="true">
+      <header className="ceng-col-head">
+        <h3 className="ceng-col-title">{title}</h3>
+      </header>
+      <div className="eng-sess-list">
+        {Array.from({ length: rows }, (_, i) => (
+          <div className="eng-sess" key={i}>
+            <div className="eng-sess-head" style={{ pointerEvents: "none" }}>
+              <span className="eng-sess-when">
+                <ChevronRight size={15} className="eng-sess-caret" style={{ visibility: "hidden" }} aria-hidden />
+                <span className="eng-sess-date"><SkelText ch={6} /></span>
+                <span className="eng-sess-time"><SkelText ch={7} /></span>
+              </span>
+              <span className="eng-sess-entry"><SkelText ch={i % 2 ? 8 : 11} /></span>
+              <span className="eng-sess-summary"><SkelText ch={26} /></span>
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   )
 }

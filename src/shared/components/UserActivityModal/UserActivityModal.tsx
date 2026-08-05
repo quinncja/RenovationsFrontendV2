@@ -9,7 +9,8 @@ import type { LineSeries } from "../Chart/chart.types"
 import useIsMobile from "../../hooks/useIsMobile"
 import { fetchUserEngagement, type UserEngagement } from "../../analytics/engagementApi"
 import { sessionTrackingHeaders } from "../../analytics/analytics"
-import { SectionEngagementList, WidgetEngagementList, SessionEngagementList } from "../../analytics/EngagementInsights"
+import { SectionEngagementList, WidgetEngagementList, SessionEngagementList, EngListCardSkeleton, SessionListSkeleton } from "../../analytics/EngagementInsights"
+import { SkelText } from "../SkelText"
 import { sectionLabel, pageLabel, formatCompactNumber } from "../../analytics/labels"
 import { ModalSectionPager } from "./ModalSectionPager"
 import { useModalLayer } from "../../hooks/useModalLayer"
@@ -411,7 +412,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                               className="usr-substat-value usr-substat-value--accent"
                               title={engagement?.interactions?.toLocaleString()}
                             >
-                              {engLoading || engagement?.interactions == null ? "—" : formatCompactNumber(engagement.interactions)}
+                              {engLoading ? <SkelText ch={3} /> : engagement?.interactions == null ? "—" : formatCompactNumber(engagement.interactions)}
                             </span>
                             <span className="usr-substat-label">Interactions</span>
                           </div>
@@ -420,7 +421,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                               className="usr-substat-value"
                               title={engagement?.pageViews?.toLocaleString()}
                             >
-                              {engLoading || engagement?.pageViews == null ? "—" : formatCompactNumber(engagement.pageViews)}
+                              {engLoading ? <SkelText ch={3} /> : engagement?.pageViews == null ? "—" : formatCompactNumber(engagement.pageViews)}
                             </span>
                             <span className="usr-substat-label">Page views</span>
                           </div>
@@ -429,7 +430,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                               className="usr-substat-value"
                               title={engagement?.apiRequests?.toLocaleString()}
                             >
-                              {engLoading || engagement?.apiRequests == null ? "—" : formatCompactNumber(engagement.apiRequests)}
+                              {engLoading ? <SkelText ch={3} /> : engagement?.apiRequests == null ? "—" : formatCompactNumber(engagement.apiRequests)}
                             </span>
                             <span className="usr-substat-label">API requests</span>
                           </div>
@@ -441,7 +442,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                               className="usr-substat-value"
                               title={isLoading ? undefined : (activity?.total ?? 0).toLocaleString()}
                             >
-                              {isLoading ? "—" : formatCompactNumber(activity?.total ?? 0)}
+                              {isLoading ? <SkelText ch={4} /> : formatCompactNumber(activity?.total ?? 0)}
                             </span>
                             <span className="usr-substat-label">Total</span>
                           </div>
@@ -450,7 +451,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                               className="usr-substat-value usr-substat-value--accent"
                               title={isLoading ? undefined : (activity?.thisMonth ?? 0).toLocaleString()}
                             >
-                              {isLoading ? "—" : formatCompactNumber(activity?.thisMonth ?? 0)}
+                              {isLoading ? <SkelText ch={4} /> : formatCompactNumber(activity?.thisMonth ?? 0)}
                             </span>
                             <span className="usr-substat-label">Last 30 days</span>
                           </div>
@@ -465,7 +466,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                       <div className="usr-stat-group-body">
                         <div className="usr-substat">
                           <span className="usr-substat-value">
-                            {engLoading || engagement?.totalSessionCount == null ? "—" : formatCompactNumber(engagement.totalSessionCount)}
+                            {engLoading ? <SkelText ch={3} /> : engagement?.totalSessionCount == null ? "—" : formatCompactNumber(engagement.totalSessionCount)}
                           </span>
                           <span className="usr-substat-label">Total</span>
                         </div>
@@ -478,13 +479,13 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                                 : undefined
                             }
                           >
-                            {engLoading || !engagement ? "—" : formatCompactNumber(engagement.sessionCount)}
+                            {engLoading ? <SkelText ch={3} /> : !engagement ? "—" : formatCompactNumber(engagement.sessionCount)}
                           </span>
                           <span className="usr-substat-label">Last 30 days</span>
                         </div>
                         <div className="usr-substat">
                           <span className="usr-substat-value">
-                            {engLoading || engagement?.engagedSessionCount == null ? "—" : formatCompactNumber(engagement.engagedSessionCount)}
+                            {engLoading ? <SkelText ch={3} /> : engagement?.engagedSessionCount == null ? "—" : formatCompactNumber(engagement.engagedSessionCount)}
                           </span>
                           <span className="usr-substat-label">Engaged</span>
                         </div>
@@ -501,7 +502,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                             className="usr-substat-value usr-substat-value--text"
                             title={engTopSection ? sectionLabel(engTopSection) : undefined}
                           >
-                            {engTopSection ? sectionLabel(engTopSection) : "—"}
+                            {engLoading ? <SkelText ch={10} /> : engTopSection ? sectionLabel(engTopSection) : "—"}
                           </span>
                           <span className="usr-substat-label">Top section</span>
                         </div>
@@ -510,7 +511,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                             className="usr-substat-value usr-substat-value--text"
                             title={engTopPage ? pageLabel(engTopPage.page) : undefined}
                           >
-                            {engTopPage ? pageLabel(engTopPage.page) : "—"}
+                            {engLoading ? <SkelText ch={9} /> : engTopPage ? pageLabel(engTopPage.page) : "—"}
                           </span>
                           <span className="usr-substat-label">Most visited</span>
                         </div>
@@ -522,8 +523,12 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                 {/* Chart */}
                 <div className="usr-activity-chart-section">
                   <p className="invoice-modal-section-label">Activity · Last 30 Days</p>
+                  {/* Skeleton fills the same .usr-activity-chart box the loaded
+                      plot renders into — one height source, no growth on load. */}
                   {isLoading ? (
-                    <div className="widget-skeleton" style={{ height: "10rem" }} />
+                    <div className="usr-activity-chart">
+                      <div className="widget-skeleton" />
+                    </div>
                   ) : (
                     <div className="usr-activity-chart">
                       <Chart
@@ -545,7 +550,16 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                     <div className="usr-onb-strip">
                       <span className="usr-onb-strip-label">Onboarding</span>
                       {onbLoading ? (
-                        <div className="widget-skeleton usr-onb-skeleton" />
+                        // Ghost chips ride the real .usr-onb-chip class — the
+                        // loaded row of milestone chips has the same anatomy.
+                        <div className="usr-onb-row" aria-hidden="true">
+                          {[9, 7, 12, 10, 8].map((ch, i) => (
+                            <span key={i} className="usr-onb-chip">
+                              <span className="usr-onb-dot" />
+                              <SkelText ch={ch} />
+                            </span>
+                          ))}
+                        </div>
                       ) : (
                         <div className="usr-onb-row">
                           <span
@@ -589,7 +603,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                 const sessionsContent = (
                   <div className="usr-activity-sessions">
                     {engLoading ? (
-                      <div className="widget-skeleton" style={{ height: "16rem" }} />
+                      <SessionListSkeleton title="Recent sessions" />
                     ) : (
                       <SessionEngagementList
                         sessions={engagement?.sessions ?? []}
@@ -604,7 +618,10 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
                 const usageContent = (
                   <div className="usr-activity-eng-lists">
                     {engLoading ? (
-                      <div className="widget-skeleton" style={{ height: "16rem" }} />
+                      <div className="ceng-cols">
+                        <EngListCardSkeleton title="Most-used sections" />
+                        <EngListCardSkeleton title="Most-used widgets" />
+                      </div>
                     ) : (
                       <div className="ceng-cols">
                         <SectionEngagementList widgets={engagement?.topWidgets ?? []} title="Most-used sections" subtitle="By time spent" />
