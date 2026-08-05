@@ -31,6 +31,12 @@ export interface WorkloadActivityRow {
   cost: number
 }
 
+export interface WorkloadLastActivityRow {
+  jobnum: number
+  /** Most recent insdte/entdte across cost lines, POs, subcontracts, COs. */
+  lastActivity: string
+}
+
 export interface WorkloadArOverdueRow {
   sprvsr: number | null
   overdueBalance: number
@@ -47,9 +53,12 @@ export interface WorkloadMonthlyRow {
 export interface EmployeeWorkloadPayload {
   phases: WorkloadPhase[]
   activity: WorkloadActivityRow[]
+  lastActivity: WorkloadLastActivityRow[]
   arOverdue: WorkloadArOverdueRow[]
   monthly: WorkloadMonthlyRow[]
-  openPeriod: { postyr: number; actprd: number }
+  openPeriod: { postyr: number; actprd: number } | null
+  /** Server's Chicago "today" — the dormancy window's reference point. */
+  asOf: string
 }
 
 export type ProgressBucket = "early" | "mid" | "closing"
@@ -66,8 +75,11 @@ export interface WorkloadJob {
   /** 0–1, cost ÷ budget (clamped). */
   pct: number
   bucket: ProgressBucket
-  /** Posted costs in the open period or the one before. */
+  /** Anything entered against the job — cost lines, POs, subcontracts,
+   *  change orders — within the dormancy window (see DORMANT_AFTER_DAYS). */
   active: boolean
+  /** Most recent entry date of any kind, null if nothing ever posted. */
+  lastActivity: string | null
   /** remaining ÷ recent monthly burn; null when dormant or burn is ~0. */
   estMonthsLeft: number | null
   watchlist: boolean
@@ -109,6 +121,12 @@ export interface WorkloadTotals {
 
 export const SPARK_MONTHS = 7
 
+// A job is dormant when NOTHING has been entered against it — no cost lines
+// (labor included), no purchase orders, no subcontracts, no change orders —
+// for this many days. 45 covers a monthly posting cycle plus slack, so a job
+// that simply straddles a billing boundary doesn't get flagged.
+export const DORMANT_AFTER_DAYS = 45
+
 // Accounting months as a single comparable index (periods are calendar
 // months, so postyr/actprd → a linear month counter).
 function monthIdx(postyr: number, actprd: number): number {
@@ -121,16 +139,27 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): {
   pms: PmWorkload[]
   totals: WorkloadTotals
 } {
-  const openIdx = monthIdx(payload.openPeriod.postyr, payload.openPeriod.actprd)
+  // "Now" in accounting-month terms, for the burn window and sparkline. Falls
+  // back to the newest month with posted costs if the open period is ever
+  // missing — a bad reference here must never zero the whole view out.
+  let openIdx = payload.openPeriod ? monthIdx(payload.openPeriod.postyr, payload.openPeriod.actprd) : NaN
+  if (!Number.isFinite(openIdx)) {
+    openIdx = payload.monthly.reduce((max, r) => Math.max(max, monthIdx(r.postyr, r.actprd)), 0)
+  }
 
-  // Per-job activity: last posted month + recent burn (mean posted cost over
-  // the three months ending at the open period — the "current pace").
-  const lastIdxByJob = new Map<number, number>()
+  // Dormancy cutoff in real dates, anchored to the server's "today".
+  const cutoffMs = new Date(payload.asOf).getTime() - DORMANT_AFTER_DAYS * 24 * 60 * 60 * 1000
+
+  const lastActivityByJob = new Map<number, string>()
+  for (const row of payload.lastActivity) {
+    lastActivityByJob.set(row.jobnum, row.lastActivity)
+  }
+
+  // Recent burn: mean posted cost over the three months ending at the open
+  // period — the "current pace" behind the finish estimate.
   const recentCostByJob = new Map<number, number>()
   for (const row of payload.activity) {
     const idx = monthIdx(row.postyr, row.actprd)
-    const prev = lastIdxByJob.get(row.jobnum)
-    if (prev === undefined || idx > prev) lastIdxByJob.set(row.jobnum, idx)
     if (idx >= openIdx - 2 && idx <= openIdx) {
       recentCostByJob.set(row.jobnum, (recentCostByJob.get(row.jobnum) ?? 0) + row.cost)
     }
@@ -174,8 +203,9 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): {
     const cost = phase.totalCost ?? 0
     const pct = budget > 0 ? clamp01(cost / budget) : cost > 0 ? 1 : 0
     const remaining = Math.max(budget - cost, 0)
-    const lastIdx = lastIdxByJob.get(jobnum)
-    const active = lastIdx !== undefined && lastIdx >= openIdx - 1
+    const lastActivity = lastActivityByJob.get(jobnum) ?? null
+    const lastActivityMs = lastActivity ? new Date(lastActivity).getTime() : NaN
+    const active = Number.isFinite(lastActivityMs) && lastActivityMs >= cutoffMs
     const burn = (recentCostByJob.get(jobnum) ?? 0) / 3
 
     const job: WorkloadJob = {
@@ -190,6 +220,7 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): {
       pct,
       bucket: pct < 1 / 3 ? "early" : pct < 0.8 ? "mid" : "closing",
       active,
+      lastActivity,
       estMonthsLeft: active && burn > 0 && remaining > 0 ? remaining / burn : null,
       watchlist: (phase.totalContract ?? 0) > 0 && (phase.margin ?? 0) < 17,
       missingContract: !phase.totalContract || phase.totalContract <= 0,

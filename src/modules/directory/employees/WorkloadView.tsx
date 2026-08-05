@@ -149,6 +149,11 @@ function JobLanes({ pm }: { pm: PmWorkload }) {
                 {" · "}
                 {formatMoney(job.remaining)} remaining
                 {est ? ` · ${est}` : ""}
+                {/* Dormant jobs explain themselves: when did anything last happen? */}
+                {!job.active &&
+                  (job.lastActivity
+                    ? ` · No entries since ${formatDate(job.lastActivity)}`
+                    : " · No entries on record")}
               </span>
             </div>
           </div>
