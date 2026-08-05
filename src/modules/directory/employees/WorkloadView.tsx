@@ -1,51 +1,21 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { Link } from "react-router-dom"
-import { Search, ChevronDown } from "lucide-react"
-import { useWidgetData } from "../../../shared/context/PageContext"
-import { MotionItem } from "../../../shared/components/MotionList/MotionList"
-import { Widget } from "../../../shared/components/Widget/Widget"
+import { ChevronDown } from "lucide-react"
 import { EmployeeAvatar } from "../../../shared/components/EmployeeAvatar/EmployeeAvatar"
-import { formatMoney, formatDate } from "../../../shared/utils/format"
+import { formatMoney, formatRelativeTime } from "../../../shared/utils/format"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
 import { useJobcostNav } from "../../jobcost/useJobcostNav"
 import { SortTh, type SortDir } from "./SortTh"
-import {
-  deriveWorkload,
-  SPARK_MONTHS,
-  type EmployeeWorkloadPayload,
-  type PmWorkload,
-  type WorkloadJob,
-} from "./workload"
+import type { PmWorkload, WorkloadJob } from "./workload"
 
-// Workload view — "who can take the next job". One row per PM: how much open
+// Workload lens — "who can take the next job". One row per PM: how much open
 // work they hold (remaining budget, not job count), how much of it is in its
 // early / mid / closing stretch, what's dormant, and the attention drains
-// (low-margin watchlist, missing contracts, overdue AR). Rows expand into the
-// PM's job lanes; the deep work lives on /employees/:id and /jobcost/:recnum.
+// (low-margin watchlist, missing contracts). Rows expand into an airy
+// sub-table of the PM's open jobs; the deep work lives on /employees/:id and
+// /jobcost/:recnum.
 
 type SortKey = "name" | "open" | "units" | "remaining"
-
-// ── Tiny inline visuals ──────────────────────────────────────────────────────
-
-// Trailing months of posted cost as a plain polyline. Fixed viewBox — the
-// shape is the message (ramping up vs. winding down), not the values.
-function Sparkline({ values }: { values: number[] }) {
-  const w = 84
-  const h = 22
-  const pad = 2
-  const max = Math.max(...values, 1)
-  const step = (w - pad * 2) / (SPARK_MONTHS - 1)
-  const points = values
-    .map((v, i) => `${pad + i * step},${h - pad - (v / max) * (h - pad * 2)}`)
-    .join(" ")
-  const [lastX, lastY] = points.split(" ").pop()!.split(",")
-  return (
-    <svg className="ewl-spark" viewBox={`0 0 ${w} ${h}`} width={w} height={h} aria-hidden>
-      <polyline points={points} fill="none" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx={lastX} cy={lastY} r={2} />
-    </svg>
-  )
-}
 
 // Open phases split by progress stretch, widths by count. One hue at three
 // strengths so it reads as a progression (and survives color blindness);
@@ -74,13 +44,6 @@ function RiskBadges({ pm }: { pm: PmWorkload }) {
       label: `${pm.watchlistCount} low margin`,
       title: `${pm.watchlistCount} open ${pm.watchlistCount === 1 ? "phase" : "phases"} under 17% margin`,
     })
-  if (pm.arOverdueBalance > 0)
-    badges.push({
-      key: "ar",
-      className: "ewl-badge--danger",
-      label: `${formatMoney(pm.arOverdueBalance)} AR`,
-      title: `${pm.arOverdueInvoices} overdue ${pm.arOverdueInvoices === 1 ? "invoice" : "invoices"} (past due date + 30)`,
-    })
   if (pm.missingContractCount > 0)
     badges.push({
       key: "contract",
@@ -104,62 +67,78 @@ function estFinishLabel(job: WorkloadJob): string | null {
   if (!job.active) return null
   if (job.estMonthsLeft === null) return null
   const months = Math.round(job.estMonthsLeft)
-  if (months > 24) return "24+ mo left"
-  if (months < 1) return "<1 mo left"
-  return `≈${months} mo left`
+  // Beyond a year the remaining/burn ratio is noise, not a forecast.
+  if (months > 12) return "12+ mo"
+  if (months < 1) return "<1 mo"
+  return `≈${months} mo`
 }
 
-// ── Expanded job lanes ───────────────────────────────────────────────────────
+// ── Expanded sub-table: the PM's open jobs ───────────────────────────────────
 
-function JobLanes({ pm }: { pm: PmWorkload }) {
+function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
   const { goToJobcost } = useJobcostNav()
-  const maxSize = Math.max(...pm.jobs.map((j) => j.contract || j.budget), 1)
 
   return (
-    <div className="ewl-lanes">
-      {pm.jobs.map((job) => {
-        const size = job.contract || job.budget
-        const laneWidth = Math.max(size / maxSize, 0.18) * 100
-        const est = estFinishLabel(job)
-        return (
-          <div key={job.recnum} className="ewl-lane">
-            <div className="ewl-lane-head">
-              <button className="ewl-lane-name" onClick={() => goToJobcost(job.recnum)}>
-                {job.name}
-              </button>
-              {job.clientName && <span className="ewl-lane-client">{job.clientName}</span>}
-              {!job.active && <span className="ewl-badge ewl-badge--muted">Dormant</span>}
-              {job.watchlist && <span className="ewl-badge ewl-badge--danger">Low margin</span>}
-              {job.missingContract && <span className="ewl-badge ewl-badge--warn">No contract</span>}
-            </div>
-            <div className="ewl-lane-body">
-              {/* The size percentage lives inside a fixed track area so a
-                  full-width (largest) job can never crowd out the meta text. */}
-              <div className="ewl-lane-bar-area">
-                <div
-                  className={`ewl-lane-bar${job.active ? "" : " ewl-lane-bar--dormant"}`}
-                  style={{ width: `${laneWidth}%` }}
-                  title={`${Math.round(job.pct * 100)}% of budget spent`}
-                >
-                  <span className={`ewl-lane-fill ewl-lane-fill--${job.bucket}`} style={{ width: `${job.pct * 100}%` }} />
-                </div>
-              </div>
-              <span className="ewl-lane-meta caption1 text-secondary">
-                {job.startDate ? `Started ${formatDate(job.startDate)}` : "No start date"}
-                {" · "}
-                {formatMoney(job.remaining)} remaining
-                {est ? ` · ${est}` : ""}
-                {/* Dormant jobs explain themselves: when did anything last happen? */}
-                {!job.active &&
-                  (job.lastActivity
-                    ? ` · No entries since ${formatDate(job.lastActivity)}`
-                    : " · No entries on record")}
-              </span>
-            </div>
-          </div>
-        )
-      })}
-      <div className="ewl-lanes-foot">
+    <div className="ewl-subpanel">
+      <div className="ewl-subscroll">
+        <table className="ewl-subtable">
+          {/* Fixed layout: the columns hold these shares at any viewport
+              width, so wide screens spread the data instead of dumping all
+              the slack into the name column. */}
+          <colgroup>
+            <col style={{ width: "34%" }} />
+            <col style={{ width: "17%" }} />
+            <col style={{ width: "21%" }} />
+            <col style={{ width: "14%" }} />
+            <col style={{ width: "14%" }} />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Project</th>
+              <th>Last activity</th>
+              <th>Progress</th>
+              <th className="ewl-num">Remaining</th>
+              <th className="ewl-num">Est. finish</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pm.jobs.map((job) => (
+              <tr key={job.recnum} onClick={() => goToJobcost(job.recnum)}>
+                <td>
+                  <div className="ewl-sub-primary">
+                    <span className="ewl-sub-name">{job.name}</span>
+                    {job.watchlist && <span className="ewl-badge ewl-badge--danger">Low margin</span>}
+                    {job.missingContract && <span className="ewl-badge ewl-badge--warn">No contract</span>}
+                  </div>
+                  <div className="ewl-sub-secondary">{job.clientName ?? `#${job.recnum}`}</div>
+                </td>
+                <td className="ewl-quiet">
+                  {job.lastActivity ? formatRelativeTime(job.lastActivity) : "—"}
+                  {!job.active && <span className="ewl-badge ewl-badge--muted">Dormant</span>}
+                </td>
+                <td>
+                  {job.pct === 0 ? (
+                    <span className="ewl-quiet">Not started</span>
+                  ) : (
+                    <div className="ewl-progress-cell" title={`${Math.round(job.pct * 100)}% of budget spent`}>
+                      <span className="ewl-progress-track">
+                        <span
+                          className={`ewl-progress-fill ewl-mix-${job.bucket}`}
+                          style={{ width: `${job.pct * 100}%` }}
+                        />
+                      </span>
+                      <span className="ewl-quiet ewl-progress-pct">{Math.round(job.pct * 100)}%</span>
+                    </div>
+                  )}
+                </td>
+                <td className="ewl-num ewl-sub-strong">{formatMoney(job.remaining)}</td>
+                <td className="ewl-num ewl-quiet">{estFinishLabel(job) ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="ewl-subfoot">
         <Link className="ewl-profile-link" to={`/employees/${pm.pmId}`}>
           View full profile →
         </Link>
@@ -168,46 +147,20 @@ function JobLanes({ pm }: { pm: PmWorkload }) {
   )
 }
 
-// ── Summary cards ────────────────────────────────────────────────────────────
+// ── The lens ─────────────────────────────────────────────────────────────────
 
-function StatTile({ label, value, sub, warn, loading }: {
-  label: string
-  value: string
-  sub?: string
-  warn?: boolean
-  loading: boolean
+export function WorkloadTable({
+  pms,
+  expandedId,
+  onToggleRow,
+}: {
+  pms: PmWorkload[]
+  expandedId: number | null
+  onToggleRow: (id: number) => void
 }) {
-  return (
-    <div className={`ewl-stat${warn ? " ewl-stat--warn" : ""}`}>
-      <span className="widget-title headline">{label}</span>
-      {loading ? (
-        <span className="stat-widget-skeleton" />
-      ) : (
-        <>
-          <span className="ewl-stat-value title1 emphasized">{value}</span>
-          {sub && <span className="caption1 text-secondary">{sub}</span>}
-        </>
-      )}
-    </div>
-  )
-}
-
-// ── The view ─────────────────────────────────────────────────────────────────
-
-export function WorkloadView() {
   const isMobile = useIsMobile()
-  const [search, setSearch] = useState("")
   const [sortKey, setSortKey] = useState<SortKey>("remaining")
   const [sortDir, setSortDir] = useState<SortDir>("desc")
-  const [openPm, setOpenPm] = useState<number | null>(null)
-
-  const { data, isLoading } = useWidgetData<{ employeeWorkload: EmployeeWorkloadPayload | null }>([
-    "employeeWorkload",
-  ])
-  const derived = useMemo(
-    () => (data?.employeeWorkload ? deriveWorkload(data.employeeWorkload) : null),
-    [data],
-  )
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -218,153 +171,82 @@ export function WorkloadView() {
     }
   }
 
-  const rows = useMemo(() => {
-    if (!derived) return []
-    const q = search.toLowerCase()
-    const filtered = q ? derived.pms.filter((pm) => pm.pmName.toLowerCase().includes(q)) : derived.pms
-    return [...filtered].sort((a, b) => {
-      const dir = sortDir === "asc" ? 1 : -1
-      if (sortKey === "name") return a.pmName.localeCompare(b.pmName) * dir
-      if (sortKey === "open") return (a.openCount - b.openCount) * dir
-      if (sortKey === "units") return (a.units - b.units) * dir
-      return (a.remaining - b.remaining) * dir
-    })
-  }, [derived, search, sortKey, sortDir])
+  const sorted = [...pms].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1
+    if (sortKey === "name") return a.pmName.localeCompare(b.pmName) * dir
+    if (sortKey === "open") return (a.openCount - b.openCount) * dir
+    if (sortKey === "units") return (a.units - b.units) * dir
+    return (a.remaining - b.remaining) * dir
+  })
 
-  const totals = derived?.totals
-  const columnCount = isMobile ? 5 : 7
+  const columnCount = isMobile ? 5 : 6
 
   return (
-    <>
-      <MotionItem>
-        <div className="ewl-stat-row">
-        <StatTile
-          label="Open Phases"
-          value={String(totals?.openCount ?? 0)}
-          sub={totals ? `${totals.activeCount} active · ${totals.dormantCount} dormant` : undefined}
-          loading={isLoading}
-        />
-        <StatTile
-          label="Remaining Backlog"
-          value={formatMoney(totals?.remaining ?? 0)}
-          sub="Budget left to spend on open phases"
-          loading={isLoading}
-        />
-        <StatTile
-          label="Unassigned Backlog"
-          value={formatMoney(totals?.unassignedRemaining ?? 0)}
-          sub={totals ? `${totals.unassignedCount} ${totals.unassignedCount === 1 ? "phase" : "phases"} with no PM` : undefined}
-          warn={(totals?.unassignedRemaining ?? 0) > 0}
-          loading={isLoading}
-        />
-        <StatTile
-          label="Watchlist"
-          value={String(totals?.watchlistCount ?? 0)}
-          sub="Open phases under 17% margin"
-          warn={(totals?.watchlistCount ?? 0) > 0}
-            loading={isLoading}
-          />
-        </div>
-      </MotionItem>
-
-      <MotionItem>
-        <Widget loading={isLoading} noData={!isLoading && (!derived || derived.pms.length === 0)} className="co-widget">
-        <div className="co-widget-toolbar">
-          <div className="co-search-wrapper">
-            <Search size={13} className="co-search-icon" />
-            <input
-              className="co-search-input"
-              type="text"
-              placeholder="Search employees..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <span className="ewl-legend caption1 text-secondary">
-            <span className="ewl-legend-swatch ewl-mix-early" /> Early
-            <span className="ewl-legend-swatch ewl-mix-mid" /> Mid
-            <span className="ewl-legend-swatch ewl-mix-closing" /> Closing
-          </span>
-        </div>
-
-        {rows.length === 0 && search ? (
-          <div className="co-no-results body-text text-secondary">No employees match "{search}"</div>
-        ) : (
-          <table className="spend-rank-table spend-rank-table--airy ewl-table">
-            <thead>
-              <tr>
-                <SortTh col="name" label="Employee" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                <SortTh col="open" label="Open" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                {!isMobile && (
-                  <SortTh col="units" label="Units" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                )}
-                <SortTh col="remaining" label="Remaining" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                <th className="spend-rank-table-value ewl-th-static">Progress</th>
-                <th className="spend-rank-table-value ewl-th-static">Risk</th>
-                {!isMobile && <th className="spend-rank-table-value ewl-th-static">Trend</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((pm) => {
-                const expanded = openPm === pm.pmId
-                return [
-                  <tr
-                    key={pm.pmId}
-                    className={`spend-rank-table-row ewl-row${expanded ? " ewl-row--open" : ""}`}
-                    onClick={() => setOpenPm(expanded ? null : pm.pmId)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === "Enter" && setOpenPm(expanded ? null : pm.pmId)}
-                    aria-expanded={expanded}
+    <table className="spend-rank-table spend-rank-table--airy ewl-table">
+      <thead>
+        <tr>
+          <SortTh col="name" label="Employee" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <SortTh col="open" label="Open" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          {!isMobile && (
+            <SortTh col="units" label="Units" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          )}
+          <SortTh col="remaining" label="Remaining" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+          <th className="spend-rank-table-value ewl-th-static">Progress</th>
+          <th className="spend-rank-table-value ewl-th-static">Risk</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sorted.map((pm) => {
+          const expanded = expandedId === pm.pmId
+          return [
+            <tr
+              key={pm.pmId}
+              className={`spend-rank-table-row ewl-row${expanded ? " ewl-row--open" : ""}`}
+              onClick={() => onToggleRow(pm.pmId)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Enter" && onToggleRow(pm.pmId)}
+              aria-expanded={expanded}
+            >
+              <td className="spend-rank-table-name body-text">
+                <div className="emp-perf-name-cell">
+                  <EmployeeAvatar firstName={pm.firstName} lastName={pm.lastName} />
+                  <span
+                    className="emp-perf-name body-text emphasized"
+                    style={pm.pmId === 0 ? { fontStyle: "italic" } : undefined}
                   >
-                    <td className="spend-rank-table-name body-text">
-                      <div className="emp-perf-name-cell">
-                        <EmployeeAvatar firstName={pm.firstName} lastName={pm.lastName} />
-                        <span
-                          className="emp-perf-name body-text emphasized"
-                          style={pm.pmId === 0 ? { fontStyle: "italic" } : undefined}
-                        >
-                          {pm.pmName}
-                        </span>
-                        <ChevronDown size={13} className={`ewl-chevron${expanded ? " ewl-chevron--open" : ""}`} />
-                      </div>
-                    </td>
-                    <td className="spend-rank-table-value body-text emphasized">
-                      {pm.openCount}
-                      {pm.dormantCount > 0 && (
-                        <span className="ewl-dormant caption1"> · {pm.dormantCount} dormant</span>
-                      )}
-                    </td>
-                    {!isMobile && (
-                      <td className="spend-rank-table-value body-text emphasized">{pm.units || "—"}</td>
-                    )}
-                    <td className="spend-rank-table-value body-text emphasized">{formatMoney(pm.remaining)}</td>
-                    <td className="spend-rank-table-value">
-                      <CompositionBar pm={pm} />
-                    </td>
-                    <td className="spend-rank-table-value">
-                      <RiskBadges pm={pm} />
-                    </td>
-                    {!isMobile && (
-                      <td className="spend-rank-table-value">
-                        <Sparkline values={pm.spark} />
-                      </td>
-                    )}
-                  </tr>,
-                  expanded ? (
-                    <tr key={`${pm.pmId}-lanes`} className="ewl-expand-row">
-                      <td colSpan={columnCount}>
-                        <JobLanes pm={pm} />
-                      </td>
-                    </tr>
-                  ) : null,
-                ]
-              })}
-            </tbody>
-          </table>
-        )}
-        </Widget>
-      </MotionItem>
-    </>
+                    {pm.pmName}
+                  </span>
+                  <ChevronDown size={13} className={`ewl-chevron${expanded ? " ewl-chevron--open" : ""}`} />
+                </div>
+              </td>
+              <td className="spend-rank-table-value body-text emphasized">
+                {pm.openCount}
+                {pm.dormantCount > 0 && (
+                  <span className="ewl-dormant caption1"> · {pm.dormantCount} dormant</span>
+                )}
+              </td>
+              {!isMobile && (
+                <td className="spend-rank-table-value body-text emphasized">{pm.units || "—"}</td>
+              )}
+              <td className="spend-rank-table-value body-text emphasized">{formatMoney(pm.remaining)}</td>
+              <td className="spend-rank-table-value">
+                <CompositionBar pm={pm} />
+              </td>
+              <td className="spend-rank-table-value">
+                <RiskBadges pm={pm} />
+              </td>
+            </tr>,
+            expanded ? (
+              <tr key={`${pm.pmId}-jobs`} className="ewl-expand-row">
+                <td colSpan={columnCount}>
+                  <OpenJobsPanel pm={pm} />
+                </td>
+              </tr>
+            ) : null,
+          ]
+        })}
+      </tbody>
+    </table>
   )
 }

@@ -1,9 +1,9 @@
 // Derivations for the Employees page Workload view. The backend's
 // `employeeWorkload` payload is deliberately raw — open phases with the
-// standard grid financials, per-job posted costs by accounting month, per-PM
-// AR-overdue and monthly-throughput rows — and everything "who can take the
-// next job" needs is computed here, so the SQL stays simple and the rules
-// (dormancy, buckets, burn rate) live in one testable place.
+// standard grid financials, per-job posted costs by accounting month, and
+// per-job last-entry dates — and everything "who can take the next job"
+// needs is computed here, so the SQL stays simple and the rules (dormancy,
+// buckets, burn rate) live in one testable place.
 
 export interface WorkloadPhase {
   recnum: string
@@ -37,12 +37,6 @@ export interface WorkloadLastActivityRow {
   lastActivity: string
 }
 
-export interface WorkloadArOverdueRow {
-  sprvsr: number | null
-  overdueBalance: number
-  overdueInvoices: number
-}
-
 export interface WorkloadMonthlyRow {
   sprvsr: number | null
   postyr: number
@@ -54,7 +48,8 @@ export interface EmployeeWorkloadPayload {
   phases: WorkloadPhase[]
   activity: WorkloadActivityRow[]
   lastActivity: WorkloadLastActivityRow[]
-  arOverdue: WorkloadArOverdueRow[]
+  /** Unused by the view since the AR pill was cut; still in the payload. */
+  arOverdue: unknown[]
   monthly: WorkloadMonthlyRow[]
   openPeriod: { postyr: number; actprd: number } | null
   /** Server's Chicago "today" — the dormancy window's reference point. */
@@ -102,24 +97,7 @@ export interface PmWorkload {
   buckets: Record<ProgressBucket, number>
   watchlistCount: number
   missingContractCount: number
-  arOverdueBalance: number
-  arOverdueInvoices: number
-  /** Trailing SPARK_MONTHS accounting months of posted cost, oldest → newest. */
-  spark: number[]
 }
-
-export interface WorkloadTotals {
-  openCount: number
-  activeCount: number
-  dormantCount: number
-  remaining: number
-  watchlistCount: number
-  missingContractCount: number
-  unassignedCount: number
-  unassignedRemaining: number
-}
-
-export const SPARK_MONTHS = 7
 
 // A job is dormant when NOTHING has been entered against it — no cost lines
 // (labor included), no purchase orders, no subcontracts, no change orders —
@@ -135,13 +113,10 @@ function monthIdx(postyr: number, actprd: number): number {
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n))
 
-export function deriveWorkload(payload: EmployeeWorkloadPayload): {
-  pms: PmWorkload[]
-  totals: WorkloadTotals
-} {
-  // "Now" in accounting-month terms, for the burn window and sparkline. Falls
-  // back to the newest month with posted costs if the open period is ever
-  // missing — a bad reference here must never zero the whole view out.
+export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkload[] } {
+  // "Now" in accounting-month terms, for the burn window. Falls back to the
+  // newest month with posted costs if the open period is ever missing — a
+  // bad reference here must never zero the estimates out.
   let openIdx = payload.openPeriod
     ? monthIdx(Number(payload.openPeriod.postyr), Number(payload.openPeriod.actprd))
     : NaN
@@ -158,7 +133,7 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): {
   // The rollup rows select raw numeric columns, and the mssql driver hands
   // BIGINT/NUMERIC back as STRINGS — while the phases arrive via FOR JSON
   // with real numbers. Coerce every join key or the Map lookups silently
-  // miss and the whole board reads dormant / sparkless.
+  // miss and the whole board reads dormant.
   const lastActivityByJob = new Map<number, string>()
   for (const row of payload.lastActivity ?? []) {
     lastActivityByJob.set(Number(row.jobnum), row.lastActivity)
@@ -198,9 +173,6 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): {
         buckets: { early: 0, mid: 0, closing: 0 },
         watchlistCount: 0,
         missingContractCount: 0,
-        arOverdueBalance: 0,
-        arOverdueInvoices: 0,
-        spark: new Array<number>(SPARK_MONTHS).fill(0),
       }
       byPm.set(pmId, pm)
     }
@@ -250,47 +222,9 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): {
     if (job.missingContract) pm.missingContractCount += 1
   }
 
-  for (const row of payload.arOverdue ?? []) {
-    const pm = byPm.get(row.sprvsr == null ? 0 : Number(row.sprvsr))
-    if (pm) {
-      pm.arOverdueBalance = Number(row.overdueBalance)
-      pm.arOverdueInvoices = Number(row.overdueInvoices)
-    }
-  }
-
-  for (const row of payload.monthly ?? []) {
-    const pm = byPm.get(row.sprvsr == null ? 0 : Number(row.sprvsr))
-    if (!pm) continue
-    const offset = monthIdx(Number(row.postyr), Number(row.actprd)) - (openIdx - (SPARK_MONTHS - 1))
-    if (offset >= 0 && offset < SPARK_MONTHS) pm.spark[offset] += Number(row.cost)
-  }
-
   const pms = [...byPm.values()]
   for (const pm of pms) pm.jobs.sort((a, b) => b.remaining - a.remaining)
   pms.sort((a, b) => b.remaining - a.remaining)
 
-  const totals: WorkloadTotals = {
-    openCount: 0,
-    activeCount: 0,
-    dormantCount: 0,
-    remaining: 0,
-    watchlistCount: 0,
-    missingContractCount: 0,
-    unassignedCount: 0,
-    unassignedRemaining: 0,
-  }
-  for (const pm of pms) {
-    totals.openCount += pm.openCount
-    totals.activeCount += pm.activeCount
-    totals.dormantCount += pm.dormantCount
-    totals.remaining += pm.remaining
-    totals.watchlistCount += pm.watchlistCount
-    totals.missingContractCount += pm.missingContractCount
-    if (pm.pmId === 0) {
-      totals.unassignedCount = pm.openCount
-      totals.unassignedRemaining = pm.remaining
-    }
-  }
-
-  return { pms, totals }
+  return { pms }
 }

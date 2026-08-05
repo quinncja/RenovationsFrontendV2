@@ -117,11 +117,12 @@ export const PAGE_QUERIES = {
   // Invoices
   invoices: ["allInvoices"],
 
-  // Directory — Employees. Performance view uses the same query that powers
-  // the home page Employee Performance widget (full list, not top N);
-  // Workload view uses the current-state employeeWorkload rollup. Both are
-  // fetched up front so the view toggle is instant.
-  employees: ["employeePerformance", "employeeWorkload"],
+  // Directory — Employees. Performance lens uses the same query that powers
+  // the home page Employee Performance widget (full list, not top N) plus
+  // allProjectPhases for its row expansion (the phases behind each PM's
+  // numbers); Workload lens uses the current-state employeeWorkload rollup.
+  // All fetched up front so the view toggle is instant.
+  employees: ["employeePerformance", "employeeWorkload", "allProjectPhases"],
 
   // Directory — Clients
   clients: ["allClientsByRevenue"],
