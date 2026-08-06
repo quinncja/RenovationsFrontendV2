@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback } from "react"
+import { createPortal } from "react-dom"
+import { motion, AnimatePresence } from "framer-motion"
 import Page from "../../shared/components/Page"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { submitFeedback, deleteFeedback } from "../../shared/api/mutationApi"
 import { useAuth } from "../../core/auth/AuthProvider"
-import { Trash2, Plus, Bug, Lightbulb } from "lucide-react"
+import { useModalLayer } from "../../shared/hooks/useModalLayer"
+import { Trash2, Plus, Bug, Lightbulb, X } from "lucide-react"
 import { formatDate } from "../../shared/utils/format"
 
 interface FeedbackItem {
@@ -24,6 +27,7 @@ export default function FeedbackPage() {
   const [type, setType] = useState<"Bug" | "Suggestion">("Bug")
   const [message, setMessage] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const { overlayZ, contentZ } = useModalLayer(showModal)
 
   const loadFeedback = useCallback(() => {
     setLoading(true)
@@ -110,44 +114,72 @@ export default function FeedbackPage() {
         </MotionItem>
       </MotionList>
 
-      {/* Feedback Modal */}
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-card" onClick={e => e.stopPropagation()}>
-            <h2 className="title2">Submit Feedback</h2>
-            <form onSubmit={handleSubmit} className="feedback-form">
-              <div className="toggle-group">
-                <button
-                  type="button"
-                  className={`button toggle-button ${type === "Bug" ? "active" : ""}`}
-                  onClick={() => setType("Bug")}
-                >
-                  <Bug size={14} /> Bug
-                </button>
-                <button
-                  type="button"
-                  className={`button toggle-button ${type === "Suggestion" ? "active" : ""}`}
-                  onClick={() => setType("Suggestion")}
-                >
-                  <Lightbulb size={14} /> Suggestion
-                </button>
-              </div>
-              <textarea
-                placeholder="Describe the issue or suggestion..."
-                value={message}
-                onChange={e => setMessage(e.target.value)}
-                rows={5}
-                required
+      {/* Feedback Modal — shared portal/overlay/positioner shell, same shape as
+          ConfirmModal/SettingsModal so every modal in the app stacks and
+          animates identically. */}
+      {createPortal(
+        <AnimatePresence>
+          {showModal && (
+            <>
+              <motion.div
+                className="modal-overlay"
+                style={{ zIndex: overlayZ }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowModal(false)}
               />
-              <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
-                <button type="button" className="button" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="button primary-button" disabled={submitting}>
-                  {submitting ? "Submitting..." : "Submit"}
-                </button>
+              <div className="modal-positioner" style={{ zIndex: contentZ }}>
+                <motion.div
+                  className="modal"
+                  initial={{ opacity: 0, scale: 0.96, y: 16 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.96, y: 16 }}
+                  transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                >
+                  <div className="modal-header">
+                    <h2 className="title2 emphasized">Submit Feedback</h2>
+                    <button className="button modal-close" onClick={() => setShowModal(false)}>
+                      <X size={16} />
+                    </button>
+                  </div>
+                  <form onSubmit={handleSubmit} className="feedback-form">
+                    <div className="toggle-group">
+                      <button
+                        type="button"
+                        className={`button toggle-button ${type === "Bug" ? "active" : ""}`}
+                        onClick={() => setType("Bug")}
+                      >
+                        <Bug size={14} /> Bug
+                      </button>
+                      <button
+                        type="button"
+                        className={`button toggle-button ${type === "Suggestion" ? "active" : ""}`}
+                        onClick={() => setType("Suggestion")}
+                      >
+                        <Lightbulb size={14} /> Suggestion
+                      </button>
+                    </div>
+                    <textarea
+                      placeholder="Describe the issue or suggestion..."
+                      value={message}
+                      onChange={e => setMessage(e.target.value)}
+                      rows={5}
+                      required
+                    />
+                    <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end" }}>
+                      <button type="button" className="button" onClick={() => setShowModal(false)}>Cancel</button>
+                      <button type="submit" className="button primary-button" disabled={submitting}>
+                        {submitting ? "Submitting..." : "Submit"}
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
               </div>
-            </form>
-          </div>
-        </div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body,
       )}
     </Page>
   )

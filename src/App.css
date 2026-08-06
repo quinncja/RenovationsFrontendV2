@@ -12213,35 +12213,6 @@ svg.placeholder-illustration {
   font-size: var(--callout-size);
 }
 
-/* ── Modal Overlay ── */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.modal-card {
-  background: var(--card-color);
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  padding: 2rem;
-  min-width: 400px;
-  max-width: 90vw;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.3);
-}
-
-.modal-card h2 {
-  margin: 0 0 1.5rem;
-  color: var(--primary-text);
-}
-
 /* ── Feedback ── */
 .feedback-list {
   display: flex;
