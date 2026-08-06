@@ -41,7 +41,13 @@ export function MetricTile({
   onOpen: (key: ReportMetricKey) => void
 }) {
   return (
-    <button type="button" className="rpt-tile" onClick={() => onOpen(metric.key)}>
+    <button
+      type="button"
+      className="rpt-tile"
+      data-widget-id={`recap:${metric.key}`}
+      data-section-id="recap"
+      onClick={() => onOpen(metric.key)}
+    >
       <MetricTileFace metric={metric} summary={summary} />
     </button>
   )

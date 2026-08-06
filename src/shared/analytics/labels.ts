@@ -28,6 +28,17 @@ export const WIDGET_LABELS: Record<string, string> = {
   estimationScorecard: "Estimation Scorecard",
   estimationCategory: "Bias by Category",
   estimationWorstJobs: "Biggest Budget Variance",
+  // Daily-recap surfaces (full-screen arrival, clock modal, Reports page).
+  "recap:projects": "Recap · Projects",
+  "recap:committed": "Recap · Costs Committed",
+  "recap:orders": "Recap · Orders Placed",
+  "recap:subcontracts": "Recap · Subcontracts",
+  "recap:costs": "Recap · Costs Posted",
+  "recap:arReceived": "Recap · Checks Received",
+  "recap:arInvoices": "Recap · AR Billed",
+  "recap:apBills": "Recap · AP Received",
+  recapItem: "Recap · Item Detail",
+  recapCta: "Recap · Continue Button",
 }
 
 const SECTION_LABELS: Record<string, string> = {
@@ -38,10 +49,13 @@ const SECTION_LABELS: Record<string, string> = {
   businessFinancials: "Cash & Billing",
   businessRelations: "Business Relations",
   estimationPerformance: "Budget Performance",
+  recap: "Daily Recap",
 }
 
 // Route → friendly page name. Dynamic detail routes collapse to their section.
 const PAGE_LABELS: Array<[string, string]> = [
+  // Synthetic page for the daily recap (arrival takeover + clock modal).
+  ["/daily-report", "Daily Recap"],
   ["/dashboard/breakdown", "Monthly Breakdown"],
   ["/dashboard/upcoming-billings", "Upcoming Billings"],
   ["/dashboard", "Dashboard"],

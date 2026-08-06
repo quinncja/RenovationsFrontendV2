@@ -345,6 +345,8 @@ function IntroArrival({ pmScoped, payload, status, onNavigate }: DailyArrivalPro
                       className={`rpt-tile ${tilesClickable ? "arr-tile-live" : "arr-tile"}`}
                       variants={rise}
                       disabled={!tilesClickable}
+                      data-widget-id={`recap:${m.key}`}
+                      data-section-id="recap"
                       onClick={() => setMetric(m.key)}
                     >
                       <MetricTileFace metric={m} summary={payload.summary} />
@@ -675,6 +677,8 @@ function TimelineArrival({
                       variants={rise}
                       custom={[section.tileDelays[i], 0.5] satisfies Beat}
                       disabled={!payload}
+                      data-widget-id={`recap:${m.key}`}
+                      data-section-id="recap"
                       onClick={() => setMetric(m.key)}
                     >
                       {/* Rendered from the real summary when it's here, the zero

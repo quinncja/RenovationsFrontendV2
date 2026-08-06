@@ -10,6 +10,7 @@ import { AnimatePresence } from "framer-motion"
 import { useAuth } from "../../../core/auth/AuthProvider"
 import { effectiveRole, isGeneralManager, ALL_JOBS_DETAIL_ID, type AppRole } from "../../../core/auth/roles"
 import { useOnboarding } from "../../../core/onboarding/OnboardingProvider"
+import { initAnalytics, track } from "../../../shared/analytics/analytics"
 import { deriveBackLabel } from "../../jobcost/useJobcostNav"
 import type { ReportPayload } from "./reportTypes"
 import { chicagoToday } from "./chicagoDate"
@@ -208,6 +209,21 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(timer)
   }, [arrival.pendingLayoutCheck])
 
+  // ── Recap analytics ────────────────────────────────────────────────────
+  // While the arrival blocks, the whole app tree — AnalyticsTracker included —
+  // is withheld, so the pipeline must be started HERE or every event fired
+  // from the recap would be silently dropped (track() no-ops before init).
+  // The recap is recorded as a synthetic page view of "/daily-report", with
+  // `source` telling the surfaces apart: the automatic takeover ("auto"), the
+  // first-run walkthrough ("intro"), and the clock-button modal ("manual").
+  // Tile and drill-down interactions ride the normal widget_click/hover stream
+  // via recap:* widget ids. Dev previews (?arrival et al) are never tracked.
+  useEffect(() => {
+    if (!arrival.active || arrival.forced) return
+    initAnalytics()
+    track({ type: "page_view", page: "/daily-report", source: arrival.intro ? "intro" : "auto" })
+  }, [arrival.active, arrival.forced, arrival.intro])
+
   // ── Report fetch + entry-page preloads, on activation ──────────────────
   useEffect(() => {
     if (!arrival.active || !source) return
@@ -280,6 +296,9 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
         // Finishing the intro variant acknowledges the intro-tour milestone
         // (server-backed, so a cleared browser won't replay it).
         if (arrival.intro) acknowledge("intro-tour")
+        // Which exit the recap got — the destination rides `source` (the
+        // follow-up page_view fires from AnalyticsTracker on reveal).
+        track({ type: "widget_click", widgetId: "recapCta", section: "recap", page: "/daily-report", source: path })
       }
       navigate(path)
       // The intro coachmark sequence: arm step 1 NOW so the blurred layer
@@ -339,6 +358,7 @@ export function DailyReportProvider({ children }: { children: ReactNode }) {
 
   const openManually = useCallback(() => {
     if (!source) return
+    track({ type: "page_view", page: "/daily-report", source: "manual" })
     setOpen(true)
     setLoading(true)
     fetchDailyReport(source)

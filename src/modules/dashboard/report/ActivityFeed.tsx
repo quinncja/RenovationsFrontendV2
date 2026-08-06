@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react"
+import { track } from "../../../shared/analytics/analytics"
 import { InvoiceDetailModal } from "../../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { formatMoneyFull, formatRelativeTime } from "../../../shared/utils/format"
 import { useJobcostNav } from "../../jobcost/useJobcostNav"
@@ -40,6 +41,16 @@ export function useItemDrilldown({
   const { goToJobcost } = useJobcostNav()
 
   const openItem = (item: RecentChangeItem) => {
+    // The second modal layer — a feed row drilling into its invoice/item
+    // detail. The rows live in portaled modals outside any [data-widget-id],
+    // so delegation can't see them; tracked explicitly with the kind as source.
+    track({
+      type: "widget_click",
+      widgetId: "recapItem",
+      section: "recap",
+      page: window.location.pathname,
+      source: item.kind,
+    })
     if (item.kind === "arInvoice") setInvoice({ id: item.id, module: "clients" })
     else if (item.kind === "payment") setInvoice({ id: item.id.split("-")[0], module: "clients" })
     else if (item.kind === "apInvoice") setInvoice({ id: item.id, module: "suppliers" })

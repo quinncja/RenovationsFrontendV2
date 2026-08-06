@@ -43,7 +43,10 @@ export interface TrackInput {
   section?: string | null
   projectRecnum?: string | null
   projectName?: string | null
-  source?: ProjectViewSource | null
+  /** Free-form origin qualifier (backend truncates to 20 chars). project_view
+   *  uses ProjectViewSource; the daily recap uses auto/intro/manual and item
+   *  kinds. */
+  source?: string | null
   durationMs?: number | null
 }
 
