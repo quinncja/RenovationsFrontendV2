@@ -18,6 +18,89 @@ Last generated: 2026-08-06.
 
 ---
 
+## Implementation status (2026-08-06, branch `ui-consolidation`)
+
+Worked through the priority-ranked roadmap below. Each item was implemented,
+typechecked (`tsc -b`), linted, and confirmed against a full `vite build`
+before moving on — no visual/browser QA was run, since this session had no
+way to view the running app; a spot-check in the browser is still owed before
+merging.
+
+**Shipped:**
+1. Fixed the Feedback modal CSS bug — deleted the legacy duplicate
+   `.modal-overlay`/`.modal-card` block, migrated `FeedbackPage` onto the
+   shared portal/`useModalLayer`/`AnimatePresence` shell every other modal uses.
+2. Deduped `SortTh` — 6 near-identical local copies (ChangeOrdersPage,
+   ClientsPage, VendorsPage, SubcontractorsPage, Jobcost, ProgressBillingsPage)
+   plus the one real shared copy collapsed into `shared/components/SortTh.tsx`,
+   with a `spendRank` flag preserving each table's exact prior markup.
+3. Deduped `SEG_SPRING` — 3 independent consts plus Jobcost's exported copy
+   collapsed into `shared/animation/springs.ts` (a standalone file, so it
+   doesn't pull any page's lazy chunk into another page's bundle).
+4. Built `shared/components/SegmentedControl.tsx` and migrated all 4 hand-rolled
+   "recessed well + sliding copper thumb" implementations onto it (Settings,
+   Overhead Report's two toggles, Jobcost's view/scope toggles, plus the
+   cross-module PropertyDetailPage PM filter and ReportsPage range preset that
+   shared Jobcost's thumb spring). CSS per surface (`jc`/`ohr`/`settings`
+   variant) is untouched, so no visual change — only the JSX/animation logic
+   was unified. Also deleted a dead `.estp-segmented`/`.estp-segmented-btn`
+   CSS block with no remaining consumer.
+5. Fixed the org-chart no-hover bug: `.toggle-button` (also used by
+   RevenueMapPage and FeedbackPage) had zero hover/focus/disabled styling —
+   confirmed user report. Added the same treatment `.org-group-header` already
+   uses two lines away in the same file.
+6. Closed keyboard-accessibility gaps: Navbar's logo click-div (no
+   role/tabIndex/keydown) and 7 of the 12 `.clickable-row` table-row call
+   sites (Invoices, WorkloadView, EmployeesPage, UpcomingBillingsPage,
+   EmployeeDetailPage, EmployeePerformanceWidget, OverdueWidget) were
+   mouse-only; brought them in line with the other 5 sites that already had
+   proper `role="button"`/`tabIndex`/`onKeyDown`, and added a
+   `:focus-visible` ring to both `.toggle-button` and `.clickable-row`.
+
+**Corrected during implementation** (the static audit got these wrong —
+recorded here so the next pass doesn't repeat the mistake):
+- **`billings-invoice-table` is not 6 copies of one table.** Grep only found
+  a shared CSS class name; reading each of the 6 files showed 6 genuinely
+  different column sets (DrillDownModal: label/committed/posted/total;
+  Overhead Report's category modal: date/trans#/description/month/amount;
+  BankingWidget: date/type/description/amount; Overdue/UpcomingBillings:
+  counterparty/invnum/job/due/amount; JobcostDetailPage: CO#/description/
+  budget/contract; ProgressBillingsWidget: project/contract/billed/earned/
+  variance). Sharing one CSS class across differently-shaped tables is
+  correct reuse, not duplication — there's nothing to merge here beyond what
+  `DrillDownModal` (already a clean, generic, well-built shared component)
+  and `SortableHeader` already provide. The real remaining opportunity is a
+  columns-config `<DataTable>` to cut down the repeated thead/tbody
+  boilerplate each of these hand-writes — see below.
+- **`.employee-stat-card` isn't hardcoded-duplicate CSS.** It uses the exact
+  same tokens as `.card` (`var(--card-color)`, `var(--border-color)`,
+  `var(--button-shadow)`) — it just picks a different radius (16 vs 12) and
+  wider padding for its tile shape. That's intentional variation through
+  shared tokens, not the kind of copy-pasted-with-drifted-values duplication
+  worth "fixing." Left as-is.
+
+**Deliberately not attempted this pass** (each is a genuine multi-file,
+higher-regression-risk effort that deserves its own reviewed pass with
+browser verification, not a blind batch edit at the end of a long session):
+- Full `<Button>`/`<IconButton>`/`<Pill>` primitive extraction across the
+  20+ button CSS families and dozens of call sites (§2 below). The
+  SegmentedControl and the two confirmed bugs (org-chart, a11y) were pulled
+  out of this item and shipped; the rest — unifying hover mechanics,
+  replacing hardcoded per-role hex colors in `.usr-assign-btn` etc. — is
+  still open.
+- A generic columns-config `<DataTable>` and migrating the ~28 table render
+  sites onto it. `SortTh`/`SEG_SPRING`/`SegmentedControl` (safe, mechanical,
+  zero behavior change) were completed; actually building and migrating a
+  `<DataTable>` touches sort state, expandable rows, footers, and clickable
+  rows differently per table and needs browser verification per table, not a
+  script.
+- `<Badge>` + tone mapper across the ~12 status-pill class families (§4).
+- `ExpandableProjectCard` extraction (Jobcost vs EmployeesPage) (§3).
+- `<TextInput>`/`<SearchField>`, `NavSectionHint`/`NavReportsHint` merge,
+  and pushing remaining pages onto `SkelText`/`ChartSkeletons` (§4).
+
+---
+
 ## 1. Tables — ~28 render sites, 5 distinct implementations
 
 Every literal `<table>` (40 instances / ~25 files) resolves to one of two base
