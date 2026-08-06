@@ -16,6 +16,12 @@ export interface WorkloadPhase {
   pmId: number | null
   pmName: string | null
   clientName: string | null
+  /** Sage actr_u.parent — the shared-address property grouping key. */
+  parent?: string | null
+  /** actr_u.oneoff — 1 marks a non-phase (one-off) project. */
+  oneoff?: number | null
+  /** actr_u.oofnme — the one-off's given display name (newer one-offs only). */
+  oofnme?: string | null
   /** Posted + committed (the grid's combined figure). */
   totalCost: number
   totalCommitted: number
@@ -62,6 +68,8 @@ export interface WorkloadJob {
   recnum: string
   name: string
   clientName: string | null
+  /** Property (parent address) the job belongs to, null when unassigned. */
+  property: string | null
   startDate: string | null
   contract: number
   budget: number
@@ -73,6 +81,9 @@ export interface WorkloadJob {
   /** Anything entered against the job — cost lines, POs, subcontracts,
    *  change orders — within the dormancy window (see DORMANT_AFTER_DAYS). */
   active: boolean
+  /** No costs (posted or committed) against the job yet — it hasn't started,
+   *  so it can't be dormant. Counted separately from active/dormant. */
+  upcoming: boolean
   /** Most recent entry date of any kind, null if nothing ever posted. */
   lastActivity: string | null
   /** remaining ÷ recent monthly burn; null when dormant or burn is ~0. */
@@ -91,18 +102,22 @@ export interface PmWorkload {
   openCount: number
   activeCount: number
   dormantCount: number
+  upcomingCount: number
   units: number
   remaining: number
   contract: number
+  budget: number
   buckets: Record<ProgressBucket, number>
   watchlistCount: number
   missingContractCount: number
 }
 
-// A job is dormant when NOTHING has been entered against it — no cost lines
-// (labor included), no purchase orders, no subcontracts, no change orders —
-// for this many days. 45 covers a monthly posting cycle plus slack, so a job
-// that simply straddles a billing boundary doesn't get flagged.
+// A job is dormant when it HAS started (some cost exists) but NOTHING has
+// been entered against it — no cost lines (labor included), no purchase
+// orders, no subcontracts, no change orders — for this many days. 45 covers
+// a monthly posting cycle plus slack, so a job that simply straddles a
+// billing boundary doesn't get flagged. A job with no costs at all yet is
+// "upcoming", not dormant — it hasn't started, so silence is expected.
 export const DORMANT_AFTER_DAYS = 45
 
 // Accounting months as a single comparable index (periods are calendar
@@ -112,6 +127,25 @@ function monthIdx(postyr: number, actprd: number): number {
 }
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n))
+
+// One-offs read "Property - Given name" (a bare "Roof Repair" says nothing
+// about where); phases keep their Sage name, which already carries the
+// address. Structural param so both lenses' phase rows (Workload's payload,
+// Performance's allProjectPhases) can share it.
+export function oneoffDisplayName(phase: {
+  recnum: string
+  name: string | null
+  jobnme: string | null
+  parent?: string | null
+  oneoff?: number | null
+  oofnme?: string | null
+}): string {
+  const base = (phase.name || phase.jobnme || phase.recnum).trim()
+  if (phase.oneoff !== 1) return base
+  const given = phase.oofnme?.trim() || base
+  const property = phase.parent?.trim()
+  return property ? `${property} - ${given}` : given
+}
 
 export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkload[] } {
   // "Now" in accounting-month terms, for the burn window. Falls back to the
@@ -167,9 +201,11 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkl
         openCount: 0,
         activeCount: 0,
         dormantCount: 0,
+        upcomingCount: 0,
         units: 0,
         remaining: 0,
         contract: 0,
+        budget: 0,
         buckets: { early: 0, mid: 0, closing: 0 },
         watchlistCount: 0,
         missingContractCount: 0,
@@ -192,8 +228,12 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkl
 
     const job: WorkloadJob = {
       recnum: phase.recnum,
-      name: (phase.name || phase.jobnme || phase.recnum).trim(),
+      // One-offs read "Property - Given name" so the work is anchored to its
+      // building (oofnme when Sage has one, raw job name as the fallback);
+      // phases keep their Sage name as-is.
+      name: oneoffDisplayName(phase),
       clientName: phase.clientName,
+      property: phase.parent?.trim() || null,
       startDate: phase.startDate,
       contract: phase.totalContract ?? 0,
       budget,
@@ -202,6 +242,7 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkl
       pct,
       bucket: pct < 1 / 3 ? "early" : pct < 0.8 ? "mid" : "closing",
       active,
+      upcoming: cost <= 0,
       lastActivity,
       estMonthsLeft: active && burn > 0 && remaining > 0 ? remaining / burn : null,
       watchlist: (phase.totalContract ?? 0) > 0 && (phase.margin ?? 0) < 17,
@@ -212,12 +253,16 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkl
     const pm = pmFor(phase)
     pm.jobs.push(job)
     pm.openCount += 1
-    if (job.active) pm.activeCount += 1
+    if (job.upcoming) pm.upcomingCount += 1
+    else if (job.active) pm.activeCount += 1
     else pm.dormantCount += 1
     pm.units += job.units
     pm.remaining += job.remaining
     pm.contract += job.contract
-    pm.buckets[job.bucket] += 1
+    pm.budget += job.budget
+    // Upcoming jobs stay out of the progress mix — it describes work that has
+    // actually started (the CompositionBar divides by the bucket sum).
+    if (!job.upcoming) pm.buckets[job.bucket] += 1
     if (job.watchlist) pm.watchlistCount += 1
     if (job.missingContract) pm.missingContractCount += 1
   }

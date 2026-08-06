@@ -37,7 +37,7 @@ import { JOBCOST_BACK_FALLBACK, useJobcostNav, type JobcostBackState } from "./u
 import { Fact, Meta } from "./detailPrimitives"
 import { oneoffFromRecnum, parseValidDate, fmtLongDate, propertySlug } from "./jobcostShared"
 import { useAuth } from "../../core/auth/AuthProvider"
-import { effectiveRole } from "../../core/auth/roles"
+import { effectiveRole, isTechRole } from "../../core/auth/roles"
 import { trackProjectView } from "../../shared/analytics/analytics"
 
 const INV_STATUS_LABEL: Record<number, string> = { 1: "Open", 2: "Review", 3: "Dispute", 4: "Paid", 5: "Void" }
@@ -63,6 +63,9 @@ interface Phase {
   totalCost?: number
   budget?: number
   margin?: number | null
+  // actrec.insusr — the backend emits it only for the tech role, and only
+  // when the column exists in this Sage install.
+  createdBy?: string | null
 }
 interface Project {
   recnum: string
@@ -90,6 +93,8 @@ interface Project {
   // Sage actr_u.oneoff (1 = non-phase project). Null/absent when the lazily
   // created custom-field row doesn't exist — fall back to the recnum suffix.
   oneoff?: number | null
+  // actrec.insusr (see Phase.createdBy) — first non-null across phases.
+  createdBy?: string | null
 }
 interface MonthlyCost { year: number; month: number; spending: number }
 interface JobInvoice {
@@ -338,6 +343,9 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   // allow-lists) — otherwise the click would just bounce off the role guard.
   const { claims } = useAuth()
   const role = effectiveRole(claims["role"] as string | undefined)
+  // Raw claim, not the effective role: `tech` collapses to executive for
+  // access checks, but the Sage "Created By" audit field is tech-only.
+  const isTech = isTechRole(claims["role"] as string | undefined)
   const canOpenClient = role === "executive" || role === "admin"
   const canOpenEmployee = canOpenClient || role === "manager" || role === "generalManager"
   const isManager = role === "manager"
@@ -362,6 +370,15 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   }>(["getPhases", "getBudgetByRecnum", "getAllCostItems", "getJobMonthlySpend", "getJobDailySpend", "getJobInvoices", "getProgressBilling"])
 
   const project = data?.getPhases?.[0] ?? null
+
+  // Sage "Created By" (actrec.insusr) — tech-only, and the backend only sends
+  // it to that role. Phases of one job can be entered by different users, so
+  // show the unique set.
+  const createdBy = isTech
+    ? Array.from(new Set(
+        (project?.phases ?? []).map((p) => p.createdBy).filter((v): v is string => !!v)
+      )).join(", ") || project?.createdBy || null
+    : null
 
   // Record a project_view once the job's name has resolved — one event per job
   // opened (the ref guards against re-fires on unrelated re-renders / data
@@ -872,6 +889,13 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                       label={isLoading ? <SkelText ch={7} /> : "Last Activity"}
                       value={isLoading ? <SkelText ch={9} /> : formatDate(lastActivity!)}
                     />
+                  )}
+                  {/* Tech-only Sage audit fact — never skeletoned: other
+                      roles (and installs without actrec.insusr) never get
+                      the field, so a placeholder would promise a fourth
+                      meta that may never arrive. */}
+                  {!isLoading && createdBy && (
+                    <Meta label="Created By" value={createdBy} />
                   )}
                 </div>
               )}

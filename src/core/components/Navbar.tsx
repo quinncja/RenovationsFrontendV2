@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate, useLocation } from "react-router-dom"
-import { Settings, ChevronsRight, ChevronsLeft, ChevronRight } from "lucide-react"
+import { Settings, ChevronsRight, ChevronsLeft, ChevronRight, Users } from "lucide-react"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import useNavItems from "../auth/hooks/useNavItems"
 import { isNavGroup, isNavDivider, type NavGroup, type NavItem } from "../auth/roles"
@@ -63,7 +63,12 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
   const location = useLocation()
   const [isOpen, setIsOpen] = useLocalStorage("navbarOpen", true)
   const [theme, setTheme] = useLocalStorage<"light" | "dark">("theme", "light")
-  const navItems = useNavItems()
+  const allNavItems = useNavItems()
+  // Users moved out of the main nav list: it renders as a small white button
+  // pinned above Settings in navbar-bottom. Role-gating stays in roles.ts —
+  // if the role's nav has no /users entry, the button simply doesn't exist.
+  const hasUsers = allNavItems.some((it) => !isNavGroup(it) && !isNavDivider(it) && it.path === "/users")
+  const navItems = allNavItems.filter((it) => isNavGroup(it) || isNavDivider(it) || it.path !== "/users")
   const [tooltip, setTooltip] = useState<TooltipState>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   // Intro coachmark for the Reports nav item (step 2; see DailyReportContext).
@@ -242,6 +247,15 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
         </div>
 
         <div className="navbar-bottom">
+          {hasUsers && (
+            <button
+              className={`button bottom-nav-button${location.pathname.startsWith("/users") ? " bottom-nav-button-active" : ""}`}
+              title="Users"
+              onClick={() => navigate("/users")}
+            >
+              <Users size={17} />
+            </button>
+          )}
           <button
             className="button bottom-nav-button"
             title="Settings"

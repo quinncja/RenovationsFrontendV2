@@ -515,6 +515,10 @@ body{
   box-shadow: var(--button-shadow);
 }
 
+.bottom-nav-button-active {
+  color: var(--primary-color);
+}
+
 .nav-button{
   position: relative;
   height: 3.5rem;
@@ -16965,10 +16969,10 @@ button.co-hero-project:hover svg { color: inherit; }
 
 .ewl-dormant { color: var(--secondary-text); font-weight: var(--font-weight-regular); }
 
-/* Progress mix — open phases by stretch, widths by count. Ink ramp, not a
-   hue: three strengths of the theme's text ink so it reads as a progression,
-   stays on-theme against the neutral surfaces, and adapts to dark mode.
-   Copper stays reserved for active state; red/amber for risk. */
+/* Progress mix — open phases by stretch, widths by count. Copper ramp:
+   three strengths of the accent so it reads as a progression toward done,
+   with "closing" earning the full copper (the share about to free the PM
+   up — an active-state read, not decoration). Red/amber stay for risk. */
 .ewl-mix {
   display: inline-flex;
   width: 110px;
@@ -16979,9 +16983,9 @@ button.co-hero-project:hover svg { color: inherit; }
   vertical-align: middle;
 }
 .ewl-mix span { display: block; height: 100%; }
-.ewl-mix-early   { background: color-mix(in srgb, var(--primary-text) 26%, transparent); }
-.ewl-mix-mid     { background: color-mix(in srgb, var(--primary-text) 52%, transparent); }
-.ewl-mix-closing { background: color-mix(in srgb, var(--primary-text) 82%, transparent); }
+.ewl-mix-early   { background: color-mix(in srgb, var(--primary-color) 28%, transparent); }
+.ewl-mix-mid     { background: color-mix(in srgb, var(--primary-color) 60%, transparent); }
+.ewl-mix-closing { background: var(--primary-color); }
 
 .ewl-legend {
   margin-left: auto;
@@ -17024,6 +17028,16 @@ button.co-hero-project:hover svg { color: inherit; }
    flush so the nested table's columns span the whole widget. */
 .ewl-row--open td { border-bottom: none; }
 .ewl-expand-row td { padding: 0; }
+/* Quiet full-bleed well: hairline-bounded, faintly tinted, spanning the
+   whole widget — contains the nested table without shrinking it. */
+.ewl-expand-region {
+  background: color-mix(in srgb, var(--primary-text) 2.5%, transparent);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+.ewl-expand-region .data-table th {
+  padding-top: 0.75rem;
+}
 .ewl-expand-row .data-table .clickable-row { cursor: pointer; }
 .ewl-name-line {
   display: flex;
@@ -17070,4 +17084,134 @@ button.co-hero-project:hover svg { color: inherit; }
   .ewl-actions { flex-wrap: wrap; }
   .ewl-mix { width: 84px; }
   .ewl-progress-track { width: 84px; }
+}
+
+/* ── Employees card deck (Job Costing property-card language) ── */
+
+.emp-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+/* Avatar rides the card head between the toggle tile and the name lockup. */
+.jc-project-head .emp-avatar { flex-shrink: 0; }
+/* The property cards' bold 17px name reads too heavy repeated down a deck of
+   people — employees keep the same lockup one notch lighter. Same for the
+   stat values: five bold money figures per row turned into a wall; medium
+   keeps them scannable (the uppercase labels carry the structure). */
+.emp-card-list .jc-project-name {
+  font-weight: var(--font-weight-semibold);
+}
+.emp-card-list .jc-head-stat-value {
+  font-weight: var(--font-weight-medium);
+}
+/* Fixed-width slots for the workload head's right side, so the mix bar, the
+   risk badges, and with them the stat cluster land on the same x across
+   every card (variable badge text otherwise shoves each card around). */
+.emp-head-mix {
+  display: inline-flex;
+  justify-content: flex-end;
+  width: 120px;
+  flex-shrink: 0;
+}
+.emp-head-risk {
+  display: inline-flex;
+  justify-content: flex-end;
+  width: 8.5rem;
+  flex-shrink: 0;
+}
+/* Risk pills stack vertically in the card head (right-aligned column), so
+   two-badge cards read as a tidy stat rather than a sprawling row. */
+.emp-head-risk .ewl-badges {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+/* Progress-mix legend recolored for the command bar's muted ink. */
+.jc-cb-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-medium);
+  color: var(--jcb-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.jc-cb-legend .ewl-legend-swatch:not(:first-child) { margin-left: 0.375rem; }
+/* Client-mix strip at the top of the expanded panel: who this employee's
+   work is for. One ink hue at descending strengths (same progression trick
+   as the workload mix bar) so rank reads without a color legend. */
+/* The overview block above the phases table: one strip per question (who do
+   they work with / where do they work). A contained rounded panel wearing
+   the app's ambient copper glow (the login/body radial, scaled down), so
+   the employee's "world" reads as its own object before the phase rows. */
+.emp-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+  margin: 0.875rem 0.75rem 0.375rem;
+  padding: 1.375rem 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 22%, var(--border-color));
+  border-radius: 12px;
+  background:
+    radial-gradient(ellipse at 18% 0%, rgba(194, 124, 62, 0.1) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 100%, rgba(168, 106, 52, 0.06) 0%, transparent 50%),
+    var(--card-color);
+}
+.emp-client-mix {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.emp-client-mix-title {
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--secondary-text);
+  flex-shrink: 0;
+  /* Fixed label column so the Clients and Properties bars share an x. */
+  width: 6.5rem;
+}
+.emp-client-mix-bar {
+  display: inline-flex;
+  width: 240px;
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--hover-bg);
+  flex-shrink: 0;
+}
+.emp-client-mix-bar span { display: block; height: 100%; }
+/* Rank as a copper ramp — #1 gets the full accent, the tail ("+N more")
+   goes neutral so "the rest" reads as background, not a fourth player. */
+.emp-cmix-0 { background: var(--primary-color); }
+.emp-cmix-1 { background: color-mix(in srgb, var(--primary-color) 62%, transparent); }
+.emp-cmix-2 { background: color-mix(in srgb, var(--primary-color) 36%, transparent); }
+.emp-cmix-3 { background: color-mix(in srgb, var(--primary-text) 16%, transparent); }
+.emp-client-mix-legend {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  min-width: 0;
+  /* The bigger panel earns body-size legend entries (the strip is the
+     content here, not a caption on something else). */
+  font-size: var(--subheadline-size);
+}
+.emp-client-mix-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+}
+
+/* The reused expand well loses its own tint and bottom hairline inside the
+   card body — the body's 2% wash and top border already frame it, and the
+   card's rounded bottom edge shouldn't carry a stray line. */
+.jc-project-body .ewl-expand-region {
+  background: transparent;
+  border-bottom: none;
+  padding-bottom: 0.375rem;
 }

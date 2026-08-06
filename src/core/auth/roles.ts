@@ -84,7 +84,7 @@ const financesGroup: NavGroup = {
 const directoryGroup: NavGroup = {
   label: "Directory",
   icon: Briefcase,
-  items: [navItems.clients, navItems.vendors, navItems.subcontractors, navItems.employees],
+  items: [navItems.clients, navItems.vendors, navItems.subcontractors],
 }
 
 const chartsGroup: NavGroup = {
@@ -93,15 +93,16 @@ const chartsGroup: NavGroup = {
   items: [navItems.orgChart, navItems.cashFlow, navItems.revenueMap],
 }
 
-// Shared by executive and the two top-tier roles (owner, tech) — identical nav.
+// Shared by executive, the two top-tier roles (owner, tech), and admin — identical nav.
 const executiveNav: NavEntry[] = [
   navItems.home,
   navItems.jobcost,
-  navItems.dailyReports,
   NAV_DIVIDER,
+  navItems.employees,
   navItems.changeOrders,
   financesGroup,
   NAV_DIVIDER,
+  navItems.dailyReports,
   chartsGroup,
   directoryGroup,
   navItems.users,
@@ -114,10 +115,11 @@ const managerNav: NavEntry[] = [
   navItems.jobcost,
   NAV_DIVIDER,
   navItems.businessSummary,
-  navItems.dailyReports,
+  navItems.employees,
   // View-only for managers: the backend scopes the list to their own jobs
   // and rejects create/delete; the page hides those affordances.
   navItems.changeOrders,
+  navItems.dailyReports,
 ]
 
 // A General Manager oversees the PMs rather than a single job: same non-admin
@@ -129,8 +131,8 @@ const generalManagerNav: NavEntry[] = [
   navItems.jobcost,
   NAV_DIVIDER,
   navItems.dailyReports,
-  navItems.changeOrders,
   navItems.employees,
+  navItems.changeOrders,
 ]
 
 export const roles = {
@@ -151,18 +153,7 @@ export const roles = {
   },
   admin: {
     appRole: "admin" as const,
-    nav: [
-      navItems.home,
-      navItems.jobcost,
-      navItems.dailyReports,
-      NAV_DIVIDER,
-      navItems.changeOrders,
-      financesGroup,
-      NAV_DIVIDER,
-      chartsGroup,
-      directoryGroup,
-      navItems.users,
-    ] as NavEntry[],
+    nav: executiveNav,
   },
   manager: {
     appRole: "manager" as const,
@@ -212,6 +203,12 @@ export function hasAnalyticsAccess(role: string | undefined | null): boolean {
 
 export function isOwnerRole(role: string | undefined | null): boolean {
   return role === "owner"
+}
+
+/** Developer-only surfaces (e.g. the jobcost detail "Created By" Sage audit
+ *  field, which the backend also only emits for this role). */
+export function isTechRole(role: string | undefined | null): boolean {
+  return role === "tech"
 }
 
 /** Display role on the Users page: tech blends in as a plain admin (its column). */
