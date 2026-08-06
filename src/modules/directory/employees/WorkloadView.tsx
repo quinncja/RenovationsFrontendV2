@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { formatMoney, formatRelativeTime } from "../../../shared/utils/format"
 import { useJobcostNav } from "../../jobcost/useJobcostNav"
-import { SortTh, type SortDir } from "./SortTh"
+import { SortTh, type SortDir } from "../../../shared/components/SortTh"
 import type { PmWorkload, WorkloadJob } from "./workload"
 
 // Workload lens pieces — "who can take the next job". Each PM's card head

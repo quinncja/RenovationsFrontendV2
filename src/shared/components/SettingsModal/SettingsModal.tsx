@@ -9,6 +9,7 @@ import useLocalStorage from "../../hooks/useLocalStorage"
 import { HASHED_RELATION_COLORS_KEY } from "../../hooks/useHashedRelationColors"
 import useJobcostDefaultRange, { JOBCOST_DEFAULT_RANGE_OPTIONS } from "../../hooks/useJobcostDefaultRange"
 import { useModalLayer } from "../../hooks/useModalLayer"
+import { SEG_SPRING } from "../../animation/springs"
 
 interface SettingsModalProps {
   open: boolean
@@ -17,10 +18,6 @@ interface SettingsModalProps {
   onThemeChange: (theme: "light" | "dark") => void
 }
 
-// Same spring as the Job Costing board's segmented thumbs (SEG_SPRING in
-// Jobcost.tsx) — duplicated rather than imported so the settings modal doesn't
-// pull the lazy Jobcost chunk into the shell bundle.
-const SEG_SPRING = { type: "spring", bounce: 0.15, visualDuration: 0.35 } as const
 
 // One segmented toggle in the settings' deck grammar: recessed well, sliding
 // copper thumb (each control owns a layoutId so thumbs glide independently).

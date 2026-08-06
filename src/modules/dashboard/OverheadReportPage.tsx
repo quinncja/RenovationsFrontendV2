@@ -25,6 +25,7 @@ import { buildMonthlyBreakdownXlsx } from "./exportMonthlyBreakdownXlsx"
 import type { LineMarker, SpendItem } from "../../shared/components/Chart/chart.types"
 import { useOnboarding } from "../../core/onboarding/OnboardingProvider"
 import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
+import { SEG_SPRING } from "../../shared/animation/springs"
 
 // Full overhead-spending report (Finances → Overhead Report). Where the
 // dashboard's /dashboard/breakdown/overhead drill-down shows one chart and
@@ -32,14 +33,6 @@ import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
 // a per-category cost modal, cumulative + YoY views, and derived stats. Both
 // years of every comparison are capped at the same month on the backend
 // (overheadCategoryComparison) so mid-year deltas are apples-to-apples.
-
-// Thumb slide for the trend toggle — same spring as the Job Costing
-// command-bar segmented controls, which this toggle mirrors.
-const SEG_SPRING: Transition = {
-  type: "spring",
-  bounce: 0.15,
-  visualDuration: 0.35,
-}
 
 // Row travel when the Top Movers ranking flips between $ and % — the same
 // soft-landing spring as the jobcost pinned-property reorder glide.

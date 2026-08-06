@@ -25,13 +25,13 @@ import {
   SummaryRow,
   JobTable,
   normalizeProject,
-  SEG_SPRING,
   type Job,
   type JobDetail,
   type RawProject,
   type SortKey,
   type SortDir,
 } from "./Jobcost"
+import { SEG_SPRING } from "../../shared/animation/springs"
 import { Fact, Meta } from "./detailPrimitives"
 import { oneoffFromRecnum, parseValidDate, fmtLongDate, propertySlug } from "./jobcostShared"
 import { JOBCOST_BACK_FALLBACK, useJobcostNav, type JobcostBackState } from "./useJobcostNav"

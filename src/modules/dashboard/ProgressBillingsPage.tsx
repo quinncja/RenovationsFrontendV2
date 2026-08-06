@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useJobcostNav } from "../jobcost/useJobcostNav"
-import { ArrowLeft, ArrowUp, ArrowDown, ArrowUpDown, Search } from "lucide-react"
+import { ArrowLeft, Search } from "lucide-react"
 import Page from "../../shared/components/Page"
+import { SortTh } from "../../shared/components/SortTh"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
@@ -36,35 +37,6 @@ type SortKey = "name" | "contract" | "budget" | "cost" | "billed" | "expected" |
 type SortDir = "asc" | "desc"
 
 const pct = (v: number) => `${Math.round(v * 100)}%`
-
-// Reuse the change-orders sortable header chrome (co-th-btn + spend-rank-table).
-// `fill` makes a column absorb the table's slack so it (the Project name) takes
-// the available horizontal space and the numeric columns hug the right edge.
-function SortTh({ col, label, align = "left", fill = false, colSpan, sortKey, sortDir, onSort }: {
-  col: SortKey
-  label: string
-  align?: "left" | "right" | "center"
-  fill?: boolean
-  colSpan?: number
-  sortKey: SortKey
-  sortDir: SortDir
-  onSort: (k: SortKey) => void
-}) {
-  const active = sortKey === col
-  const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
-  const thClass = align === "right" ? "spend-rank-table-value" : "spend-rank-table-name"
-  const alignClass = align === "right" ? " co-th-btn-right" : align === "center" ? " co-th-btn-center" : ""
-  return (
-    <th className={thClass} colSpan={colSpan} style={fill ? { width: "100%" } : undefined}>
-      <button
-        className={`co-th-btn${alignClass}${active ? " co-th-btn-active" : ""}`}
-        onClick={() => onSort(col)}
-      >
-        {label} <Icon size={11} />
-      </button>
-    </th>
-  )
-}
 
 function ProgressBillingsContent() {
   const navigate = useNavigate()
@@ -221,13 +193,13 @@ function ProgressBillingsContent() {
                 <table className="spend-rank-table" style={{ width: "100%" }}>
                   <thead>
                     <tr>
-                      <SortTh col="name" label="Project" fill sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh col="cost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh col="billed" label="Billed" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh col="expected" label="Earned" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                      <SortTh col="variance" label="Over / Under" align="center" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="name" label="Project" fill sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="cost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="billed" label="Billed" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="expected" label="Earned" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="variance" label="Over / Under" align="center" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     </tr>
                   </thead>
                   <tbody>

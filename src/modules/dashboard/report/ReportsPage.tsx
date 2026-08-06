@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { motion } from "framer-motion"
 import Page from "../../../shared/components/Page"
-import { SEG_SPRING } from "../../jobcost/Jobcost"
+import { SEG_SPRING } from "../../../shared/animation/springs"
 import { Widget } from "../../../shared/components/Widget/Widget"
 import { MotionList, MotionItem } from "../../../shared/components/MotionList/MotionList"
 import { useAuth } from "../../../core/auth/AuthProvider"

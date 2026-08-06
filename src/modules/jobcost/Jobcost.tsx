@@ -2,8 +2,10 @@ import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, use
 import { motion, AnimatePresence, useMotionValue, useTransform, type MotionValue, type Transition } from "framer-motion"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useJobcostNav } from "./useJobcostNav"
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, ChevronRight, ChevronDown, ExternalLink, ChartNoAxesColumn, Building2, Hammer, Pin, RotateCcw } from "lucide-react"
+import { Search, ArrowUp, ArrowDown, ChevronRight, ChevronDown, ExternalLink, ChartNoAxesColumn, Building2, Hammer, Pin, RotateCcw } from "lucide-react"
 import Page from "../../shared/components/Page"
+import { SortTh } from "../../shared/components/SortTh"
+import { SEG_SPRING } from "../../shared/animation/springs"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector, MIN_YEAR } from "../../shared/components/YearSelector/YearSelector"
@@ -333,30 +335,6 @@ type HideableCol = (typeof HIDE_ORDER)[number]
 // try to come back.
 const RESHOW_BUFFER = 60
 
-function SortTh({ col, label, align = "left", sortKey, sortDir, onSort, className }: {
-  col: SortKey
-  label: string
-  align?: "left" | "right"
-  // null = no column sort applied (the list sits in its default name order).
-  sortKey: SortKey | null
-  sortDir: SortDir
-  onSort: (k: SortKey) => void
-  className?: string
-}) {
-  const active = sortKey === col
-  const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
-  const thClass = align === "right" ? "spend-rank-table-value" : "spend-rank-table-name"
-  return (
-    <th className={`${thClass}${className ? ` ${className}` : ""}`}>
-      <button
-        className={`co-th-btn${align === "right" ? " co-th-btn-right" : ""}${active ? " co-th-btn-active" : ""}`}
-        onClick={() => onSort(col)}
-      >
-        {label} <Icon size={11} />
-      </button>
-    </th>
-  )
-}
 
 // Label/value row inside a summary card; `total` bolds it as the card's
 // bottom-line figure. Shared with the detail page's Contract/Cost Summary
@@ -761,10 +739,6 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
     </div>
   )
 }
-
-// Thumb slide for the segmented controls (command bar here; the property
-// page's PM filter rides the same spring).
-export const SEG_SPRING: Transition = { type: "spring", bounce: 0.15, visualDuration: 0.35 }
 
 // Animates real width (not transforms) when its child's intrinsic size
 // changes, so text never scale-stretches — used by the sort-direction toggle
@@ -1558,22 +1532,23 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
         <thead>
           <tr>
             <th className="spend-rank-table-name jc-expand-th" aria-hidden="true" />
-            <SortTh col="name" label="Project" className="jc-name-col" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            <SortTh spendRank col="name" label="Project" className="jc-name-col" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             {showStatus && (
-              <SortTh col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+              <SortTh spendRank col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             )}
             {showPM && (
-              <SortTh col="supervisor" label="PM" className="jc-pm-col" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+              <SortTh spendRank col="supervisor" label="PM" className="jc-pm-col" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             )}
             {showContract && (
-              <SortTh col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+              <SortTh spendRank col="contract" label="Contract" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             )}
             {showBudget && (
-              <SortTh col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+              <SortTh spendRank col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             )}
-            <SortTh col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            <SortTh spendRank col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             {showVariance && (
               <SortTh
+                spendRank
                 col="variance"
                 label={showPM ? "Budget Variance" : "Variance"}
                 align="right"
@@ -1582,7 +1557,7 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
                 onSort={onSort}
               />
             )}
-            <SortTh col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            <SortTh spendRank col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             <th className="spend-rank-table-name jc-view-th" aria-label="Actions" />
           </tr>
         </thead>
