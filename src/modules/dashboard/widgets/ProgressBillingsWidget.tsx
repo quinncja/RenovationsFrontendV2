@@ -144,6 +144,9 @@ function ProgressBillingsModal({
                           className="clickable-row"
                           onClick={() => onSelectJob(p.id)}
                           title="Open job costing"
+                          tabIndex={0}
+                          role="button"
+                          onKeyDown={(e) => e.key === "Enter" && onSelectJob(p.id)}
                         >
                           <td>
                             {p.name}

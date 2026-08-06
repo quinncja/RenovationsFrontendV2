@@ -109,6 +109,9 @@ function OverdueModal({
                           className={inv.recnum ? "clickable-row" : undefined}
                           onClick={inv.recnum ? () => onSelectInvoice(inv.recnum) : undefined}
                           title={inv.recnum ? "View invoice details" : undefined}
+                          tabIndex={inv.recnum ? 0 : undefined}
+                          role={inv.recnum ? "button" : undefined}
+                          onKeyDown={inv.recnum ? (e) => e.key === "Enter" && onSelectInvoice(inv.recnum) : undefined}
                         >
                           <td>{inv.counterparty || "—"}</td>
                           <td className="text-secondary">{inv.invnum || "—"}</td>

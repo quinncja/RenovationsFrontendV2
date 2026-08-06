@@ -729,7 +729,14 @@ function PerfPhasesPanel({ phases }: { phases: PerfPhase[] }) {
             {sorted.map((phase) => {
               const variance = (phase.budget ?? 0) - (phase.totalCost ?? 0)
               return (
-                <tr key={phase.recnum} className="clickable-row" onClick={() => goToJobcost(phase.recnum)}>
+                <tr
+                  key={phase.recnum}
+                  className="clickable-row"
+                  onClick={() => goToJobcost(phase.recnum)}
+                  tabIndex={0}
+                  role="button"
+                  onKeyDown={(e) => e.key === "Enter" && goToJobcost(phase.recnum)}
+                >
                   <td>
                     <div className="cell-primary">{oneoffDisplayName(phase)}</div>
                     <div className="cell-secondary">#{phase.recnum}</div>

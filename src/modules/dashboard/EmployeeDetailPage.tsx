@@ -199,7 +199,14 @@ function ProjectsTable({
       </thead>
       <tbody>
         {sorted.map((job) => (
-          <tr key={job.recnum} onClick={() => onRowClick(job.jobNumber)} className="clickable-row">
+          <tr
+            key={job.recnum}
+            onClick={() => onRowClick(job.jobNumber)}
+            className="clickable-row"
+            tabIndex={0}
+            role="button"
+            onKeyDown={(e) => e.key === "Enter" && onRowClick(job.jobNumber)}
+          >
             <td>
               <div className="cell-primary">{job.name}</div>
               <div className="cell-secondary">#{job.jobNumber}</div>
