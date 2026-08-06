@@ -13980,50 +13980,6 @@ button.co-hero-project:hover svg { color: inherit; }
   color: color-mix(in srgb, var(--secondary-text) 80%, transparent);
 }
 
-/* Segmented control in the segmentation widget header (By PM / By Size).
-   Mirrors the period-selector pill so it sits naturally among the dashboard's
-   other header controls. */
-.estp-segmented {
-  display: flex;
-  border: 1.5px solid var(--border-color);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.estp-segmented-btn {
-  appearance: none;
-  background: transparent;
-  border: none;
-  color: var(--secondary-text);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.78rem;
-  font-weight: 500;
-  padding: 0.35rem 0.7rem;
-  transition: background-color 0.15s, color 0.15s;
-}
-
-.estp-segmented-btn:first-child {
-  border-top-left-radius: 999px;
-  border-bottom-left-radius: 999px;
-}
-.estp-segmented-btn:last-child {
-  border-top-right-radius: 999px;
-  border-bottom-right-radius: 999px;
-}
-.estp-segmented-btn:not(:last-child) {
-  border-right: 1px solid var(--border-color);
-}
-
-.estp-segmented-btn:hover {
-  background-color: color-mix(in srgb, var(--primary-color) 8%, transparent);
-}
-
-.estp-segmented-btn--active {
-  background-color: var(--primary-color);
-  color: #fff;
-}
-
 /* Tables shared by the segmentation + worst-jobs widgets. */
 .estp-table-wrap {
   flex: 1;

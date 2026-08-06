@@ -5,7 +5,7 @@ import { useJobcostNav } from "./useJobcostNav"
 import { Search, ArrowUp, ArrowDown, ChevronRight, ChevronDown, ExternalLink, ChartNoAxesColumn, Building2, Hammer, Pin, RotateCcw } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { SortTh } from "../../shared/components/SortTh"
-import { SEG_SPRING } from "../../shared/animation/springs"
+import { SegmentedControl } from "../../shared/components/SegmentedControl"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector, MIN_YEAR } from "../../shared/components/YearSelector/YearSelector"
@@ -2145,56 +2145,31 @@ export default function Jobcost() {
         {!isMobile && (
           <MotionItem>
             <div className="jc-command-bar">
-              <div ref={segTargetRef} className="jc-seg" role="tablist" aria-label="View mode">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={grouped}
-                  className={`jc-seg-btn${grouped ? " jc-seg-btn-active" : ""}`}
-                  onClick={() => setViewMode("grouped")}
-                >
-                  {grouped && <motion.span layoutId="jcViewThumb" className="jc-seg-thumb" transition={SEG_SPRING} />}
-                  <span className="jc-seg-label">Property</span>
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={!grouped}
-                  className={`jc-seg-btn${!grouped ? " jc-seg-btn-active" : ""}`}
-                  onClick={() => setViewMode("list")}
-                >
-                  {!grouped && <motion.span layoutId="jcViewThumb" className="jc-seg-thumb" transition={SEG_SPRING} />}
-                  <span className="jc-seg-label">Project</span>
-                </button>
-              </div>
+              <SegmentedControl
+                rootRef={segTargetRef}
+                variant="jc"
+                ariaLabel="View mode"
+                layoutId="jcViewThumb"
+                value={grouped ? "grouped" : "list"}
+                options={[
+                  { key: "grouped", label: "Property" },
+                  { key: "list", label: "Project" },
+                ]}
+                onChange={(k) => setViewMode(k)}
+              />
               <span className="jc-cb-divider" aria-hidden="true" />
               {isManager && (
-                <div className="jc-seg" role="tablist" aria-label="Project scope">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={!showAllProjects}
-                    className={`jc-seg-btn${!showAllProjects ? " jc-seg-btn-active" : ""}`}
-                    onClick={() => setShowAllProjects(false)}
-                  >
-                    {!showAllProjects && (
-                      <motion.span layoutId="jcScopeThumb" className="jc-seg-thumb" transition={SEG_SPRING} />
-                    )}
-                    <span className="jc-seg-label">Mine</span>
-                  </button>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={showAllProjects}
-                    className={`jc-seg-btn${showAllProjects ? " jc-seg-btn-active" : ""}`}
-                    onClick={() => setShowAllProjects(true)}
-                  >
-                    {showAllProjects && (
-                      <motion.span layoutId="jcScopeThumb" className="jc-seg-thumb" transition={SEG_SPRING} />
-                    )}
-                    <span className="jc-seg-label">All</span>
-                  </button>
-                </div>
+                <SegmentedControl
+                  variant="jc"
+                  ariaLabel="Project scope"
+                  layoutId="jcScopeThumb"
+                  value={showAllProjects ? "all" : "mine"}
+                  options={[
+                    { key: "mine", label: "Mine" },
+                    { key: "all", label: "All" },
+                  ]}
+                  onChange={(k) => setShowAllProjects(k === "all")}
+                />
               )}
               {/* Year + phase share one joined control (same seam treatment
                   as the sort) — together they answer "when". Starts on the

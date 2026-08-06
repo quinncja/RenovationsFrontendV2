@@ -25,7 +25,7 @@ import { buildMonthlyBreakdownXlsx } from "./exportMonthlyBreakdownXlsx"
 import type { LineMarker, SpendItem } from "../../shared/components/Chart/chart.types"
 import { useOnboarding } from "../../core/onboarding/OnboardingProvider"
 import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
-import { SEG_SPRING } from "../../shared/animation/springs"
+import { SegmentedControl } from "../../shared/components/SegmentedControl"
 
 // Full overhead-spending report (Finances → Overhead Report). Where the
 // dashboard's /dashboard/breakdown/overhead drill-down shows one chart and
@@ -766,32 +766,17 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
             loading={isLoading}
             noData={!trendSeries}
             actions={
-              <div className="ohr-seg" role="tablist" aria-label="Trend view">
-                {(
-                  [
-                    ["monthly", "Monthly"],
-                    ["cumulative", "Running total"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={trendView === key}
-                    className={`ohr-seg-btn${trendView === key ? " ohr-seg-btn-active" : ""}`}
-                    onClick={() => setTrendView(key)}
-                  >
-                    {trendView === key && (
-                      <motion.span
-                        layoutId="ohrTrendThumb"
-                        className="ohr-seg-thumb"
-                        transition={SEG_SPRING}
-                      />
-                    )}
-                    <span className="ohr-seg-label">{label}</span>
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                variant="ohr"
+                ariaLabel="Trend view"
+                layoutId="ohrTrendThumb"
+                value={trendView}
+                options={[
+                  { key: "monthly", label: "Monthly" },
+                  { key: "cumulative", label: "Running total" },
+                ]}
+                onChange={setTrendView}
+              />
             }
           >
             {trendSeries && (
@@ -824,32 +809,17 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
             loading={isLoading}
             noData={!isLoading && movers.length === 0}
             actions={
-              <div className="ohr-seg" role="tablist" aria-label="Rank movers by">
-                {(
-                  [
-                    ["dollars", "By $"],
-                    ["percent", "By %"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={moversBy === key}
-                    className={`ohr-seg-btn${moversBy === key ? " ohr-seg-btn-active" : ""}`}
-                    onClick={() => setMoversBy(key)}
-                  >
-                    {moversBy === key && (
-                      <motion.span
-                        layoutId="ohrMoversThumb"
-                        className="ohr-seg-thumb"
-                        transition={SEG_SPRING}
-                      />
-                    )}
-                    <span className="ohr-seg-label">{label}</span>
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                variant="ohr"
+                ariaLabel="Rank movers by"
+                layoutId="ohrMoversThumb"
+                value={moversBy}
+                options={[
+                  { key: "dollars", label: "By $" },
+                  { key: "percent", label: "By %" },
+                ]}
+                onChange={setMoversBy}
+              />
             }
           >
             <ol className="ohr-movers">

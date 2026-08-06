@@ -31,7 +31,7 @@ import {
   type SortKey,
   type SortDir,
 } from "./Jobcost"
-import { SEG_SPRING } from "../../shared/animation/springs"
+import { SegmentedControl } from "../../shared/components/SegmentedControl"
 import { Fact, Meta } from "./detailPrimitives"
 import { oneoffFromRecnum, parseValidDate, fmtLongDate, propertySlug } from "./jobcostShared"
 import { JOBCOST_BACK_FALLBACK, useJobcostNav, type JobcostBackState } from "./useJobcostNav"
@@ -647,50 +647,41 @@ function JobsSection({ jobRows, pmStats, isLoading, isManager, marginColorsOn, c
               deck's copper-thumb seg control. */}
           <div className="jc-command-bar pd-jobs-bar">
             {pmStats.length > 0 && (
-              <div className="jc-seg pd-pm-seg" role="group" aria-label="Filter jobs by project manager">
-                <button
-                  type="button"
-                  className={`jc-seg-btn${pmFilter == null ? " jc-seg-btn-active" : ""}`}
-                  aria-pressed={pmFilter == null}
-                  onClick={() => setPmFilter(null)}
-                >
-                  {pmFilter == null && (
-                    <motion.span layoutId="pdPmThumb" className="jc-seg-thumb" transition={SEG_SPRING} />
-                  )}
-                  <span className="jc-seg-label">All</span>
-                </button>
-                {pmStats.map((s) => {
-                  const pmMargin = s.contract > 0 ? ((s.contract - s.cost) / s.contract) * 100 : null
-                  const active = pmFilter === s.name
-                  return (
-                    <button
-                      key={s.name}
-                      type="button"
-                      className={`jc-seg-btn${active ? " jc-seg-btn-active" : ""}`}
-                      aria-pressed={active}
-                      title={active ? "Clear PM filter" : `Show only ${s.name}'s jobs`}
-                      onClick={() => setPmFilter(active ? null : s.name)}
-                    >
-                      {active && (
-                        <motion.span layoutId="pdPmThumb" className="jc-seg-thumb" transition={SEG_SPRING} />
-                      )}
-                      <span className="jc-seg-label pd-pm-seg-label">
-                        {s.name}
-                        {pmMargin != null && (
-                          <span
-                            className="pd-pm-seg-margin"
-                            // Margin-scale color only off the copper thumb —
-                            // on it, the class's white keeps the text legible.
-                            style={!active && marginColorsOn ? { color: marginTextColor(pmMargin) } : undefined}
-                          >
-                            {pmMargin.toFixed(1)}%
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
+              <SegmentedControl
+                variant="jc"
+                role="group"
+                ariaLabel="Filter jobs by project manager"
+                className="pd-pm-seg"
+                layoutId="pdPmThumb"
+                value={pmFilter ?? "__all__"}
+                onChange={(k) => setPmFilter(k === "__all__" || k === pmFilter ? null : k)}
+                options={[
+                  { key: "__all__", label: "All" },
+                  ...pmStats.map((s) => {
+                    const pmMargin = s.contract > 0 ? ((s.contract - s.cost) / s.contract) * 100 : null
+                    const active = pmFilter === s.name
+                    return {
+                      key: s.name,
+                      title: active ? "Clear PM filter" : `Show only ${s.name}'s jobs`,
+                      label: (
+                        <span className="pd-pm-seg-label">
+                          {s.name}
+                          {pmMargin != null && (
+                            <span
+                              className="pd-pm-seg-margin"
+                              // Margin-scale color only off the copper thumb —
+                              // on it, the class's white keeps the text legible.
+                              style={!active && marginColorsOn ? { color: marginTextColor(pmMargin) } : undefined}
+                            >
+                              {pmMargin.toFixed(1)}%
+                            </span>
+                          )}
+                        </span>
+                      ),
+                    }
+                  }),
+                ]}
+              />
             )}
             {/* Drill-through to the filtered PM's page. Permanently mounted
                 (invisible when no PM is filtered) so showing it never moves
