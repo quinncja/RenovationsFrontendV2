@@ -6222,17 +6222,19 @@ button.jc-kind-chip:hover {
 .pd-cell-extra { padding: 0 0.5625rem; }
 .pd-cell-extra svg { color: var(--jcb-muted); flex-shrink: 0; }
 
-/* Matrix hover tooltip: dark ink pill above the cell, fed by data-tip
-   (newline-separated lines, pre-line keeps them stacked). Pure CSS so it
-   works inside the hero without a portal. */
-.pd-cell[data-tip] { position: relative; }
-.pd-cell[data-tip]::after {
-  content: attr(data-tip);
+/* Matrix hover tooltip: dark ink pill above the cell, built from a real
+   child span (.pd-tip) so its status line can carry its own color — a plain
+   data-tip/attr() pseudo-element can't style part of its string. */
+.pd-cell-tip { position: relative; }
+.pd-tip {
   position: absolute;
   bottom: calc(100% + 0.4375rem);
   left: 50%;
   translate: -50% 0;
   z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   width: max-content;
   max-width: 15rem;
   padding: 0.375rem 0.625rem;
@@ -6249,8 +6251,16 @@ button.jc-kind-chip:hover {
   transition: opacity 140ms ease;
   box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
 }
-.pd-cell[data-tip]:hover::after { opacity: 1; }
-.pd-cell[data-tip]:hover { z-index: 4; }
+.pd-tip-status {
+  font-size: 0.65625rem;
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 0.125rem;
+}
+.pd-cell-tip:hover .pd-tip,
+.pd-cell-tip:focus-visible .pd-tip { opacity: 1; }
+.pd-cell-tip:hover, .pd-cell-tip:focus-visible { z-index: 4; }
 
 /* ── Kind-ledger drill columns ── */
 .pd-kind-title { display: flex; align-items: center; gap: 0.4375rem; }

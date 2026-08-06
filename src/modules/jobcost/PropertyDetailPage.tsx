@@ -48,6 +48,17 @@ import type { LineMarker } from "../../shared/components/Chart/chart.types"
 // Units bars wear the brand orange the app's other single-series charts use.
 const COLOR_UNITS = "#c27c3e"
 
+// Same hues as the .status-N badge classes (App.css), reused so the matrix
+// tooltip's status line reads consistently with badges elsewhere on the page.
+const JOB_STATUS_COLORS: Record<number, string> = {
+  1: "#3b82f6", // Bidding
+  2: "#9ca3af", // Refused
+  3: "#eab308", // Contract
+  4: "#e0985a", // Current — lighter primary-color tint for the dark tooltip pill
+  5: "#22c55e", // Complete
+  6: "#9ca3af", // Closed
+}
+
 interface RawPhaseRow {
   recnum: string | number
   name: string
@@ -1166,17 +1177,23 @@ function PropertyDetail({ slug }: { slug: string }) {
                           <button
                             key={i}
                             type="button"
-                            className="pd-cell"
-                            // Custom hover tooltip (data-tip pseudo, newline
-                            // separated): phase + year, then contract volume
-                            // for roles allowed to see it.
-                            data-tip={`P${i + 1} ${row.year}${showContract ? `\n${formatMoneyFull(cell.contract)}` : ""}`}
+                            className="pd-cell pd-cell-tip"
                             onClick={() => openJob(cell)}
                             style={marginColorsOn && cell.margin != null
                               ? { color: marginTextColor(cell.margin) }
                               : undefined}
                           >
                             {cell.margin == null ? "—" : `${Math.round(cell.margin)}%`}
+                            <span className="pd-tip">
+                              <span
+                                className="pd-tip-status"
+                                style={{ color: JOB_STATUS_COLORS[cell.status] ?? JOB_STATUS_COLORS[6] }}
+                              >
+                                {JOB_STATUS_LABELS[cell.status] ?? cell.status}
+                              </span>
+                              {`P${i + 1} ${row.year}`}
+                              {showContract && <>{"\n"}{formatMoneyFull(cell.contract)}</>}
+                            </span>
                           </button>
                         ) : (
                           <span key={i} className="pd-cell pd-cell-empty" />
@@ -1188,9 +1205,7 @@ function PropertyDetail({ slug }: { slug: string }) {
                             <button
                               key={m.recnum}
                               type="button"
-                              className="pd-cell pd-cell-extra"
-                              // Cluster tiles lead with their actual job name.
-                              data-tip={`${m.name}${showContract ? `\n${formatMoneyFull(m.contract)}` : ""}`}
+                              className="pd-cell pd-cell-extra pd-cell-tip"
                               onClick={() => openJob(m)}
                             >
                               {m.oneoff ? <Hammer size={10} /> : <Building2 size={10} />}
@@ -1200,6 +1215,16 @@ function PropertyDetail({ slug }: { slug: string }) {
                                   : undefined}
                               >
                                 {m.margin == null ? "—" : `${Math.round(m.margin)}%`}
+                              </span>
+                              <span className="pd-tip">
+                                <span
+                                  className="pd-tip-status"
+                                  style={{ color: JOB_STATUS_COLORS[m.status] ?? JOB_STATUS_COLORS[6] }}
+                                >
+                                  {JOB_STATUS_LABELS[m.status] ?? m.status}
+                                </span>
+                                {m.name}
+                                {showContract && <>{"\n"}{formatMoneyFull(m.contract)}</>}
                               </span>
                             </button>
                           ))}
