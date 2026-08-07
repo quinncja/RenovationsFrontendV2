@@ -7,7 +7,6 @@ import useNavItems from "../auth/hooks/useNavItems"
 import { isNavGroup, isNavDivider, type NavGroup, type NavItem } from "../auth/roles"
 import { SettingsModal } from "../../shared/components/SettingsModal/SettingsModal"
 import { useDailyReport } from "../../modules/dashboard/report/DailyReportContext"
-import { NavReportsHint } from "../../modules/dashboard/report/NavReportsHint"
 import { registerCoachTarget } from "../onboarding/coachTargets"
 import { useOnboarding } from "../onboarding/OnboardingProvider"
 import { SECTION_ANNOUNCEMENTS } from "../onboarding/sectionAnnouncements"
@@ -72,11 +71,16 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
   const [tooltip, setTooltip] = useState<TooltipState>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   // Intro coachmark for the Reports nav item (step 2; see DailyReportContext).
-  const { introStep } = useDailyReport()
+  const { introStep, advanceIntro } = useDailyReport()
   // Exposes the Job Cost nav button to the onboarding host (coachTargets.ts)
   // without document.querySelector; only attached to that one leaf item below.
   const jobcostRef = useCallback((el: HTMLButtonElement | null) => {
     registerCoachTarget("nav-jobcost", el)
+  }, [])
+  // Same for the Reports nav button — the intro's second coachmark (see
+  // NavSectionHint usage below) used to find it via document.querySelector.
+  const reportsRef = useCallback((el: HTMLButtonElement | null) => {
+    registerCoachTarget("nav-reports", el)
   }, [])
   // Stable per-group callback refs for announcement coach targets. Leaf-item
   // (navPath) announcements reuse an already-registered target (e.g.
@@ -241,7 +245,7 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
             ) : (
               <button
                 key={item.path}
-                ref={item.path === "/jobcost" ? jobcostRef : undefined}
+                ref={item.path === "/jobcost" ? jobcostRef : item.path === "/reports" ? reportsRef : undefined}
                 data-nav={item.path}
                 className={`button nav-button${location.pathname === item.path || location.pathname.startsWith(`${item.path}/`) ? " nav-button-active" : ""}${(introStep === 2 && item.path === "/reports") || announcement?.navPath === item.path ? " nav-button-attention" : ""}`}
                 onClick={() => {
@@ -320,7 +324,17 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
         document.body
       )}
 
-      <NavReportsHint />
+      {/* Intro coachmark step 2: teaches the Reports nav item. Was a
+          standalone component (NavReportsHint) with its own
+          document.querySelector-based positioning; now the same
+          NavSectionHint every other nav popover uses. */}
+      <NavSectionHint
+        targetId="nav-reports"
+        active={introStep === 2}
+        title="Reports shortcut"
+        body="To view activity reports from other time periods, click here."
+        onDismiss={advanceIntro}
+      />
 
       {/* Kept mounted with fallback props while inactive: AnimatePresence
           freezes the exiting card's content, so the fallbacks never paint. */}

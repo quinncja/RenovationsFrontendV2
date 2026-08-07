@@ -40,7 +40,7 @@ added or retired.
   the first arrival after onboarding runs the intro variant (`intro-tour`
   milestone unseen): full-screen `DailyArrival` intro framing, then the
   coachmark pair — header-clock spotlight (`DailyReportCoach`) → Reports
-  nav-item hint (`NavReportsHint`, `introStep` 2). Subsequent days are the
+  nav-item hint (`NavSectionHint` targeting `nav-reports`, `introStep` 2). Subsequent days are the
   plain recap. Auto-open starts the day AFTER `onboardedAt`.
 
 **D — Job Costing interactive tour (incremental milestone `jobcost-intro`)**
@@ -122,8 +122,10 @@ flags are pushed up after merge.
 - `NavSectionHint.tsx` — non-blocking nav popover for `section:*` milestones
   (framer entrance/exit, ResizeObserver anchor tracking, `.nav-hint--motion`
   z 150 so full-screen overlays cover it).
-- `NavReportsHint.tsx` — the intro's Reports popover (legacy querySelector
-  anchor; predates the registry).
+- The intro's Reports popover is `NavSectionHint` targeting `nav-reports`
+  (registered in Navbar.tsx's `reportsRef`), rendered inline in Navbar.tsx —
+  no longer a standalone component (formerly `NavReportsHint.tsx`, which
+  predated the registry and used `document.querySelector`).
 - `.nav-button-attention` — copper `coachPulse` ring on the nav item being
   pointed at.
 
