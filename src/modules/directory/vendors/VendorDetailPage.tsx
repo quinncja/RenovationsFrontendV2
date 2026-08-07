@@ -5,6 +5,8 @@ import Page from "../../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../../shared/config/pageQueries"
 import { Widget } from "../../../shared/components/Widget/Widget"
+import { Badge } from "../../../shared/components/Badge"
+import { invoiceStatusLabel, invoiceStatusTone } from "../../../shared/utils/invoiceStatus"
 import { StatWidget } from "../../../shared/components/StatWidget/StatWidget"
 import { Chart } from "../../../shared/components/Chart/Chart"
 import { YearSelector } from "../../../shared/components/YearSelector/YearSelector"
@@ -30,8 +32,6 @@ const INVOICES_ACCENT = "var(--secondary-text)" // theme-aware gray
 
 const JOB_STATUS_LABEL: Record<number, string> = { 1: "Bid", 2: "Refused", 3: "Contract", 4: "Current", 5: "Complete", 6: "Closed" }
 const JOB_STATUS_CLASS: Record<number, string> = { 1: "bid", 2: "refused", 3: "contract", 4: "current", 5: "complete", 6: "closed" }
-const INV_STATUS_LABEL: Record<number, string> = { 1: "Open", 2: "Review", 3: "Dispute", 4: "Paid", 5: "Void" }
-const INV_STATUS_CLASS: Record<number, string> = { 1: "open", 2: "review", 3: "dispute", 4: "paid", 5: "void" }
 
 interface Summary {
   label: string
@@ -200,9 +200,7 @@ function VendorDetail({ year, onYearChange }: { year: number | null; onYearChang
                       {formatDate(inv.invoiceDate)}
                     </td>
                     <td className="spend-rank-table-name inv-th-status">
-                      <span className={`invoice-status-badge invoice-status-badge--${INV_STATUS_CLASS[inv.status] ?? "open"}`}>
-                        {INV_STATUS_LABEL[inv.status] ?? `Status ${inv.status}`}
-                      </span>
+                      <Badge tone={invoiceStatusTone(inv.status)}>{invoiceStatusLabel(inv.status)}</Badge>
                     </td>
                     <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(inv.value ?? 0)}</td>
                     <td className="spend-rank-table-value body-text invoice-amount-value--remaining">

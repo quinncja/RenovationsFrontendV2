@@ -6,6 +6,8 @@ import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { SortableHeader } from "../../shared/components/SortableHeader"
+import { Badge } from "../../shared/components/Badge"
+import { invoiceStatusLabel, invoiceStatusTone } from "../../shared/utils/invoiceStatus"
 import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { formatMoneyFull, formatDate } from "../../shared/utils/format"
@@ -29,20 +31,6 @@ interface Invoice {
   entityName: string | null
 }
 
-const INVOICE_STATUS: Record<number, string> = {
-  1: "Open",
-  2: "Review",
-  3: "Dispute",
-  4: "Paid",
-  5: "Void",
-}
-const INVOICE_STATUS_CLASS: Record<number, string> = {
-  1: "open",
-  2: "review",
-  3: "dispute",
-  4: "paid",
-  5: "void",
-}
 
 type TypeFilter = "all" | "AR" | "AP"
 type StatusFilter = "all" | number
@@ -226,9 +214,7 @@ export default function Invoices() {
                 <td>{formatDate(inv.invoiceDate)}</td>
                 <td style={{ textAlign: "right" }}>{formatMoneyFull(inv.total)}</td>
                 <td>
-                  <span className={`invoice-status-badge invoice-status-badge--${INVOICE_STATUS_CLASS[inv.status] ?? "open"}`}>
-                    {INVOICE_STATUS[inv.status] ?? `Status ${inv.status}`}
-                  </span>
+                  <Badge tone={invoiceStatusTone(inv.status)}>{invoiceStatusLabel(inv.status)}</Badge>
                 </td>
               </tr>
             ))}

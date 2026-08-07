@@ -13,6 +13,8 @@ import { computeCostGroups, type BudgetBreakdown, type CostItem } from "./types"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { Widget } from "../../shared/components/Widget/Widget"
+import { Badge } from "../../shared/components/Badge"
+import { invoiceStatusLabel, invoiceStatusTone } from "../../shared/utils/invoiceStatus"
 import { Chart } from "../../shared/components/Chart/Chart"
 import { ChartLegend } from "../../shared/components/Chart/ChartLegend"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
@@ -40,8 +42,6 @@ import { useAuth } from "../../core/auth/AuthProvider"
 import { effectiveRole, isTechRole } from "../../core/auth/roles"
 import { trackProjectView } from "../../shared/analytics/analytics"
 
-const INV_STATUS_LABEL: Record<number, string> = { 1: "Open", 2: "Review", 3: "Dispute", 4: "Paid", 5: "Void" }
-const INV_STATUS_CLASS: Record<number, string> = { 1: "open", 2: "review", 3: "dispute", 4: "paid", 5: "void" }
 
 type InvSortKey = "num" | "date" | "status" | "total" | "paid" | "remaining"
 type CoSortKey = "num" | "name" | "budget" | "contract"
@@ -1333,9 +1333,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                                   <td className="spend-rank-table-name body-text emphasized inv-th-num">{inv.invoiceNum}</td>
                                   <td className="spend-rank-table-name body-text text-secondary inv-th-date">{formatDate(inv.invoiceDate)}</td>
                                   <td className="spend-rank-table-name inv-th-status">
-                                    <span className={`invoice-status-badge invoice-status-badge--${INV_STATUS_CLASS[inv.status] ?? "open"}`}>
-                                      {INV_STATUS_LABEL[inv.status] ?? `Status ${inv.status}`}
-                                    </span>
+                                    <Badge tone={invoiceStatusTone(inv.status)}>{invoiceStatusLabel(inv.status)}</Badge>
                                   </td>
                                   <td className="spend-rank-table-value body-text">{formatMoneyFull(inv.total)}</td>
                                   <td className="spend-rank-table-value body-text">{formatMoneyFull(inv.amountPaid)}</td>

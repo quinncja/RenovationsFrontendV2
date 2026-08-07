@@ -2915,20 +2915,31 @@ span.skel-text {
   margin: 0;
 }
 
-/* Status badge — soft-tinted semantic pill. */
-.invoice-status-badge {
-  font-size: 0.6875rem;
-  font-weight: var(--font-weight-semibold);
-  padding: 0.2rem 0.55rem;
+/* Status badge — soft-tinted semantic pill. Shared by every `<Badge>`
+   consumer (see shared/components/Badge.tsx); `--standard`/`--compact`
+   preserve each site's original geometry, `--{tone}` its original color. */
+.badge {
+  display: inline-block;
   border-radius: 999px;
-  letter-spacing: 0.02em;
   white-space: nowrap;
+  font-weight: var(--font-weight-semibold);
 }
-.invoice-status-badge--open    { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
-.invoice-status-badge--review  { background: rgba(245, 158, 11, 0.12); color: #d97706; }
-.invoice-status-badge--dispute { background: rgba(239, 68, 68, 0.12);  color: #dc2626; }
-.invoice-status-badge--paid    { background: rgba(22, 163, 74, 0.12);  color: #16a34a; }
-.invoice-status-badge--void    { background: rgba(107, 114, 128, 0.12); color: #6b7280; }
+.badge--standard {
+  font-size: 0.6875rem;
+  padding: 0.2rem 0.55rem;
+  letter-spacing: 0.02em;
+}
+.badge--compact {
+  font-size: var(--caption1-size);
+  padding: 0.125rem 0.5rem;
+}
+.badge--blue   { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+.badge--amber  { background: rgba(245, 158, 11, 0.12); color: #d97706; }
+.badge--red    { background: rgba(239, 68, 68, 0.12);  color: #dc2626; }
+.badge--green  { background: rgba(22, 163, 74, 0.12);  color: #16a34a; }
+.badge--gray   { background: rgba(107, 114, 128, 0.12); color: #6b7280; }
+.badge--muted  { background: var(--hover-bg); color: var(--secondary-text); }
+.badge--purple { background: rgba(159, 61, 172, 0.15); color: #9f3dac; }
 
 .invoice-modal-body {
   overflow-y: auto;
@@ -16963,25 +16974,14 @@ button.co-hero-project:hover svg { color: inherit; }
 }
 .ewl-legend .ewl-legend-swatch:not(:first-child) { margin-left: 0.5rem; }
 
-/* Risk badges — the status-badge family's soft-tinted pills. */
+/* Risk badges — rendered via the shared <Badge size="compact"> (see App.css's
+   .badge rules near .invoice-status-badge's old spot). */
 .ewl-badges {
   display: inline-flex;
   gap: 0.375rem;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
-.ewl-badge {
-  display: inline-block;
-  font-size: var(--caption1-size);
-  font-weight: var(--font-weight-semibold);
-  padding: 0.125rem 0.5rem;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-.ewl-badge--danger { background: rgba(239, 68, 68, 0.12); color: #dc2626; }
-.ewl-badge--warn   { background: rgba(245, 158, 11, 0.12); color: #d97706; }
-.ewl-badge--muted  { background: var(--hover-bg); color: var(--secondary-text); }
-.ewl-badge--clear  { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
 
 /* Expanded region — the open row reveals the app-standard full-width
    .data-table beneath it (same nested-table convention as EmployeeDetail's
