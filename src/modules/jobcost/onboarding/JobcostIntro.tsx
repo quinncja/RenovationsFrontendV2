@@ -312,6 +312,7 @@ export function JobcostIntro() {
     "wip-toggle": null,
     "nav-jobcost": null,
     "nav-finances": null,
+    "nav-reports": null,
     navbar: null,
     "jc-view-seg": segEl,
     "jc-card": cardEl,

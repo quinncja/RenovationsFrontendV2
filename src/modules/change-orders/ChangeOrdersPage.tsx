@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useJobcostNav } from "../jobcost/useJobcostNav"
-import { Search, Plus, Upload } from "lucide-react"
+import { Plus, Upload } from "lucide-react"
+import { SearchField } from "../../shared/components/SearchField"
 import Page from "../../shared/components/Page"
 import { SortTh } from "../../shared/components/SortTh"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
@@ -135,16 +136,7 @@ export default function ChangeOrdersPage() {
           >
           <Widget loading={loading} noData={!loading && orders.length === 0} className="co-widget">
             <div className="co-widget-toolbar">
-              <div className="co-search-wrapper">
-                <Search size={13} className="co-search-icon" />
-                <input
-                  className="co-search-input"
-                  type="text"
-                  placeholder="Search change orders..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+              <SearchField variant="co" placeholder="Search change orders..." value={search} onChange={setSearch} />
               <span className="co-count subheadline text-secondary">
                 {filtered.length} {filtered.length === 1 ? "change order" : "change orders"}
               </span>

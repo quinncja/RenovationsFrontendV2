@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, LayoutGrid } from "lucide-react"
+import { LayoutGrid } from "lucide-react"
+import { SearchField } from "../../../shared/components/SearchField"
 import Page from "../../../shared/components/Page"
 import { SortTh } from "../../../shared/components/SortTh"
 import { PageDataProvider, useWidgetData } from "../../../shared/context/PageContext"
@@ -97,16 +98,7 @@ function ClientsContent({ year, onYearChange }: { year: number | null; onYearCha
         <MotionItem>
           <Widget loading={isLoading} noData={!isLoading && items.length === 0} className="co-widget">
             <div className="co-widget-toolbar">
-              <div className="co-search-wrapper">
-                <Search size={13} className="co-search-icon" />
-                <input
-                  className="co-search-input"
-                  type="text"
-                  placeholder="Search clients..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+              <SearchField variant="co" placeholder="Search clients..." value={search} onChange={setSearch} />
               <span className="co-count subheadline text-secondary">
                 {sorted.length} {sorted.length === 1 ? "client" : "clients"}
               </span>

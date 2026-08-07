@@ -10,6 +10,7 @@ export type CoachTargetId =
   | "wip-toggle"
   | "nav-jobcost"
   | "nav-finances"
+  | "nav-reports"
   // The navbar root — measured (not spotlighted) by overlays that cover the
   // page content and must stop at the nav's live edge.
   | "navbar"

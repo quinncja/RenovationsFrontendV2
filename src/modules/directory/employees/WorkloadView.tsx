@@ -2,6 +2,7 @@ import { useMemo, useState } from "react"
 import { formatMoney, formatRelativeTime } from "../../../shared/utils/format"
 import { useJobcostNav } from "../../jobcost/useJobcostNav"
 import { SortTh, type SortDir } from "../../../shared/components/SortTh"
+import { Badge, type BadgeTone } from "../../../shared/components/Badge"
 import type { PmWorkload, WorkloadJob } from "./workload"
 
 // Workload lens pieces — "who can take the next job". Each PM's card head
@@ -32,28 +33,28 @@ export function CompositionBar({ pm }: { pm: PmWorkload }) {
 }
 
 export function RiskBadges({ pm }: { pm: PmWorkload }) {
-  const badges: Array<{ key: string; className: string; label: string; title: string }> = []
+  const badges: Array<{ key: string; tone: BadgeTone; label: string; title: string }> = []
   if (pm.watchlistCount > 0)
     badges.push({
       key: "watch",
-      className: "ewl-badge--danger",
+      tone: "red",
       label: `${pm.watchlistCount} low margin`,
       title: `${pm.watchlistCount} open ${pm.watchlistCount === 1 ? "phase" : "phases"} under 17% margin`,
     })
   if (pm.missingContractCount > 0)
     badges.push({
       key: "contract",
-      className: "ewl-badge--warn",
+      tone: "amber",
       label: `${pm.missingContractCount} no contract`,
       title: `${pm.missingContractCount} open ${pm.missingContractCount === 1 ? "phase" : "phases"} without a contract amount`,
     })
-  if (badges.length === 0) return <span className="ewl-badge ewl-badge--clear">Clear</span>
+  if (badges.length === 0) return <Badge tone="green" size="compact">Clear</Badge>
   return (
     <span className="ewl-badges">
       {badges.map((b) => (
-        <span key={b.key} className={`ewl-badge ${b.className}`} title={b.title}>
+        <Badge key={b.key} tone={b.tone} size="compact" title={b.title}>
           {b.label}
-        </span>
+        </Badge>
       ))}
     </span>
   )
@@ -217,8 +218,8 @@ export function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
                 <td>
                   <div className="cell-primary ewl-name-line">
                     {job.name}
-                    {job.watchlist && <span className="ewl-badge ewl-badge--danger">Low margin</span>}
-                    {job.missingContract && <span className="ewl-badge ewl-badge--warn">No contract</span>}
+                    {job.watchlist && <Badge tone="red" size="compact">Low margin</Badge>}
+                    {job.missingContract && <Badge tone="amber" size="compact">No contract</Badge>}
                   </div>
                   <div className="cell-secondary">#{job.recnum}</div>
                 </td>
@@ -245,9 +246,9 @@ export function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
                       badge alone says why. */}
                   {job.lastActivity ? formatRelativeTime(job.lastActivity) : job.upcoming ? null : "—"}
                   {job.upcoming ? (
-                    <span className="ewl-badge ewl-badge--muted">Upcoming</span>
+                    <Badge tone="muted" size="compact">Upcoming</Badge>
                   ) : (
-                    !job.active && <span className="ewl-badge ewl-badge--muted">Dormant</span>
+                    !job.active && <Badge tone="muted" size="compact">Dormant</Badge>
                   )}
                 </td>
               </tr>

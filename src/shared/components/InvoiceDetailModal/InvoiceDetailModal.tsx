@@ -7,25 +7,8 @@ import {
   DetailModalContent,
   type DetailStat,
 } from "../DetailModal/DetailModal"
+import { invoiceStatusLabel, invoiceStatusTone } from "../../utils/invoiceStatus"
 
-// ─── Status labels & classes ──────────────────────────────────────────────────
-
-const INVOICE_STATUS: Record<number, string> = {
-  1: "Open",
-  2: "Review",
-  3: "Dispute",
-  4: "Paid",
-  5: "Void",
-}
-const INVOICE_STATUS_CLASS: Record<number, string> = {
-  1: "open",
-  2: "review",
-  3: "dispute",
-  4: "paid",
-  5: "void",
-}
-function invoiceStatus(n: number) { return INVOICE_STATUS[n] ?? `Status ${n}` }
-function invoiceStatusClass(n: number) { return INVOICE_STATUS_CLASS[n] ?? "open" }
 function formatAmount(v: number | null | undefined) {
   return v == null || isNaN(v) ? "N/A" : formatMoneyFull(v)
 }
@@ -235,8 +218,8 @@ function InvoiceContent({
       badge={
         h.status != null
           ? {
-              label: invoiceStatus(h.status),
-              className: `invoice-status-badge invoice-status-badge--${invoiceStatusClass(h.status)}`,
+              label: invoiceStatusLabel(h.status),
+              className: `badge badge--${invoiceStatusTone(h.status)} badge--standard`,
             }
           : null
       }
