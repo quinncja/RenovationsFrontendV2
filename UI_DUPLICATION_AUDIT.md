@@ -94,10 +94,61 @@ browser verification, not a blind batch edit at the end of a long session):
   `<DataTable>` touches sort state, expandable rows, footers, and clickable
   rows differently per table and needs browser verification per table, not a
   script.
-- `<Badge>` + tone mapper across the ~12 status-pill class families (§4).
 - `ExpandableProjectCard` extraction (Jobcost vs EmployeesPage) (§3).
-- `<TextInput>`/`<SearchField>`, `NavSectionHint`/`NavReportsHint` merge,
-  and pushing remaining pages onto `SkelText`/`ChartSkeletons` (§4).
+- Pushing remaining pages' bespoke skeleton markup (`MetricGrid`'s
+  `.rpt-tile--skeleton`, `CostBreakdownTable`'s `.skel-line`/`.jc-skel-num`)
+  onto `SkelText`/`ChartSkeletons` (§4).
+
+---
+
+## Round 2 (branch `ui-consolidation-2`, merged into `ui-consolidation`'s successor on main)
+
+Picked back up after merging round 1. Same verification discipline (`tsc -b`
++ lint diff against a stash + full `vite build` before every commit), plus
+two bugs found and fixed mid-round-1 that are worth remembering:
+- **`useItemDrilldown`'s `window` parameter shadowed the global `window`**,
+  crashing `openItem()`'s analytics call whenever no DateRange was passed —
+  silently breaking the Activity modal's drill-down click. Pre-existing,
+  predated this work; fixed by renaming the local binding.
+- **The `isTopLayer` modal-stacking-lag fix had its own bug**: the
+  `slot === null` fallback (meant for the one render before mount) also
+  fired after a modal *released* its slot on close, so closing a 3-deep
+  modal stack re-triggered blur on every layer mid-exit-animation — the
+  opposite of the intended fix. Caught by the user reporting continued lag
+  specifically on close; fixed by dropping the null fallback.
+Lesson from both: a clean `tsc -b`/build is necessary but not sufficient —
+neither bug was a type error, both were runtime-only.
+
+**Shipped this round:**
+1. **`<Badge>` component** (`shared/components/Badge.tsx`) — merged
+   `.invoice-status-badge` and `.ewl-badge`, which turned out to have
+   byte-identical color values for red/amber/green (only gray differed:
+   literal slate vs theme-aware `var(--secondary-text)`, kept as separate
+   `gray`/`muted` tones). `size="compact"|"standard"` preserves each site's
+   original geometry exactly. Also deduped the invoice-status label+color
+   maps copy-pasted across 6 files into `shared/utils/invoiceStatus.ts`.
+   **Deliberately left out**: `.status-badge`, `.jc-status-badge`,
+   `.inv-type-badge`, `.org-cat-pill`, `.usr-column-badge`, `.bank-pill` —
+   each has at least one genuinely distinct color/geometry value (verified
+   by reading the CSS, not assumed), so merging them risked an unverifiable
+   visual change.
+2. **`NavSectionHint`/`NavReportsHint` merge** — `NavReportsHint` was the
+   older of the two (predated the `coachTargets.ts` registry, found its
+   anchor via `document.querySelector`, no `ResizeObserver`, snapped away
+   instantly on dismiss instead of animating out). Registered `nav-reports`
+   as a proper `CoachTargetId` and replaced it with a second `NavSectionHint`
+   instance. Deleted the standalone component.
+3. **`<SearchField>` component** (`shared/components/SearchField.tsx`) —
+   the "wrapper div + positioned Search icon + bare input" block was
+   byte-identical (only placeholder text differed) across 9 call sites.
+   `variant` selects the CSS class family (`co`/`jc`/`invoices`) so each
+   surface keeps its exact original look.
+
+**Still deferred**: the columns-config `<DataTable>` (§1 — the biggest
+remaining item, needs per-table browser verification), `ExpandableProjectCard`
+extraction, and skeleton consolidation. `.status-badge`/`.jc-status-badge`/
+`.inv-type-badge`/`.org-cat-pill`/`.usr-column-badge`/`.bank-pill` remain
+un-migrated by design (see above).
 
 ---
 
