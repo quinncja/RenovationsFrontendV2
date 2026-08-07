@@ -27,7 +27,7 @@ export default function FeedbackPage() {
   const [type, setType] = useState<"Bug" | "Suggestion">("Bug")
   const [message, setMessage] = useState("")
   const [submitting, setSubmitting] = useState(false)
-  const { overlayZ, contentZ } = useModalLayer(showModal)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(showModal)
 
   const loadFeedback = useCallback(() => {
     setLoading(true)
@@ -122,7 +122,7 @@ export default function FeedbackPage() {
           {showModal && (
             <>
               <motion.div
-                className="modal-overlay"
+                className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
                 style={{ zIndex: overlayZ }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

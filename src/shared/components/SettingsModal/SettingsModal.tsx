@@ -37,7 +37,7 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
   const [jobcostDefaultRange, setJobcostDefaultRange] = useJobcostDefaultRange()
   const [sqlConnected, setSqlConnected] = useState<boolean | null>(null)
   const [sqlLoading, setSqlLoading] = useState(false)
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
 
   // Fetch SQL status when modal opens (admin only)
   useEffect(() => {
@@ -73,7 +73,7 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

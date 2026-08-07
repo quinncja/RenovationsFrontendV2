@@ -350,7 +350,7 @@ function KindJobsModal({ open, title, members, showContract, marginColorsOn, onC
   onClose: () => void
   onOpen: (m: Member) => void
 }) {
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   const contract = members.reduce((s, m) => s + m.contract, 0)
   const subtitle = [
     `${members.length} job${members.length === 1 ? "" : "s"}`,
@@ -362,7 +362,7 @@ function KindJobsModal({ open, title, members, showContract, marginColorsOn, onC
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

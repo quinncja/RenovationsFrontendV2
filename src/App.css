@@ -2535,7 +2535,16 @@ span.skel-text {
   inset: 0;
   background: rgba(0, 0, 0, 0.55);
   z-index: 200;
+}
+
+/* Blur is opt-in (see useModalLayer's isTopLayer) — only the outermost
+   stacked modal's overlay applies it. Stacking several full-viewport
+   backdrop-filter layers is the classic cause of modal lag once 2-3 modals
+   are open at once; every lower overlay's blur is redundant anyway, since
+   the topmost overlay already blurs everything beneath it. */
+.modal-overlay--blur {
   backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .modal {

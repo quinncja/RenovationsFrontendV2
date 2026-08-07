@@ -181,7 +181,7 @@ function OverheadCategoryModal({
 }) {
   const open = category !== null
   const sort = useTableSort<ModalSortKey>("date", "desc")
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
 
   const rows = useMemo(() => {
     if (!category || !Array.isArray(lineItems)) return []
@@ -215,7 +215,7 @@ function OverheadCategoryModal({
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -347,7 +347,7 @@ function OtherCategoriesModal({
   onSelect: (id: string) => void
   onClose: () => void
 }) {
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   const otherTotal = categories.reduce((s, c) => s + (c.current_amount || 0), 0)
 
   return createPortal(
@@ -355,7 +355,7 @@ function OtherCategoriesModal({
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

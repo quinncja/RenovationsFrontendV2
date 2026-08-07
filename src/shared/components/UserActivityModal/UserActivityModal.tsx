@@ -104,7 +104,7 @@ const ROLE_CLASS: Record<string, string> = {
 
 export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech = false, showEngagement = false, onClose, onRoleChange }: UserActivityModalProps) {
   const isMobile = useIsMobile()
-  const { overlayZ, contentZ } = useModalLayer(!!user)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(!!user)
   // The engagement analytics are desktop-only context: on mobile we keep the
   // compact modal and skip them entirely (no fetch, no render).
   const engagementVisible = showEngagement && !isMobile
@@ -258,7 +258,7 @@ export function UserActivityModal({ user, isAdmin, isExecutive = false, isTech =
       {user && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

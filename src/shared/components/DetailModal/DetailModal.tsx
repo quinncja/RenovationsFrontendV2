@@ -31,7 +31,7 @@ export function DetailModal({
   onClose: () => void
   children: ReactNode
 }) {
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   // "View project" navigates while this modal (and any stack above it, e.g. the
   // daily recap) stays mounted — a route change must dismiss it.
   useCloseOnRouteChange(open, onClose)
@@ -41,7 +41,7 @@ export function DetailModal({
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

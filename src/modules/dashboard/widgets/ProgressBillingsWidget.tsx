@@ -69,7 +69,7 @@ function ProgressBillingsModal({
 }) {
   // Default to the most under-billed at the top (largest positive variance).
   const sort = useTableSort<PbSortKey>("variance", "desc")
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   const sorted = useMemo(
     () =>
       applySort(projects, sort, (p, key) =>
@@ -92,7 +92,7 @@ function ProgressBillingsModal({
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

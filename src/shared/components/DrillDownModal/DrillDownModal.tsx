@@ -47,7 +47,7 @@ export function DrillDownModal({
   rows,
   onRowClick,
 }: DrillDownModalProps) {
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   // Largest total first — the pie slice the user clicked reads top-down.
   const sort = useTableSort<DrillSortKey>("total", "desc")
   const sorted = useMemo(
@@ -70,7 +70,7 @@ export function DrillDownModal({
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

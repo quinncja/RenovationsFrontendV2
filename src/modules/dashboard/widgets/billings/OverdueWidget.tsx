@@ -31,7 +31,7 @@ function OverdueModal({
   onSelectInvoice: (recnum: string) => void
 }) {
   const sort = useTableSort<SortKey>("daysOverdue", "desc")
-  const { overlayZ, contentZ } = useModalLayer(!!side)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(!!side)
   const invoices = useMemo(
     () => (side ? buildOverdueInvoices(rows, new Date(), side) : []),
     [rows, side]
@@ -57,7 +57,7 @@ function OverdueModal({
       {side && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

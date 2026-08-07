@@ -209,7 +209,7 @@ function ChangeOrderListModal({ open, onClose, changeOrders, originalContract, o
   originalContract: number
   onSelect: (co: ChangeOrder) => void
 }) {
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   const sort = useTableSort<CoSortKey>()
   const sorted = applySort(changeOrders, sort, (co, key) => {
     switch (key) {
@@ -233,7 +233,7 @@ function ChangeOrderListModal({ open, onClose, changeOrders, originalContract, o
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

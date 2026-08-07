@@ -125,7 +125,7 @@ export function ReportWidget({ reportId, compact = false }: { reportId: ReportWi
   const { goToJobcost } = useJobcostNav()
 
   const [open, setOpen] = useState(false)
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
 
   // Rows in this modal correspond to jobs flagged by the data-validation
   // queries; clicking the Job / Job # cells jumps to the job detail page so
@@ -189,7 +189,7 @@ export function ReportWidget({ reportId, compact = false }: { reportId: ReportWi
           {open && (
             <>
               <motion.div
-                className="modal-overlay"
+                className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
                 style={{ zIndex: overlayZ }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
