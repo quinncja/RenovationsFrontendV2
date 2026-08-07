@@ -3,7 +3,7 @@ import { formatMoney, formatRelativeTime } from "../../../shared/utils/format"
 import { useJobcostNav } from "../../jobcost/useJobcostNav"
 import { SortTh, type SortDir } from "../../../shared/components/SortTh"
 import { Badge, type BadgeTone } from "../../../shared/components/Badge"
-import type { PmWorkload, WorkloadJob } from "./workload"
+import type { PmWorkload } from "./workload"
 
 // Workload lens pieces — "who can take the next job". Each PM's card head
 // (EmployeesPage) carries how much open work they hold (remaining budget, not
