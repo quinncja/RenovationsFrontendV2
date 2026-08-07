@@ -86,6 +86,50 @@ export function sectionLabel(id: string | null): string {
   return (SECTION_LABELS as Record<string, string>)[id] ?? id
 }
 
+// Endpoint → friendly name for the session request list. Unknown endpoints fall
+// back to the raw path, which is still meaningful to a technical reader.
+const ENDPOINT_LABELS: Record<string, string> = {
+  "/home-data": "Dashboard data",
+  "/jobcost": "Job cost data",
+  "/jobcost-data": "Job cost data",
+  "/jobcost-items": "Cost items",
+  "/change-orders": "Change orders",
+  "/user-list": "User list",
+  "/project-list": "Project list",
+  "/project-list-data": "Project list data",
+  "/project-phase-data": "Project phases",
+  "/feedback": "Feedback",
+  "/monday/process-boards": "Org chart",
+}
+
+/**
+ * Human-readable breakdown of one recorded backend request. `title` names the
+ * endpoint; `queries` lists the dispatch queries it batched (the `queries=`
+ * param, the real payload of /home-data-style calls); `params` is the leftover
+ * query params as compact `key=value` text (null when there are none).
+ */
+export function describeRequest(endpoint: string, query: string | null): {
+  title: string
+  queries: string[]
+  params: string | null
+} {
+  const title = ENDPOINT_LABELS[endpoint] ?? endpoint
+  let queries: string[] = []
+  const rest: string[] = []
+  if (query) {
+    try {
+      const sp = new URLSearchParams(query)
+      for (const [key, value] of sp.entries()) {
+        if (key === "queries") queries = value.split(",").filter(Boolean)
+        else if (key !== "timezone") rest.push(value === "" ? key : `${key}=${value}`)
+      }
+    } catch {
+      rest.push(query)
+    }
+  }
+  return { title, queries, params: rest.length ? rest.join(" · ") : null }
+}
+
 export function pageLabel(path: string): string {
   const hit = PAGE_LABELS.find(([prefix]) => path === prefix || path.startsWith(prefix + "/"))
   return hit ? hit[1] : path

@@ -35,6 +35,16 @@ export interface ProjectEngagement {
   userCount?: number // company view only
 }
 
+/** One distinct backend request made during a session: the endpoint plus the
+ * raw query string (which, for query-dispatch endpoints like /home-data, names
+ * the actual queries fetched), with how many times it fired. */
+export interface SessionRequest {
+  endpoint: string
+  method: string | null
+  query: string | null
+  count: number
+}
+
 /** One reconstructed browsing session, most-recent first — ALL sessions, brief
  * visits included; `engaged` is a classification, not an admission rule. Counts
  * are exact; the enumerated `pages`/`projects`/`widgets` lists are capped
@@ -66,6 +76,9 @@ export interface SessionSummary {
   pages: string[]
   projects: Array<{ recnum: string; name: string | null }>
   widgets: Array<{ widgetId: string; section: string | null }>
+  /** Distinct backend requests, busiest first (capped server-side). Absent
+   * from a pre-cutover backend. */
+  requests?: SessionRequest[]
 }
 
 export interface UserEngagement {

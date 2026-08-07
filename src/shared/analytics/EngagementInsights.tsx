@@ -3,7 +3,7 @@ import { createPortal } from "react-dom"
 import { X, ChevronRight } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import type { WidgetEngagement, PageEngagement, ProjectEngagement, SessionSummary } from "./engagementApi"
-import { widgetLabel, sectionLabel, pageLabel, formatDuration } from "./labels"
+import { widgetLabel, sectionLabel, pageLabel, describeRequest, formatDuration } from "./labels"
 import { useModalLayer } from "../hooks/useModalLayer"
 import { SkelText } from "../components/SkelText"
 
@@ -488,7 +488,8 @@ function SessCount({ n, noun }: { n: number; noun: string }) {
 function SessionRow({ s }: { s: SessionSummary }) {
   const [open, setOpen] = useState(false)
   const { date, time } = fmtSessionWhen(s.startedAt)
-  const hasDetail = s.pages.length > 0 || s.projects.length > 0 || s.widgets.length > 0
+  const requests = s.requests ?? []
+  const hasDetail = s.pages.length > 0 || s.projects.length > 0 || s.widgets.length > 0 || requests.length > 0
   // Pre-cutover backends omit `engaged` — everything they return WAS engaged.
   const engaged = s.engaged ?? true
   const duration = s.durationMs && s.durationMs >= 1000 ? formatDuration(s.durationMs) : null
@@ -582,6 +583,29 @@ function SessionRow({ s }: { s: SessionSummary }) {
                         {widgetLabel(w.widgetId)}
                       </span>
                     ))}
+                  </div>
+                </div>
+              )}
+              {requests.length > 0 && (
+                <div className="eng-sess-group">
+                  <span className="eng-sess-group-label">Requests</span>
+                  <div className="eng-sess-reqs">
+                    {requests.map((r, i) => {
+                      const d = describeRequest(r.endpoint, r.query)
+                      return (
+                        <div className="eng-sess-req" key={`${r.endpoint}-${r.query ?? ""}-${i}`}>
+                          <span className="eng-sess-req-name">
+                            {r.method && r.method !== "GET" ? `${r.method} ` : ""}
+                            {d.title}
+                            {r.count > 1 && <span className="eng-sess-req-count">×{r.count}</span>}
+                          </span>
+                          {d.queries.length > 0 && (
+                            <span className="eng-sess-req-queries">{d.queries.join(", ")}</span>
+                          )}
+                          {d.params && <span className="eng-sess-req-params">{d.params}</span>}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
