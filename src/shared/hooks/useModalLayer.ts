@@ -103,6 +103,17 @@ export function useModalLayer(active: boolean): ModalLayer {
   return {
     overlayZ: base,
     contentZ: base + 1,
-    isTopLayer: slot === null || slot === currentMaxSlot,
+    // slot is null for one render before mount (acquire hasn't run yet, safe
+    // to render un-blurred — AnimatePresence's initial opacity is 0 for that
+    // frame anyway) AND, critically, for every render *after* this modal has
+    // released its slot on close. Treating null as "top" was the bug: once a
+    // closing modal's cleanup fires (releaseSlot → setSlot(null)), it would
+    // re-report isTopLayer=true and reapply blur mid-exit-animation — and
+    // releaseSlot's notify() forces every other still-exiting modal in the
+    // stack through the same recompute at the same moment. That's exactly
+    // the "closing 3 stacked modals at once" case: three layers each
+    // re-blurring themselves while running their own exit transition,
+    // simultaneously with the destination route mounting.
+    isTopLayer: slot !== null && slot === currentMaxSlot,
   }
 }
