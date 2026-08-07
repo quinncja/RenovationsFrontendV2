@@ -185,9 +185,9 @@ function buildRailSibs(rows: RailRow[], slug: string): RailSib[] {
   const phases = members.filter(m => !m.oneoff).sort((a, b) => Number(a.recnum) - Number(b.recnum))
   const oneoffs = members.filter(m => m.oneoff).sort((a, b) => Number(a.recnum) - Number(b.recnum))
   // "P3" alone is ambiguous once the property spans years — add 'YY then.
-  const multiYear = new Set(phases.map(p => (/^\d{8}$/.test(p.recnum) ? p.recnum.slice(0, 2) : ""))).size > 1
+  const multiYear = new Set(phases.map(p => (/^\d{8,9}$/.test(p.recnum) ? p.recnum.slice(0, 2) : ""))).size > 1
   const phaseLabel = (rec: string) => {
-    if (/^\d{8}$/.test(rec)) {
+    if (/^\d{8,9}$/.test(rec)) {
       const mm = Number(rec.slice(-2))
       if (mm >= 1 && mm <= 12) return `P${mm}${multiYear ? ` '${rec.slice(0, 2)}` : ""}`
     }
@@ -817,7 +817,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                   present; the recnum suffix (01–12 = phase month) is the
                   fallback, so it still renders before data lands. */}
               {!isMobile && (() => {
-                const suffix = /^\d{8}$/.test(recnum) ? Number(recnum.slice(-2)) : null
+                const suffix = /^\d{8,9}$/.test(recnum) ? Number(recnum.slice(-2)) : null
                 const isOneOff = project?.oneoff != null ? project.oneoff === 1 : oneoffFromRecnum(recnum)
                 const isPhaseJob = !isOneOff && suffix != null && suffix >= 1 && suffix <= 12
                 // layout="position": when the hero grows on data arrival the

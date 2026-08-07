@@ -128,7 +128,7 @@ function normalizeMember(p: RawPhaseRow): Member {
   const updatedDate = parseValidDate(p.updatedDate)
   let phaseNum: number | null = null
   let monthKey: string | null = null
-  if (!oneoff && /^\d{8}$/.test(recnum)) {
+  if (!oneoff && /^\d{8,9}$/.test(recnum)) {
     const yy = Number(recnum.slice(0, 2))
     const mm = Number(recnum.slice(-2))
     if (mm >= 1 && mm <= 12) {
