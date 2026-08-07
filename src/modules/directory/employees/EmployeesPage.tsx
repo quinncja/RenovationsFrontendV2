@@ -23,7 +23,8 @@ import useIsMobile from "../../../shared/hooks/useIsMobile"
 import { EmployeeAvatar } from "../../../shared/components/EmployeeAvatar/EmployeeAvatar"
 import { useJobcostNav } from "../../jobcost/useJobcostNav"
 import { JOB_STATUS_LABELS } from "../directoryShared"
-import { SortTh } from "./SortTh"
+import { SortTh } from "../../../shared/components/SortTh"
+import { SEG_SPRING } from "../../../shared/animation/springs"
 import { CompositionBar, RiskBadges, OpenJobsPanel, ClientMixStrip, clientShares } from "./WorkloadView"
 import { deriveWorkload, oneoffDisplayName, type EmployeeWorkloadPayload, type PmWorkload } from "./workload"
 
@@ -97,7 +98,6 @@ const PERF_SORT_OPTIONS: { key: PerfSortKey; label: string }[] = [
 
 // Same springs/tweens as the Job Costing view this page borrows its card
 // language from: seg thumb spring, card entrance, body expand.
-const SEG_SPRING: Transition = { type: "spring", bounce: 0.15, visualDuration: 0.35 }
 const ENTRANCE_EASE = [0.25, 0.46, 0.45, 0.94] as const
 const EXPAND: Transition = { duration: 0.38, ease: [0.4, 0, 0.2, 1] }
 
@@ -729,7 +729,14 @@ function PerfPhasesPanel({ phases }: { phases: PerfPhase[] }) {
             {sorted.map((phase) => {
               const variance = (phase.budget ?? 0) - (phase.totalCost ?? 0)
               return (
-                <tr key={phase.recnum} className="clickable-row" onClick={() => goToJobcost(phase.recnum)}>
+                <tr
+                  key={phase.recnum}
+                  className="clickable-row"
+                  onClick={() => goToJobcost(phase.recnum)}
+                  tabIndex={0}
+                  role="button"
+                  onKeyDown={(e) => e.key === "Enter" && goToJobcost(phase.recnum)}
+                >
                   <td>
                     <div className="cell-primary">{oneoffDisplayName(phase)}</div>
                     <div className="cell-secondary">#{phase.recnum}</div>

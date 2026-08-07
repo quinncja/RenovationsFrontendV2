@@ -68,6 +68,9 @@ export function EmployeePerformanceWidget() {
                   key={emp.employeeNum}
                   className="clickable-row"
                   onClick={() => navigate(`/employees/${emp.employeeNum}`)}
+                  tabIndex={0}
+                  role="button"
+                  onKeyDown={(e) => e.key === "Enter" && navigate(`/employees/${emp.employeeNum}`)}
                 >
                   <td>
                     <div className="emp-perf-name-cell">

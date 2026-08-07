@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react"
-import { motion } from "framer-motion"
 import Page from "../../../shared/components/Page"
-import { SEG_SPRING } from "../../jobcost/Jobcost"
+import { SegmentedControl } from "../../../shared/components/SegmentedControl"
 import { Widget } from "../../../shared/components/Widget/Widget"
 import { MotionList, MotionItem } from "../../../shared/components/MotionList/MotionList"
 import { useAuth } from "../../../core/auth/AuthProvider"
@@ -81,24 +80,14 @@ export default function ReportsPage() {
           {/* Same recessed-well segmented control as the jobcost command bar
               (.jc-seg + sliding copper thumb); the day-select pill shares the
               thumb's layoutId so picking a day glides it over there. */}
-          <div className="jc-seg" role="tablist" aria-label="Report window">
-            {PRESETS.map(({ key, label }) => {
-              const active = sel.kind === "preset" && sel.preset === key
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  className={`jc-seg-btn${active ? " jc-seg-btn-active" : ""}`}
-                  onClick={() => setSel({ kind: "preset", preset: key })}
-                >
-                  {active && <motion.span layoutId="rptRangeThumb" className="jc-seg-thumb" transition={SEG_SPRING} />}
-                  <span className="jc-seg-label">{label}</span>
-                </button>
-              )
-            })}
-          </div>
+          <SegmentedControl
+            variant="jc"
+            ariaLabel="Report window"
+            layoutId="rptRangeThumb"
+            value={sel.kind === "preset" ? sel.preset : null}
+            options={PRESETS}
+            onChange={(key) => setSel({ kind: "preset", preset: key })}
+          />
           <MiniCalendarPopover
             value={sel.kind === "day" ? sel.day : null}
             max={today}

@@ -23,7 +23,7 @@ export const INTRO_PROJECT_BLOCK =
 
 export function useItemDrilldown({
   backLabel,
-  window,
+  window: reportWindow,
   blockProjectNav = false,
 }: {
   /** Jobcost back-button label for "View project" (see useJobcostNav). */
@@ -48,7 +48,7 @@ export function useItemDrilldown({
       type: "widget_click",
       widgetId: "recapItem",
       section: "recap",
-      page: window.location.pathname,
+      page: window.location.pathname, // global window — the report range is `reportWindow`
       source: item.kind,
     })
     if (item.kind === "arInvoice") setInvoice({ id: item.id, module: "clients" })
@@ -65,7 +65,7 @@ export function useItemDrilldown({
         item={selected}
         onClose={() => setSelected(null)}
         onViewProject={(jobId) => goToJobcost(jobId, { backLabel })}
-        window={window}
+        window={reportWindow}
         projectBlockedReason={projectBlockedReason}
       />
       <InvoiceDetailModal

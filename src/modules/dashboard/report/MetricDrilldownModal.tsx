@@ -35,7 +35,7 @@ export function MetricDrilldownModal({
   onClose: () => void
 }) {
   const open = metric !== null
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   // The item drill-downs below can navigate ("View project") while this list —
   // mounted above the routes — stays up; a route change dismisses it.
   useCloseOnRouteChange(open, onClose)
@@ -51,7 +51,7 @@ export function MetricDrilldownModal({
         {open && def && (
           <>
             <motion.div
-              className="modal-overlay"
+              className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
               style={{ zIndex: overlayZ }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

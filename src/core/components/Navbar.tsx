@@ -205,7 +205,19 @@ function Navbar({ veil = "off" }: { veil?: NavbarVeil }) {
         ref={(el) => registerCoachTarget("navbar", el)}
         className={`navbar ${isOpen ? "navbar-open" : ""}${veil !== "off" ? " navbar--tour" : ""}${veil === "veiled" ? " navbar--veiled" : ""}`}
       >
-        <div className="logo-wrapper" onClick={() => navigate("/dashboard", { state: { resetHome: true } })}>
+        <div
+          className="logo-wrapper"
+          onClick={() => navigate("/dashboard", { state: { resetHome: true } })}
+          role="button"
+          tabIndex={0}
+          aria-label="Go to dashboard"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault()
+              navigate("/dashboard", { state: { resetHome: true } })
+            }
+          }}
+        >
           <div className="logo-icon">
             <Logo size={32} />
           </div>

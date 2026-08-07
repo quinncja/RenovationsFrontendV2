@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useJobcostNav } from "../jobcost/useJobcostNav"
-import { Search, Plus, ArrowUpDown, ArrowUp, ArrowDown, Upload } from "lucide-react"
+import { Search, Plus, Upload } from "lucide-react"
 import Page from "../../shared/components/Page"
+import { SortTh } from "../../shared/components/SortTh"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
@@ -23,28 +24,6 @@ import { ChangeOrderModal, type CreateChangeOrderConfig } from "./components/Cha
 type SortKey = "name" | "job" | "budget" | "markup" | "total" | "user" | "date"
 type SortDir = "asc" | "desc"
 
-function SortTh({ col, label, align = "left", sortKey, sortDir, onSort }: {
-  col: SortKey
-  label: string
-  align?: "left" | "right"
-  sortKey: SortKey
-  sortDir: SortDir
-  onSort: (k: SortKey) => void
-}) {
-  const active = sortKey === col
-  const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
-  const thClass = align === "right" ? "spend-rank-table-value" : "spend-rank-table-name"
-  return (
-    <th className={thClass}>
-      <button
-        className={`co-th-btn${align === "right" ? " co-th-btn-right" : ""}${active ? " co-th-btn-active" : ""}`}
-        onClick={() => onSort(col)}
-      >
-        {label} <Icon size={11} />
-      </button>
-    </th>
-  )
-}
 
 export default function ChangeOrdersPage() {
   const { goToJobcost } = useJobcostNav()
@@ -178,15 +157,15 @@ export default function ChangeOrdersPage() {
               <table className="spend-rank-table">
                 <thead>
                   <tr>
-                    <SortTh col="name" label="Name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="job" label="Project" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh spendRank col="name" label="Name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh spendRank col="job" label="Project" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <th className="spend-rank-table-name">Units</th>
-                    <SortTh col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="markup" label="Markup" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="total" label="Total Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh spendRank col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh spendRank col="markup" label="Markup" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh spendRank col="total" label="Total Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <th aria-hidden="true" style={{ width: "100%" }} />
-                    <SortTh col="user" label="Submitted By" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="date" label="Date" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh spendRank col="user" label="Submitted By" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh spendRank col="date" label="Date" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                   </tr>
                 </thead>
                 <tbody>

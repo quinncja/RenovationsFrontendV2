@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
 import { formatMoney, formatRelativeTime } from "../../../shared/utils/format"
 import { useJobcostNav } from "../../jobcost/useJobcostNav"
-import { SortTh, type SortDir } from "./SortTh"
+import { SortTh, type SortDir } from "../../../shared/components/SortTh"
 import type { PmWorkload, WorkloadJob } from "./workload"
 
 // Workload lens pieces — "who can take the next job". Each PM's card head
@@ -206,7 +206,14 @@ export function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
           </thead>
           <tbody>
             {sorted.map((job) => (
-              <tr key={job.recnum} className="clickable-row" onClick={() => goToJobcost(job.recnum)}>
+              <tr
+                key={job.recnum}
+                className="clickable-row"
+                onClick={() => goToJobcost(job.recnum)}
+                tabIndex={0}
+                role="button"
+                onKeyDown={(e) => e.key === "Enter" && goToJobcost(job.recnum)}
+              >
                 <td>
                   <div className="cell-primary ewl-name-line">
                     {job.name}

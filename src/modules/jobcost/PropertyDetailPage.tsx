@@ -25,13 +25,13 @@ import {
   SummaryRow,
   JobTable,
   normalizeProject,
-  SEG_SPRING,
   type Job,
   type JobDetail,
   type RawProject,
   type SortKey,
   type SortDir,
 } from "./Jobcost"
+import { SegmentedControl } from "../../shared/components/SegmentedControl"
 import { Fact, Meta } from "./detailPrimitives"
 import { oneoffFromRecnum, parseValidDate, fmtLongDate, propertySlug } from "./jobcostShared"
 import { JOBCOST_BACK_FALLBACK, useJobcostNav, type JobcostBackState } from "./useJobcostNav"
@@ -128,7 +128,7 @@ function normalizeMember(p: RawPhaseRow): Member {
   const updatedDate = parseValidDate(p.updatedDate)
   let phaseNum: number | null = null
   let monthKey: string | null = null
-  if (!oneoff && /^\d{8}$/.test(recnum)) {
+  if (!oneoff && /^\d{8,9}$/.test(recnum)) {
     const yy = Number(recnum.slice(0, 2))
     const mm = Number(recnum.slice(-2))
     if (mm >= 1 && mm <= 12) {
@@ -350,7 +350,7 @@ function KindJobsModal({ open, title, members, showContract, marginColorsOn, onC
   onClose: () => void
   onOpen: (m: Member) => void
 }) {
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   const contract = members.reduce((s, m) => s + m.contract, 0)
   const subtitle = [
     `${members.length} job${members.length === 1 ? "" : "s"}`,
@@ -362,7 +362,7 @@ function KindJobsModal({ open, title, members, showContract, marginColorsOn, onC
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -647,50 +647,41 @@ function JobsSection({ jobRows, pmStats, isLoading, isManager, marginColorsOn, c
               deck's copper-thumb seg control. */}
           <div className="jc-command-bar pd-jobs-bar">
             {pmStats.length > 0 && (
-              <div className="jc-seg pd-pm-seg" role="group" aria-label="Filter jobs by project manager">
-                <button
-                  type="button"
-                  className={`jc-seg-btn${pmFilter == null ? " jc-seg-btn-active" : ""}`}
-                  aria-pressed={pmFilter == null}
-                  onClick={() => setPmFilter(null)}
-                >
-                  {pmFilter == null && (
-                    <motion.span layoutId="pdPmThumb" className="jc-seg-thumb" transition={SEG_SPRING} />
-                  )}
-                  <span className="jc-seg-label">All</span>
-                </button>
-                {pmStats.map((s) => {
-                  const pmMargin = s.contract > 0 ? ((s.contract - s.cost) / s.contract) * 100 : null
-                  const active = pmFilter === s.name
-                  return (
-                    <button
-                      key={s.name}
-                      type="button"
-                      className={`jc-seg-btn${active ? " jc-seg-btn-active" : ""}`}
-                      aria-pressed={active}
-                      title={active ? "Clear PM filter" : `Show only ${s.name}'s jobs`}
-                      onClick={() => setPmFilter(active ? null : s.name)}
-                    >
-                      {active && (
-                        <motion.span layoutId="pdPmThumb" className="jc-seg-thumb" transition={SEG_SPRING} />
-                      )}
-                      <span className="jc-seg-label pd-pm-seg-label">
-                        {s.name}
-                        {pmMargin != null && (
-                          <span
-                            className="pd-pm-seg-margin"
-                            // Margin-scale color only off the copper thumb —
-                            // on it, the class's white keeps the text legible.
-                            style={!active && marginColorsOn ? { color: marginTextColor(pmMargin) } : undefined}
-                          >
-                            {pmMargin.toFixed(1)}%
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
+              <SegmentedControl
+                variant="jc"
+                role="group"
+                ariaLabel="Filter jobs by project manager"
+                className="pd-pm-seg"
+                layoutId="pdPmThumb"
+                value={pmFilter ?? "__all__"}
+                onChange={(k) => setPmFilter(k === "__all__" || k === pmFilter ? null : k)}
+                options={[
+                  { key: "__all__", label: "All" },
+                  ...pmStats.map((s) => {
+                    const pmMargin = s.contract > 0 ? ((s.contract - s.cost) / s.contract) * 100 : null
+                    const active = pmFilter === s.name
+                    return {
+                      key: s.name,
+                      title: active ? "Clear PM filter" : `Show only ${s.name}'s jobs`,
+                      label: (
+                        <span className="pd-pm-seg-label">
+                          {s.name}
+                          {pmMargin != null && (
+                            <span
+                              className="pd-pm-seg-margin"
+                              // Margin-scale color only off the copper thumb —
+                              // on it, the class's white keeps the text legible.
+                              style={!active && marginColorsOn ? { color: marginTextColor(pmMargin) } : undefined}
+                            >
+                              {pmMargin.toFixed(1)}%
+                            </span>
+                          )}
+                        </span>
+                      ),
+                    }
+                  }),
+                ]}
+              />
             )}
             {/* Drill-through to the filtered PM's page. Permanently mounted
                 (invisible when no PM is filtered) so showing it never moves

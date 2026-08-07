@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react"
-import { SEG_SPRING } from "../../jobcost/Jobcost"
+import { SEG_SPRING } from "../../../shared/animation/springs"
 import { addDays } from "./chicagoDate"
 
 // ─── Month grid ──────────────────────────────────────────────────────────────

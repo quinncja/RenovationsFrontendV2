@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useSyncExternalStore } from "react"
 
 // ─── Modal stacking ──────────────────────────────────────────────────────────
 //
@@ -22,16 +22,37 @@ const BASE_Z = 200
 const LAYER_STEP = 10
 
 const takenSlots = new Set<number>()
+const listeners = new Set<() => void>()
+
+function notify(): void {
+  for (const l of listeners) l()
+}
+
+function subscribe(cb: () => void): () => void {
+  listeners.add(cb)
+  return () => listeners.delete(cb)
+}
+
+// Highest currently-taken slot = the outermost open modal. Recomputed on
+// every subscriber notification rather than cached, since the stack is
+// shallow (a handful of slots at most) and this only runs on open/close.
+function maxSlot(): number {
+  let max = -1
+  for (const s of takenSlots) if (s > max) max = s
+  return max
+}
 
 function acquireSlot(): number {
   let slot = 0
   while (takenSlots.has(slot)) slot++
   takenSlots.add(slot)
+  notify()
   return slot
 }
 
 function releaseSlot(slot: number): void {
   takenSlots.delete(slot)
+  notify()
 }
 
 export interface ModalLayer {
@@ -39,6 +60,15 @@ export interface ModalLayer {
   overlayZ: number
   /** z-index for the `.modal-positioner` (or the `.modal` itself when no positioner). */
   contentZ: number
+  /**
+   * True while this is the outermost open modal. Stacking N full-viewport
+   * `backdrop-filter: blur()` layers is expensive and the cost compounds
+   * with depth — but only the topmost overlay's blur is ever visible (it
+   * blurs everything beneath it, including any blur the layers below already
+   * applied), so lower layers can skip the filter for free. Each modal's
+   * overlay should apply `backdrop-filter` only when `isTopLayer` is true.
+   */
+  isTopLayer: boolean
 }
 
 /**
@@ -64,6 +94,26 @@ export function useModalLayer(active: boolean): ModalLayer {
     }
   }, [active])
 
+  // Recomputed whenever any modal acquires/releases a slot, so the modal that
+  // just lost "topmost" (a new one opened above it) re-renders and drops its
+  // blur, and the one left on top after a close regains it.
+  const currentMaxSlot = useSyncExternalStore(subscribe, maxSlot, maxSlot)
+
   const base = BASE_Z + (slot ?? 0) * LAYER_STEP
-  return { overlayZ: base, contentZ: base + 1 }
+  return {
+    overlayZ: base,
+    contentZ: base + 1,
+    // slot is null for one render before mount (acquire hasn't run yet, safe
+    // to render un-blurred — AnimatePresence's initial opacity is 0 for that
+    // frame anyway) AND, critically, for every render *after* this modal has
+    // released its slot on close. Treating null as "top" was the bug: once a
+    // closing modal's cleanup fires (releaseSlot → setSlot(null)), it would
+    // re-report isTopLayer=true and reapply blur mid-exit-animation — and
+    // releaseSlot's notify() forces every other still-exiting modal in the
+    // stack through the same recompute at the same moment. That's exactly
+    // the "closing 3 stacked modals at once" case: three layers each
+    // re-blurring themselves while running their own exit transition,
+    // simultaneously with the destination route mounting.
+    isTopLayer: slot !== null && slot === currentMaxSlot,
+  }
 }

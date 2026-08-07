@@ -212,7 +212,14 @@ export default function Invoices() {
           </thead>
           <tbody>
             {filtered.map(inv => (
-              <tr key={inv.id} className="clickable-row" onClick={() => setSelected(inv)}>
+              <tr
+                key={inv.id}
+                className="clickable-row"
+                onClick={() => setSelected(inv)}
+                tabIndex={0}
+                role="button"
+                onKeyDown={(e) => e.key === "Enter" && setSelected(inv)}
+              >
                 <td><span className={`inv-type-badge inv-type-badge--${inv.type.toLowerCase()}`}>{inv.type}</span></td>
                 <td>{inv.invoiceNum}</td>
                 <td>{inv.entityName || "—"}</td>

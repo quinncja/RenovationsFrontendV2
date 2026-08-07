@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ReactNode } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { X, Sun, Moon, Database, LogOut } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { signOut } from "firebase/auth"
@@ -9,51 +9,13 @@ import useLocalStorage from "../../hooks/useLocalStorage"
 import { HASHED_RELATION_COLORS_KEY } from "../../hooks/useHashedRelationColors"
 import useJobcostDefaultRange, { JOBCOST_DEFAULT_RANGE_OPTIONS } from "../../hooks/useJobcostDefaultRange"
 import { useModalLayer } from "../../hooks/useModalLayer"
+import { SegmentedControl } from "../SegmentedControl"
 
 interface SettingsModalProps {
   open: boolean
   onClose: () => void
   theme: "light" | "dark"
   onThemeChange: (theme: "light" | "dark") => void
-}
-
-// Same spring as the Job Costing board's segmented thumbs (SEG_SPRING in
-// Jobcost.tsx) — duplicated rather than imported so the settings modal doesn't
-// pull the lazy Jobcost chunk into the shell bundle.
-const SEG_SPRING = { type: "spring", bounce: 0.15, visualDuration: 0.35 } as const
-
-// One segmented toggle in the settings' deck grammar: recessed well, sliding
-// copper thumb (each control owns a layoutId so thumbs glide independently).
-function SettingsSeg<K extends string>({
-  label,
-  layoutId,
-  value,
-  options,
-  onChange,
-}: {
-  label: string
-  layoutId: string
-  value: K
-  options: readonly { key: K; label: ReactNode }[]
-  onChange: (key: K) => void
-}) {
-  return (
-    <div className="settings-seg" role="radiogroup" aria-label={label}>
-      {options.map((o) => (
-        <button
-          key={o.key}
-          type="button"
-          role="radio"
-          aria-checked={value === o.key}
-          className={`settings-seg-btn${value === o.key ? " settings-seg-btn-active" : ""}`}
-          onClick={() => onChange(o.key)}
-        >
-          {value === o.key && <motion.span layoutId={layoutId} className="settings-seg-thumb" transition={SEG_SPRING} />}
-          <span className="settings-seg-label">{o.label}</span>
-        </button>
-      ))}
-    </div>
-  )
 }
 
 const ON_OFF = [
@@ -75,7 +37,7 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
   const [jobcostDefaultRange, setJobcostDefaultRange] = useJobcostDefaultRange()
   const [sqlConnected, setSqlConnected] = useState<boolean | null>(null)
   const [sqlLoading, setSqlLoading] = useState(false)
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
 
   // Fetch SQL status when modal opens (admin only)
   useEffect(() => {
@@ -111,7 +73,7 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -151,8 +113,10 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                         </span>
                         <span className="settings-row-description">Switch between light and dark mode</span>
                       </div>
-                      <SettingsSeg
-                        label="Appearance"
+                      <SegmentedControl
+                        variant="settings"
+                        role="radiogroup"
+                        ariaLabel="Appearance"
                         layoutId="settingsThemeThumb"
                         value={theme}
                         options={[
@@ -167,8 +131,10 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                         <span className="settings-row-label">Margin Colors</span>
                         <span className="settings-row-description">Color margin values green / amber / red by health</span>
                       </div>
-                      <SettingsSeg
-                        label="Margin colors"
+                      <SegmentedControl
+                        variant="settings"
+                        role="radiogroup"
+                        ariaLabel="Margin colors"
                         layoutId="settingsMarginThumb"
                         value={marginColorsEnabled ? "on" : "off"}
                         options={ON_OFF}
@@ -182,8 +148,10 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                           Give each client, subcontractor and supplier its own consistent color instead of shades of one hue
                         </span>
                       </div>
-                      <SettingsSeg
-                        label="Randomize relation colors"
+                      <SegmentedControl
+                        variant="settings"
+                        role="radiogroup"
+                        ariaLabel="Randomize relation colors"
                         layoutId="settingsRelationThumb"
                         value={hashedRelationColors ? "on" : "off"}
                         options={ON_OFF}
@@ -201,8 +169,10 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                         <span className="settings-row-label">Opens to</span>
                         <span className="settings-row-description">Where the year and phase filters start each visit</span>
                       </div>
-                      <SettingsSeg
-                        label="Job Costing default range"
+                      <SegmentedControl
+                        variant="settings"
+                        role="radiogroup"
+                        ariaLabel="Job Costing default range"
                         layoutId="settingsJcRangeThumb"
                         value={jobcostDefaultRange}
                         options={JOBCOST_DEFAULT_RANGE_OPTIONS}

@@ -25,6 +25,7 @@ import { buildMonthlyBreakdownXlsx } from "./exportMonthlyBreakdownXlsx"
 import type { LineMarker, SpendItem } from "../../shared/components/Chart/chart.types"
 import { useOnboarding } from "../../core/onboarding/OnboardingProvider"
 import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
+import { SegmentedControl } from "../../shared/components/SegmentedControl"
 
 // Full overhead-spending report (Finances → Overhead Report). Where the
 // dashboard's /dashboard/breakdown/overhead drill-down shows one chart and
@@ -32,14 +33,6 @@ import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
 // a per-category cost modal, cumulative + YoY views, and derived stats. Both
 // years of every comparison are capped at the same month on the backend
 // (overheadCategoryComparison) so mid-year deltas are apples-to-apples.
-
-// Thumb slide for the trend toggle — same spring as the Job Costing
-// command-bar segmented controls, which this toggle mirrors.
-const SEG_SPRING: Transition = {
-  type: "spring",
-  bounce: 0.15,
-  visualDuration: 0.35,
-}
 
 // Row travel when the Top Movers ranking flips between $ and % — the same
 // soft-landing spring as the jobcost pinned-property reorder glide.
@@ -188,7 +181,7 @@ function OverheadCategoryModal({
 }) {
   const open = category !== null
   const sort = useTableSort<ModalSortKey>("date", "desc")
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
 
   const rows = useMemo(() => {
     if (!category || !Array.isArray(lineItems)) return []
@@ -222,7 +215,7 @@ function OverheadCategoryModal({
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -354,7 +347,7 @@ function OtherCategoriesModal({
   onSelect: (id: string) => void
   onClose: () => void
 }) {
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   const otherTotal = categories.reduce((s, c) => s + (c.current_amount || 0), 0)
 
   return createPortal(
@@ -362,7 +355,7 @@ function OtherCategoriesModal({
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -773,32 +766,17 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
             loading={isLoading}
             noData={!trendSeries}
             actions={
-              <div className="ohr-seg" role="tablist" aria-label="Trend view">
-                {(
-                  [
-                    ["monthly", "Monthly"],
-                    ["cumulative", "Running total"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={trendView === key}
-                    className={`ohr-seg-btn${trendView === key ? " ohr-seg-btn-active" : ""}`}
-                    onClick={() => setTrendView(key)}
-                  >
-                    {trendView === key && (
-                      <motion.span
-                        layoutId="ohrTrendThumb"
-                        className="ohr-seg-thumb"
-                        transition={SEG_SPRING}
-                      />
-                    )}
-                    <span className="ohr-seg-label">{label}</span>
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                variant="ohr"
+                ariaLabel="Trend view"
+                layoutId="ohrTrendThumb"
+                value={trendView}
+                options={[
+                  { key: "monthly", label: "Monthly" },
+                  { key: "cumulative", label: "Running total" },
+                ]}
+                onChange={setTrendView}
+              />
             }
           >
             {trendSeries && (
@@ -831,32 +809,17 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
             loading={isLoading}
             noData={!isLoading && movers.length === 0}
             actions={
-              <div className="ohr-seg" role="tablist" aria-label="Rank movers by">
-                {(
-                  [
-                    ["dollars", "By $"],
-                    ["percent", "By %"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={moversBy === key}
-                    className={`ohr-seg-btn${moversBy === key ? " ohr-seg-btn-active" : ""}`}
-                    onClick={() => setMoversBy(key)}
-                  >
-                    {moversBy === key && (
-                      <motion.span
-                        layoutId="ohrMoversThumb"
-                        className="ohr-seg-thumb"
-                        transition={SEG_SPRING}
-                      />
-                    )}
-                    <span className="ohr-seg-label">{label}</span>
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                variant="ohr"
+                ariaLabel="Rank movers by"
+                layoutId="ohrMoversThumb"
+                value={moversBy}
+                options={[
+                  { key: "dollars", label: "By $" },
+                  { key: "percent", label: "By %" },
+                ]}
+                onChange={setMoversBy}
+              />
             }
           >
             <ol className="ohr-movers">

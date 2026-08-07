@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, LayoutGrid } from "lucide-react"
+import { Search, LayoutGrid } from "lucide-react"
 import Page from "../../../shared/components/Page"
+import { SortTh } from "../../../shared/components/SortTh"
 import { PageDataProvider, useWidgetData } from "../../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../../shared/config/pageQueries"
 import { MotionList, MotionItem } from "../../../shared/components/MotionList/MotionList"
@@ -26,29 +27,6 @@ interface Client {
 
 type SortKey = "id" | "label" | "value" | "jobCount"
 type SortDir = "asc" | "desc"
-
-function SortTh({ col, label, align = "left", sortKey, sortDir, onSort }: {
-  col: SortKey
-  label: string
-  align?: "left" | "right"
-  sortKey: SortKey
-  sortDir: SortDir
-  onSort: (k: SortKey) => void
-}) {
-  const active = sortKey === col
-  const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown
-  const thClass = align === "right" ? "spend-rank-table-value" : "spend-rank-table-name"
-  return (
-    <th className={thClass}>
-      <button
-        className={`co-th-btn${align === "right" ? " co-th-btn-right" : ""}${active ? " co-th-btn-active" : ""}`}
-        onClick={() => onSort(col)}
-      >
-        {label} <Icon size={11} />
-      </button>
-    </th>
-  )
-}
 
 export default function ClientsPage() {
   const [year, setYear] = useLocalStorage<number | null>("clientsYear", new Date().getFullYear())
@@ -141,9 +119,9 @@ function ClientsContent({ year, onYearChange }: { year: number | null; onYearCha
                 <thead>
                   <tr>
                     <th className="spend-rank-table-num">#</th>
-                    <SortTh col="label" label="Client Name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="jobCount" label="Jobs" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                    <SortTh col="value" label="Revenue" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh spendRank col="label" label="Client Name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh spendRank col="jobCount" label="Jobs" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <SortTh spendRank col="value" label="Revenue" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                   </tr>
                 </thead>
                 <tbody>

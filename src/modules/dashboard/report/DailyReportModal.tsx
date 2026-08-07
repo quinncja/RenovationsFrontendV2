@@ -42,7 +42,7 @@ export function DailyReportModal({
   pmScoped?: boolean
   onClose: () => void
 }) {
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   const navigate = useNavigate()
   const [metric, setMetric] = useState<ReportMetricKey | null>(null)
   // Mounted app-wide (DailyReportProvider): a drill-down's "View project" can
@@ -61,7 +61,7 @@ export function DailyReportModal({
         {open && (
           <>
             <motion.div
-              className="modal-overlay"
+              className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
               style={{ zIndex: overlayZ }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

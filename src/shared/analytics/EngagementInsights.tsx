@@ -140,7 +140,7 @@ function EngListModal({
 }) {
   // Mounted only while open, so it always claims the next stacking layer above
   // the engagement modal it was opened from.
-  const { overlayZ, contentZ } = useModalLayer(true)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(true)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
@@ -150,7 +150,7 @@ function EngListModal({
 
   return createPortal(
     <>
-      <div className="modal-overlay eng-seeall-overlay" style={{ zIndex: overlayZ }} onClick={onClose} />
+      <div className={`modal-overlay eng-seeall-overlay${isTopLayer ? " modal-overlay--blur" : ""}`} style={{ zIndex: overlayZ }} onClick={onClose} />
       <div className="modal-positioner eng-seeall-positioner" style={{ zIndex: contentZ }}>
         <div className="modal eng-seeall-modal" role="dialog" aria-label={title}>
           <header className="eng-seeall-head">

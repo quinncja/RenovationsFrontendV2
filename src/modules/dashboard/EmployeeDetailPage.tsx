@@ -199,7 +199,14 @@ function ProjectsTable({
       </thead>
       <tbody>
         {sorted.map((job) => (
-          <tr key={job.recnum} onClick={() => onRowClick(job.jobNumber)} className="clickable-row">
+          <tr
+            key={job.recnum}
+            onClick={() => onRowClick(job.jobNumber)}
+            className="clickable-row"
+            tabIndex={0}
+            role="button"
+            onKeyDown={(e) => e.key === "Enter" && onRowClick(job.jobNumber)}
+          >
             <td>
               <div className="cell-primary">{job.name}</div>
               <div className="cell-secondary">#{job.jobNumber}</div>
@@ -252,13 +259,13 @@ function ProjectsModal({
   projects: ProjectRow[]
   onRowClick: (jobNumber: string) => void
 }) {
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   return createPortal(
     <AnimatePresence>
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

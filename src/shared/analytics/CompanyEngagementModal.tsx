@@ -20,7 +20,7 @@ import { useModalLayer } from "../hooks/useModalLayer"
 export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [data, setData] = useState<CompanyEngagement | null>(null)
   const [loading, setLoading] = useState(true)
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
 
   // Fetch fresh each open — engagement drifts day to day.
   useEffect(() => {
@@ -212,7 +212,7 @@ export function CompanyEngagementModal({ open, onClose }: { open: boolean; onClo
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

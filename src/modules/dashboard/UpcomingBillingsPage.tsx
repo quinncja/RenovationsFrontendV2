@@ -86,6 +86,9 @@ function InvoiceTable({
             className={inv.recnum ? "clickable-row" : undefined}
             onClick={inv.recnum ? () => onOpen(inv.recnum, side) : undefined}
             title={inv.recnum ? "View invoice details" : undefined}
+            tabIndex={inv.recnum ? 0 : undefined}
+            role={inv.recnum ? "button" : undefined}
+            onKeyDown={inv.recnum ? (e) => e.key === "Enter" && onOpen(inv.recnum, side) : undefined}
           >
             <td>{inv.counterparty || "—"}</td>
             <td className="text-secondary">{inv.invnum || "—"}</td>

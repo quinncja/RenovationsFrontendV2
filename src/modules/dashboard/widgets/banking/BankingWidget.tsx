@@ -56,7 +56,7 @@ type TxnSortKey = "date" | "type" | "description" | "amount"
  */
 function BankTransactionsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const sort = useTableSort<TxnSortKey>("date", "desc")
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   const [rows, setRows] = useState<BankTransactionRow[] | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -103,7 +103,7 @@ function BankTransactionsModal({ open, onClose }: { open: boolean; onClose: () =
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

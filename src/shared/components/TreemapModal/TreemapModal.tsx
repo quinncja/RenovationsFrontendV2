@@ -36,7 +36,7 @@ export function TreemapModal({
   year,
   onItemClick,
 }: TreemapModalProps) {
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   const total = items.reduce((s, i) => s + (i.value ?? 0), 0)
   const count = items.length
   const periodLabel = year != null ? String(year) : "Since 2018"
@@ -49,7 +49,7 @@ export function TreemapModal({
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

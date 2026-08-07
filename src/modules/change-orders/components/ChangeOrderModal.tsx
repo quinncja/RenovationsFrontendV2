@@ -70,13 +70,13 @@ interface ChangeOrderModalProps {
 
 export function ChangeOrderModal({ order, create, onClose, onDeleted, onCreated }: ChangeOrderModalProps) {
   const open = !!order || !!create
-  const { overlayZ, contentZ } = useModalLayer(open)
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   return createPortal(
     <AnimatePresence>
       {open && (
         <>
           <motion.div
-            className="modal-overlay"
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
