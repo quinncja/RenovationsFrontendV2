@@ -8,9 +8,9 @@ import {
   ChevronDown,
   ChevronRight,
   ExternalLink,
-  Search,
 } from "lucide-react"
 import Page from "../../../shared/components/Page"
+import { SearchField } from "../../../shared/components/SearchField"
 import { PageDataProvider, useWidgetData } from "../../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../../shared/config/pageQueries"
 import { MotionList, MotionItem } from "../../../shared/components/MotionList/MotionList"
@@ -332,16 +332,7 @@ function EmployeesView({ year, onYearChange }: { year: number | null; onYearChan
                 <span className="ewl-legend-swatch ewl-mix-closing" /> Closing
               </span>
             )}
-            <div className="jc-cb-search">
-              <Search size={14} className="jc-cb-search-icon" />
-              <input
-                className="jc-cb-search-input"
-                type="text"
-                placeholder="Search employees..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+            <SearchField variant="jc" placeholder="Search employees..." value={search} onChange={setSearch} />
             <span className="jc-cb-count">
               <span className="jc-cb-count-num">{resultCount}</span> {resultCount === 1 ? "Employee" : "Employees"}
             </span>

@@ -2,10 +2,11 @@ import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, use
 import { motion, AnimatePresence, useMotionValue, useTransform, type MotionValue, type Transition } from "framer-motion"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useJobcostNav } from "./useJobcostNav"
-import { Search, ArrowUp, ArrowDown, ChevronRight, ChevronDown, ExternalLink, ChartNoAxesColumn, Building2, Hammer, Pin, RotateCcw } from "lucide-react"
+import { ArrowUp, ArrowDown, ChevronRight, ChevronDown, ExternalLink, ChartNoAxesColumn, Building2, Hammer, Pin, RotateCcw } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { SortTh } from "../../shared/components/SortTh"
 import { SegmentedControl } from "../../shared/components/SegmentedControl"
+import { SearchField } from "../../shared/components/SearchField"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { Widget } from "../../shared/components/Widget/Widget"
 import { YearSelector, MIN_YEAR } from "../../shared/components/YearSelector/YearSelector"
@@ -2283,16 +2284,7 @@ export default function Jobcost() {
                   </motion.button>
                 )}
               </AnimatePresence>
-              <div className="jc-cb-search">
-                <Search size={14} className="jc-cb-search-icon" />
-                <input
-                  className="jc-cb-search-input"
-                  type="text"
-                  placeholder={searchPlaceholder}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+              <SearchField variant="jc" placeholder={searchPlaceholder} value={search} onChange={setSearch} />
               <span className="jc-cb-count">
                 <span className="jc-cb-count-num">{resultCount}</span> {resultNoun}
               </span>
@@ -2304,16 +2296,7 @@ export default function Jobcost() {
           <MotionItem>
           <Widget className="co-widget">
             <div className="co-widget-toolbar">
-              <div className="co-search-wrapper">
-                <Search size={13} className="co-search-icon" />
-                <input
-                  className="co-search-input"
-                  type="text"
-                  placeholder="Search projects..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+              <SearchField variant="co" placeholder="Search projects..." value={search} onChange={setSearch} />
               <MobileFilterButton
                 count={activeFilterCount(
                   isManager

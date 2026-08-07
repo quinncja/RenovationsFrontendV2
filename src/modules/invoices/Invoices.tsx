@@ -11,7 +11,7 @@ import { invoiceStatusLabel, invoiceStatusTone } from "../../shared/utils/invoic
 import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { formatMoneyFull, formatDate } from "../../shared/utils/format"
-import { Search } from "lucide-react"
+import { SearchField } from "../../shared/components/SearchField"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import useIsMobile from "../../shared/hooks/useIsMobile"
 import { MobileFilterSheet, activeFilterCount, type FilterGroup } from "../../shared/components/MobileFilterSheet/MobileFilterSheet"
@@ -152,15 +152,12 @@ export default function Invoices() {
               <FilterPills label="Status" options={STATUS_FILTERS} value={statusFilter} onChange={setStatusFilter} />
             </>
           )}
-          <div className="invoices-search">
-            <Search size={14} />
-            <input
-              type="text"
-              placeholder={isMobile ? "Search invoices..." : "Search invoice #, entity, or description..."}
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
+          <SearchField
+            variant="invoices"
+            placeholder={isMobile ? "Search invoices..." : "Search invoice #, entity, or description..."}
+            value={search}
+            onChange={setSearch}
+          />
           {isMobile && (
             <MobileFilterButton
               count={activeFilterCount({ type: typeFilter, status: String(statusFilter) }, FILTER_DEFAULTS)}

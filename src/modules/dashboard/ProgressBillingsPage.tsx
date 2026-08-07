@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { useJobcostNav } from "../jobcost/useJobcostNav"
-import { ArrowLeft, Search } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
+import { SearchField } from "../../shared/components/SearchField"
 import Page from "../../shared/components/Page"
 import { SortTh } from "../../shared/components/SortTh"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
@@ -164,16 +165,7 @@ function ProgressBillingsContent() {
             className="co-widget"
           >
             <div className="co-widget-toolbar">
-              <div className="co-search-wrapper">
-                <Search size={13} className="co-search-icon" />
-                <input
-                  className="co-search-input"
-                  type="text"
-                  placeholder="Search projects..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-              </div>
+              <SearchField variant="co" placeholder="Search projects..." value={search} onChange={setSearch} />
               {pb && (
                 <div className="co-count pb-headline-counts">
                   <span className="pb-count pb-count-under">
