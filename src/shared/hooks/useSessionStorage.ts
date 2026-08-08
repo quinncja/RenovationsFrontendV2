@@ -26,10 +26,18 @@ export function readSessionStored<T>(key: string, fallback: T): T {
   }
 }
 
-export default function useSessionStorage<T>(key: string, initialValue: T | (() => T)) {
+export default function useSessionStorage<T>(
+  key: string,
+  initialValue: T | (() => T),
+  options?: { reset?: boolean },
+) {
+  // `reset` is read once, at mount — it decides whether this instance rides an
+  // existing tab-scoped pick or starts fresh (e.g. Jobcost's when-pair: fresh on
+  // a genuine page visit, preserved when returning from a drill-in detail page).
+  const resetOnMountRef = useRef(options?.reset ?? false)
   const [storedValue, setStoredValue] = useState<T>(() => {
     const init = initialValue instanceof Function ? initialValue() : initialValue
-    return readSessionStored(key, init)
+    return resetOnMountRef.current ? init : readSessionStored(key, init)
   })
 
   // initialValue rides in a ref — an inline default (or arrow initializer) is

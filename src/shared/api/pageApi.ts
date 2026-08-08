@@ -108,8 +108,15 @@ export async function fetchPageData(
 
     const result: PageDataResponse = await response.json()
 
-    // Strip server-side query errors ({ __error: "..." }) → null
+    // Strip server-side query errors ({ __error: "..." }) → null, and drop the
+    // runner's underscore-prefixed metadata (_meta, _errors, _hasErrors) —
+    // nothing consumes it, and non-null objects there would mask the
+    // "every query is null" disconnected detection in PageContext.
     for (const key of Object.keys(result)) {
+      if (key.startsWith("_")) {
+        delete result[key]
+        continue
+      }
       const val = result[key]
       if (val && typeof val === "object" && "__error" in (val as Record<string, unknown>)) {
         result[key] = null

@@ -11138,27 +11138,6 @@ svg.placeholder-illustration {
   gap: 0.3rem;
 }
 
-/* Dark mode overrides for SQL toggle */
-@media (prefers-color-scheme: dark) {
-  .settings-sql-connected {
-    background: rgba(34, 197, 94, 0.15);
-    color: #86efac;
-  }
-
-  .settings-sql-connected:hover {
-    background: rgba(34, 197, 94, 0.25);
-  }
-
-  .settings-sql-disconnected {
-    background: rgba(239, 68, 68, 0.15);
-    color: #fca5a5;
-  }
-
-  .settings-sql-disconnected:hover {
-    background: rgba(239, 68, 68, 0.25);
-  }
-}
-
 /* ═══════════════════════════════════════════════════════════════════════════════
    Mobile Bottom Nav
    ═══════════════════════════════════════════════════════════════════════════════ */

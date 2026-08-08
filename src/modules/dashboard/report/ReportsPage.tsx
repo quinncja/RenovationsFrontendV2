@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import { DatabaseZap } from "lucide-react"
 import Page from "../../../shared/components/Page"
 import { SegmentedControl } from "../../../shared/components/SegmentedControl"
 import { Widget } from "../../../shared/components/Widget/Widget"
@@ -103,8 +104,9 @@ export default function ReportsPage() {
             <MetricGridSkeleton pmScoped={source === "pm"} />
           ) : disconnected || !payload ? (
             <div className="widget card">
-              <div className="widget-no-data">
-                <span className="body-text">Couldn't load this report — try again shortly</span>
+              <div className="widget-no-data widget-disconnected">
+                <DatabaseZap size={24} className="widget-no-data-icon" />
+                <span className="body-text">Data source offline</span>
               </div>
             </div>
           ) : (

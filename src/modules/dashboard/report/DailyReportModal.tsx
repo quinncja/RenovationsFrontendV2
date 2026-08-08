@@ -2,7 +2,7 @@ import { useState } from "react"
 import { createPortal } from "react-dom"
 import { useNavigate } from "react-router-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { X } from "lucide-react"
+import { X, DatabaseZap } from "lucide-react"
 import { useModalLayer } from "../../../shared/hooks/useModalLayer"
 import { useCloseOnRouteChange } from "../../../shared/hooks/useCloseOnRouteChange"
 import type { ReportMetricKey, ReportPayload } from "./reportTypes"
@@ -96,8 +96,9 @@ export function DailyReportModal({
                   ) : payload ? (
                     <MetricGrid summary={payload.summary} onOpen={setMetric} />
                   ) : (
-                    <div className="widget-no-data">
-                      <span className="body-text">Couldn't load the report — try again shortly</span>
+                    <div className="widget-no-data widget-disconnected">
+                      <DatabaseZap size={24} className="widget-no-data-icon" />
+                      <span className="body-text">Data source offline</span>
                     </div>
                   )}
                 </div>

@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, useDeferredValue, memo, type ReactNode } from "react"
 import { motion, AnimatePresence, useMotionValue, useTransform, type MotionValue, type Transition } from "framer-motion"
 import { useVirtualizer } from "@tanstack/react-virtual"
+import { useLocation } from "react-router-dom"
 import { useJobcostNav } from "./useJobcostNav"
-import { ArrowUp, ArrowDown, ChevronRight, ChevronDown, ExternalLink, ChartNoAxesColumn, Building2, Hammer, Pin, RotateCcw } from "lucide-react"
+import { ArrowUp, ArrowDown, ChevronRight, ChevronDown, ExternalLink, ChartNoAxesColumn, DatabaseZap, Building2, Hammer, Pin, RotateCcw } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { SortTh } from "../../shared/components/SortTh"
 import { SegmentedControl } from "../../shared/components/SegmentedControl"
@@ -60,6 +61,22 @@ import type { BudgetBreakdown, CostItem } from "./types"
 interface ProjectPhase {
   recnum: string
   pmName: string | null
+}
+
+// Empty-board fallback: distinguishes "the data source is offline" (every
+// fetched query nulled server-side) from a genuinely empty project list.
+function BoardEmptyState({ disconnected }: { disconnected: boolean }) {
+  return disconnected ? (
+    <div className="widget-no-data widget-disconnected">
+      <DatabaseZap size={24} className="widget-no-data-icon" />
+      <span className="body-text">Data source offline</span>
+    </div>
+  ) : (
+    <div className="widget-no-data">
+      <ChartNoAxesColumn size={24} className="widget-no-data-icon" />
+      <span className="body-text">No data available</span>
+    </div>
+  )
 }
 
 export interface RawProject {
@@ -1659,16 +1676,25 @@ export default function Jobcost() {
   const { claims } = useAuth()
   const isManager = claims["role"] === "manager"
   const [showAllProjects, setShowAllProjects] = useLocalStorage("jobcostShowAllProjects", false)
-  // The "when" pair (year + phase) starts each session from the user's
-  // default-range preference (Settings: open phase / this month / all phases)
-  // and is session-scoped from there: picks survive route changes within the
-  // tab, a new session starts back at the default. While the pair is untouched
-  // (no session key yet), the fetch below may still snap it to the real open
-  // period when the cached guess was stale.
-  const [year, setYear] = useSessionStorage<number | null>(JOBCOST_YEAR_SESSION_KEY, () => resolveDefaultRange().year)
+  // The "when" pair (year + phase) starts fresh from the user's default-range
+  // preference (Settings: open phase / this month / all phases) on every real
+  // visit to the board — leaving for another page and coming back re-applies
+  // it. The one exception is returning from a drill-in (job/property detail
+  // page's back button), which stashes `preserveJobcostWhen` in router state
+  // so the pair the user was looking at survives the round trip. While the
+  // pair is untouched (no session key yet), the fetch below may still snap it
+  // to the real open period when the cached guess was stale.
+  const location = useLocation()
+  const preserveWhen = Boolean((location.state as { preserveJobcostWhen?: boolean } | null)?.preserveJobcostWhen)
+  const [year, setYear] = useSessionStorage<number | null>(
+    JOBCOST_YEAR_SESSION_KEY,
+    () => resolveDefaultRange().year,
+    { reset: !preserveWhen },
+  )
   const [phaseFilter, setPhaseFilter] = useSessionStorage<PhaseFilter>(
     JOBCOST_PHASE_SESSION_KEY,
     () => resolveDefaultRange().phase,
+    { reset: !preserveWhen },
   )
   const [viewMode, setViewMode] = useLocalStorage<ViewMode>("jobcostViewMode", "grouped")
   const [search, setSearch] = useState("")
@@ -1699,6 +1725,7 @@ export default function Jobcost() {
   }, [])
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
+  const [disconnected, setDisconnected] = useState(false)
   // Single-open everywhere: at most one list row and one property card are
   // expanded at a time, and within an open property at most one sub-card
   // (phases OR one-offs).
@@ -1761,6 +1788,10 @@ export default function Jobcost() {
       .then((result) => {
         if (controller.signal.aborted) return
         const data = result.getPhases
+        // Every requested query null → the data source is offline (each query
+        // fails server-side and is nulled), so show the offline state instead
+        // of an empty board.
+        setDisconnected(queries.every((q) => result[q] === null))
         if (Array.isArray(data)) setJobs((data as RawProject[]).map(normalizeProject))
         setLoading(false)
         // When this visit's start was GUESSED (open-phase preference, pair
@@ -2314,10 +2345,7 @@ export default function Jobcost() {
             {loading ? (
               <div className="widget-skeleton" />
             ) : jobs.length === 0 ? (
-              <div className="widget-no-data">
-                <ChartNoAxesColumn size={24} className="widget-no-data-icon" />
-                <span className="body-text">No data available</span>
-              </div>
+              <BoardEmptyState disconnected={disconnected} />
             ) : resultCount === 0 && (search || statusFilter !== "all" || phaseFilter !== "all") ? (
               <div className="co-no-results body-text text-secondary">
                 {search ? `No projects match "${search}"` : "No projects match your filters"}
@@ -2461,10 +2489,7 @@ export default function Jobcost() {
                 >
                   {jobs.length === 0 ? (
                     <Widget className="co-widget">
-                      <div className="widget-no-data">
-                        <ChartNoAxesColumn size={24} className="widget-no-data-icon" />
-                        <span className="body-text">No data available</span>
-                      </div>
+                      <BoardEmptyState disconnected={disconnected} />
                     </Widget>
                   ) : resultCount === 0 && (search || statusFilter !== "all" || phaseFilter !== "all") ? (
                     <div className="jc-empty-note body-text text-secondary">
@@ -2507,10 +2532,7 @@ export default function Jobcost() {
             </motion.div>
           ) : jobs.length === 0 ? (
             <Widget className="co-widget">
-              <div className="widget-no-data">
-                <ChartNoAxesColumn size={24} className="widget-no-data-icon" />
-                <span className="body-text">No data available</span>
-              </div>
+              <BoardEmptyState disconnected={disconnected} />
             </Widget>
           ) : resultCount === 0 && (search || statusFilter !== "all" || phaseFilter !== "all") ? (
             <div className="jc-empty-note body-text text-secondary">

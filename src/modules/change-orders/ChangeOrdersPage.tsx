@@ -36,6 +36,7 @@ export default function ChangeOrdersPage() {
   const [search, setSearch] = useState("")
   const [orders, setOrders] = useState<ChangeOrder[]>([])
   const [loading, setLoading] = useState(true)
+  const [disconnected, setDisconnected] = useState(false)
   const [selected, setSelected] = useState<ChangeOrder | null>(null)
   const [creating, setCreating] = useState<CreateChangeOrderConfig | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>("date")
@@ -59,9 +60,14 @@ export default function ChangeOrdersPage() {
     })
       .then((result) => {
         const data = result as unknown
+        setDisconnected(false)
         if (Array.isArray(data)) setOrders(data)
         else if (data && typeof data === "object" && "changeOrders" in (data as Record<string, unknown>)) {
-          setOrders((data as { changeOrders: ChangeOrder[] }).changeOrders)
+          const list = (data as { changeOrders: ChangeOrder[] | null }).changeOrders
+          // The backend answers { changeOrders: null } when the data source is
+          // manually disconnected — show the offline state, not an empty list.
+          if (list === null) setDisconnected(true)
+          else setOrders(list)
         }
         setLoading(false)
       })
@@ -134,7 +140,7 @@ export default function ChangeOrdersPage() {
             } : undefined}
             onDrop={canEdit ? handleDrop : undefined}
           >
-          <Widget loading={loading} noData={!loading && orders.length === 0} className="co-widget">
+          <Widget loading={loading} disconnected={disconnected} noData={!loading && orders.length === 0} className="co-widget">
             <div className="co-widget-toolbar">
               <SearchField variant="co" placeholder="Search change orders..." value={search} onChange={setSearch} />
               <span className="co-count subheadline text-secondary">

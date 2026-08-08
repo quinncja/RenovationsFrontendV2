@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { signOut } from "firebase/auth"
 import { auth } from "../../../core/auth/firebase"
 import { useAuth } from "../../../core/auth/AuthProvider"
+import { effectiveRole } from "../../../core/auth/roles"
 import { fetchSqlStatus, connectSql, disconnectSql } from "../../api/sqlApi"
 import useLocalStorage from "../../hooks/useLocalStorage"
 import { HASHED_RELATION_COLORS_KEY } from "../../hooks/useHashedRelationColors"
@@ -25,7 +26,7 @@ const ON_OFF = [
 
 export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsModalProps) {
   const { user, claims } = useAuth()
-  const isAdmin = claims["role"] === "executive"
+  const isAdmin = effectiveRole(claims["role"] as string) === "executive"
 
   const handleSignOut = useCallback(async () => {
     onClose()

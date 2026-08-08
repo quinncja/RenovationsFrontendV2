@@ -1,11 +1,14 @@
-// Where the Job Costing board's "when" pair (year + phase) starts. The pair is
-// session-scoped: within a tab the user's picks survive route changes, and a
-// fresh session re-derives the start from the default-range preference
-// (useJobcostDefaultRange). For the open-phase preference the open accounting
-// period comes from the previous fetch's cached getOpenPeriod result — the
-// board refreshes the cache on every list fetch — and a cold cache falls back
-// to the calendar, which the board corrects once the real period lands (unless
-// the user has already touched the controls).
+// Where the Job Costing board's "when" pair (year + phase) starts. The pair
+// re-derives from the default-range preference (useJobcostDefaultRange) on
+// every real visit to the board; it only survives a round trip through a
+// job/property detail page's back button (Jobcost.tsx checks
+// `location.state.preserveJobcostWhen`, set by that back button, before
+// deciding whether to honor the sessionStorage pick or reset it). For the
+// open-phase preference the open accounting period comes from the previous
+// fetch's cached getOpenPeriod result — the board refreshes the cache on
+// every list fetch — and a cold cache falls back to the calendar, which the
+// board corrects once the real period lands (unless the user has already
+// touched the controls).
 
 import {
   JOBCOST_DEFAULT_RANGE_FALLBACK,

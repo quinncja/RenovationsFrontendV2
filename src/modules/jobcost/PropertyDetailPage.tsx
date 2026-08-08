@@ -1063,7 +1063,11 @@ function PropertyDetail({ slug }: { slug: string }) {
       subtitle={subtitle}
       actions={
         isMobile ? undefined : (
-          <button className="jc-export-btn" onClick={() => navigate(backTo)} title={`Back to ${backLabel}`}>
+          <button
+            className="jc-export-btn"
+            onClick={() => navigate(backTo, { state: { preserveJobcostWhen: true } })}
+            title={`Back to ${backLabel}`}
+          >
             <ArrowLeft size={14} /> {backLabel}
           </button>
         )

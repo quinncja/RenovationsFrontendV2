@@ -90,6 +90,7 @@ export default function Invoices() {
   const sort = useTableSort<SortKey>("invoiceDate", "desc")
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
+  const [disconnected, setDisconnected] = useState(false)
   const [selected, setSelected] = useState<Invoice | null>(null)
 
   useEffect(() => {
@@ -102,6 +103,10 @@ export default function Invoices() {
       signal: controller.signal,
     }).then(result => {
       const data = result.allInvoices
+      // A null result means the query failed server-side — with the data
+      // source disconnected every query nulls, so surface the offline state
+      // instead of an empty table.
+      setDisconnected(data === null)
       if (Array.isArray(data)) setInvoices(data as Invoice[])
       setLoading(false)
     }).catch(err => {
@@ -183,7 +188,7 @@ export default function Invoices() {
         </MotionItem>
 
         <MotionItem>
-      <Widget loading={loading} noData={!loading && invoices.length === 0} className="invoices-table-widget">
+      <Widget loading={loading} disconnected={disconnected} noData={!loading && invoices.length === 0} className="invoices-table-widget">
         <table className="data-table">
           <thead>
             <tr>
