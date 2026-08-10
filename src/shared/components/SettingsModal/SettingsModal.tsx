@@ -26,7 +26,8 @@ const ON_OFF = [
 
 export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsModalProps) {
   const { user, claims } = useAuth()
-  const isAdmin = effectiveRole(claims["role"] as string) === "executive"
+  const role = effectiveRole(claims["role"] as string)
+  const isAdmin = role === "executive" || role === "admin"
 
   const handleSignOut = useCallback(async () => {
     onClose()
