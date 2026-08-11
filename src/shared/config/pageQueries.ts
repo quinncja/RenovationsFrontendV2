@@ -62,8 +62,9 @@ export const PAGE_QUERIES = {
   // A manager's home (/dashboard) — the employee-detail view scoped to their
   // own supervisor id. Their activity feed now lives in the daily report
   // modal / the Reports page (dailyReportPm / activityReportPm, fetched
-  // outside the page provider).
-  managerHome: ["employeePerformanceBreakdown", "openMonthFinances"],
+  // outside the page provider). whatsChangedPm is page 0 of the What's
+  // Changed timeline (token-scoped; later pages fetched ad hoc with offset).
+  managerHome: ["employeePerformanceBreakdown", "openMonthFinances", "whatsChangedPm"],
 
   // A General Manager's home (/dashboard) — company-wide (all-jobs) rollups: the
   // breakdown drives the stat cards + period/year summary (scoped to the
@@ -78,6 +79,8 @@ export const PAGE_QUERIES = {
     // Reports section reads — counts + per-issue job rows).
     "dataValidation",
     "dataValidationOpen",
+    // Page 0 of the What's Changed timeline, company-wide scope.
+    "whatsChangedGm",
   ],
 
   // Dashboard drill-down queries

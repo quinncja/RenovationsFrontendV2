@@ -1,7 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
-import { SECTION_REGISTRY } from "../config/sectionRegistry"
-import type { SectionLayout } from "../types/dashboardLayout"
 
 // Opening: a little bounce for the playful grow/lift.
 const SPRING_GROW = { type: "spring", visualDuration: 0.3, bounce: 0.2 } as const
@@ -43,7 +41,7 @@ export function SectionNav({
   active,
   onSelect,
 }: {
-  sections: SectionLayout[]
+  sections: { id: string; title: string }[]
   active: number
   onSelect: (index: number) => void
 }) {
@@ -252,7 +250,7 @@ export function SectionNav({
             className={`section-nav-row${i === active ? " section-nav-row-active" : ""}`}
             role="tab"
             aria-selected={i === active}
-            aria-label={SECTION_REGISTRY[section.id].title}
+            aria-label={section.title}
             onClick={() => select(i)}
             transition={transition}
           >
@@ -293,7 +291,7 @@ export function SectionNav({
                     className="section-nav-label-text"
                     transition={transition}
                   >
-                    {SECTION_REGISTRY[section.id].title}
+                    {section.title}
                   </motion.span>
                 </motion.span>
               )}

@@ -2668,6 +2668,363 @@ span.skel-text {
   color: #ef4444;
 }
 
+/* ── PM/GM home — Current Project Performance section ─────────────────────
+   The section content is a simple vertical stack: the centered stat-card row
+   above the What's Changed timeline. */
+.home-current-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Centered evolution of .employee-stat-row: the two primary cards (Watchlist,
+   Open) carry the visual weight; Closed reads quieter. Same 16px-radius card
+   family, same color-mix hover — hierarchy comes from size and type, not new
+   chrome. */
+.home-stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 1rem;
+}
+
+.home-stat-card {
+  flex: 0 1 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.5rem 1.75rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--button-shadow);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.home-stat-card:hover:not(:disabled) {
+  background-color: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+}
+
+.home-stat-card:disabled {
+  cursor: default;
+}
+
+.home-stat-card-value {
+  color: var(--primary-text);
+  font-size: 2.75rem;
+  line-height: 1;
+}
+
+/* Figure (or shimmer) centers between the pinned label and the sub-metric. */
+.home-stat-card .home-stat-card-value,
+.home-stat-card .stat-widget-skeleton {
+  margin-block: auto;
+}
+
+.home-stat-card--warn .home-stat-card-value {
+  color: #ef4444;
+}
+
+/* The quieter third card: narrower, smaller figure, muted label. */
+.home-stat-card--secondary {
+  flex: 0 1 225px;
+  padding: 1.25rem 1.5rem;
+}
+
+.home-stat-card--secondary .widget-title {
+  color: var(--secondary-text);
+}
+
+.home-stat-card--secondary .home-stat-card-value {
+  font-size: 2rem;
+}
+
+/* One supporting metric under the figure, so the number has context without
+   a click. */
+.home-stat-sub {
+  color: var(--secondary-text);
+}
+
+.home-stat-sub-warn {
+  color: #ef4444;
+}
+
+@media (max-width: 768px) {
+  .home-stat-card,
+  .home-stat-card--secondary {
+    flex: 1 1 100%;
+  }
+}
+
+/* ── What's Changed timeline ──────────────────────────────────────────────
+   A horizontally scrolling row of change cards, newest at the left, riding a
+   thin rail with a dot per event. The scroll affordance is threefold: a
+   partially visible peeking card, a right-edge fade (only while there is
+   more), and a floating chevron. */
+.wc-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.wc-title {
+  margin: 0;
+}
+
+.wc-scroller {
+  position: relative;
+}
+
+.wc-row {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding: 0.25rem 0.25rem 0.75rem;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+.wc-row::-webkit-scrollbar {
+  display: none;
+}
+
+/* Fade the right edge only while older cards remain off-screen. */
+.wc-row--more {
+  mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent);
+}
+
+.wc-item {
+  position: relative;
+  flex: 0 0 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  scroll-snap-align: start;
+}
+
+/* The timeline rail: each item draws its own segment, spanning its width plus
+   the gap to the next item, so the line reads as continuous while scrolling. */
+.wc-item::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 16px;
+  right: -1rem;
+  height: 2px;
+  background: var(--border-color);
+}
+
+.wc-item:last-of-type::before {
+  right: 0.25rem;
+}
+
+.wc-item-when {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--secondary-text);
+}
+
+/* The timestamp sits ON the rail — give it the page background so the line
+   reads as passing behind the label, not through it. */
+.wc-item-when > span:last-child {
+  background: var(--background-color);
+  padding-right: 0.4rem;
+}
+
+.wc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--secondary-text);
+  flex: none;
+  margin-left: 2px;
+}
+
+/* Copper marks fresh (today's) activity — state, not decoration. */
+.wc-dot--today {
+  background: var(--primary-color);
+}
+
+.wc-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 1.1rem 1.25rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--button-shadow);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.wc-card:hover {
+  background-color: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+}
+
+.wc-card--skel {
+  cursor: default;
+}
+
+.wc-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Neutral kind pill for cost batches; status flips reuse .status-badge. */
+.wc-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--primary-text) 4%, var(--card-color));
+  color: var(--secondary-text);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.wc-pill--skel {
+  border-color: transparent;
+  background: none;
+  padding-inline: 0;
+}
+
+.wc-card-name {
+  color: var(--primary-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.6em;
+}
+
+.wc-card-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: auto;
+}
+
+.wc-card-amount {
+  color: var(--primary-text);
+}
+
+.wc-card-count,
+.wc-card-margin {
+  color: var(--secondary-text);
+}
+
+.wc-delta {
+  margin-left: 0.5rem;
+  font-weight: 600;
+}
+
+.wc-delta--down {
+  color: #ef4444;
+}
+
+.wc-delta--up {
+  color: #22c55e;
+}
+
+/* Zero-size prefetch sentinel at the end of the row. */
+.wc-sentinel {
+  flex: 0 0 1px;
+}
+
+/* Floating "older changes" chevron at the row's right edge. */
+.wc-more-btn {
+  position: absolute;
+  top: 50%;
+  right: 0.25rem;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: var(--card-color);
+  color: var(--secondary-text);
+  box-shadow: var(--button-shadow);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.wc-more-btn:hover {
+  background-color: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+}
+
+.wc-empty {
+  margin: 0;
+  padding: 2.25rem 0;
+  text-align: center;
+  color: var(--secondary-text);
+}
+
+/* ── Performance Over Time — All Time grand-totals strip ─────────────────
+   A slim full-width card under the period/year snapshot: one label, a row of
+   figures. Same surface family as the widgets. */
+.home-alltime-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem 2.5rem;
+  padding: 1.1rem 1.5rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: var(--button-shadow);
+}
+
+.home-alltime-title {
+  color: var(--primary-text);
+}
+
+.home-alltime-figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2.5rem;
+  margin-left: auto;
+}
+
+.home-alltime-figure {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.home-alltime-label {
+  color: var(--secondary-text);
+}
+
+.home-alltime-value {
+  color: var(--primary-text);
+}
+
+@media (max-width: 768px) {
+  .home-alltime-figures {
+    margin-left: 0;
+    width: 100%;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+  }
+}
+
 /* Flex-based centering container used by portalled modals.
    Keeps centering out of the transform property so framer-motion
    can freely animate scale/y without clobbering translate(-50%,-50%). */

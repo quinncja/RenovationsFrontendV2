@@ -1,122 +1,38 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, ChevronRight } from "lucide-react"
-import { Link, useParams } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import { useJobcostNav } from "../jobcost/useJobcostNav"
 import useIsMobile from "../../shared/hooks/useIsMobile"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
 import { Widget } from "../../shared/components/Widget/Widget"
-import { Chart } from "../../shared/components/Chart/Chart"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
-import { formatMoneyFull, formatPercent, marginTextColor, shortMonth } from "../../shared/utils/format"
+import { formatMoneyFull, marginTextColor } from "../../shared/utils/format"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
 import { useModalLayer } from "../../shared/hooks/useModalLayer"
 import { SortableHeader } from "../../shared/components/SortableHeader"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { useAuth } from "../../core/auth/AuthProvider"
+import { SnapPager } from "../../shared/components/SnapPager/SnapPager"
 import { EmployeePeriodAndYearSummary } from "./widgets/EmployeePeriodAndYearSummary"
-import { MarginWidget } from "./widgets/MarginWidget"
-import { EmployeePerformanceWidget } from "./widgets/EmployeePerformanceWidget"
-import { ReportWidget } from "./widgets/reports/ReportWidget"
 import { DailyReportButton } from "./report/DailyReportButton"
-
-// ───── Breakdown shape (page-level fetch) ────────────────────────────────
-// `breakdown.projects[]` comes from the backend's `getProjectGridData`
-// (same function the /jobcost page uses via `getPhases`), pre-filtered to
-// this employee. That means every field the /jobcost projects table shows
-// is already on each row — no second fetch + join needed. Earlier this
-// page double-fetched via /jobcost and inner-joined by recnum; the join
-// silently dropped any project that didn't survive both sides' phase
-// consolidation, which is why some rows were missing vs the old frontend.
-interface BreakdownProject {
-  recnum: string | number
-  name?: string
-  jobnme?: string
-  status: number
-  totalContract?: number
-  totalCost?: number
-  // Raw phase rows expose the budget as `budget`; consolidated rows as
-  // `totalBudget` (see project-utils.js). Accept either.
-  totalBudget?: number
-  budget?: number
-  // Raw phase rows (consolidate:false from backend) carry pmName directly.
-  pmName?: string | null
-  // Consolidated rows (consolidate:true) bundle phases under here.
-  phases?: { recnum: string; pmName: string | null }[]
-}
-
-interface Breakdown {
-  employee: { employeeNum: number; firstName: string; lastName: string }
-  stats: {
-    totals: { totalCost: number; totalIncome: number; budget: number; margin: number }
-    yearly: { year: number; income: number; totalCost: number; profit: number; margin: number }[]
-    monthly: { month: number; income: number; totalCost: number; profit: number; margin: number }[]
-  }
-  projects: BreakdownProject[]
-}
-
-// Normalized row the table renders. Mirrors the shape Jobcost.tsx builds
-// from getPhases, so the columns line up exactly with /jobcost.
-interface ProjectRow {
-  recnum: string
-  jobNumber: string
-  name: string
-  status: number
-  contract: number
-  totalCost: number
-  budget: number
-  // Budget − Cost. Positive = under budget, negative = over.
-  variance: number
-  margin: number | null
-  supervisor: string
-}
-
-function normalizeProject(p: BreakdownProject): ProjectRow {
-  const contract = p.totalContract ?? 0
-  const totalCost = p.totalCost ?? 0
-  const budget = p.totalBudget ?? p.budget ?? 0
-  // Raw phase rows (consolidate:false) have an 8-digit recnum directly; that
-  // doubles as the URL id /jobcost navigates with. Consolidated rows
-  // (4-digit recnum) drill into their first phase for the 8-digit id.
-  // Supervisor comes either from `pmName` on the raw row, or from any
-  // phase carrying one when consolidated.
-  return {
-    recnum: String(p.recnum),
-    jobNumber: p.phases?.[0]?.recnum ?? String(p.recnum),
-    name: p.jobnme ?? p.name ?? "",
-    status: p.status,
-    contract,
-    totalCost,
-    budget,
-    variance: budget - totalCost,
-    margin: contract > 0 ? ((contract - totalCost) / contract) * 100 : null,
-    supervisor:
-      p.pmName?.trim() ??
-      p.phases?.find((ph) => ph.pmName?.trim())?.pmName?.trim() ??
-      "",
-  }
-}
-
-const STATUS_LABELS: Record<number, string> = {
-  1: "Bidding", 2: "Refused", 3: "Contract", 4: "Current", 5: "Complete", 6: "Closed",
-}
-
-// Bar color for margin bars, mirroring MarginWidget's thresholds.
-function marginColor(margin: number): string {
-  if (margin >= 20) return "#22c55e"
-  if (margin >= 17) return "#f59e0b"
-  return "#ef4444"
-}
-
-// Margin below which an open project lands on the watchlist. The backend's
-// getWatchList uses 17%; this page surfaces the stricter 15% the team asked for.
-const WATCHLIST_MARGIN_THRESHOLD = 15
+import {
+  normalizeProject,
+  STATUS_LABELS,
+  WATCHLIST_MARGIN_THRESHOLD,
+  type Breakdown,
+  type BreakdownProject,
+  type ProjectRow,
+} from "./home/breakdownRows"
+import { PerformanceCharts } from "./home/PerformanceCharts"
+import { CurrentPerformanceSection } from "./home/CurrentPerformanceSection"
+import { PerformanceOverTimeSection } from "./home/PerformanceOverTimeSection"
 
 type ProjectSortKey = "name" | "status" | "supervisor" | "contract" | "budget" | "totalCost" | "variance" | "margin"
 
@@ -333,74 +249,6 @@ function StatCard({
   )
 }
 
-// ── "Table moved" notice (manager home only) ───────────────────────────────
-// The manager home's Projects table now lives on /jobcost. In its place, a
-// centered pointer shows until the manager clicks through OR has seen it on
-// three separate visits; after that the page simply ends at the yearly charts.
-// (Admins' /employees/:id view keeps the table.) Self-contained persistence —
-// a view *count* doesn't fit the onboarding engine's seen-once milestones.
-const JC_MOVED_KEY = "jobcostTableMovedNotice"
-
-interface JcMovedState {
-  views: number
-  dismissed: boolean
-}
-
-function readJcMovedState(): JcMovedState {
-  try {
-    const raw = localStorage.getItem(JC_MOVED_KEY)
-    if (raw) return JSON.parse(raw) as JcMovedState
-  } catch {
-    /* corrupt value — treat as unseen */
-  }
-  return { views: 0, dismissed: false }
-}
-
-// setItem throws in storage-restricted contexts (Safari private mode) — the
-// notice bookkeeping is best-effort, never worth an error boundary trip.
-function writeJcMovedState(next: JcMovedState) {
-  try {
-    localStorage.setItem(JC_MOVED_KEY, JSON.stringify(next))
-  } catch {
-    /* storage unavailable — the notice just shows again next visit */
-  }
-}
-
-function JobcostMovedNotice() {
-  // Decided once at mount, from the state *before* this visit is counted —
-  // so the notice shows on visits 1–3 and never flickers away mid-session
-  // when its own view increment lands.
-  const [visible] = useState(() => {
-    const s = readJcMovedState()
-    return !s.dismissed && s.views < 3
-  })
-
-  // Count this visit once (ref guards StrictMode's double effect run).
-  const counted = useRef(false)
-  useEffect(() => {
-    if (!visible || counted.current) return
-    counted.current = true
-    const s = readJcMovedState()
-    writeJcMovedState({ ...s, views: s.views + 1 })
-  }, [visible])
-
-  if (!visible) return null
-  return (
-    <MotionItem className="col-span-full">
-      <p className="jc-moved-notice">
-        Your projects table has moved to the{" "}
-        <Link
-          to="/jobcost"
-          onClick={() => writeJcMovedState({ ...readJcMovedState(), dismissed: true })}
-        >
-          Job Costing
-        </Link>{" "}
-        page.
-      </p>
-    </MotionItem>
-  )
-}
-
 export default function EmployeeDetailPage() {
   const { employeeNum } = useParams<{ employeeNum: string }>()
   const numericId = Number(employeeNum)
@@ -442,11 +290,6 @@ export function EmployeeDetail({
   gmHome?: boolean
 }) {
   const { goToJobcost } = useJobcostNav()
-  const marginColorsOn = useMarginColorsEnabled()
-  // On mobile match the WIP toggle's label rather than spelling out "Work
-  // Completed" (keeps the chart titles/legends short and consistent).
-  const isMobile = useIsMobile()
-  const wcLabel = isMobile ? "WIP" : "Work Completed"
   const { data, isLoading } = useWidgetData<{ employeePerformanceBreakdown: Breakdown | null }>([
     "employeePerformanceBreakdown",
   ])
@@ -458,98 +301,9 @@ export function EmployeeDetail({
   const monthly = breakdown?.stats.monthly
   const projects = breakdown?.projects
 
-  // Line chart: Work Completed (income) by year. Mirrors AnnualRevenueWidget's
-  // line series shape — one series, x = year as string, y = income.
-  const workCompletedSeries = useMemo(() => {
-    if (!yearly || yearly.length === 0) return null
-    const sorted = [...yearly].sort((a, b) => a.year - b.year)
-    return [{
-      id: wcLabel,
-      data: sorted.map((d) => ({ x: String(d.year), y: d.income })),
-    }]
-  }, [yearly, wcLabel])
-
-  // ── Monthly charts for the page year ─────────────────────────────────
-  // breakdown.stats.monthly is already filtered to the selected year on
-  // the backend; we just sort + project into the chart shapes. Both
-  // charts use shortMonth labels on the x-axis so they line up with how
-  // the home page monthly charts read.
-  const monthlyWorkCompletedSeries = useMemo(() => {
-    if (!monthly || monthly.length === 0) return null
-    const byMonth = new Map<number, number>()
-    for (const d of monthly) {
-      if (d.month >= 1 && d.month <= 12) byMonth.set(d.month, d.income)
-    }
-    return [
-      {
-        id: wcLabel,
-        data: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => ({
-          x: shortMonth(m),
-          y: byMonth.get(m) ?? 0,
-        })),
-      },
-    ]
-  }, [monthly, wcLabel])
-
-  // Bar chart: monthly margin %. Mirrors the yearly margin's symlog
-  // scaling so the chart degrades the same way for outlier months. Fills
-  // missing months with 0 so the x-axis always reads Jan→Dec.
-  const monthlyMarginBars = useMemo(() => {
-    if (!monthly || monthly.length === 0) return null
-    const byMonth = new Map<number, number>()
-    for (const d of monthly) {
-      if (d.month >= 1 && d.month <= 12) byMonth.set(d.month, d.margin)
-    }
-    const bars = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => ({
-      label: shortMonth(m),
-      value: byMonth.get(m) ?? 0,
-    }))
-    const values = bars.map((b) => b.value)
-    const NICE = [10, 20, 30, 50, 100, 200, 300, 500, 1000]
-    const niceMag = (v: number) => NICE.find((m) => m >= Math.abs(v)) ?? Math.ceil(Math.abs(v) / 1000) * 1000
-    const dataMin = Math.min(0, ...values)
-    const dataMax = Math.max(0, ...values)
-    const minValue = dataMin < 0 ? -niceMag(dataMin) : 0
-    const maxValue = dataMax > 0 ? niceMag(dataMax) : 10
-    const absDesc = values.map((v) => Math.abs(v)).sort((a, b) => b - a)
-    const inlier = absDesc[1] ?? absDesc[0] ?? 30
-    const scaleConstant = Math.max(30, Math.ceil(inlier / 10) * 10)
-    const candidates = [20, 50, 100, 200, 300, 500, 1000]
-    const ticks = [0]
-    for (const m of candidates) {
-      if (-m >= minValue) ticks.push(-m)
-      if (m <= maxValue) ticks.push(m)
-    }
-    ticks.sort((a, b) => a - b)
-    return { bars, minValue, maxValue, scaleConstant, ticks }
-  }, [monthly])
-
-  // Bar chart: yearly margin %. Mirrors MarginWidget's symlog config so very
-  // negative outliers (a lost year) don't crush the rest of the bars to zero.
-  const marginBars = useMemo(() => {
-    if (!yearly || yearly.length === 0) return null
-    const sorted = [...yearly].sort((a, b) => a.year - b.year)
-    const bars = sorted.map((d) => ({ label: String(d.year), value: d.margin }))
-    const values = bars.map((b) => b.value)
-    const NICE = [10, 20, 30, 50, 100, 200, 300, 500, 1000]
-    const niceMag = (v: number) => NICE.find((m) => m >= Math.abs(v)) ?? Math.ceil(Math.abs(v) / 1000) * 1000
-    const dataMin = Math.min(0, ...values)
-    const dataMax = Math.max(0, ...values)
-    const minValue = dataMin < 0 ? -niceMag(dataMin) : 0
-    const maxValue = dataMax > 0 ? niceMag(dataMax) : 10
-    // Keep typical margins inside the symlog linear zone; only extremes compress.
-    const absDesc = values.map((v) => Math.abs(v)).sort((a, b) => b - a)
-    const inlier = absDesc[1] ?? absDesc[0] ?? 30
-    const scaleConstant = Math.max(30, Math.ceil(inlier / 10) * 10)
-    const candidates = [20, 50, 100, 200, 300, 500, 1000]
-    const ticks = [0]
-    for (const m of candidates) {
-      if (-m >= minValue) ticks.push(-m)
-      if (m <= maxValue) ticks.push(m)
-    }
-    ticks.sort((a, b) => a - b)
-    return { bars, minValue, maxValue, scaleConstant, ticks }
-  }, [yearly])
+  // PM home and GM home share the two-section snap pager; the admin
+  // /employees/:id route keeps the flat widget grid.
+  const isHome = Boolean(isManagerHome || gmHome)
 
   // ───── Projects section ────────────────────────────────────────────────
   // `breakdown.projects[]` is already the same rich shape the /jobcost
@@ -566,11 +320,15 @@ export function EmployeeDetail({
 
   const [projectsMode, setProjectsMode] = useState<ProjectsMode>("currentYear")
 
-  // All-time breakdown projects, cached per employee so navigating between
-  // employees (or toggling the Projects range) never refetches needlessly —
-  // and so we never reset state from an effect. null = not yet loaded for this id.
-  const [allTimeByEmp, setAllTimeByEmp] = useState<Record<number, BreakdownProject[]>>({})
-  const allTimeProjects = allTimeByEmp[employeeId] ?? null
+  // All-time breakdown (projects + the stats totals that back the home's
+  // All Time strip), cached per employee so navigating between employees (or
+  // toggling the Projects range) never refetches needlessly — and so we never
+  // reset state from an effect. Missing key = not yet loaded for this id.
+  const [allTimeByEmp, setAllTimeByEmp] = useState<
+    Record<number, { projects: BreakdownProject[]; totals: Breakdown["stats"]["totals"] | null }>
+  >({})
+  const allTime = allTimeByEmp[employeeId] ?? null
+  const allTimeProjects = allTime?.projects ?? null
 
   // Eager: the top summary cards reflect the employee's whole portfolio, and
   // the Projects "All Time" toggle reuses this same cached set (no second fetch).
@@ -585,11 +343,14 @@ export function EmployeeDetail({
     })
       .then((d) => {
         const b = (d.employeePerformanceBreakdown as Breakdown | null) ?? null
-        setAllTimeByEmp((prev) => ({ ...prev, [employeeId]: b?.projects ?? [] }))
+        setAllTimeByEmp((prev) => ({
+          ...prev,
+          [employeeId]: { projects: b?.projects ?? [], totals: b?.stats?.totals ?? null },
+        }))
       })
       .catch((err) => {
         if (err instanceof Error && err.name === "AbortError") return
-        setAllTimeByEmp((prev) => ({ ...prev, [employeeId]: [] }))
+        setAllTimeByEmp((prev) => ({ ...prev, [employeeId]: { projects: [], totals: null } }))
       })
     return () => ctrl.abort()
   }, [allTimeProjects, employeeId])
@@ -646,16 +407,74 @@ export function EmployeeDetail({
 
   const openJob = (jobNumber: string) => goToJobcost(jobNumber)
 
+  const pageActions = (
+    <>
+      {isManagerHome && <DailyReportButton />}
+      <YearSelector value={year} onChange={onYearChange} />
+    </>
+  )
+
+  const projectsModal = (
+    <ProjectsModal
+      open={!!activeContent}
+      onClose={() => setActiveModal(null)}
+      title={activeContent?.title ?? ""}
+      projects={activeContent?.projects ?? []}
+      onRowClick={(jobNumber) => {
+        setActiveModal(null)
+        openJob(jobNumber)
+      }}
+    />
+  )
+
+  // ── PM / GM home: two-section snap pager ────────────────────────────────
+  if (isHome) {
+    return (
+      <Page title={gmHome ? "Dashboard" : name} actions={pageActions}>
+        <SnapPager
+          sections={[
+            {
+              id: "current",
+              title: "Current Project Performance",
+              content: (
+                <CurrentPerformanceSection
+                  watchlistProjects={watchlistProjects}
+                  openProjects={openProjects}
+                  closedProjects={closedProjects}
+                  isLoading={isLoading}
+                  allTimeLoading={allTimeLoading}
+                  year={year}
+                  gmHome={gmHome}
+                  onOpenModal={setActiveModal}
+                />
+              ),
+            },
+            {
+              id: "overTime",
+              title: "Performance Over Time",
+              content: (
+                <PerformanceOverTimeSection
+                  monthly={monthly}
+                  yearly={yearly}
+                  isLoading={isLoading}
+                  year={year}
+                  gmHome={gmHome}
+                  allTimeTotals={allTime?.totals ?? null}
+                  allTimeRows={allTimeRows}
+                  allTimeLoading={allTimeLoading}
+                />
+              ),
+            },
+          ]}
+        />
+        {projectsModal}
+      </Page>
+    )
+  }
+
+  // ── Admin /employees/:id: the original flat widget grid ─────────────────
   return (
-    <Page
-      title={gmHome ? "Dashboard" : name}
-      actions={
-        <>
-          {isManagerHome && <DailyReportButton />}
-          <YearSelector value={year} onChange={onYearChange} />
-        </>
-      }
-    >
+    <Page title={name} actions={pageActions}>
       <MotionList className="widget-grid widget-grid-2 dashboard-home-grid">
         <MotionItem className="col-span-full">
           <div className="employee-stat-row">
@@ -678,22 +497,6 @@ export function EmployeeDetail({
               loading={isLoading}
               onClick={() => setActiveModal("closed")}
             />
-            {/* GM home: the data-validation reports (admin home's Reports
-                section) as a pill cluster inside a fourth card, so the
-                strip belongs to the stat-card family instead of floating. */}
-            {gmHome && (
-              <div className="gm-reports-card">
-                <span className="widget-title headline">Reports</span>
-                <div className="gm-reports-cluster">
-                  <ReportWidget reportId="reconciliation" compact />
-                  <ReportWidget reportId="dataQuality" compact />
-                  <ReportWidget reportId="missingContracts" compact />
-                  <ReportWidget reportId="openProjectsNoBudget" compact />
-                  <ReportWidget reportId="missingUnitCounts" compact />
-                  <ReportWidget reportId="missingOneOffNames" compact />
-                </div>
-              </div>
-            )}
           </div>
         </MotionItem>
 
@@ -701,105 +504,8 @@ export function EmployeeDetail({
           <EmployeePeriodAndYearSummary monthly={monthly} yearly={yearly} loading={isLoading} />
         </MotionItem>
 
-        {/* GM home: company-wide Monthly Margin Performance next to the
-            Employee Performance leaderboard (the PM roster the GM oversees).
-            Both pull from the same page provider (generalManagerHome queries).
-            No per-employee charts or project table — the latter lives on Job
-            Costing. */}
-        {gmHome && (
-          <>
-            <MotionItem>
-              <MarginWidget />
-            </MotionItem>
-            <MotionItem>
-              <EmployeePerformanceWidget />
-            </MotionItem>
-          </>
-        )}
+        <PerformanceCharts monthly={monthly} yearly={yearly} year={year} isLoading={isLoading} />
 
-        {/* Monthly views for the page year — sit above the yearly charts
-            since the page year is the user's primary lens. */}
-        {!gmHome && (
-        <>
-        <MotionItem>
-          <Widget title={`Monthly ${wcLabel} — ${year}`} loading={isLoading} noData={!monthlyWorkCompletedSeries}>
-            {monthlyWorkCompletedSeries && (
-              <Chart config={{ type: "line", series: monthlyWorkCompletedSeries, enableArea: true }} />
-            )}
-          </Widget>
-        </MotionItem>
-
-        <MotionItem>
-          <Widget title={`Monthly Margin — ${year}`} loading={isLoading} noData={!monthlyMarginBars}>
-            {monthlyMarginBars && (
-              <Chart
-                config={{
-                  type: "bar",
-                  data: monthlyMarginBars.bars,
-                  yFormat: formatPercent,
-                  colorBy: marginColorsOn ? marginColor : undefined,
-                  barGradient: true,
-                  scaleType: "symlog",
-                  scaleConstant: monthlyMarginBars.scaleConstant,
-                  minValue: monthlyMarginBars.minValue,
-                  maxValue: monthlyMarginBars.maxValue,
-                  axisLeftTickValues: monthlyMarginBars.ticks,
-                  emphasizeZero: true,
-                  // Full-height column hover (same as the admin home's margin
-                  // chart) so near-zero months are as hoverable as tall bars.
-                  barTooltip: (label, value) => (
-                    <div className="chart-tooltip">
-                      <span>{label}</span>
-                      <strong>{formatPercent(value)}</strong>
-                    </div>
-                  ),
-                }}
-              />
-            )}
-          </Widget>
-        </MotionItem>
-
-        <MotionItem>
-          <Widget title={`Yearly ${wcLabel}`} loading={isLoading} noData={!workCompletedSeries}>
-            {workCompletedSeries && (
-              <Chart config={{ type: "line", series: workCompletedSeries, enableArea: true }} />
-            )}
-          </Widget>
-        </MotionItem>
-
-        <MotionItem>
-          <Widget title="Yearly Margin" loading={isLoading} noData={!marginBars}>
-            {marginBars && (
-              <Chart
-                config={{
-                  type: "bar",
-                  data: marginBars.bars,
-                  yFormat: formatPercent,
-                  colorBy: marginColorsOn ? marginColor : undefined,
-                  barGradient: true,
-                  scaleType: "symlog",
-                  scaleConstant: marginBars.scaleConstant,
-                  minValue: marginBars.minValue,
-                  maxValue: marginBars.maxValue,
-                  axisLeftTickValues: marginBars.ticks,
-                  emphasizeZero: true,
-                  barTooltip: (label, value) => (
-                    <div className="chart-tooltip">
-                      <span>{label}</span>
-                      <strong>{formatPercent(value)}</strong>
-                    </div>
-                  ),
-                }}
-              />
-            )}
-          </Widget>
-        </MotionItem>
-
-        {/* Manager home: the table moved to /jobcost — show the (self-
-            expiring) pointer instead. Admin /employees/:id keeps the table. */}
-        {isManagerHome ? (
-          <JobcostMovedNotice />
-        ) : (
         <MotionItem className="col-span-full">
           <Widget
             title="Projects"
@@ -833,21 +539,9 @@ export function EmployeeDetail({
             )}
           </Widget>
         </MotionItem>
-        )}
-        </>
-        )}
       </MotionList>
 
-      <ProjectsModal
-        open={!!activeContent}
-        onClose={() => setActiveModal(null)}
-        title={activeContent?.title ?? ""}
-        projects={activeContent?.projects ?? []}
-        onRowClick={(jobNumber) => {
-          setActiveModal(null)
-          openJob(jobNumber)
-        }}
-      />
+      {projectsModal}
     </Page>
   )
 }
