@@ -187,7 +187,13 @@ export function WhatsChangedRow({ queryName }: { queryName: WhatsChangedQuery })
     <div className="wc-block">
       <h3 className="wc-title title3 emphasized">What's Changed</h3>
       {empty ? (
-        <p className="wc-empty subheadline">Nothing new on your projects yet</p>
+        // Distinct copy for the null case (backend without the query, missing
+        // claim, or SQL disconnect) so it can't masquerade as a quiet feed.
+        <p className="wc-empty subheadline">
+          {unavailable
+            ? "The change feed is not available right now"
+            : "Nothing new on your projects yet"}
+        </p>
       ) : (
         <div className="wc-scroller">
           <div className={`wc-row${moreRight ? " wc-row--more" : ""}`} ref={rowRef}>

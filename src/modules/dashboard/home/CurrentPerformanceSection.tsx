@@ -47,10 +47,10 @@ export function CurrentPerformanceSection({
         />
       </MotionItem>
       <MotionItem>
-        <EmployeePeriodAndYearSummary monthly={monthly} yearly={yearly} loading={isLoading} />
+        <WhatsChangedRow queryName={gmHome ? "whatsChangedGm" : "whatsChangedPm"} />
       </MotionItem>
       <MotionItem>
-        <WhatsChangedRow queryName={gmHome ? "whatsChangedGm" : "whatsChangedPm"} />
+        <EmployeePeriodAndYearSummary monthly={monthly} yearly={yearly} loading={isLoading} />
       </MotionItem>
     </MotionList>
   )

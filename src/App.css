@@ -2677,6 +2677,13 @@ span.skel-text {
   gap: 2rem;
 }
 
+/* Outside the dashboard grid the base .widget min-height (280px) would
+   balloon the period/year snapshot halves with empty space — same override
+   the admin grid applies. */
+.home-current-stack .current-period-widget {
+  min-height: 0;
+}
+
 /* Centered evolution of .employee-stat-row: the two primary cards (Watchlist,
    Open) carry the visual weight; Closed reads quieter. Same 16px-radius card
    family, same color-mix hover — hierarchy comes from size and type, not new
