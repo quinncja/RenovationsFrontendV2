@@ -10473,11 +10473,18 @@ button.jc-kind-chip:hover {
   width: 100%;
   height: 100%;
   display: block;
+  background: var(--background-color);
 }
 
 .loading-screen-logo {
   position: relative;
   z-index: 1;
+  animation: loading-logo-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes loading-logo-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
 }
 
 /* ─── Dashboard Editor (edit mode) ───────────────────────────────────── */

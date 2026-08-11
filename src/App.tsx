@@ -1,3 +1,4 @@
+import { Suspense } from "react"
 import { Outlet } from "react-router-dom"
 import LoadingScreen from "./core/components/LoadingScreen"
 import Navbar from "./core/components/Navbar"
@@ -62,7 +63,19 @@ export default function App() {
         <AnalyticsTracker />
         <IdleRefreshOverlay />
         {!isMobile && <Navbar veil={navbarVeil} />}
-        <Outlet />
+        {/* ONE persistent Suspense boundary for every lazy route chunk. Per-
+            route boundaries (the old SuspenseWrapper in Router.tsx) remounted
+            on each navigation, and a NEWLY mounted boundary always shows its
+            fallback — so the first visit to any not-yet-loaded chunk blanked
+            the content area while it downloaded (LoadingScreen was also null
+            then, so the blank was literal). Because router navigations run in
+            a React transition, an already-revealed boundary keeps the current
+            page up until the next chunk resolves; the fallback only appears
+            on cold loads (deep-link / refresh), where it now paints a real
+            loading screen. */}
+        <Suspense fallback={<LoadingScreen />}>
+          <Outlet />
+        </Suspense>
         {isMobile && <MobileNav />}
         {tour}
         {/* One-time Job Costing redesign intro (jobcost-intro milestone).

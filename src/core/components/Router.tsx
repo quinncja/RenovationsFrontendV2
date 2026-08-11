@@ -5,9 +5,10 @@ import LoginPage from "../auth/pages/LoginPage.tsx"
 import LogoutPage from "../auth/pages/LogoutPage.tsx"
 import SignoutPage from "../auth/pages/SignoutPage.tsx"
 
-// Modules — lazy loaded
-import { lazy, Suspense } from "react"
-import LoadingScreen from "./LoadingScreen.tsx"
+// Modules — lazy loaded. No per-route Suspense here: App wraps its <Outlet/>
+// in ONE persistent boundary, so navigations keep the current page up while
+// the next chunk loads instead of flashing a blank fallback (see App.tsx).
+import { lazy } from "react"
 
 const Dashboard = lazy(() => import("../../modules/dashboard/Dashboard.tsx"))
 const BusinessSummary = lazy(() => import("../../modules/business-summary/BusinessSummaryPage.tsx"))
@@ -35,10 +36,6 @@ const OverheadReportPage = lazy(() => import("../../modules/dashboard/OverheadRe
 const Users = lazy(() => import("../../modules/users/Users.tsx"))
 const FeedbackPage = lazy(() => import("../../modules/feedback/FeedbackPage.tsx"))
 
-function SuspenseWrapper({ children }: { children: React.ReactNode }) {
-  return <Suspense fallback={<LoadingScreen />}>{children}</Suspense>
-}
-
 export default function Router() {
   return (
     <BrowserRouter>
@@ -53,29 +50,29 @@ export default function Router() {
         <Route element={<App />}>
           <Route element={<RequireAuth />}>
             {/* Dashboard — admin/executive see full, PM sees limited */}
-            <Route path="/dashboard" element={<SuspenseWrapper><Dashboard /></SuspenseWrapper>} />
-            <Route path="/dashboard/breakdown/:category" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><MonthlyBreakdownPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/dashboard/upcoming-billings" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><UpcomingBillingsPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/employees" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><SuspenseWrapper><EmployeesPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/employees/:employeeNum" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><SuspenseWrapper><EmployeeDetailPage /></SuspenseWrapper></RequireRole>} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard/breakdown/:category" element={<RequireRole allowed={["executive", "admin"]}><MonthlyBreakdownPage /></RequireRole>} />
+            <Route path="/dashboard/upcoming-billings" element={<RequireRole allowed={["executive", "admin"]}><UpcomingBillingsPage /></RequireRole>} />
+            <Route path="/employees" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><EmployeesPage /></RequireRole>} />
+            <Route path="/employees/:employeeNum" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><EmployeeDetailPage /></RequireRole>} />
 
             {/* Company — shown in nav for managers (PMs); GMs use Employees instead */}
             <Route path="/company" element={
               <RequireRole allowed={["executive", "admin", "manager"]}>
-                <SuspenseWrapper><BusinessSummary /></SuspenseWrapper>
+                <BusinessSummary />
               </RequireRole>
             } />
 
             {/* Job Costing — all roles */}
-            <Route path="/jobcost" element={<SuspenseWrapper><Jobcost /></SuspenseWrapper>} />
-            <Route path="/jobcost/:recnum" element={<SuspenseWrapper><JobcostDetailPage /></SuspenseWrapper>} />
-            <Route path="/jobcost/property/:parent" element={<SuspenseWrapper><PropertyDetailPage /></SuspenseWrapper>} />
+            <Route path="/jobcost" element={<Jobcost />} />
+            <Route path="/jobcost/:recnum" element={<JobcostDetailPage />} />
+            <Route path="/jobcost/property/:parent" element={<PropertyDetailPage />} />
 
             {/* Reports — daily/weekly/monthly activity; all roles (managers
                 get the token-scoped variant, GMs the company-wide one) */}
             <Route path="/reports" element={
               <RequireRole allowed={["executive", "admin", "manager", "generalManager"]}>
-                <SuspenseWrapper><ReportsPage /></SuspenseWrapper>
+                <ReportsPage />
               </RequireRole>
             } />
 
@@ -85,7 +82,7 @@ export default function Router() {
                 in the page's wizard modal — there is no /new route. */}
             <Route path="/change-orders" element={
               <RequireRole allowed={["executive", "admin", "generalManager", "manager"]}>
-                <SuspenseWrapper><ChangeOrders /></SuspenseWrapper>
+                <ChangeOrders />
               </RequireRole>
             } />
 
@@ -94,43 +91,43 @@ export default function Router() {
                 dashboard widgets' own links. */}
             <Route path="/invoices" element={
               <RequireRole allowed={["executive", "admin"]}>
-                <SuspenseWrapper><Invoices /></SuspenseWrapper>
+                <Invoices />
               </RequireRole>
             } />
             <Route path="/upcoming-billings" element={
               <RequireRole allowed={["executive", "admin"]}>
-                <SuspenseWrapper><UpcomingBillingsPage /></SuspenseWrapper>
+                <UpcomingBillingsPage />
               </RequireRole>
             } />
             <Route path="/progress-billings" element={
               <RequireRole allowed={["executive", "admin"]}>
-                <SuspenseWrapper><ProgressBillingsPage /></SuspenseWrapper>
+                <ProgressBillingsPage />
               </RequireRole>
             } />
             <Route path="/overhead-report" element={
               <RequireRole allowed={["executive", "admin"]}>
-                <SuspenseWrapper><OverheadReportPage /></SuspenseWrapper>
+                <OverheadReportPage />
               </RequireRole>
             } />
 
             {/* Directory — admin/executive */}
-            <Route path="/clients" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><ClientsPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/clients/:id" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><ClientDetailPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/vendors" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><VendorsPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/vendors/:id" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><VendorDetailPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/subcontractors" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><SubcontractorsPage /></SuspenseWrapper></RequireRole>} />
-            <Route path="/subcontractors/:id" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><SubcontractorDetailPage /></SuspenseWrapper></RequireRole>} />
+            <Route path="/clients" element={<RequireRole allowed={["executive", "admin"]}><ClientsPage /></RequireRole>} />
+            <Route path="/clients/:id" element={<RequireRole allowed={["executive", "admin"]}><ClientDetailPage /></RequireRole>} />
+            <Route path="/vendors" element={<RequireRole allowed={["executive", "admin"]}><VendorsPage /></RequireRole>} />
+            <Route path="/vendors/:id" element={<RequireRole allowed={["executive", "admin"]}><VendorDetailPage /></RequireRole>} />
+            <Route path="/subcontractors" element={<RequireRole allowed={["executive", "admin"]}><SubcontractorsPage /></RequireRole>} />
+            <Route path="/subcontractors/:id" element={<RequireRole allowed={["executive", "admin"]}><SubcontractorDetailPage /></RequireRole>} />
 
             {/* Charts — admin/executive */}
-            <Route path="/cash-flow" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><CashFlow /></SuspenseWrapper></RequireRole>} />
-            <Route path="/revenue-map" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><RevenueMap /></SuspenseWrapper></RequireRole>} />
-            <Route path="/org-chart" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><OrgChart /></SuspenseWrapper></RequireRole>} />
+            <Route path="/cash-flow" element={<RequireRole allowed={["executive", "admin"]}><CashFlow /></RequireRole>} />
+            <Route path="/revenue-map" element={<RequireRole allowed={["executive", "admin"]}><RevenueMap /></RequireRole>} />
+            <Route path="/org-chart" element={<RequireRole allowed={["executive", "admin"]}><OrgChart /></RequireRole>} />
 
             {/* Users — admin/executive */}
-            <Route path="/users" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><Users /></SuspenseWrapper></RequireRole>} />
+            <Route path="/users" element={<RequireRole allowed={["executive", "admin"]}><Users /></RequireRole>} />
 
             {/* Feedback — admin/executive */}
-            <Route path="/feedback" element={<RequireRole allowed={["executive", "admin"]}><SuspenseWrapper><FeedbackPage /></SuspenseWrapper></RequireRole>} />
+            <Route path="/feedback" element={<RequireRole allowed={["executive", "admin"]}><FeedbackPage /></RequireRole>} />
           </Route>
         </Route>
       </Routes>
