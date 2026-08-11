@@ -15,6 +15,11 @@
       }
     </script>
     <link rel="icon" type="image/png" href="/r-logo.png" />
+    <!-- The boot loading screen shows one of these before the app has painted
+         anything else — preloaded so the logo never pops in after its pulse
+         has already started. -->
+    <link rel="preload" as="image" href="/r-logo.png" />
+    <link rel="preload" as="image" href="/r-logo-white.png" />
     <style>
       @import url("https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,300..900&display=swap")
     </style>

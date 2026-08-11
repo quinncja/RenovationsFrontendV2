@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import { motion, animate, AnimatePresence, useMotionValue } from "framer-motion"
-import { ArrowLeftToLine, ArrowUpRight, ChevronLeft, ChevronRight, CircleCheck, CloudOff, X } from "lucide-react"
+import { ArrowLeftToLine, ArrowUpRight, ChevronLeft, ChevronRight, CircleCheck, CloudOff, FileCheck2, FileClock, X } from "lucide-react"
 import { useJobcostNav } from "../../jobcost/useJobcostNav"
 import { phaseFromRecnum } from "../../jobcost/jobcostShared"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
@@ -53,10 +53,11 @@ function dayLabel(key: string): string {
 }
 
 function marginDelta(item: WhatsChangedItem): number | null {
-  if (item.kind !== "cost" || item.marginBefore == null || item.marginAfter == null) return null
+  if (item.kind === "status" || item.marginBefore == null || item.marginAfter == null) return null
   const delta = item.marginAfter - item.marginBefore
-  // A cost batch normally lowers margin; a credit batch raises it. Only a
-  // meaningful move is worth showing.
+  // A cost batch normally lowers margin, a credit batch (or an approved change
+  // order, which grows the contract) raises it. Only a meaningful move is
+  // worth showing.
   return Math.abs(delta) >= 0.05 ? delta : null
 }
 
@@ -72,13 +73,21 @@ function DeltaChip({ delta }: { delta: number }) {
 }
 
 function KindPill({ item }: { item: WhatsChangedItem }) {
-  return item.kind === "status" ? (
-    <span className={`status-badge status-${item.newStatus}`}>
-      {STATUS_LABELS[item.newStatus ?? 0] ?? "Updated"}
-    </span>
-  ) : (
-    <span className="wc-pill">Costs posted</span>
-  )
+  if (item.kind === "status") {
+    return (
+      <span className={`status-badge status-${item.newStatus}`}>
+        {STATUS_LABELS[item.newStatus ?? 0] ?? "Updated"}
+      </span>
+    )
+  }
+  if (item.kind === "changeOrder") {
+    return (
+      <span className={`wc-pill wc-pill--co${item.coApproved ? "" : " wc-pill--co-pending"}`}>
+        {item.coApproved ? "CO approved" : "CO awaiting approval"}
+      </span>
+    )
+  }
+  return <span className="wc-pill">Costs posted</span>
 }
 
 // One property's events for one calendar day, rolled into a single card.
@@ -145,6 +154,58 @@ function EventRow({ item, group, onOpen }: {
                 {item.marginAfter.toFixed(1)}%
               </span>
             </>
+          )}
+        </span>
+      </button>
+    )
+  }
+
+  if (item.kind === "changeOrder") {
+    // A change order reads as its own kind at a glance — milestone anatomy
+    // (icon + tinted amount) in the CO palette: amber while awaiting approval
+    // (the money isn't in the contract yet), blue once approved. The state
+    // tag rides the label line; the foot carries the contract-side margin
+    // move once approved, the CO's description until then.
+    const pending = !item.coApproved
+    return (
+      <button
+        type="button"
+        className={`wc-event wc-event--co${pending ? " wc-event--co-pending" : ""}`}
+        onClick={() => onOpen(item)}
+        title="View details"
+      >
+        <span className="wc-event-label caption1">
+          {label}
+          <span className="wc-co-tag">{pending ? "CO awaiting approval" : "CO approved"}</span>
+        </span>
+        <span className="wc-event-head title3 emphasized">
+          {pending ? (
+            <FileClock size={19} aria-hidden="true" />
+          ) : (
+            <FileCheck2 size={19} aria-hidden="true" />
+          )}
+          {formatMoneyFull(item.amount ?? 0)}
+        </span>
+        <span className="wc-event-foot caption1">
+          {!pending && item.marginAfter != null ? (
+            <>
+              Margin{" "}
+              {delta != null && item.marginBefore != null && (
+                <>
+                  <span style={marginStyle(item.marginBefore)}>
+                    {item.marginBefore.toFixed(1)}%
+                  </span>
+                  <span className="wc-margin-arrow" aria-hidden="true">
+                    {" "}→{" "}
+                  </span>
+                </>
+              )}
+              <span className="emphasized" style={marginStyle(item.marginAfter)}>
+                {item.marginAfter.toFixed(1)}%
+              </span>
+            </>
+          ) : (
+            <span className="wc-co-title">{item.title?.trim() || "Change order"}</span>
           )}
         </span>
       </button>
@@ -423,8 +484,35 @@ function ChangeDetailModal({
                   {formatDate(item.occurredAt)} · {formatRelativeTime(item.occurredAt)}
                 </span>
               </div>
+              {/* The CO's description is the event's own name — the header
+                  above names the project, so it reads here. */}
+              {item.kind === "changeOrder" && item.title?.trim() && (
+                <p className="wc-detail-co-title body-text">{item.title.trim()}</p>
+              )}
               <dl className="wc-detail-grid">
-                {item.kind === "cost" ? (
+                {item.kind === "changeOrder" ? (
+                  <>
+                    <div className="wc-detail-fact">
+                      <dt className="caption1">Amount</dt>
+                      <dd className="title3 emphasized">{formatMoneyFull(item.amount ?? 0)}</dd>
+                    </div>
+                    <div className="wc-detail-fact">
+                      <dt className="caption1">Approval</dt>
+                      <dd className="title3 emphasized">
+                        {item.coApproved ? "Approved" : "Awaiting approval"}
+                      </dd>
+                    </div>
+                    {item.marginAfter != null && (
+                      <div className="wc-detail-fact">
+                        <dt className="caption1">Margin</dt>
+                        <dd className="title3 emphasized" style={marginStyle(item.marginAfter)}>
+                          {item.marginAfter.toFixed(1)}%
+                          {delta != null && <DeltaChip delta={delta} />}
+                        </dd>
+                      </div>
+                    )}
+                  </>
+                ) : item.kind === "cost" ? (
                   <>
                     <div className="wc-detail-fact">
                       <dt className="caption1">Amount</dt>
@@ -581,19 +669,22 @@ function ChangeDetailModal({
  * the end. Clicking a card expands it into a detail modal; the project link
  * lives there.
  */
-// The timeline's filter: both event kinds, posted-cost batches only, or
-// projects marked Complete/Closed only. Rendered with the shared Job Costing
-// segmented control (light-surface variant — this section sits on the page,
-// not the command bar's ink deck).
+// The timeline's filter: every event kind, posted-cost batches only, change
+// orders only, or projects marked Complete/Closed only. Rendered with the
+// shared Job Costing segmented control (light-surface variant — this section
+// sits on the page, not the command bar's ink deck). "COs" is the trade's own
+// shorthand — the spelled-out label made the four-way control too wide.
 const KIND_OPTIONS: readonly { key: WhatsChangedKind; label: string }[] = [
   { key: "all", label: "All" },
   { key: "cost", label: "Costs" },
+  { key: "changeOrder", label: "COs" },
   { key: "status", label: "Finished" },
 ]
 
 const EMPTY_SUB: Record<WhatsChangedKind, string> = {
-  all: "New costs and status changes will land here.",
+  all: "New costs, change orders, and status changes will land here.",
   cost: "New posted costs will land here.",
+  changeOrder: "New change orders will land here.",
   status: "Projects marked Complete or Closed will land here.",
 }
 

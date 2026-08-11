@@ -4,15 +4,20 @@ import { fetchPageData } from "../../../shared/api/pageApi"
 
 // One event on the What's Changed timeline. `cost` = a batch of job cost
 // lines posted on one calendar day for one job; `status` = the project was
-// marked Complete (5) or Closed (6).
+// marked Complete (5) or Closed (6); `changeOrder` = a change order entered
+// or approved (one event per CO — it resurfaces, re-dated, on approval).
 export interface WhatsChangedItem {
-  kind: "cost" | "status"
+  kind: "cost" | "status" | "changeOrder"
   id: string
   jobId: string
   amount: number | null
   lineCount: number | null
   newStatus: number | null
   occurredAt: string
+  /** CO description (falls back to "CO #n" server-side); other kinds null. */
+  title?: string | null
+  /** Change orders only: true once the CO is approved (prmchg status 1). */
+  coApproved?: boolean | null
   jobName: string
   /** Sage actr_u.parent — the shared-address property key the timeline groups
    *  cards by. Null/absent (one-off, missing actr_u row, or a backend that
@@ -37,8 +42,10 @@ export const WHATS_CHANGED_PAGE_SIZE = 10
 
 export type WhatsChangedQuery = "whatsChangedPm" | "whatsChangedGm"
 
-/** The timeline's filter toggle: both event kinds, or just one. */
-export type WhatsChangedKind = "all" | "cost" | "status"
+/** The timeline's filter toggle: every event kind, or just one. */
+export type WhatsChangedKind = "all" | "cost" | "status" | "changeOrder"
+
+type FilterableKind = Exclude<WhatsChangedKind, "all">
 
 // A filtered kind owns its whole feed (page 0 included — the page provider
 // only carries the unfiltered default). Cached per kind for the session so
@@ -85,7 +92,7 @@ export function useWhatsChangedFeed(queryName: WhatsChangedQuery, kind: WhatsCha
   // null = no extra page fetched yet; follow the first page's hasMore.
   const [extraHasMore, setExtraHasMore] = useState<boolean | null>(null)
   // Session cache of the filtered feeds, keyed by kind.
-  const [filtered, setFiltered] = useState<Partial<Record<"cost" | "status", FilteredFeed>>>({})
+  const [filtered, setFiltered] = useState<Partial<Record<FilterableKind, FilteredFeed>>>({})
   const [loadingMore, setLoadingMore] = useState(false)
   // Ref guard so a re-observing IntersectionObserver can't double-fire a page
   // while the previous request is still in flight.

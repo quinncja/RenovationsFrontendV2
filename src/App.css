@@ -3180,6 +3180,66 @@ span.wc-event {
   flex: none;
 }
 
+/* Change-order row — the contract-side event kind gets its own palette so it
+   scans apart from cost batches at a glance: amber while awaiting approval
+   (the money isn't in the contract yet), blue once approved. Reuses the
+   milestone head anatomy (icon + tinted figure) via the same custom property. */
+.wc-event--co {
+  --wc-ms-text: light-dark(#2563eb, #60a5fa);
+}
+
+.wc-event--co-pending {
+  --wc-ms-text: light-dark(#b45309, #f0a13b);
+}
+
+/* The label line hosts the state tag beside the phase label (or alone on a
+   parentless job) — flex, so a missing label leaves no stray gap. */
+.wc-event--co .wc-event-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* State tag: soft-tinted pill in the row's palette, same badge family as
+   .wc-delta. Inherits the label line's uppercase — it reads as part of it. */
+.wc-co-tag {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wc-ms-text) 12%, transparent);
+  color: var(--wc-ms-text);
+  font-size: 0.6875rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+/* A pending CO's foot carries its description — one ellipsized line so a
+   wordy CO never reflows the card. */
+.wc-event--co .wc-event-foot {
+  align-self: stretch;
+  min-width: 0;
+}
+
+.wc-co-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Change-order variants of the kind pill (modal meta row) — same palette as
+   the timeline row, so state carries through into the detail view. */
+.wc-pill--co {
+  --wc-ms-text: light-dark(#2563eb, #60a5fa);
+  border-color: color-mix(in srgb, var(--wc-ms-text) 35%, transparent);
+  background: color-mix(in srgb, var(--wc-ms-text) 10%, var(--card-color));
+  color: var(--wc-ms-text);
+}
+
+.wc-pill--co-pending {
+  --wc-ms-text: light-dark(#b45309, #f0a13b);
+}
+
 /* Margin-move chip — a soft-tinted pill in the badge family, so the delta
    reads as a tag beside the margin rather than a second loud figure. Modal
    stat band only; the timeline card spells the move out as before → after. */
@@ -3371,6 +3431,12 @@ span.wc-event {
 .wc-detail-when {
   color: var(--secondary-text);
   font-variant-numeric: tabular-nums;
+}
+
+/* Change-order description line — rides between the meta row and the facts
+   grid, pulling the meta's bottom gap in so the pair reads as one block. */
+.wc-detail-co-title {
+  margin: -0.875rem 0 1.375rem;
 }
 
 .wc-detail-grid {
@@ -10479,11 +10545,15 @@ button.jc-kind-chip:hover {
 .loading-screen-logo {
   position: relative;
   z-index: 1;
-  animation: loading-logo-pulse 1.6s ease-in-out infinite;
+  /* Duration is mirrored by PULSE_MS in LoadingScreen.tsx, which phase-locks
+     every instance to one shared clock via a negative animation-delay. */
+  animation: loading-logo-pulse 2s ease-in-out infinite;
 }
 
+/* A calm breath, not a blink — the shallow range keeps the logo legible the
+   whole cycle. */
 @keyframes loading-logo-pulse {
-  0%, 100% { opacity: 0.45; }
+  0%, 100% { opacity: 0.55; }
   50% { opacity: 1; }
 }
 
