@@ -10460,6 +10460,9 @@ button.jc-kind-chip:hover {
    project link is a contained pill instead — see .co-modal-project-pill. */
 .co-project-link {
   cursor: pointer;
+  /* The table's flexible spacer column crushes this cell to min-content,
+     wrapping long job names one word per line — keep them on one line. */
+  white-space: nowrap;
 }
 .co-project-link:hover .body-text.emphasized {
   color: var(--primary-color);

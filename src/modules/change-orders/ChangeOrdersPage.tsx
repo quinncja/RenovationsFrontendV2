@@ -203,7 +203,7 @@ export default function ChangeOrdersPage() {
                       <td className="spend-rank-table-value body-text">{formatMoneyFull(coMarkup(co))}</td>
                       <td className="spend-rank-table-value body-text">{formatMoneyFull(co.total)}</td>
                       <td aria-hidden="true" />
-                      <td className="spend-rank-table-name body-text text-secondary">{co.user}</td>
+                      <td className="spend-rank-table-name body-text text-secondary" style={{ whiteSpace: "nowrap" }}>{co.user}</td>
                       <td className="spend-rank-table-name subheadline text-secondary">{formatDate(co.date)}</td>
                     </tr>
                   ))}
