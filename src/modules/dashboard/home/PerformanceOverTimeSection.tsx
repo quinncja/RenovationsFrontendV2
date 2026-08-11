@@ -3,7 +3,6 @@ import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled
 import { MotionList, MotionItem } from "../../../shared/components/MotionList/MotionList"
 import { SkelText } from "../../../shared/components/SkelText"
 import { formatMoneyFull, marginTextColor } from "../../../shared/utils/format"
-import { EmployeePeriodAndYearSummary } from "../widgets/EmployeePeriodAndYearSummary"
 import { MarginWidget } from "../widgets/MarginWidget"
 import { EmployeePerformanceWidget } from "../widgets/EmployeePerformanceWidget"
 import { PerformanceCharts } from "./PerformanceCharts"
@@ -31,10 +30,11 @@ function AllTimeFigure({
 }
 
 /**
- * Section 2 of the PM/GM home: the period/year snapshot, an All Time
- * grand-totals strip (fed by the same all-time breakdown fetch the Open
- * Projects card uses), and the trend charts — the four per-employee charts
- * for PMs, the company-wide margin + employee performance pair for the GM.
+ * Section 2 of the PM/GM home: an All Time grand-totals strip (fed by the
+ * same all-time breakdown fetch the Open Projects card uses) above the trend
+ * charts — the four per-employee charts for PMs, the company-wide margin +
+ * employee performance pair for the GM. (The period/year snapshot lives in
+ * section 1 — it reads as current performance.)
  */
 export function PerformanceOverTimeSection({
   monthly,
@@ -69,10 +69,6 @@ export function PerformanceOverTimeSection({
 
   return (
     <MotionList className="widget-grid widget-grid-2 dashboard-home-grid">
-      <MotionItem className="col-span-full">
-        <EmployeePeriodAndYearSummary monthly={monthly} yearly={yearly} loading={isLoading} />
-      </MotionItem>
-
       <MotionItem className="col-span-full">
         <div className="home-alltime-strip">
           <span className="home-alltime-title headline">All Time</span>

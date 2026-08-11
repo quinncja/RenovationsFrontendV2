@@ -441,6 +441,8 @@ export function EmployeeDetail({
                   watchlistProjects={watchlistProjects}
                   openProjects={openProjects}
                   closedProjects={closedProjects}
+                  monthly={monthly}
+                  yearly={yearly}
                   isLoading={isLoading}
                   allTimeLoading={allTimeLoading}
                   year={year}

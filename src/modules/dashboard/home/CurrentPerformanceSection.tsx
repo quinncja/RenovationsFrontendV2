@@ -1,16 +1,20 @@
 import { MotionList, MotionItem } from "../../../shared/components/MotionList/MotionList"
+import { EmployeePeriodAndYearSummary } from "../widgets/EmployeePeriodAndYearSummary"
 import { StatCardRow, type HomeModalKind } from "./StatCardRow"
 import { WhatsChangedRow } from "./WhatsChangedRow"
-import type { ProjectRow } from "./breakdownRows"
+import type { Breakdown, ProjectRow } from "./breakdownRows"
 
 /**
  * Section 1 of the PM/GM home: the centered stat-card row (with drill-down
- * modals owned by the page) above the What's Changed timeline.
+ * modals owned by the page), the period/year snapshot, then the What's
+ * Changed timeline.
  */
 export function CurrentPerformanceSection({
   watchlistProjects,
   openProjects,
   closedProjects,
+  monthly,
+  yearly,
   isLoading,
   allTimeLoading,
   year,
@@ -20,6 +24,8 @@ export function CurrentPerformanceSection({
   watchlistProjects: ProjectRow[]
   openProjects: ProjectRow[]
   closedProjects: ProjectRow[]
+  monthly: Breakdown["stats"]["monthly"] | undefined
+  yearly: Breakdown["stats"]["yearly"] | undefined
   isLoading: boolean
   allTimeLoading: boolean
   year: number
@@ -39,6 +45,9 @@ export function CurrentPerformanceSection({
           gmHome={gmHome}
           onOpenModal={onOpenModal}
         />
+      </MotionItem>
+      <MotionItem>
+        <EmployeePeriodAndYearSummary monthly={monthly} yearly={yearly} loading={isLoading} />
       </MotionItem>
       <MotionItem>
         <WhatsChangedRow queryName={gmHome ? "whatsChangedGm" : "whatsChangedPm"} />
