@@ -8,6 +8,7 @@ export const PAGE_QUERIES = {
     "monthlyOverheadComparison",
     "monthlyNetProfitComparison",
     "marginPerformance",
+    "annualMarginTrend",
     "annualDirectExpenses",
     "phaseCompletion",
     "clientInsights",
@@ -74,6 +75,8 @@ export const PAGE_QUERIES = {
     "employeePerformanceBreakdown",
     "openMonthFinances",
     "marginPerformance",
+    // Yearly half of the Margin widget's Monthly/Yearly toggle.
+    "annualMarginTrend",
     "employeePerformance",
     // The four data-validation report cards (same pair the admin home's
     // Reports section reads — counts + per-issue job rows).
@@ -98,6 +101,7 @@ export const PAGE_QUERIES = {
   // Business Summary — Period & Year Summary, Margin (MoM), Employee Performance.
   businessSummary: [
     "marginPerformance",
+    "annualMarginTrend",
     "openMonthFinances",
     "employeePerformance",
   ],

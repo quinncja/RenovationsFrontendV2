@@ -7,6 +7,7 @@ import { useAuth } from "../../../core/auth/AuthProvider"
 import { effectiveRole } from "../../../core/auth/roles"
 import { fetchSqlStatus, connectSql, disconnectSql } from "../../api/sqlApi"
 import useLocalStorage from "../../hooks/useLocalStorage"
+import useIncludeOverUnder from "../../hooks/useIncludeOverUnder"
 import { HASHED_RELATION_COLORS_KEY } from "../../hooks/useHashedRelationColors"
 import useJobcostDefaultRange, { JOBCOST_DEFAULT_RANGE_OPTIONS } from "../../hooks/useJobcostDefaultRange"
 import { useModalLayer } from "../../hooks/useModalLayer"
@@ -35,6 +36,9 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
   }, [onClose])
 
   const [marginColorsEnabled, setMarginColorsEnabled] = useLocalStorage("marginColorsEnabled", true)
+  // Managers/GMs flip the WIP fold here (defaults on for them) — admins keep
+  // the "Incl. WIP" pill in the dashboard header instead, so no duplicate row.
+  const [includeOverUnder, setIncludeOverUnder] = useIncludeOverUnder()
   const [hashedRelationColors, setHashedRelationColors] = useLocalStorage(HASHED_RELATION_COLORS_KEY, false)
   const [jobcostDefaultRange, setJobcostDefaultRange] = useJobcostDefaultRange()
   const [sqlConnected, setSqlConnected] = useState<boolean | null>(null)
@@ -143,6 +147,25 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                         onChange={(k) => setMarginColorsEnabled(k === "on")}
                       />
                     </div>
+                    {!isAdmin && (
+                      <div className="settings-row">
+                        <div className="settings-row-info">
+                          <span className="settings-row-label">Include WIP</span>
+                          <span className="settings-row-description">
+                            Fold work completed but not yet billed into revenue and margin figures
+                          </span>
+                        </div>
+                        <SegmentedControl
+                          variant="settings"
+                          role="radiogroup"
+                          ariaLabel="Include WIP"
+                          layoutId="settingsWipThumb"
+                          value={includeOverUnder ? "on" : "off"}
+                          options={ON_OFF}
+                          onChange={(k) => setIncludeOverUnder(k === "on")}
+                        />
+                      </div>
+                    )}
                     <div className="settings-row">
                       <div className="settings-row-info">
                         <span className="settings-row-label">Randomize Relation Colors</span>

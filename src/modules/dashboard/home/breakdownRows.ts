@@ -20,6 +20,13 @@ export interface BreakdownProject {
   budget?: number
   // Raw phase rows (consolidate:false from backend) carry pmName directly.
   pmName?: string | null
+  // actrec.insdte — when the job record was entered into Sage. Probe-guarded
+  // on the backend (absent from the payload if prod lacks the column).
+  enteredDate?: string | null
+  // actrec.upddte — last edit to the job record. For a completed project the
+  // status flip is normally the final edit, so this stands in for "when it
+  // was marked complete" (sttdte/cmpdte aren't reliably maintained in Sage).
+  updatedDate?: string | null
   // Consolidated rows (consolidate:true) bundle phases under here.
   phases?: { recnum: string; pmName: string | null }[]
 }
@@ -32,6 +39,16 @@ export interface Breakdown {
     monthly: { month: number; income: number; totalCost: number; profit: number; margin: number }[]
   }
   projects: BreakdownProject[]
+  // Billing-basis companion for the Margin chart's WIP toggle OFF state —
+  // only the open month's bar swaps to it (AR-billed revenue + posted costs
+  // for this PM's jobs; every other bar is settled history and stays on the
+  // earned stats). Optional: absent until the backend deploy lands, or when
+  // there's no open period.
+  billing?: {
+    monthly: { month: number; revenue: number; total_expenses: number }[]
+    openYear: number
+    openMonth: number
+  } | null
 }
 
 // Normalized row the tables render. Mirrors the shape Jobcost.tsx builds
@@ -48,6 +65,8 @@ export interface ProjectRow {
   variance: number
   margin: number | null
   supervisor: string
+  enteredDate: string | null
+  updatedDate: string | null
 }
 
 export function normalizeProject(p: BreakdownProject): ProjectRow {
@@ -73,6 +92,21 @@ export function normalizeProject(p: BreakdownProject): ProjectRow {
       p.pmName?.trim() ??
       p.phases?.find((ph) => ph.pmName?.trim())?.pmName?.trim() ??
       "",
+    enteredDate: p.enteredDate ?? null,
+    updatedDate: p.updatedDate ?? null,
+  }
+}
+
+// Newest-date-first comparator for the stat-card drill-down modals: Open
+// Projects order by most recently entered, Closed by most recently marked
+// complete (last record edit). Rows missing the date sink to the bottom.
+export function byDateDesc(field: "enteredDate" | "updatedDate") {
+  return (a: ProjectRow, b: ProjectRow): number => {
+    const at = a[field] ? Date.parse(a[field]!) : NaN
+    const bt = b[field] ? Date.parse(b[field]!) : NaN
+    if (Number.isNaN(at)) return Number.isNaN(bt) ? 0 : 1
+    if (Number.isNaN(bt)) return -1
+    return bt - at
   }
 }
 

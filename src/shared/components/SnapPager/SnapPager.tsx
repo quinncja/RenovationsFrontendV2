@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import useIsMobile from "../../hooks/useIsMobile"
-import { SectionNav } from "../../../modules/dashboard/components/SectionNav"
+import { SectionDots } from "../../../modules/dashboard/components/SectionNav"
 
 export interface SnapPagerSection {
   id: string
@@ -27,13 +27,15 @@ function scrollBehavior(): ScrollBehavior {
 
 /**
  * Presentational sibling of the admin home's SectionPager: the same full-screen
- * scroll-snap column (snap, scroll-linked fades, dot rail, arrow-key paging,
- * zoom-to-fit, load-time scroll anchoring) for a FIXED set of sections passed
+ * scroll-snap column (snap, scroll-linked fades, arrow-key paging, zoom-to-fit,
+ * load-time scroll anchoring) for a FIXED set of sections passed
  * as props — no layout-edit machinery, no widget registries. Reuses the
  * `.section-pager*` CSS classes, so the `.page:has(.section-pager)` header
  * overlay rules apply unchanged. Always starts at the first section (no
  * persisted restore); a navbar Home navigation (`state.resetHome`) scrolls back
- * to the top. On mobile it degrades to the same plain `.section-stack` flow.
+ * to the top. With only 2-3 fixed sections the right rail is the static
+ * SectionDots capsule (no hover-morph menu). On mobile it degrades to the same
+ * plain `.section-stack` flow.
  */
 export function SnapPager({ sections }: { sections: SnapPagerSection[] }) {
   const location = useLocation()
@@ -295,7 +297,7 @@ export function SnapPager({ sections }: { sections: SnapPagerSection[] }) {
             ref={(el) => {
               panelRefs.current[i] = el
             }}
-            className="section-pager-panel snap-pager-panel-fill"
+            className="section-pager-panel"
           >
             <div className="section-slide-content">
               {/* Zoom-to-fit wrapper — scaled down only when the section would
@@ -315,7 +317,7 @@ export function SnapPager({ sections }: { sections: SnapPagerSection[] }) {
         ))}
       </div>
 
-      <SectionNav
+      <SectionDots
         sections={sections.map((s) => ({ id: s.id, title: s.title }))}
         active={active}
         onSelect={goTo}

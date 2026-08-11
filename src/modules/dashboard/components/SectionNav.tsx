@@ -22,6 +22,43 @@ const LABEL_CLOSE_S = 0.28
 const SELECT_CLOSE_MS = 850
 
 /**
+ * Static dots-only variant of the section navigator (PM/GM home, 2-3 fixed
+ * sections): the same dot geometry as SectionNav's resting state, but with no
+ * capsule chrome, hover morph or labels — bare dots that show position and
+ * jump on click.
+ */
+export function SectionDots({
+  sections,
+  active,
+  onSelect,
+}: {
+  sections: { id: string; title: string }[]
+  active: number
+  onSelect: (index: number) => void
+}) {
+  return (
+    <div className="section-nav section-nav-dots-only">
+      <div className="section-nav-card" role="tablist" aria-label="Sections">
+        {sections.map((section, i) => (
+          <button
+            key={section.id}
+            type="button"
+            className={`section-nav-row${i === active ? " section-nav-row-active" : ""}`}
+            role="tab"
+            aria-selected={i === active}
+            aria-label={section.title}
+            title={section.title}
+            onClick={() => onSelect(i)}
+          >
+            <span className="section-nav-dot" />
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
  * Right-edge section navigator. At rest it's a bordered capsule (year-selector
  * style) around a column of dots; on hover/focus it morphs into a labeled menu.
  * Three layers cooperate so the border stays pixel-crisp through the morph:

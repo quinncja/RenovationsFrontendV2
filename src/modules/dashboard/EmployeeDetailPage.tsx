@@ -23,6 +23,7 @@ import { SnapPager } from "../../shared/components/SnapPager/SnapPager"
 import { EmployeePeriodAndYearSummary } from "./widgets/EmployeePeriodAndYearSummary"
 import { DailyReportButton } from "./report/DailyReportButton"
 import {
+  byDateDesc,
   normalizeProject,
   STATUS_LABELS,
   WATCHLIST_MARGIN_THRESHOLD,
@@ -382,8 +383,17 @@ export function EmployeeDetail({
   const allTimeRows = useMemo(() => (allTimeProjects ?? []).map(normalizeProject), [allTimeProjects])
   const yearRows = useMemo(() => (projects ?? []).map(normalizeProject), [projects])
 
-  const openProjects = useMemo(() => allTimeRows.filter((p) => p.status === 4), [allTimeRows])
-  const closedProjects = useMemo(() => yearRows.filter((p) => p.status === 5), [yearRows])
+  // Open sorts most-recently-entered first, Closed by most-recent record
+  // edit (≈ when it was flipped to Complete), so the drill-down modals lead
+  // with the freshest projects (headers can still re-sort).
+  const openProjects = useMemo(
+    () => allTimeRows.filter((p) => p.status === 4).sort(byDateDesc("enteredDate")),
+    [allTimeRows]
+  )
+  const closedProjects = useMemo(
+    () => yearRows.filter((p) => p.status === 5).sort(byDateDesc("updatedDate")),
+    [yearRows]
+  )
   const watchlistProjects = useMemo(
     () =>
       yearRows.filter(
@@ -408,11 +418,13 @@ export function EmployeeDetail({
 
   const openJob = (jobNumber: string) => goToJobcost(jobNumber)
 
-  const pageActions = (
-    <>
-      {isManagerHome && <DailyReportButton />}
-      <YearSelector value={year} onChange={onYearChange} />
-    </>
+  // PM/GM home: the year selector lives in the Year Summary card (section 2)
+  // instead of the header — the header keeps just the daily-report clock.
+  // Admin /employees/:id keeps the header selector.
+  const pageActions = isHome ? (
+    isManagerHome ? <DailyReportButton /> : undefined
+  ) : (
+    <YearSelector value={year} onChange={onYearChange} />
   )
 
   const projectsModal = (
@@ -442,8 +454,6 @@ export function EmployeeDetail({
                   watchlistProjects={watchlistProjects}
                   openProjects={openProjects}
                   closedProjects={closedProjects}
-                  monthly={monthly}
-                  yearly={yearly}
                   isLoading={isLoading}
                   allTimeLoading={allTimeLoading}
                   year={year}
@@ -462,9 +472,8 @@ export function EmployeeDetail({
                   isLoading={isLoading}
                   year={year}
                   gmHome={gmHome}
-                  allTimeTotals={allTime?.totals ?? null}
-                  allTimeRows={allTimeRows}
-                  allTimeLoading={allTimeLoading}
+                  billing={breakdown?.billing}
+                  onYearChange={onYearChange}
                 />
               ),
             },
@@ -512,7 +521,7 @@ export function EmployeeDetail({
           <EmployeePeriodAndYearSummary monthly={monthly} yearly={yearly} loading={isLoading} />
         </MotionItem>
 
-        <PerformanceCharts monthly={monthly} yearly={yearly} year={year} isLoading={isLoading} />
+        <PerformanceCharts monthly={monthly} yearly={yearly} year={year} isLoading={isLoading} billing={breakdown?.billing} />
 
         <MotionItem className="col-span-full">
           <Widget

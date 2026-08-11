@@ -2669,100 +2669,126 @@ span.skel-text {
 }
 
 /* ── PM/GM home — Current Project Performance section ─────────────────────
-   The section content is a simple vertical stack: the centered stat-card row
-   above the What's Changed timeline. */
+   Two blocks only — the stat band above the What's Changed timeline (the
+   period/year snapshot moved to Performance Over Time) — so the section is
+   deliberately set airy: a scoped type-scale bump (the shared classes read
+   these vars) and a generous gap. Top-aligned like every other pager section
+   (content-sized, so the next section peeks in below). */
 .home-current-stack {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 3rem;
+  /* One step up from the app scale — this is the landing screen, and at the
+     base sizes two lone blocks read cramped against all that empty canvas. */
+  --title3-size: 1.0625rem;
+  --body-size: 0.9375rem;
+  --callout-size: 0.875rem;
+  --caption1-size: 0.75rem;
 }
 
-/* Outside the dashboard grid the base .widget min-height (280px) would
-   balloon the period/year snapshot halves with empty space — same override
-   the admin grid applies. */
-.home-current-stack .current-period-widget {
-  min-height: 0;
-}
-
-/* Centered evolution of .employee-stat-row: the two primary cards (Watchlist,
-   Open) carry the visual weight; Closed reads quieter. Same 16px-radius card
-   family, same color-mix hover — hierarchy comes from size and type, not new
-   chrome. */
-.home-stat-row {
+/* The portfolio stat band: one full-width fused card, three equal drill-down
+   segments split by hairline dividers — the same fused-card language as the
+   Period & Year snapshot pair below it. Each segment puts the big figure
+   beside its label + supporting metric, so the row reads as three short
+   sentences with aligned baselines instead of three floating tiles. */
+.home-stat-band {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
   align-items: stretch;
-  gap: 1rem;
-}
-
-.home-stat-card {
-  flex: 0 1 300px;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1.5rem 1.75rem;
   background: var(--card-color);
   border: 1px solid var(--border-color);
   border-radius: 16px;
   box-shadow: var(--button-shadow);
+  overflow: hidden;
+}
+
+.home-stat-seg {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 2rem 2.25rem;
+  background: none;
+  border: none;
+  font-family: inherit;
   cursor: pointer;
   text-align: left;
   transition: background-color 0.15s ease;
 }
 
-.home-stat-card:hover:not(:disabled) {
+.home-stat-seg + .home-stat-seg {
+  border-left: 1px solid var(--border-color);
+}
+
+.home-stat-seg:hover:not(:disabled) {
   background-color: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
 }
 
-.home-stat-card:disabled {
+.home-stat-seg:disabled {
   cursor: default;
 }
 
-.home-stat-card-value {
-  color: var(--primary-text);
+.home-stat-seg-value {
+  flex: none;
+  min-width: 2ch;
+  text-align: center;
   font-size: 2.75rem;
   line-height: 1;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
 }
 
-/* Figure (or shimmer) centers between the pinned label and the sub-metric. */
-.home-stat-card .home-stat-card-value,
-.home-stat-card .stat-widget-skeleton {
-  margin-block: auto;
-}
-
-.home-stat-card--warn .home-stat-card-value {
+/* Red = needs the PM; muted = a zero that is good news. */
+.home-stat-seg-value--warn {
   color: #ef4444;
 }
 
-/* The quieter third card: narrower, smaller figure, muted label. */
-.home-stat-card--secondary {
-  flex: 0 1 225px;
-  padding: 1.25rem 1.5rem;
+.home-stat-seg-value--quiet {
+  color: rgb(from var(--primary-text) r g b / 0.4);
 }
 
-.home-stat-card--secondary .widget-title {
+/* Loading shimmer sized to the figure slot so the band doesn't reflow. */
+.home-stat-seg-skel {
+  flex: none;
+  width: 2.9rem;
+  height: 2.9rem;
+}
+
+.home-stat-seg-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+/* Sentence-case label at full text color; the single muted sub-line carries
+   the supporting metric. One tone each — no competing emphasis. */
+.home-stat-seg-label {
+  color: var(--primary-text);
+}
+
+.home-stat-seg-sub {
   color: var(--secondary-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.home-stat-card--secondary .home-stat-card-value {
-  font-size: 2rem;
-}
-
-/* One supporting metric under the figure, so the number has context without
-   a click. */
-.home-stat-sub {
-  color: var(--secondary-text);
-}
-
-.home-stat-sub-warn {
+.home-stat-seg-sub-warn {
   color: #ef4444;
+  font-weight: var(--font-weight-semibold);
 }
 
+/* Mobile: the band stacks into rows; dividers rotate to horizontal. */
 @media (max-width: 768px) {
-  .home-stat-card,
-  .home-stat-card--secondary {
-    flex: 1 1 100%;
+  .home-stat-band {
+    flex-direction: column;
+  }
+
+  .home-stat-seg + .home-stat-seg {
+    border-left: none;
+    border-top: 1px solid var(--border-color);
   }
 }
 
@@ -2774,20 +2800,64 @@ span.skel-text {
 .wc-block {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: 1.1rem;
 }
 
 .wc-title {
   margin: 0;
 }
 
+/* Title + kind filter (All / Costs / Finished) on one line. The seg is the
+   shared Job Costing control in its light-surface (.ohr) dress. */
+.wc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.wc-head-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Return-to-newest: a labeled pill beside the filter once the row has been
+   scrolled; glides it back to the start. Same quiet chrome as the paging
+   chevrons, sized to sit flush with the seg control. */
+.wc-start-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 30px;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--card-color);
+  color: var(--secondary-text);
+  box-shadow: var(--button-shadow);
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.wc-start-btn:hover {
+  background-color: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+  color: var(--primary-text);
+}
+
 .wc-scroller {
   position: relative;
 }
 
-/* Free momentum scroll — deliberately NO scroll-snap here: trackpad
-   horizontal scrolling fighting a snap point feels broken. The chevron pages
-   by whole cards with explicit scroll math instead. */
+/* Free scrolling, NO scroll-snap: even proximity snap grabs the row when a
+   trackpad flick settles near a boundary, which reads as drag. The row rests
+   wherever momentum leaves it; only the chevrons/return button land flush,
+   because their spring targets are exact multiples of the 432px card pitch
+   (card 416 + 1rem gap). */
 .wc-row {
   display: flex;
   gap: 1rem;
@@ -2807,42 +2877,99 @@ span.skel-text {
   mask-image: linear-gradient(to right, #000 calc(100% - 72px), transparent);
 }
 
-.wc-item {
-  position: relative;
-  flex: 0 0 300px;
+/* One rail segment per calendar day; that day's cards ride beneath it.
+   The row gap and in-group card gap are both 1rem on purpose, so cards keep
+   a uniform pitch across group boundaries (the chevron's paging math and the
+   rail line's gap-bleed both rely on it). */
+.wc-group {
+  /* Exactly as wide as this day's cards, never narrower — the row scrolls.
+     flex: none alone still let groups compress in some sizing paths, which
+     sent fixed-width cards overflowing sideways onto the next group. */
+  flex: none;
+  width: max-content;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
 }
 
-/* Timeline rail: dot — label — line. The line is a flex filler AFTER the
+.wc-group-cards {
+  flex: 1;
+  display: flex;
+  /* Cards size to their own content instead of stretching to the row's
+     tallest — a single-event card next to a three-phase one would otherwise
+     carry a hollow bottom half. Ragged heights are part of the airy read. */
+  align-items: flex-start;
+  gap: 1rem;
+  width: max-content;
+}
+
+/* Explicit width, not just flex-basis: WebKit computes the groups' intrinsic
+   (max-content) width from the cards' CONTENT when only flex-basis is set,
+   which undersized every group and made consecutive days overlap. A definite
+   width makes the intrinsic contribution 416px in every engine. (Pitch =
+   416 + 1rem gap = 432px — WhatsChangedRow's paging fallback matches.) */
+.wc-group-cards > .wc-card {
+  flex: none;
+  width: 416px;
+}
+
+/* Timeline rail: dot — day label — line. The line is a flex filler AFTER the
    label (never underneath it, so no background hacks over the app's glow
-   gradient), bleeding across the 1rem gap to meet the next item's dot. */
-.wc-item-when {
+   gradient), bleeding across the 1rem gap to meet the next group's dot. */
+.wc-group-when {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  /* Label-to-line spacing comes from the label's own padding-right, so the
+     masked patch behind the stuck label covers the space too. */
+  gap: 0;
   color: var(--secondary-text);
 }
 
-.wc-item-when::after {
-  content: "";
-  flex: 1;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--border-color);
-  margin-right: -1rem;
+/* Dot + day label, sticky against the row's left edge so the label stays
+   readable while a long day scrolls past; the next group's label pushes it
+   out (sticky can't escape its containing when-row). NO background here —
+   the fixed-attachment glow repaint used to mask the rail line misaligned
+   inside the pager's scroll/zoom containers (WebKit especially) and flashed
+   as a visible patch. While stuck the hairline may run behind the label;
+   it's quiet enough to read through. */
+.wc-group-label {
+  position: sticky;
+  left: 0.25rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-right: 0.5rem;
 }
 
-.wc-item:last-of-type .wc-item-when::after {
+.wc-group-day {
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The rail is a hairline, quieter than the card borders it runs behind —
+   it should read as a guide, not a rule. */
+.wc-group-when::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: color-mix(in srgb, var(--border-color) 60%, transparent);
+  margin-right: -1rem;
+  /* Trimmed from the left by the sticky label's stick offset (set per scroll
+     frame by WhatsChangedRow) so the line starts at the stuck label's right
+     edge instead of running beneath it — the label paints no background. */
+  margin-left: var(--wc-line-trim, 0px);
+}
+
+.wc-group:last-of-type .wc-group-when::after {
   margin-right: 0.25rem;
 }
 
 .wc-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: var(--secondary-text);
+  /* Softened alongside the hairline rail — the pair carries the same weight. */
+  background: color-mix(in srgb, var(--secondary-text) 70%, var(--background-color));
   flex: none;
   margin-left: 2px;
 }
@@ -2852,37 +2979,28 @@ span.skel-text {
   background: var(--primary-color);
 }
 
+/* Property-first card: the address anchors the card, each phase's event is an
+   airy row beneath it. The card itself isn't clickable — the header goes to
+   the property page, the rows open the detail modal — so it carries no hover.
+   A softer, longer shadow than --button-shadow lets it float rather than sit. */
 .wc-card {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 0.6rem;
-  padding: 1.1rem 1.25rem;
+  align-items: stretch;
+  gap: 1rem;
+  padding: 1.6rem 1.7rem 0.8rem;
   background: var(--card-color);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  box-shadow: var(--button-shadow);
-  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent);
+  border-radius: 16px;
+  box-shadow:
+    light-dark(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.25)) 0px 1px 2px,
+    light-dark(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.45)) 0px 14px 32px -22px;
   text-align: left;
-  transition: background-color 0.15s ease;
+  font-family: var(--font-family);
 }
 
-.wc-card:hover {
-  background-color: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
-}
-
-.wc-card--skel {
-  cursor: default;
-}
-
-.wc-card-top {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-/* Neutral kind pill for cost batches; status flips reuse .status-badge. */
+/* Neutral kind pill for cost batches; status flips reuse .status-badge.
+   Card no longer shows it — it survives in the detail modal's meta row. */
 .wc-pill {
   display: inline-flex;
   align-items: center;
@@ -2895,48 +3013,197 @@ span.skel-text {
   font-weight: 600;
 }
 
-.wc-pill--skel {
-  border-color: transparent;
-  background: none;
-  padding-inline: 0;
+/* Card header: property name (+ jump arrow when it's a real parent group) over
+   an optional rollup line for multi-event days. */
+.wc-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  align-items: flex-start;
 }
 
-.wc-card-name {
+.wc-prop {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font-family);
+  text-align: left;
   color: var(--primary-text);
+}
+
+button.wc-prop {
+  cursor: pointer;
+}
+
+.wc-prop-name {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: 2.6em;
 }
 
-.wc-card-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  margin-top: auto;
+/* The jump arrow whispers until the header is the thing being pointed at —
+   same restraint as the invoice modal's project card. */
+.wc-prop-arrow {
+  flex: none;
+  color: var(--secondary-text);
+  opacity: 0.45;
+  transition: opacity 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
-.wc-card-amount {
-  color: var(--primary-text);
+button.wc-prop:hover .wc-prop-name,
+button.wc-prop:focus-visible .wc-prop-name {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--primary-text) 35%, transparent);
 }
 
-.wc-card-count,
-.wc-card-margin {
+button.wc-prop:hover .wc-prop-arrow,
+button.wc-prop:focus-visible .wc-prop-arrow {
+  opacity: 1;
+  color: var(--primary-color);
+  transform: translate(1px, -1px);
+}
+
+.wc-prop-sub {
   color: var(--secondary-text);
 }
 
+/* Event rows: full-bleed buttons stacked inside the card, separated by
+   hairlines quieter than the card border. Generous vertical padding is what
+   keeps a multi-phase day feeling light instead of listy. */
+.wc-events {
+  display: flex;
+  flex-direction: column;
+}
+
+.wc-event {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.45rem;
+  /* Rows bleed a little past the text column so the hover fill reads as a
+     contained rounded slab inside the card, not a text highlight. */
+  margin: 0 -0.85rem;
+  padding: 1.05rem 0.85rem 1.1rem;
+  background: none;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-family);
+  transition: background-color 0.15s ease;
+}
+
+/* Hairline divider between rows — a positioned pseudo, NOT a border-top: a
+   border would trace the row's rounded corners and curve at the ends. Inset
+   to the text column so it reads with the content, not the hover slab. */
+.wc-event + .wc-event::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0.85rem;
+  right: 0.85rem;
+  height: 1px;
+  background: color-mix(in srgb, var(--border-color) 55%, transparent);
+  transition: opacity 0.15s ease;
+}
+
+/* Quiet gray fill on the pointed-at row — the app's standard hover surface.
+   The hairlines touching the hovered row drop out so the rounded slab sits
+   clean instead of being underlined top and bottom. */
+button.wc-event:hover,
+button.wc-event:focus-visible {
+  background: var(--hover-bg);
+}
+button.wc-event:hover::before,
+button.wc-event:focus-visible::before,
+button.wc-event:hover + .wc-event::before,
+button.wc-event:focus-visible + .wc-event::before {
+  opacity: 0;
+}
+
+span.wc-event {
+  cursor: default;
+}
+
+.wc-event-label {
+  color: var(--secondary-text);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+}
+
+.wc-event-amount {
+  color: var(--primary-text);
+  display: flex;
+  align-items: baseline;
+  gap: 0.125rem;
+}
+
+.wc-event-foot {
+  color: var(--secondary-text);
+  /* The before → after margin read shouldn't wiggle between rows. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* The arrow in the margin before → after read stays quieter than the numbers
+   around it — direction, not another figure. */
+.wc-margin-arrow {
+  opacity: 0.55;
+}
+
+/* Milestone row (project marked Complete/Closed) — the rarest event on the
+   feed reads stronger than a cost batch, not emptier. Green for Complete;
+   Closed keeps a neutral tint via the custom-property swap. */
+.wc-event--milestone {
+  --wc-ms-text: light-dark(#16a34a, #22c55e);
+}
+
+.wc-event--closed {
+  --wc-ms-text: light-dark(#4b5563, #9ca3af);
+}
+
+.wc-event-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--wc-ms-text);
+}
+
+.wc-event-head svg {
+  flex: none;
+}
+
+/* Margin-move chip — a soft-tinted pill in the badge family, so the delta
+   reads as a tag beside the margin rather than a second loud figure. Modal
+   stat band only; the timeline card spells the move out as before → after. */
 .wc-delta {
+  display: inline-block;
   margin-left: 0.5rem;
-  font-weight: 600;
+  padding: 0.125rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  vertical-align: 0.1em;
 }
 
 .wc-delta--down {
-  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
 }
 
 .wc-delta--up {
-  color: #22c55e;
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
 }
 
 /* Zero-size prefetch sentinel at the end of the row. */
@@ -2944,7 +3211,8 @@ span.skel-text {
   flex: 0 0 1px;
 }
 
-/* Floating "older changes" chevron at the row's right edge. */
+/* Floating paging chevrons: "older" at the right edge, "newer" at the left
+   once the row has been scrolled. */
 .wc-more-btn {
   position: absolute;
   top: 50%;
@@ -2968,34 +3236,148 @@ span.skel-text {
   background-color: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
 }
 
+/* Unlike the right chevron, which floats over the edge fade, the left edge is
+   unfaded — so the newer-cards chevron steps fully off the cards into the
+   section's left gutter (2.5rem of .section-slide-content padding, which is
+   part of that scroller's padding box, so nothing clips it). */
+.wc-more-btn--left {
+  right: auto;
+  left: -2.35rem;
+}
+
+/* Empty feed: the timeline drawn as its own ghost — today's rail segment,
+   then dashed card slots where news would ride, the message sitting in the
+   first slot. Mirrors the loaded layout (same pitch, same right-edge fade)
+   so the state reads as "quiet", not "broken". */
 .wc-empty {
-  margin: 0;
-  padding: 2.25rem 0;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.25rem 0.25rem 0.75rem;
+  overflow: hidden;
+  mask-image: linear-gradient(to right, #000 calc(100% - 160px), transparent calc(100% - 8px));
+}
+
+.wc-empty .wc-group-when::after {
+  margin-right: 0;
+}
+
+.wc-empty-slots {
+  display: flex;
+  gap: 1rem;
+  width: max-content;
+}
+
+.wc-empty-msg,
+.wc-empty-slot {
+  flex: none;
+  box-sizing: border-box;
+  width: 416px;
+  min-height: 144px;
+  border-radius: 16px;
+  border: 1px dashed color-mix(in srgb, var(--secondary-text) 28%, transparent);
+}
+
+/* Successive slots recede — depth without motion. */
+.wc-empty-slot:nth-child(2) { opacity: 0.65; }
+.wc-empty-slot:nth-child(3) { opacity: 0.45; }
+.wc-empty-slot:nth-child(4) { opacity: 0.3; }
+.wc-empty-slot:nth-child(n + 5) { opacity: 0.2; }
+
+.wc-empty-msg {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 0.3rem;
+  padding: 1.1rem 1.25rem;
+}
+
+.wc-empty-msg-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--primary-text);
+}
+
+/* Caught-up check borrows the milestone green — same "settled" semantic;
+   the unavailable state stays neutral. */
+.wc-empty-msg-head svg {
+  flex: none;
+  color: light-dark(#16a34a, #22c55e);
+}
+
+.wc-empty-msg--unavailable .wc-empty-msg-head svg {
   color: var(--secondary-text);
 }
 
-/* Expanded timeline card. */
+.wc-empty-msg-sub {
+  color: var(--secondary-text);
+}
+
+/* Mobile: the 380px pitch would leave nothing of the next card peeking on a
+   narrow phone — shrink the pitch so a sliver of the neighbor stays visible
+   as the scroll affordance. The chevrons' paging math measures offsetWidth,
+   so it follows automatically. */
+@media (max-width: 768px) {
+  .wc-group-cards > .wc-card,
+  .wc-empty-msg,
+  .wc-empty-slot {
+    width: min(340px, 84vw);
+  }
+}
+
+/* Expanded timeline card. Same skeleton as before the Aug 10 refinement pass —
+   header, kind + date meta, facts row, bordered lines card, copper CTA — with
+   the finish tightened: surface borrows the invoice modal's border + soft
+   double shadow, figures ride tabular numerals, the lines card scrolls itself
+   past ~4 rows, and the CTA nudges its chevron instead of traveling. */
 .wc-detail-modal {
-  width: min(480px, calc(100vw - 2rem));
+  width: min(500px, calc(100vw - 2rem));
+  padding: 1.625rem 1.75rem 1.75rem;
+  border-radius: 18px;
+  border: 1px solid var(--border-color);
+  box-shadow:
+    0 1px 2px light-dark(rgba(25, 55, 90, 0.06), rgba(0, 0, 0, 0.4)),
+    0 24px 64px light-dark(rgba(25, 55, 90, 0.16), rgba(0, 0, 0, 0.55));
+  /* The base .modal's flex gap stacked ON TOP of each section's own margins,
+     so every break was 1rem plus a different remainder. Zero the gap and let
+     explicit margins carry one rhythm: meta tight under the title (it's the
+     title's metadata), then equal 1.375rem section breaks. */
+  gap: 0;
+}
+
+/* Long project names wrap under a top-aligned close button instead of
+   colliding with it. */
+.wc-detail-modal .modal-header {
+  align-items: flex-start;
+}
+.wc-detail-modal .modal-header h2 {
+  /* UA h2 margins put ~18px between the name and the kind badge below —
+     drop them and let the meta row's own small top margin set the gap. */
+  margin: 0;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  padding-right: 0.5rem;
 }
 
 .wc-detail-meta {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 1.25rem;
+  margin: 0.5rem 0 1.375rem;
 }
 
 .wc-detail-when {
   color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .wc-detail-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem 2.5rem;
-  margin: 0 0 1.5rem;
+  gap: 1rem 2.25rem;
+  margin: 0 0 1.375rem;
 }
 
 .wc-detail-fact {
@@ -3011,14 +3393,28 @@ span.skel-text {
 .wc-detail-fact dd {
   margin: 0;
   color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-/* The individual cost lines behind the batch, scrolling past ~6 rows. */
+/* The project CTA rides between the facts and the lines table (so the jump
+   to the report never sinks below a long batch) — same section break as the
+   facts grid above it. */
+.wc-detail-modal .cost-detail-project {
+  margin-bottom: 1.375rem;
+}
+
+/* Status events have no lines table, leaving the CTA last — no stray gap. */
+.wc-detail-modal .cost-detail-project:last-child {
+  margin-bottom: 0;
+}
+
+/* The individual cost lines behind the batch. The list never scrolls itself —
+   a long batch grows the card and the modal scrolls as one surface. */
 .wc-detail-lines-block {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin-bottom: 1.5rem;
 }
 
 .wc-detail-lines-title {
@@ -3029,19 +3425,21 @@ span.skel-text {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 264px;
-  overflow-y: auto;
   border: 1px solid var(--border-color);
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .wc-detail-line {
-  display: flex;
+  display: grid;
+  /* Explicit: buttons are UA border-box but the skeleton renders this class
+     as a span (content-box), which let width:100% + padding spill the row
+     past the card edge. */
+  box-sizing: border-box;
   width: 100%;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.6rem 0.85rem;
+  gap: 0.875rem;
+  padding: 0.65rem 0.9rem;
   background: none;
   border: none;
   text-align: left;
@@ -3050,38 +3448,78 @@ span.skel-text {
   transition: background-color 0.15s ease;
 }
 
-/* Skeleton rows reuse the class as a span — no pointer there. */
+/* Skeleton rows reuse the class as a span — no pointer there. They keep the
+   button's full three-column grid (incl. the chevron slot) so the loaded
+   rows land without any shift; the chevron itself sits ghosted. */
 span.wc-detail-line {
   cursor: default;
 }
 
+.wc-detail-line-chevron--skel {
+  opacity: 0.4;
+}
+
 button.wc-detail-line:hover {
-  background-color: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+  background-color: var(--hover-bg);
+}
+button.wc-detail-line:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: -2px;
+  border-radius: 8px;
 }
 
 .wc-detail-lines li + li {
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
 }
 
 .wc-detail-line-chevron {
   color: var(--secondary-text);
   flex: none;
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+button.wc-detail-line:hover .wc-detail-line-chevron,
+button.wc-detail-line:focus-visible .wc-detail-line-chevron {
+  color: var(--primary-text);
+  transform: translateX(2px);
 }
 
 .wc-detail-line-main {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 0.125rem;
   color: var(--primary-text);
   min-width: 0;
+}
+.wc-detail-line-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .wc-detail-line-meta {
   color: var(--secondary-text);
 }
 
+/* Invoice-relationship tag on a cost line — the app's contained neutral pill
+   at caption scale. "Added to $X invoice" (a slice of a bigger invoice) or
+   "Full invoice" (the line IS the invoice). */
+.wc-line-pill {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.075rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--primary-text) 4%, var(--card-color));
+  color: var(--secondary-text);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .wc-detail-line-amount {
   color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -3090,19 +3528,8 @@ button.wc-detail-line:hover {
   color: var(--secondary-text);
 }
 
-.wc-detail-open-btn {
-  gap: 0.35rem;
-  padding: 0.6rem 1.1rem;
-  border-radius: 999px;
-  background: var(--primary-color);
-  color: white;
-  font-weight: 600;
-  transition: background-color 0.15s ease;
-}
-
-.wc-detail-open-btn:hover {
-  background: var(--primary-color-hover);
-}
+/* The way out is the invoice modal's project card, reused verbatim — see
+   .cost-detail-project. */
 
 /* ── Performance Over Time — All Time grand-totals strip ─────────────────
    A slim full-width card under the period/year snapshot: one label, a row of
@@ -10931,15 +11358,6 @@ svg.placeholder-illustration {
   min-height: 100vh;
 }
 
-/* SnapPager (PM/GM home): EVERY panel fills the viewport, not just the last.
-   The admin home's sections are content-rich enough to fill a screen anyway;
-   with only 2-3 fixed sections a short one would put its snap stop at an odd
-   distance and the section-to-section scroll loses the admin home's uniform
-   one-screen-per-flick rhythm. */
-.snap-pager-panel-fill {
-  min-height: 100vh;
-}
-
 /* Top-aligned, padded content. The 3rem top keeps the title clear of the header
    overlay + fade band; the bottom pad spaces the next (peeking) section.
    max-height caps a too-tall section to the screen so it scrolls internally
@@ -11194,6 +11612,18 @@ svg.placeholder-illustration {
 }
 .section-nav-card-open .section-nav-row:hover .section-nav-dot {
   opacity: 0.6;
+}
+
+/* Dots-only variant (SectionDots, PM/GM home): bare dots, no capsule chrome —
+   no surface layer, no border, no morph. Dot geometry is inherited unchanged
+   from .section-nav-card/.section-nav-row, so the dots sit exactly where the
+   full nav's resting dots do. */
+/* Clickability cue: inactive dots brighten a touch under the pointer. */
+.section-nav-dots-only .section-nav-row:hover .section-nav-dot {
+  opacity: 0.6;
+}
+.section-nav-dots-only .section-nav-row-active:hover .section-nav-dot {
+  opacity: 1;
 }
 
 /* The in-row dot is now an invisible spacer (the visible one lives in the rail);

@@ -3,6 +3,7 @@ import { RotateCcw } from "lucide-react"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import { fullMonth, shortMonth, marginTextColor, formatRatioPercent } from "../../../shared/utils/format"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
+import { YearSelector } from "../../../shared/components/YearSelector/YearSelector"
 import { SummarySnapshotCard } from "./SummarySnapshotCard"
 
 // Employee-scoped Period & Year Summary pair for /employees/:id. Reuses the
@@ -56,9 +57,14 @@ interface Props {
   monthly: MonthlyRow[] | null | undefined
   yearly: YearlyRow[] | null | undefined
   loading?: boolean
+  /** PM/GM home: the page-level year selector lives in the Year Summary
+   *  card's corner (mirroring the Period card's month dropdown) instead of
+   *  the page header. Omitted on the admin /employees/:id route, which keeps
+   *  its header selector. */
+  onYearChange?: (year: number) => void
 }
 
-export function EmployeePeriodAndYearSummary({ monthly, yearly, loading }: Props) {
+export function EmployeePeriodAndYearSummary({ monthly, yearly, loading, onYearChange }: Props) {
   const pageYear = usePageYear()
   const marginColorsOn = useMarginColorsEnabled()
   const { data } = useWidgetData<{ openMonthFinances: OpenMonth | null }>(["openMonthFinances"])
@@ -178,6 +184,7 @@ export function EmployeePeriodAndYearSummary({ monthly, yearly, loading }: Props
       <SummarySnapshotCard
         title="Year Summary"
         className="year-summary-widget"
+        actions={onYearChange && <YearSelector value={pageYear} onChange={onYearChange} />}
         headlineLabel={String(pageYear)}
         headlineMeta={yearMeta}
         stats={[

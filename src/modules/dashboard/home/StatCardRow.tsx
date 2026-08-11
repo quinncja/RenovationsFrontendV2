@@ -1,56 +1,73 @@
-import type { ReactNode } from "react"
-import { useAuth } from "../../../core/auth/AuthProvider"
+import type { CSSProperties, ReactNode } from "react"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import { SkelText } from "../../../shared/components/SkelText"
-import { formatMoneyFull, marginTextColor } from "../../../shared/utils/format"
+import { marginTextColor } from "../../../shared/utils/format"
 import type { ProjectRow } from "./breakdownRows"
 import { WATCHLIST_MARGIN_THRESHOLD } from "./breakdownRows"
 
 export type HomeModalKind = "watchlist" | "open" | "closed"
 
-// Clickable KPI tile for the home's centered stat row. Primary cards (the two
-// that steer a PM's day) are larger with a bigger figure; the secondary card
-// reads quieter. Every card carries one supporting metric under the figure so
-// the number has context without a click.
-function HomeStatCard({
+// One segment of the home's fused stat band: big figure beside a label, with
+// an optional supporting-metric sub-line when there's more to say ("2.1%
+// Closed margin in 2026, 64 closed properties"). The hover wash is the
+// drill-down affordance — no extra chrome.
+function HomeStatSeg({
   label,
   value,
   sub,
   loading,
   warn,
-  secondary,
+  quiet,
   onClick,
+  valueStyle,
 }: {
   label: string
-  value: number
-  sub: ReactNode
+  value: ReactNode
+  sub?: ReactNode
   loading?: boolean
+  valueStyle?: CSSProperties
+  /** Red figure — something on this segment needs the PM's attention. */
   warn?: boolean
-  secondary?: boolean
+  /** Muted figure — a zero that is good news shouldn't draw the eye. */
+  quiet?: boolean
   onClick: () => void
 }) {
   return (
     <button
       type="button"
-      className={`home-stat-card${warn ? " home-stat-card--warn" : ""}${secondary ? " home-stat-card--secondary" : ""}`}
+      className="home-stat-seg"
       onClick={onClick}
       disabled={loading}
     >
-      <span className="widget-title headline">{label}</span>
       {loading ? (
-        <span className="stat-widget-skeleton" />
+        <span className="stat-widget-skeleton home-stat-seg-skel" />
       ) : (
-        <span className="home-stat-card-value title1 emphasized">{value}</span>
+        <span
+          className={`home-stat-seg-value${warn ? " home-stat-seg-value--warn" : ""}${quiet ? " home-stat-seg-value--quiet" : ""}`}
+          style={valueStyle}
+        >
+          {value}
+        </span>
       )}
-      <span className="home-stat-sub caption1">{loading ? <SkelText ch={12} /> : sub}</span>
+      <span className="home-stat-seg-text">
+        <span className="home-stat-seg-label title3 emphasized">{label}</span>
+        {sub !== undefined && (
+          <span className="home-stat-seg-sub callout">
+            {loading ? <SkelText ch={16} /> : sub}
+          </span>
+        )}
+      </span>
     </button>
   )
 }
 
 /**
- * The three drill-down stat cards, centered, with visual hierarchy: Watchlist
- * and Open Projects are the primary pair, Closed Projects the quieter third.
- * (The GM's Reports cluster lives in its own strip below the row.)
+ * The home's portfolio stat band: one full-width fused card with three
+ * drill-down segments, reading left to right as the PM thinks about their
+ * book — what I'm running (Open), which of those need me (Need Attention),
+ * and how the finished work landed (Closed). Shares the section's design
+ * language (full-width card, hairline dividers) rather than free-floating
+ * tiles of unequal size.
  */
 export function StatCardRow({
   watchlistProjects,
@@ -70,20 +87,13 @@ export function StatCardRow({
   onOpenModal: (kind: HomeModalKind) => void
 }) {
   const marginColorsOn = useMarginColorsEnabled()
-  // Managers never see contract figures (same rule as the projects tables) —
-  // their Open card totals budgets instead.
-  const { claims } = useAuth()
-  const isManager = claims["role"] === "manager"
 
-  // Watchlist: the single worst margin is the number a PM acts on first.
-  const worstMargin = watchlistProjects.reduce<number | null>(
-    (worst, p) => (p.margin != null && (worst == null || p.margin < worst) ? p.margin : worst),
+  // Watchlist: naming the worst project makes the segment actionable at a
+  // glance — the PM knows where to look before clicking anything.
+  const worstProject = watchlistProjects.reduce<ProjectRow | null>(
+    (worst, p) =>
+      p.margin != null && (worst?.margin == null || p.margin < worst.margin) ? p : worst,
     null
-  )
-
-  const openTotal = openProjects.reduce(
-    (sum, p) => sum + (isManager ? p.budget : p.contract),
-    0
   )
 
   // Closed: realized margin across the year's completed set.
@@ -92,17 +102,26 @@ export function StatCardRow({
   const closedMargin = closedContract > 0 ? ((closedContract - closedCost) / closedContract) * 100 : null
 
   return (
-    <div className="home-stat-row">
-      <HomeStatCard
-        label="Low-Margin Watchlist"
+    <div className="home-stat-band">
+      <HomeStatSeg
+        label="Open projects"
+        value={openProjects.length}
+        loading={allTimeLoading}
+        onClick={() => onOpenModal("open")}
+      />
+      <HomeStatSeg
+        label="Need attention"
         value={watchlistProjects.length}
         warn={watchlistProjects.length > 0}
+        quiet={watchlistProjects.length === 0}
         loading={isLoading}
         sub={
-          watchlistProjects.length > 0 && worstMargin != null ? (
+          worstProject != null && worstProject.margin != null ? (
             <>
-              Lowest margin{" "}
-              <span className="home-stat-sub-warn emphasized">{worstMargin.toFixed(1)}%</span>
+              {worstProject.name} at{" "}
+              <span className="home-stat-seg-sub-warn">
+                {worstProject.margin.toFixed(1)}%
+              </span>
             </>
           ) : (
             <>All projects above {WATCHLIST_MARGIN_THRESHOLD}%</>
@@ -110,37 +129,20 @@ export function StatCardRow({
         }
         onClick={() => onOpenModal("watchlist")}
       />
-      <HomeStatCard
-        label="Open Projects"
-        value={openProjects.length}
-        loading={allTimeLoading}
-        sub={
-          openProjects.length > 0 ? (
-            <>
-              {isManager ? "Total budget " : "Under contract "}
-              <span className="emphasized">{formatMoneyFull(openTotal)}</span>
-            </>
-          ) : (
-            <>No projects currently open</>
-          )
+      <HomeStatSeg
+        label={`Closed margin in ${year}`}
+        value={closedMargin != null ? `${closedMargin.toFixed(1)}%` : "—"}
+        valueStyle={
+          marginColorsOn && closedMargin != null
+            ? { color: marginTextColor(closedMargin) }
+            : undefined
         }
-        onClick={() => onOpenModal("open")}
-      />
-      <HomeStatCard
-        label="Closed Projects"
-        value={closedProjects.length}
         loading={isLoading}
-        secondary
         sub={
-          closedMargin != null ? (
+          closedProjects.length > 0 ? (
             <>
-              Realized margin{" "}
-              <span
-                className="emphasized"
-                style={marginColorsOn ? { color: marginTextColor(closedMargin) } : undefined}
-              >
-                {closedMargin.toFixed(1)}%
-              </span>
+              {closedProjects.length} closed{" "}
+              {closedProjects.length === 1 ? "property" : "properties"}
             </>
           ) : (
             <>None completed in {year}</>

@@ -1,40 +1,15 @@
-import { useAuth } from "../../../core/auth/AuthProvider"
-import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import { MotionList, MotionItem } from "../../../shared/components/MotionList/MotionList"
-import { SkelText } from "../../../shared/components/SkelText"
-import { formatMoneyFull, marginTextColor } from "../../../shared/utils/format"
 import { MarginWidget } from "../widgets/MarginWidget"
 import { EmployeePerformanceWidget } from "../widgets/EmployeePerformanceWidget"
+import { EmployeePeriodAndYearSummary } from "../widgets/EmployeePeriodAndYearSummary"
 import { PerformanceCharts } from "./PerformanceCharts"
-import type { Breakdown, ProjectRow } from "./breakdownRows"
-
-function AllTimeFigure({
-  label,
-  value,
-  loading,
-  color,
-}: {
-  label: string
-  value: string
-  loading: boolean
-  color?: string
-}) {
-  return (
-    <div className="home-alltime-figure">
-      <span className="home-alltime-label caption1">{label}</span>
-      <span className="home-alltime-value title3 emphasized" style={color ? { color } : undefined}>
-        {loading ? <SkelText ch={7} /> : value}
-      </span>
-    </div>
-  )
-}
+import type { Breakdown } from "./breakdownRows"
 
 /**
- * Section 2 of the PM/GM home: an All Time grand-totals strip (fed by the
- * same all-time breakdown fetch the Open Projects card uses) above the trend
- * charts — the four per-employee charts for PMs, the company-wide margin +
- * employee performance pair for the GM. (The period/year snapshot lives in
- * section 1 — it reads as current performance.)
+ * Section 2 of the PM/GM home: the Period & Year snapshot pair across the top
+ * (moved down from section 1 — it reads as the bridge from "now" into the
+ * trends), above the trend charts — the toggled Work Completed + Margin pair
+ * for PMs, the company-wide margin + employee performance pair for the GM.
  */
 export function PerformanceOverTimeSection({
   monthly,
@@ -42,64 +17,27 @@ export function PerformanceOverTimeSection({
   isLoading,
   year,
   gmHome,
-  allTimeTotals,
-  allTimeRows,
-  allTimeLoading,
+  billing,
+  onYearChange,
 }: {
   monthly: Breakdown["stats"]["monthly"] | undefined
   yearly: Breakdown["stats"]["yearly"] | undefined
   isLoading: boolean
   year: number
   gmHome?: boolean
-  allTimeTotals: Breakdown["stats"]["totals"] | null
-  allTimeRows: ProjectRow[]
-  allTimeLoading: boolean
+  billing?: Breakdown["billing"]
+  /** Home only: puts the page-level year selector in the Year Summary card. */
+  onYearChange?: (year: number) => void
 }) {
-  const marginColorsOn = useMarginColorsEnabled()
-  // Managers never see contract figures — the GM/admin-only Under Contract
-  // figure is additionally gated on gmHome below, but keep the rule explicit.
-  const { claims } = useAuth()
-  const isManager = claims["role"] === "manager"
-
-  const delivered = allTimeRows.filter((p) => p.status === 5 || p.status === 6).length
-  const underContract = allTimeRows
-    .filter((p) => p.status === 4)
-    .reduce((sum, p) => sum + p.contract, 0)
-  const allTimeMargin = allTimeTotals?.margin ?? null
-
   return (
     <MotionList className="widget-grid widget-grid-2 dashboard-home-grid">
       <MotionItem className="col-span-full">
-        <div className="home-alltime-strip">
-          <span className="home-alltime-title headline">All Time</span>
-          <div className="home-alltime-figures">
-            <AllTimeFigure
-              label="Work Completed"
-              value={formatMoneyFull(allTimeTotals?.totalIncome ?? 0)}
-              loading={allTimeLoading}
-            />
-            <AllTimeFigure
-              label="Margin"
-              value={allTimeMargin != null ? `${allTimeMargin.toFixed(1)}%` : "—"}
-              loading={allTimeLoading}
-              color={
-                marginColorsOn && allTimeMargin != null ? marginTextColor(allTimeMargin) : undefined
-              }
-            />
-            <AllTimeFigure
-              label="Projects Delivered"
-              value={String(delivered)}
-              loading={allTimeLoading}
-            />
-            {gmHome && !isManager && (
-              <AllTimeFigure
-                label="Under Contract"
-                value={formatMoneyFull(underContract)}
-                loading={allTimeLoading}
-              />
-            )}
-          </div>
-        </div>
+        <EmployeePeriodAndYearSummary
+          monthly={monthly}
+          yearly={yearly}
+          loading={isLoading}
+          onYearChange={onYearChange}
+        />
       </MotionItem>
 
       {gmHome ? (
@@ -112,7 +50,7 @@ export function PerformanceOverTimeSection({
           </MotionItem>
         </>
       ) : (
-        <PerformanceCharts monthly={monthly} yearly={yearly} year={year} isLoading={isLoading} />
+        <PerformanceCharts monthly={monthly} yearly={yearly} year={year} isLoading={isLoading} billing={billing} />
       )}
     </MotionList>
   )
