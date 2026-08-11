@@ -235,9 +235,17 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       return setupCheck ? setupCheck(ctx) : data.milestones[key] != null
     }
     const firstIncomplete = sequence.find((key) => !stepDone(key)) ?? null
-    // Terminal (§4.12): onboardedAt wins outright; otherwise onboarded once every
-    // sequence step is done.
-    if (data.onboardedAt != null || firstIncomplete === null) {
+    // choose-supervisor re-fires even for an onboarded account: its done-state
+    // is the employeeId claim — synchronously trustworthy from the token — and
+    // without it a manager can't function (stranded on "Unassigned Work", e.g.
+    // after a role round-trip wiped the claim). choose-layout deliberately does
+    // NOT get this treatment: hasLayout is cache/fetch-derived and transiently
+    // false on a cold cache, so re-firing it would bounce onboarded admins
+    // back into onboarding until the bootstrap resolves.
+    const blockingUndone = firstIncomplete === "choose-supervisor"
+    // Terminal (§4.12): otherwise onboardedAt wins outright, or onboarded once
+    // every sequence step is done.
+    if (!blockingUndone && (data.onboardedAt != null || firstIncomplete === null)) {
       phase = "onboarded"
     } else {
       phase = seqRole === "admin" ? "admin-onboarding" : "manager-onboarding"
