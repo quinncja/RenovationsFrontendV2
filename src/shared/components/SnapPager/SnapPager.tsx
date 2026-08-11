@@ -295,7 +295,7 @@ export function SnapPager({ sections }: { sections: SnapPagerSection[] }) {
             ref={(el) => {
               panelRefs.current[i] = el
             }}
-            className="section-pager-panel"
+            className="section-pager-panel snap-pager-panel-fill"
           >
             <div className="section-slide-content">
               {/* Zoom-to-fit wrapper — scaled down only when the section would

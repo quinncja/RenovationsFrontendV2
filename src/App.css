@@ -3037,14 +3037,35 @@ span.skel-text {
 
 .wc-detail-line {
   display: flex;
+  width: 100%;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   padding: 0.6rem 0.85rem;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: var(--font-family);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
-.wc-detail-line + .wc-detail-line {
+/* Skeleton rows reuse the class as a span — no pointer there. */
+span.wc-detail-line {
+  cursor: default;
+}
+
+button.wc-detail-line:hover {
+  background-color: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+}
+
+.wc-detail-lines li + li {
   border-top: 1px solid var(--border-color);
+}
+
+.wc-detail-line-chevron {
+  color: var(--secondary-text);
+  flex: none;
 }
 
 .wc-detail-line-main {
@@ -10907,6 +10928,15 @@ svg.placeholder-illustration {
 /* The last section gets a screen's worth of height so it can settle at the top
    (nothing below it to scroll against). */
 .section-pager-panel:last-child {
+  min-height: 100vh;
+}
+
+/* SnapPager (PM/GM home): EVERY panel fills the viewport, not just the last.
+   The admin home's sections are content-rich enough to fill a screen anyway;
+   with only 2-3 fixed sections a short one would put its snap stop at an odd
+   distance and the section-to-section scroll loses the admin home's uniform
+   one-screen-per-flick rhythm. */
+.snap-pager-panel-fill {
   min-height: 100vh;
 }
 

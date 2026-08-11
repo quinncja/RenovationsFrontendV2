@@ -8,6 +8,8 @@ import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled
 import { useModalLayer } from "../../../shared/hooks/useModalLayer"
 import { SkelText } from "../../../shared/components/SkelText"
 import { fetchPageData } from "../../../shared/api/pageApi"
+import { useItemDrilldown } from "../report/ActivityFeed"
+import type { RecentChangeItem } from "../widgets/recent/recentTypes"
 import {
   formatDate,
   formatMoneyFull,
@@ -155,6 +157,30 @@ interface CostLine {
   amount: number
   costType: number | null
   enteredAt: string
+  recnum: string | null
+  /** AP invoice recnum the line was posted from; null = payroll/journal. */
+  linkRecnum: string | null
+}
+
+// Same drill-down convention as the jobcost Cost Breakdown table: an
+// invoice-backed line opens the AP invoice modal, anything else a header-only
+// posted-cost card (jobId null on purpose — the ledger fetch describes a
+// job × cost-type rollup, not this single posting).
+function lineToDrilldownItem(line: CostLine, item: WhatsChangedItem): RecentChangeItem {
+  const isInvoice = Boolean(line.linkRecnum)
+  return {
+    kind: isInvoice ? "apInvoice" : "cost",
+    id: isInvoice ? String(line.linkRecnum) : `cost-${line.recnum}`,
+    jobId: null,
+    jobName: item.jobName,
+    title: line.description?.trim() || line.vendorName?.trim() || "Cost line",
+    party: line.vendorName,
+    amount: line.amount,
+    status: null,
+    pmName: null,
+    enteredBy: null,
+    occurredAt: line.enteredAt,
+  }
 }
 
 /** The individual cost lines behind one job × day batch. The batch id encodes
@@ -197,10 +223,12 @@ function ChangeDetailModal({
   item,
   onClose,
   onOpenProject,
+  onOpenLine,
 }: {
   item: WhatsChangedItem | null
   onClose: () => void
   onOpenProject: (jobId: string) => void
+  onOpenLine: (line: CostLine, item: WhatsChangedItem) => void
 }) {
   const open = item !== null
   const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
@@ -285,12 +313,14 @@ function ChangeDetailModal({
                   {linesLoading || lines === null ? (
                     <ul className="wc-detail-lines" aria-hidden="true">
                       {[0, 1, 2].map((i) => (
-                        <li key={i} className="wc-detail-line">
-                          <span className="wc-detail-line-main body-text">
-                            <SkelText ch={18} />
-                          </span>
-                          <span className="wc-detail-line-amount body-text emphasized">
-                            <SkelText ch={6} />
+                        <li key={i}>
+                          <span className="wc-detail-line">
+                            <span className="wc-detail-line-main body-text">
+                              <SkelText ch={18} />
+                            </span>
+                            <span className="wc-detail-line-amount body-text emphasized">
+                              <SkelText ch={6} />
+                            </span>
                           </span>
                         </li>
                       ))}
@@ -300,19 +330,27 @@ function ChangeDetailModal({
                   ) : (
                     <ul className="wc-detail-lines">
                       {lines.map((line, i) => (
-                        <li key={i} className="wc-detail-line">
-                          <span className="wc-detail-line-main body-text">
-                            {line.description?.trim() || line.vendorName?.trim() || "Cost line"}
-                            <span className="wc-detail-line-meta caption1">
-                              {COST_TYPE_LABELS[line.costType ?? 0] ?? "Cost"}
-                              {line.vendorName?.trim() && line.description?.trim()
-                                ? ` · ${line.vendorName.trim()}`
-                                : ""}
+                        <li key={i}>
+                          <button
+                            type="button"
+                            className="wc-detail-line"
+                            onClick={() => onOpenLine(line, item)}
+                            title={line.linkRecnum ? "View invoice" : "View posting"}
+                          >
+                            <span className="wc-detail-line-main body-text">
+                              {line.description?.trim() || line.vendorName?.trim() || "Cost line"}
+                              <span className="wc-detail-line-meta caption1">
+                                {COST_TYPE_LABELS[line.costType ?? 0] ?? "Cost"}
+                                {line.vendorName?.trim() && line.description?.trim()
+                                  ? ` · ${line.vendorName.trim()}`
+                                  : ""}
+                              </span>
                             </span>
-                          </span>
-                          <span className="wc-detail-line-amount body-text emphasized">
-                            {formatMoneyFull(line.amount)}
-                          </span>
+                            <span className="wc-detail-line-amount body-text emphasized">
+                              {formatMoneyFull(line.amount)}
+                            </span>
+                            <ChevronRight size={14} className="wc-detail-line-chevron" />
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -348,6 +386,10 @@ export function WhatsChangedRow({ queryName }: { queryName: WhatsChangedQuery })
   const { items, hasMore, loadMore, loadingMore, isLoading, unavailable } =
     useWhatsChangedFeed(queryName)
   const { goToJobcost } = useJobcostNav()
+  // Second modal layer for the expanded card's line click-through — the same
+  // routing the Daily Recap feed and jobcost Cost Breakdown use (AP invoice
+  // modal for invoice-backed lines, header-only card otherwise).
+  const { openItem, modals: drilldownModals } = useItemDrilldown({ backLabel: "Dashboard" })
   const isMobile = useIsMobile()
 
   const rowRef = useRef<HTMLDivElement>(null)
@@ -446,7 +488,9 @@ export function WhatsChangedRow({ queryName }: { queryName: WhatsChangedQuery })
           setDetailItem(null)
           goToJobcost(jobId)
         }}
+        onOpenLine={(line, item) => openItem(lineToDrilldownItem(line, item))}
       />
+      {drilldownModals}
     </div>
   )
 }
