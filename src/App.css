@@ -2785,11 +2785,13 @@ span.skel-text {
   position: relative;
 }
 
+/* Free momentum scroll — deliberately NO scroll-snap here: trackpad
+   horizontal scrolling fighting a snap point feels broken. The chevron pages
+   by whole cards with explicit scroll math instead. */
 .wc-row {
   display: flex;
   gap: 1rem;
   overflow-x: auto;
-  scroll-snap-type: x proximity;
   padding: 0.25rem 0.25rem 0.75rem;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -2811,38 +2813,29 @@ span.skel-text {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
-  scroll-snap-align: start;
 }
 
-/* The timeline rail: each item draws its own segment, spanning its width plus
-   the gap to the next item, so the line reads as continuous while scrolling. */
-.wc-item::before {
-  content: "";
-  position: absolute;
-  top: 5px;
-  left: 16px;
-  right: -1rem;
-  height: 2px;
-  background: var(--border-color);
-}
-
-.wc-item:last-of-type::before {
-  right: 0.25rem;
-}
-
+/* Timeline rail: dot — label — line. The line is a flex filler AFTER the
+   label (never underneath it, so no background hacks over the app's glow
+   gradient), bleeding across the 1rem gap to meet the next item's dot. */
 .wc-item-when {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   color: var(--secondary-text);
 }
 
-/* The timestamp sits ON the rail — give it the page background so the line
-   reads as passing behind the label, not through it. */
-.wc-item-when > span:last-child {
-  background: var(--background-color);
-  padding-right: 0.4rem;
+.wc-item-when::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--border-color);
+  margin-right: -1rem;
+}
+
+.wc-item:last-of-type .wc-item-when::after {
+  margin-right: 0.25rem;
 }
 
 .wc-dot {
@@ -2980,6 +2973,87 @@ span.skel-text {
   padding: 2.25rem 0;
   text-align: center;
   color: var(--secondary-text);
+}
+
+/* Expanded timeline card. */
+.wc-detail-modal {
+  width: min(480px, calc(100vw - 2rem));
+}
+
+.wc-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.wc-detail-when {
+  color: var(--secondary-text);
+}
+
+.wc-detail-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2.5rem;
+  margin: 0 0 1.5rem;
+}
+
+.wc-detail-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.wc-detail-fact dt {
+  color: var(--secondary-text);
+}
+
+.wc-detail-fact dd {
+  margin: 0;
+  color: var(--primary-text);
+}
+
+.wc-detail-open-btn {
+  gap: 0.35rem;
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  background: var(--primary-color);
+  color: white;
+  font-weight: 600;
+  transition: background-color 0.15s ease;
+}
+
+.wc-detail-open-btn:hover {
+  background: var(--primary-color-hover);
+}
+
+/* GM home: the data-validation report pills as one slim centered strip under
+   the stat cards — quiet card surface, single wrapping row. */
+.gm-reports-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 1rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--button-shadow);
+  max-width: 1060px;
+  margin-inline: auto;
+}
+
+.gm-reports-strip-title {
+  color: var(--primary-text);
+  margin-right: 0.5rem;
+}
+
+.gm-reports-strip-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.5rem;
 }
 
 /* ── Performance Over Time — All Time grand-totals strip ─────────────────

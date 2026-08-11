@@ -3,7 +3,6 @@ import { useAuth } from "../../../core/auth/AuthProvider"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import { SkelText } from "../../../shared/components/SkelText"
 import { formatMoneyFull, marginTextColor } from "../../../shared/utils/format"
-import { ReportWidget } from "../widgets/reports/ReportWidget"
 import type { ProjectRow } from "./breakdownRows"
 import { WATCHLIST_MARGIN_THRESHOLD } from "./breakdownRows"
 
@@ -51,7 +50,7 @@ function HomeStatCard({
 /**
  * The three drill-down stat cards, centered, with visual hierarchy: Watchlist
  * and Open Projects are the primary pair, Closed Projects the quieter third.
- * On the GM home the Reports pill cluster joins the row as a fourth card.
+ * (The GM's Reports cluster lives in its own strip below the row.)
  */
 export function StatCardRow({
   watchlistProjects,
@@ -60,7 +59,6 @@ export function StatCardRow({
   isLoading,
   allTimeLoading,
   year,
-  gmHome,
   onOpenModal,
 }: {
   watchlistProjects: ProjectRow[]
@@ -69,7 +67,6 @@ export function StatCardRow({
   isLoading: boolean
   allTimeLoading: boolean
   year: number
-  gmHome?: boolean
   onOpenModal: (kind: HomeModalKind) => void
 }) {
   const marginColorsOn = useMarginColorsEnabled()
@@ -151,21 +148,6 @@ export function StatCardRow({
         }
         onClick={() => onOpenModal("closed")}
       />
-      {/* GM home: the data-validation reports as a pill cluster inside a
-          fourth card, so the strip belongs to the stat-card family. */}
-      {gmHome && (
-        <div className="gm-reports-card">
-          <span className="widget-title headline">Reports</span>
-          <div className="gm-reports-cluster">
-            <ReportWidget reportId="reconciliation" compact />
-            <ReportWidget reportId="dataQuality" compact />
-            <ReportWidget reportId="missingContracts" compact />
-            <ReportWidget reportId="openProjectsNoBudget" compact />
-            <ReportWidget reportId="missingUnitCounts" compact />
-            <ReportWidget reportId="missingOneOffNames" compact />
-          </div>
-        </div>
-      )}
     </div>
   )
 }

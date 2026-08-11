@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import { ChevronRight } from "lucide-react"
+import { createPortal } from "react-dom"
+import { motion, AnimatePresence } from "framer-motion"
+import { ChevronRight, X } from "lucide-react"
 import { useJobcostNav } from "../../jobcost/useJobcostNav"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
+import { useModalLayer } from "../../../shared/hooks/useModalLayer"
 import { SkelText } from "../../../shared/components/SkelText"
-import { formatMoneyFull, formatRelativeTime, marginTextColor } from "../../../shared/utils/format"
+import {
+  formatDate,
+  formatMoneyFull,
+  formatRelativeTime,
+  marginTextColor,
+} from "../../../shared/utils/format"
 import { STATUS_LABELS } from "./breakdownRows"
 import {
   useWhatsChangedFeed,
@@ -21,18 +29,38 @@ function isToday(occurredAt: string): boolean {
   return +m[1] === now.getFullYear() && +m[2] === now.getMonth() + 1 && +m[3] === now.getDate()
 }
 
-function ChangeCard({ item, onOpen }: { item: WhatsChangedItem; onOpen: (jobId: string) => void }) {
+function marginDelta(item: WhatsChangedItem): number | null {
+  if (item.kind !== "cost" || item.marginBefore == null || item.marginAfter == null) return null
+  const delta = item.marginAfter - item.marginBefore
+  // A cost batch normally lowers margin; a credit batch raises it. Only a
+  // meaningful move is worth showing.
+  return Math.abs(delta) >= 0.05 ? delta : null
+}
+
+function DeltaChip({ delta }: { delta: number }) {
+  return (
+    <span className={`wc-delta${delta < 0 ? " wc-delta--down" : " wc-delta--up"}`}>
+      {delta > 0 ? "+" : "−"}
+      {Math.abs(delta).toFixed(1)} pts
+    </span>
+  )
+}
+
+function KindPill({ item }: { item: WhatsChangedItem }) {
+  return item.kind === "status" ? (
+    <span className={`status-badge status-${item.newStatus}`}>
+      {STATUS_LABELS[item.newStatus ?? 0] ?? "Updated"}
+    </span>
+  ) : (
+    <span className="wc-pill">Costs posted</span>
+  )
+}
+
+function ChangeCard({ item, onOpen }: { item: WhatsChangedItem; onOpen: (item: WhatsChangedItem) => void }) {
   const marginColorsOn = useMarginColorsEnabled()
   const marginStyle = (m: number | null) =>
     marginColorsOn && m != null ? { color: marginTextColor(m) } : undefined
-
-  const delta =
-    item.kind === "cost" && item.marginBefore != null && item.marginAfter != null
-      ? item.marginAfter - item.marginBefore
-      : null
-  // A cost batch normally lowers margin; a credit batch raises it. Only a
-  // meaningful move gets the delta chip.
-  const showDelta = delta != null && Math.abs(delta) >= 0.05
+  const delta = marginDelta(item)
 
   return (
     <div className="wc-item">
@@ -40,15 +68,9 @@ function ChangeCard({ item, onOpen }: { item: WhatsChangedItem; onOpen: (jobId: 
         <span className={`wc-dot${isToday(item.occurredAt) ? " wc-dot--today" : ""}`} aria-hidden="true" />
         <span>{formatRelativeTime(item.occurredAt)}</span>
       </div>
-      <button type="button" className="wc-card" onClick={() => onOpen(item.jobId)} title="Open full report">
+      <button type="button" className="wc-card" onClick={() => onOpen(item)} title="View details">
         <div className="wc-card-top">
-          {item.kind === "status" ? (
-            <span className={`status-badge status-${item.newStatus}`}>
-              {STATUS_LABELS[item.newStatus ?? 0] ?? "Updated"}
-            </span>
-          ) : (
-            <span className="wc-pill">Costs posted</span>
-          )}
+          <KindPill item={item} />
         </div>
         <span className="wc-card-name body-text emphasized">{item.jobName}</span>
         {item.kind === "cost" ? (
@@ -68,12 +90,7 @@ function ChangeCard({ item, onOpen }: { item: WhatsChangedItem; onOpen: (jobId: 
                 <span className="emphasized" style={marginStyle(item.marginAfter)}>
                   {item.marginAfter.toFixed(1)}%
                 </span>
-                {showDelta && (
-                  <span className={`wc-delta${delta < 0 ? " wc-delta--down" : " wc-delta--up"}`}>
-                    {delta > 0 ? "+" : "−"}
-                    {Math.abs(delta).toFixed(1)} pts
-                  </span>
-                )}
+                {delta != null && <DeltaChip delta={delta} />}
               </span>
             )}
           </div>
@@ -123,13 +140,116 @@ function CardSkeleton() {
   )
 }
 
+/** Expanded view of one timeline card. The project link lives here — the
+ *  card itself only expands. */
+function ChangeDetailModal({
+  item,
+  onClose,
+  onOpenProject,
+}: {
+  item: WhatsChangedItem | null
+  onClose: () => void
+  onOpenProject: (jobId: string) => void
+}) {
+  const open = item !== null
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
+  const marginColorsOn = useMarginColorsEnabled()
+  const marginStyle = (m: number | null) =>
+    marginColorsOn && m != null ? { color: marginTextColor(m) } : undefined
+  const delta = item ? marginDelta(item) : null
+
+  return createPortal(
+    <AnimatePresence>
+      {item && (
+        <>
+          <motion.div
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
+            style={{ zIndex: overlayZ }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
+            <motion.div
+              className="modal wc-detail-modal"
+              role="dialog"
+              aria-modal="true"
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <div className="modal-header">
+                <h2 className="title2 emphasized">{item.jobName}</h2>
+                <button className="button modal-close" onClick={onClose}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="wc-detail-meta">
+                <KindPill item={item} />
+                <span className="caption1 wc-detail-when">
+                  {formatDate(item.occurredAt)} · {formatRelativeTime(item.occurredAt)}
+                </span>
+              </div>
+              <dl className="wc-detail-grid">
+                {item.kind === "cost" ? (
+                  <>
+                    <div className="wc-detail-fact">
+                      <dt className="caption1">Costs entered</dt>
+                      <dd className="title3 emphasized">{formatMoneyFull(item.amount ?? 0)}</dd>
+                    </div>
+                    <div className="wc-detail-fact">
+                      <dt className="caption1">Cost lines</dt>
+                      <dd className="title3 emphasized">{item.lineCount ?? "—"}</dd>
+                    </div>
+                    <div className="wc-detail-fact">
+                      <dt className="caption1">Margin</dt>
+                      <dd className="title3 emphasized" style={marginStyle(item.marginAfter)}>
+                        {item.marginAfter != null ? `${item.marginAfter.toFixed(1)}%` : "—"}
+                        {delta != null && <DeltaChip delta={delta} />}
+                      </dd>
+                    </div>
+                  </>
+                ) : (
+                  <div className="wc-detail-fact">
+                    <dt className="caption1">Final margin</dt>
+                    <dd className="title3 emphasized" style={marginStyle(item.marginAfter)}>
+                      {item.marginAfter != null ? `${item.marginAfter.toFixed(1)}%` : "—"}
+                    </dd>
+                  </div>
+                )}
+                {item.pmName && (
+                  <div className="wc-detail-fact">
+                    <dt className="caption1">Project manager</dt>
+                    <dd className="title3 emphasized">{item.pmName}</dd>
+                  </div>
+                )}
+              </dl>
+              <button
+                type="button"
+                className="button wc-detail-open-btn"
+                onClick={() => onOpenProject(item.jobId)}
+              >
+                Open project report
+                <ChevronRight size={16} />
+              </button>
+            </motion.div>
+          </div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body
+  )
+}
+
 /**
  * The What's Changed timeline: a horizontally scrolling row of project-change
- * cards, newest at the left. A thin rail + dots give it the timeline read; a
- * right-edge fade plus a floating chevron say "there's more" until the end.
- * Pages of 10 are prefetched ~two card-widths before the user reaches the end
- * (IntersectionObserver sentinel inside the scroll container), so scrolling
- * never hits a visible buffer.
+ * cards, newest at the left, riding a thin rail with a dot per event. Free
+ * momentum scroll (no snap — trackpads hate fighting it); the affordances are
+ * a peeking card, a right-edge fade, and a chevron that pages by whole cards.
+ * Pages of 10 are prefetched ~two card-widths before the end. Clicking a card
+ * expands it into a detail modal; the project link lives there.
  */
 export function WhatsChangedRow({ queryName }: { queryName: WhatsChangedQuery }) {
   const { items, hasMore, loadMore, loadingMore, isLoading, unavailable } =
@@ -139,6 +259,7 @@ export function WhatsChangedRow({ queryName }: { queryName: WhatsChangedQuery })
 
   const rowRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const [detailItem, setDetailItem] = useState<WhatsChangedItem | null>(null)
   // Fade + chevron show only while there's content past the right edge.
   const [moreRight, setMoreRight] = useState(false)
 
@@ -175,10 +296,17 @@ export function WhatsChangedRow({ queryName }: { queryName: WhatsChangedQuery })
     return () => io.disconnect()
   }, [loadMore])
 
+  // Advance by as many WHOLE cards as fit the viewport (measured, not
+  // guessed), so the chevron reads as paging: the first partially-visible
+  // card lands flush at the left edge of the next page.
   const scrollByPage = () => {
     const el = rowRef.current
     if (!el) return
-    el.scrollBy({ left: el.clientWidth * 0.8, behavior: "smooth" })
+    const item = el.querySelector<HTMLElement>(".wc-item")
+    const step = item ? item.offsetWidth + 16 : 316
+    const cardsPerView = Math.max(1, Math.floor(el.clientWidth / step))
+    const target = Math.round((el.scrollLeft + cardsPerView * step) / step) * step
+    el.scrollTo({ left: target, behavior: "smooth" })
   }
 
   const empty = !isLoading && (unavailable || items.length === 0)
@@ -199,7 +327,7 @@ export function WhatsChangedRow({ queryName }: { queryName: WhatsChangedQuery })
           <div className={`wc-row${moreRight ? " wc-row--more" : ""}`} ref={rowRef}>
             {isLoading
               ? [0, 1, 2].map((i) => <CardSkeleton key={i} />)
-              : items.map((item) => <ChangeCard key={item.id} item={item} onOpen={goToJobcost} />)}
+              : items.map((item) => <ChangeCard key={item.id} item={item} onOpen={setDetailItem} />)}
             {loadingMore && [0, 1].map((i) => <CardSkeleton key={`more-${i}`} />)}
             {/* Sentinel sits after the last card; observed against the row with
                 a generous right rootMargin so the next page is already in
@@ -218,6 +346,14 @@ export function WhatsChangedRow({ queryName }: { queryName: WhatsChangedQuery })
           )}
         </div>
       )}
+      <ChangeDetailModal
+        item={detailItem}
+        onClose={() => setDetailItem(null)}
+        onOpenProject={(jobId) => {
+          setDetailItem(null)
+          goToJobcost(jobId)
+        }}
+      />
     </div>
   )
 }
