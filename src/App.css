@@ -3013,6 +3013,62 @@ span.skel-text {
   color: var(--primary-text);
 }
 
+/* The individual cost lines behind the batch, scrolling past ~6 rows. */
+.wc-detail-lines-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.wc-detail-lines-title {
+  color: var(--secondary-text);
+}
+
+.wc-detail-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 264px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.wc-detail-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.85rem;
+}
+
+.wc-detail-line + .wc-detail-line {
+  border-top: 1px solid var(--border-color);
+}
+
+.wc-detail-line-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  color: var(--primary-text);
+  min-width: 0;
+}
+
+.wc-detail-line-meta {
+  color: var(--secondary-text);
+}
+
+.wc-detail-line-amount {
+  color: var(--primary-text);
+  white-space: nowrap;
+}
+
+.wc-detail-lines-empty {
+  margin: 0;
+  color: var(--secondary-text);
+}
+
 .wc-detail-open-btn {
   gap: 0.35rem;
   padding: 0.6rem 1.1rem;
@@ -3025,35 +3081,6 @@ span.skel-text {
 
 .wc-detail-open-btn:hover {
   background: var(--primary-color-hover);
-}
-
-/* GM home: the data-validation report pills as one slim centered strip under
-   the stat cards — quiet card surface, single wrapping row. */
-.gm-reports-strip {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem 1rem;
-  padding: 0.85rem 1.25rem;
-  background: var(--card-color);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  box-shadow: var(--button-shadow);
-  max-width: 1060px;
-  margin-inline: auto;
-}
-
-.gm-reports-strip-title {
-  color: var(--primary-text);
-  margin-right: 0.5rem;
-}
-
-.gm-reports-strip-pills {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem 0.5rem;
 }
 
 /* ── Performance Over Time — All Time grand-totals strip ─────────────────

@@ -7,6 +7,7 @@ import useIsMobile from "../../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import { useModalLayer } from "../../../shared/hooks/useModalLayer"
 import { SkelText } from "../../../shared/components/SkelText"
+import { fetchPageData } from "../../../shared/api/pageApi"
 import {
   formatDate,
   formatMoneyFull,
@@ -140,6 +141,56 @@ function CardSkeleton() {
   )
 }
 
+const COST_TYPE_LABELS: Record<number, string> = {
+  1: "Material",
+  2: "Labor",
+  3: "Equipment",
+  4: "Subcontract",
+  5: "Other",
+}
+
+interface CostLine {
+  description: string | null
+  vendorName: string | null
+  amount: number
+  costType: number | null
+  enteredAt: string
+}
+
+/** The individual cost lines behind one job × day batch. The batch id encodes
+ *  its calendar day (`jobnum-YYYY-MM-DD`), which becomes the [from, to] window
+ *  of a csttyp-less recentCostLines fetch. */
+function useCostLines(item: WhatsChangedItem | null) {
+  // Lines are stored WITH the batch id they belong to — a stale result for a
+  // previously-opened item simply reads as "still loading" for the current
+  // one, so no synchronous reset is needed when the item changes.
+  const [loaded, setLoaded] = useState<{ id: string; lines: CostLine[] } | null>(null)
+  const itemId = item?.kind === "cost" ? item.id : null
+  const jobId = item?.jobId
+
+  useEffect(() => {
+    if (!itemId || !jobId) return
+    const day = itemId.slice(-10)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return
+    const ctrl = new AbortController()
+    fetchPageData({
+      module: "dashboard",
+      queries: ["recentCostLines"],
+      params: { jobnum: Number(jobId), from: day, to: day },
+      signal: ctrl.signal,
+    })
+      .then((d) => setLoaded({ id: itemId, lines: (d.recentCostLines as CostLine[] | null) ?? [] }))
+      .catch((err) => {
+        if (err instanceof Error && err.name === "AbortError") return
+        setLoaded({ id: itemId, lines: [] })
+      })
+    return () => ctrl.abort()
+  }, [itemId, jobId])
+
+  const lines = itemId && loaded?.id === itemId ? loaded.lines : null
+  return { lines, loading: itemId !== null && lines === null }
+}
+
 /** Expanded view of one timeline card. The project link lives here — the
  *  card itself only expands. */
 function ChangeDetailModal({
@@ -157,6 +208,7 @@ function ChangeDetailModal({
   const marginStyle = (m: number | null) =>
     marginColorsOn && m != null ? { color: marginTextColor(m) } : undefined
   const delta = item ? marginDelta(item) : null
+  const { lines, loading: linesLoading } = useCostLines(item)
 
   return createPortal(
     <AnimatePresence>
@@ -226,6 +278,47 @@ function ChangeDetailModal({
                   </div>
                 )}
               </dl>
+              {/* The actual lines in this batch (cost events only). */}
+              {item.kind === "cost" && (
+                <div className="wc-detail-lines-block">
+                  <span className="caption1 wc-detail-lines-title">Lines added</span>
+                  {linesLoading || lines === null ? (
+                    <ul className="wc-detail-lines" aria-hidden="true">
+                      {[0, 1, 2].map((i) => (
+                        <li key={i} className="wc-detail-line">
+                          <span className="wc-detail-line-main body-text">
+                            <SkelText ch={18} />
+                          </span>
+                          <span className="wc-detail-line-amount body-text emphasized">
+                            <SkelText ch={6} />
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : lines.length === 0 ? (
+                    <p className="wc-detail-lines-empty caption1">Line detail is not available</p>
+                  ) : (
+                    <ul className="wc-detail-lines">
+                      {lines.map((line, i) => (
+                        <li key={i} className="wc-detail-line">
+                          <span className="wc-detail-line-main body-text">
+                            {line.description?.trim() || line.vendorName?.trim() || "Cost line"}
+                            <span className="wc-detail-line-meta caption1">
+                              {COST_TYPE_LABELS[line.costType ?? 0] ?? "Cost"}
+                              {line.vendorName?.trim() && line.description?.trim()
+                                ? ` · ${line.vendorName.trim()}`
+                                : ""}
+                            </span>
+                          </span>
+                          <span className="wc-detail-line-amount body-text emphasized">
+                            {formatMoneyFull(line.amount)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
               <button
                 type="button"
                 className="button wc-detail-open-btn"

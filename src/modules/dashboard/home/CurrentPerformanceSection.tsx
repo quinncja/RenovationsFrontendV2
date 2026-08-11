@@ -1,6 +1,5 @@
 import { MotionList, MotionItem } from "../../../shared/components/MotionList/MotionList"
 import { EmployeePeriodAndYearSummary } from "../widgets/EmployeePeriodAndYearSummary"
-import { ReportWidget } from "../widgets/reports/ReportWidget"
 import { StatCardRow, type HomeModalKind } from "./StatCardRow"
 import { WhatsChangedRow } from "./WhatsChangedRow"
 import type { Breakdown, ProjectRow } from "./breakdownRows"
@@ -46,23 +45,6 @@ export function CurrentPerformanceSection({
           onOpenModal={onOpenModal}
         />
       </MotionItem>
-      {/* GM home: the data-validation report pills as a slim centered strip
-          under the stat row — one quiet line instead of a bulky fourth card. */}
-      {gmHome && (
-        <MotionItem>
-          <div className="gm-reports-strip">
-            <span className="gm-reports-strip-title headline">Reports</span>
-            <div className="gm-reports-strip-pills">
-              <ReportWidget reportId="reconciliation" compact />
-              <ReportWidget reportId="dataQuality" compact />
-              <ReportWidget reportId="missingContracts" compact />
-              <ReportWidget reportId="openProjectsNoBudget" compact />
-              <ReportWidget reportId="missingUnitCounts" compact />
-              <ReportWidget reportId="missingOneOffNames" compact />
-            </div>
-          </div>
-        </MotionItem>
-      )}
       <MotionItem>
         <WhatsChangedRow queryName={gmHome ? "whatsChangedGm" : "whatsChangedPm"} />
       </MotionItem>

@@ -33,6 +33,7 @@ import {
 import { PerformanceCharts } from "./home/PerformanceCharts"
 import { CurrentPerformanceSection } from "./home/CurrentPerformanceSection"
 import { PerformanceOverTimeSection } from "./home/PerformanceOverTimeSection"
+import { ReportsSection } from "./home/ReportsSection"
 
 type ProjectSortKey = "name" | "status" | "supervisor" | "contract" | "budget" | "totalCost" | "variance" | "margin"
 
@@ -467,6 +468,11 @@ export function EmployeeDetail({
                 />
               ),
             },
+            // GM home: the data-validation reports as their own section,
+            // mirroring the admin home's Reports section.
+            ...(gmHome
+              ? [{ id: "reports", title: "Reports", content: <ReportsSection /> }]
+              : []),
           ]}
         />
         {projectsModal}
