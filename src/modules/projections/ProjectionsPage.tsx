@@ -47,7 +47,7 @@ function MonthlySummary({
   }
 
   const rows: Array<{ label: string; cells: number[]; kind: "int" | "money"; className?: string }> = [
-    { label: "Units", cells: summary.unitsByMonth, kind: "int" },
+    { label: "Units", cells: summary.unitsByMonth, kind: "int", className: "pj-summary-units" },
     { label: "Revenue", cells: summary.revenueByMonth, kind: "money" },
     { label: "COGS", cells: summary.cogsByMonth, kind: "money" },
     { label: "Net", cells: summary.netByMonth, kind: "money", className: "pj-summary-net" },
@@ -57,7 +57,10 @@ function MonthlySummary({
   return (
     <div className="pj-summary card">
       <div className="pj-summary-head">
-        <h2 className="headline">Monthly Summary</h2>
+        <div className="pj-summary-title-group">
+          <h2 className="headline">Monthly Summary</h2>
+          <span className="callout text-secondary">Projected revenue, cost, and net by month</span>
+        </div>
         <label className="pj-overhead-control callout text-secondary">
           Overhead / month
           <input

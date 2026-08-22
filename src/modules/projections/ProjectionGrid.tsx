@@ -141,16 +141,17 @@ export function ProjectionGrid({ rows, summary, onEdit, onAddRow, onDeleteRow }:
         <table className="pj-table">
           <thead>
             <tr className="pj-group-row">
-              <th className="pj-sticky" colSpan={IDENTITY_COLS.length}>Project</th>
-              <th colSpan={8}>Economics</th>
-              <th colSpan={14}>Schedule · units per month</th>
+              <th className="pj-sticky">Project</th>
+              <th colSpan={IDENTITY_COLS.length - 1} />
+              <th className="pj-zone-start" colSpan={8}>Economics</th>
+              <th className="pj-zone-start" colSpan={14}>Schedule · units per month</th>
               <th className="pj-gutter" />
             </tr>
             <tr>
               {IDENTITY_COLS.map((c, i) => (
                 <th key={c.key} className={i === 0 ? "pj-sticky" : undefined}>{c.label}</th>
               ))}
-              <th className="pj-num">Units</th>
+              <th className="pj-num pj-zone-start">Units</th>
               <th className="pj-num">Avg Unit Price</th>
               <th className="pj-num pj-computed-th">Total</th>
               <th className="pj-num">% Win</th>
@@ -158,8 +159,8 @@ export function ProjectionGrid({ rows, summary, onEdit, onAddRow, onDeleteRow }:
               <th className="pj-num pj-computed-th">COGS</th>
               <th className="pj-num pj-computed-th">Gross Rev</th>
               <th className="pj-num pj-computed-th">Gross Profit</th>
-              {MONTH_COLS.map((c) => (
-                <th key={c.key} className="pj-num pj-month-th">{c.label}</th>
+              {MONTH_COLS.map((c, m) => (
+                <th key={c.key} className={`pj-num pj-month-th${m === 0 ? " pj-zone-start" : ""}`}>{c.label}</th>
               ))}
               <th className="pj-num pj-computed-th">Sched</th>
               <th className="pj-num pj-computed-th">Left</th>
@@ -176,7 +177,7 @@ export function ProjectionGrid({ rows, summary, onEdit, onAddRow, onDeleteRow }:
                       <EditableCell row={row} col={col} value={row[col.key as "address"]} rowIndex={ri} onCommit={onEdit} />
                     </td>
                   ))}
-                  <td className="pj-num"><EditableCell row={row} col={ECON_COLS[0]} value={row.units} rowIndex={ri} onCommit={onEdit} /></td>
+                  <td className="pj-num pj-zone-start"><EditableCell row={row} col={ECON_COLS[0]} value={row.units} rowIndex={ri} onCommit={onEdit} /></td>
                   <td className="pj-num"><EditableCell row={row} col={ECON_COLS[1]} value={row.avgUnitPrice} rowIndex={ri} onCommit={onEdit} /></td>
                   <td className="pj-num pj-computed">{c.total ? formatMoneyFull(c.total) : ""}</td>
                   <td className="pj-num"><EditableCell row={row} col={ECON_COLS[2]} value={row.pctWin} rowIndex={ri} onCommit={onEdit} /></td>
@@ -185,7 +186,7 @@ export function ProjectionGrid({ rows, summary, onEdit, onAddRow, onDeleteRow }:
                   <td className="pj-num pj-computed">{c.grossRevenue ? formatMoneyFull(c.grossRevenue) : ""}</td>
                   <td className="pj-num pj-computed">{c.grossProfit ? formatMoneyFull(c.grossProfit) : ""}</td>
                   {MONTH_COLS.map((col, m) => (
-                    <td key={col.key} className="pj-num pj-month">
+                    <td key={col.key} className={`pj-num pj-month${m === 0 ? " pj-zone-start" : ""}`}>
                       <EditableCell row={row} col={col} value={row.months[m] ?? 0} rowIndex={ri} onCommit={onEdit} />
                     </td>
                   ))}
@@ -210,14 +211,14 @@ export function ProjectionGrid({ rows, summary, onEdit, onAddRow, onDeleteRow }:
             <tr className="pj-totals-row">
               <td className="pj-sticky">Totals</td>
               <td colSpan={2} />
-              <td className="pj-num">{summary.totalUnits}</td>
+              <td className="pj-num pj-zone-start">{summary.totalUnits}</td>
               <td />
               <td className="pj-num">{formatMoneyFull(summary.totalValue)}</td>
               <td colSpan={3} />
               <td className="pj-num">{formatMoneyFull(summary.totalGrossRevenue)}</td>
               <td className="pj-num">{formatMoneyFull(summary.totalGrossProfit)}</td>
               {summary.unitsByMonth.map((u, m) => (
-                <td key={m} className="pj-num">{fmtInt(u)}</td>
+                <td key={m} className={`pj-num${m === 0 ? " pj-zone-start" : ""}`}>{fmtInt(u)}</td>
               ))}
               <td className="pj-num">{fmtInt(summary.scheduledUnits)}</td>
               <td className="pj-num">{fmtInt(summary.totalUnits - summary.scheduledUnits)}</td>
