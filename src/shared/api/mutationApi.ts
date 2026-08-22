@@ -16,9 +16,9 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   }
 }
 
-async function apiRequest<T = unknown>(
+export async function apiRequest<T = unknown>(
   path: string,
-  method: "POST" | "PUT" | "DELETE",
+  method: "POST" | "PUT" | "PATCH" | "DELETE",
   body?: unknown
 ): Promise<T> {
   const headers = await getAuthHeaders()
@@ -38,7 +38,7 @@ async function apiRequest<T = unknown>(
   return text ? JSON.parse(text) : ({} as T)
 }
 
-async function apiGet<T = unknown>(path: string): Promise<T> {
+export async function apiGet<T = unknown>(path: string): Promise<T> {
   const headers = await getAuthHeaders()
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "GET",

@@ -16,6 +16,7 @@ const Jobcost = lazy(() => import("../../modules/jobcost/Jobcost.tsx"))
 const JobcostDetailPage = lazy(() => import("../../modules/jobcost/JobcostDetailPage.tsx"))
 const PropertyDetailPage = lazy(() => import("../../modules/jobcost/PropertyDetailPage.tsx"))
 const ChangeOrders = lazy(() => import("../../modules/change-orders/ChangeOrdersPage.tsx"))
+const ProjectionsPage = lazy(() => import("../../modules/projections/ProjectionsPage.tsx"))
 const ReportsPage = lazy(() => import("../../modules/dashboard/report/ReportsPage.tsx"))
 const CashFlow = lazy(() => import("../../modules/cash-flow/CashFlowPage.tsx"))
 const RevenueMap = lazy(() => import("../../modules/revenue-map/RevenueMapPage.tsx"))
@@ -67,6 +68,14 @@ export default function Router() {
             <Route path="/jobcost" element={<Jobcost />} />
             <Route path="/jobcost/:recnum" element={<JobcostDetailPage />} />
             <Route path="/jobcost/property/:parent" element={<PropertyDetailPage />} />
+
+            {/* Projection Board — executive tier only (owner/tech collapse to
+                executive); the backend gates its endpoints on the same roles. */}
+            <Route path="/projections" element={
+              <RequireRole allowed={["executive", "admin"]}>
+                <ProjectionsPage />
+              </RequireRole>
+            } />
 
             {/* Reports — daily/weekly/monthly activity; all roles (managers
                 get the token-scoped variant, GMs the company-wide one) */}

@@ -21,6 +21,7 @@ import {
   Receipt,
   Clock,
   ChartPie,
+  Table2,
 } from "lucide-react"
 
 export interface NavItem {
@@ -56,6 +57,8 @@ const navItems = {
   home: { label: "Dashboard", path: "/dashboard", icon: Home },
   businessSummary: { label: "Company", path: "/company", icon: Building2 },
   jobcost: { label: "Job Costing", path: "/jobcost", icon: JobcostIcon as unknown as LucideIcon },
+  // Executive-tier only: the Master Projection Sheet as a living board.
+  projections: { label: "Projections", path: "/projections", icon: Table2 },
   // "Reports" the page (daily/weekly/monthly activity reports) — distinct from
   // the dashboard's `reports` home section (reconciliation/data quality).
   dailyReports: { label: "Activity", path: "/reports", icon: Clock },
@@ -97,6 +100,7 @@ const chartsGroup: NavGroup = {
 const executiveNav: NavEntry[] = [
   navItems.home,
   navItems.jobcost,
+  navItems.projections,
   NAV_DIVIDER,
   navItems.employees,
   navItems.changeOrders,
