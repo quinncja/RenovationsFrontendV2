@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react"
-import { History, Check, CloudUpload } from "lucide-react"
+import { History, Check, ChevronDown, CloudUpload } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { StatWidget } from "../../shared/components/StatWidget/StatWidget"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
@@ -173,20 +173,26 @@ export default function ProjectionsPage() {
       actions={
         <div className="pj-header-actions">
           <SaveIndicator state={board.saveState} />
-          <select
-            className="year-selector"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            aria-label="Projection year"
-          >
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
-          <button className="button secondary-button" onClick={() => setDrawerOpen(true)}>
-            <History size={14} />
-            History
-          </button>
+          <div className="pj-control-bar">
+            <div className="pj-select-wrap">
+              <select
+                className="pj-year-select"
+                value={year}
+                onChange={(e) => setYear(Number(e.target.value))}
+                aria-label="Projection year"
+              >
+                {yearOptions.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              <ChevronDown size={13} className="pj-select-caret" />
+            </div>
+            <span className="pj-control-divider" />
+            <button className="pj-control-btn" onClick={() => setDrawerOpen(true)}>
+              <History size={14} />
+              History
+            </button>
+          </div>
         </div>
       }
     >
@@ -227,6 +233,7 @@ export default function ProjectionsPage() {
             <ProjectionGrid
               rows={sheet.rows}
               summary={sheet.summary}
+              lastAddedRowId={board.lastAddedRowId}
               onEdit={board.applyEdit}
               onAddRow={board.addRow}
               onDeleteRow={board.deleteRow}

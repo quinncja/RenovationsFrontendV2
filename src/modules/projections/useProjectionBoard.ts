@@ -53,6 +53,7 @@ export function useProjectionBoard(year: number) {
   const [error, setError] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<SaveState>("idle")
   const [conflict, setConflict] = useState(false)
+  const [lastAddedRowId, setLastAddedRowId] = useState<string | null>(null)
 
   const pendingRef = useRef<Map<string, CellEdit>>(new Map())
   const flushTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -87,6 +88,9 @@ export function useProjectionBoard(year: number) {
     for (const edit of pendingRef.current.values()) {
       next = applyLocally(next, edit)
     }
+    // Keep the ref current immediately (not at next render) so callers awaiting
+    // a structural op can diff against the adopted sheet.
+    sheetRef.current = next
     setSheet(next)
   }, [])
 
@@ -159,10 +163,12 @@ export function useProjectionBoard(year: number) {
     [flush, adoptServerSheet, handleWriteError]
   )
 
-  const addRow = useCallback(
-    () => structural((s) => addProjectionRow(s.year, s.revision)),
-    [structural]
-  )
+  const addRow = useCallback(async () => {
+    const prevIds = new Set((sheetRef.current?.rows ?? []).map((r) => r.rowId))
+    await structural((s) => addProjectionRow(s.year, s.revision))
+    const added = sheetRef.current?.rows.find((r) => !prevIds.has(r.rowId))
+    if (added) setLastAddedRowId(added.rowId)
+  }, [structural])
   const deleteRow = useCallback(
     (rowId: string) => structural((s) => deleteProjectionRow(s.year, s.revision, rowId)),
     [structural]
@@ -193,6 +199,7 @@ export function useProjectionBoard(year: number) {
     error,
     saveState,
     conflict,
+    lastAddedRowId,
     applyEdit,
     addRow,
     deleteRow,

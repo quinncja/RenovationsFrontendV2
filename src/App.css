@@ -18219,7 +18219,95 @@ button.co-hero-project:hover svg { color: inherit; }
 .pj-header-actions {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
+  gap: 0.75rem;
+}
+
+/* One cohesive control bar (year + history) on the jobcost command-bar
+   surface recipe, instead of a stray select next to a stray pill. */
+.pj-control-bar {
+  --pj-cb-s1: light-dark(#fdfcfa, #2b241e);
+  --pj-cb-s2: light-dark(#f4f1ec, #1f1a15);
+  --pj-cb-line: light-dark(var(--border-color), rgba(240, 232, 222, 0.1));
+  --pj-cb-well: light-dark(rgb(from var(--primary-text) r g b / 0.06), rgba(240, 232, 222, 0.08));
+  --pj-cb-text: light-dark(var(--primary-text), rgba(240, 232, 222, 0.93));
+  --pj-cb-muted: light-dark(var(--secondary-text), rgba(240, 232, 222, 0.55));
+  --pj-cb-shadow-ink: light-dark(var(--primary-text), #000);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.25rem;
+  border-radius: 12px;
+  border: 1px solid var(--pj-cb-line);
+  background: linear-gradient(180deg, var(--pj-cb-s1) 0%, var(--pj-cb-s2) 100%);
+  box-shadow:
+    inset 0 1px 0 light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.07)),
+    0 1px 2px rgb(from var(--pj-cb-shadow-ink) r g b / 0.06),
+    0 12px 24px -20px rgb(from var(--pj-cb-shadow-ink) r g b / 0.3);
+}
+.pj-select-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.pj-year-select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 1.9375rem;
+  box-sizing: border-box;
+  padding: 0 1.6875rem 0 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--pj-cb-well);
+  color: var(--pj-cb-text);
+  font-family: var(--font-family);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color 160ms ease;
+}
+.pj-year-select:hover {
+  border-color: var(--pj-cb-line);
+}
+.pj-year-select:focus {
+  outline: none;
+}
+.pj-year-select:focus-visible {
+  border-color: var(--pj-cb-line);
+}
+.pj-select-caret {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: var(--pj-cb-muted);
+}
+.pj-control-divider {
+  width: 1px;
+  height: 1.125rem;
+  background: var(--pj-cb-line);
+  flex-shrink: 0;
+}
+.pj-control-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  height: 1.9375rem;
+  padding: 0 0.8125rem;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--pj-cb-muted);
+  font-family: var(--font-family);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+  white-space: nowrap;
+}
+.pj-control-btn:hover {
+  background: var(--pj-cb-well);
+  color: var(--pj-cb-text);
 }
 
 .pj-save-indicator {
@@ -18279,13 +18367,27 @@ button.co-hero-project:hover svg { color: inherit; }
 /* ── The grid card ── */
 
 .pj-grid {
+  --pj-s1: light-dark(#fdfcfa, #2b241e);
+  --pj-s2: light-dark(#f4f1ec, #1f1a15);
   padding: 0;
   overflow: hidden;
 }
 
+/* Slim, quiet scrollbars. The horizontal one lives at the container's bottom
+   edge, directly beneath the sticky Totals row — the golden strip painted on
+   the container's last 9px puts its (transparent-tracked) thumb visually
+   inside the Totals surface instead of on a stray white gutter. */
 .pj-grid-scroll {
   overflow: auto;
   max-height: min(66vh, 46rem);
+  scrollbar-width: thin;
+  scrollbar-color: rgb(from var(--secondary-text) r g b / 0.28) transparent;
+  background: linear-gradient(0deg, var(--pj-s2) 0, var(--pj-s2) 9px, transparent 9px);
+}
+.pj-summary-scroll,
+.pj-drawer-body {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(from var(--secondary-text) r g b / 0.28) transparent;
 }
 
 /* Hairline quieter than the border token — the grid's rules should whisper. */
@@ -18397,17 +18499,22 @@ button.co-hero-project:hover svg { color: inherit; }
 .pj-num .pj-cell-input {
   text-align: right;
 }
-/* THE copper moment on this page: the active cell. */
+/* THE copper moment on this page: the active cell. A soft halo that breathes
+   in and out rather than a hard ring. */
+.pj-cell-input {
+  transition: box-shadow 200ms ease, background-color 200ms ease;
+}
 .pj-cell-input:focus {
-  box-shadow: inset 0 0 0 2px var(--primary-color);
-  background: rgb(from var(--primary-color) r g b / 0.06);
+  box-shadow: inset 0 0 0 1.5px rgb(from var(--primary-color) r g b / 0.5);
+  background: rgb(from var(--primary-color) r g b / 0.05);
 }
 .pj-cell-input:hover:not(:focus) {
   background: var(--hover-bg);
 }
 
-/* Computed columns: output, not input — secondary ink, no wash, no border. */
-.pj-computed {
+/* Computed columns: output, not input — secondary ink, no wash, no border.
+   (td-qualified: `.pj-table td` zeroes padding at higher specificity.) */
+.pj-table td.pj-computed {
   color: var(--secondary-text);
   padding: 0.5625rem 0.875rem;
 }
@@ -18423,8 +18530,6 @@ button.co-hero-project:hover svg { color: inherit; }
 /* Totals: the statement row. Warm ink-gradient surface (same recipe as the
    jobcost command bar) pinned to the bottom of the scroll area. */
 .pj-totals-row td {
-  --pj-s1: light-dark(#fdfcfa, #2b241e);
-  --pj-s2: light-dark(#f4f1ec, #1f1a15);
   position: sticky;
   bottom: 0;
   z-index: 2;

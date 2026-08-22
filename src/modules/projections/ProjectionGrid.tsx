@@ -1,4 +1,5 @@
-import { useRef, useState, type KeyboardEvent } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent } from "react"
+import { motion, useReducedMotion } from "framer-motion"
 import { Trash2, Plus } from "lucide-react"
 import { ConfirmModal } from "../../shared/components/ConfirmModal/ConfirmModal"
 import { formatMoneyFull, shortMonth } from "../../shared/utils/format"
@@ -107,15 +108,32 @@ function EditableCell({ row, col, value, rowIndex, onCommit }: CellProps) {
 interface ProjectionGridProps {
   rows: ProjectionRow[]
   summary: ProjectionSummary
+  /** rowId of the most recently added row — the grid scrolls to it, fades it
+   *  in with a brief copper wash, and focuses its Address cell. */
+  lastAddedRowId?: string | null
   onEdit: (edit: CellEdit) => void
   onAddRow: () => void
   onDeleteRow: (rowId: string) => Promise<void> | void
 }
 
-export function ProjectionGrid({ rows, summary, onEdit, onAddRow, onDeleteRow }: ProjectionGridProps) {
+export function ProjectionGrid({ rows, summary, lastAddedRowId, onEdit, onAddRow, onDeleteRow }: ProjectionGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [confirmDelete, setConfirmDelete] = useState<ProjectionRow | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const reducedMotion = useReducedMotion()
+
+  // A new project lands at the bottom: glide the scroll there and put the
+  // cursor in its Address cell (preventScroll so the glide isn't cut short).
+  useEffect(() => {
+    if (!lastAddedRowId) return
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTo({ top: el.scrollHeight, behavior: reducedMotion ? "auto" : "smooth" })
+    const input = el.querySelector<HTMLInputElement>(
+      `tr[data-rowid="${CSS.escape(lastAddedRowId)}"] input[data-col="address"]`
+    )
+    input?.focus({ preventScroll: true })
+  }, [lastAddedRowId, reducedMotion])
 
   // Excel-style vertical travel: Enter or ↑/↓ moves within the column. Tab is
   // native; Escape (handled in the cell) reverts the draft before blurring.
@@ -170,8 +188,19 @@ export function ProjectionGrid({ rows, summary, onEdit, onAddRow, onDeleteRow }:
           <tbody>
             {rows.map((row, ri) => {
               const c = computeRow(row)
+              const isNew = row.rowId === lastAddedRowId && !reducedMotion
+              // The one focal animation here: a fresh row fades in under a
+              // copper wash that clears as it settles.
+              const Tr = isNew ? motion.tr : "tr"
+              const motionProps = isNew
+                ? {
+                    initial: { opacity: 0, backgroundColor: "rgba(194, 124, 62, 0.12)" },
+                    animate: { opacity: 1, backgroundColor: "rgba(194, 124, 62, 0)" },
+                    transition: { duration: 0.6, ease: "easeOut" as const },
+                  }
+                : {}
               return (
-                <tr key={row.rowId}>
+                <Tr key={row.rowId} data-rowid={row.rowId} {...motionProps}>
                   {IDENTITY_COLS.map((col, i) => (
                     <td key={col.key} className={i === 0 ? "pj-sticky" : undefined}>
                       <EditableCell row={row} col={col} value={row[col.key as "address"]} rowIndex={ri} onCommit={onEdit} />
@@ -203,7 +232,7 @@ export function ProjectionGrid({ rows, summary, onEdit, onAddRow, onDeleteRow }:
                       <Trash2 size={13} />
                     </button>
                   </td>
-                </tr>
+                </Tr>
               )
             })}
           </tbody>
