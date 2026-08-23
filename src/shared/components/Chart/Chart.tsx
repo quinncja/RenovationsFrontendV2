@@ -1151,7 +1151,7 @@ function buildDashedSeriesLayers(dashedIds: string[]) {
 }
 
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
-  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip } = config
+  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip, topBand } = config
 
   // Dashed-overlay mode swaps the stock areas/lines layers for versions that
   // stroke the listed series dashed and skip their area fill. Muted highlight
@@ -1186,7 +1186,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
   // still must not clip it.
   const hasTopMarkerLabel =
     markers?.some((m) => m.axis === "x" && m.legend != null && (m.legendPosition ?? "top") === "top") ?? false
-  const marginTop = compactTop || legend || hasTopMarkerLabel ? 40 : 20
+  const marginTop = compactTop || legend || hasTopMarkerLabel || topBand ? 40 : 20
   // "Muted" mode: when the caller is highlighting a specific x value, all
   // series fade to gray and the single matching point paints in its
   // own series color. Communicates "this is what you clicked" without

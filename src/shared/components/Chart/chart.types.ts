@@ -213,6 +213,11 @@ export type ChartConfig =
        *  (green ahead / red behind); slices where only the plan has a value —
        *  and all slices without `delta` — read "Plan: $X" in neutral ink. */
       planTooltip?: { delta?: boolean }
+      /** Reserve the 40px top band even with no in-plot legend or top marker
+       *  label, so this plot's top edge aligns with sibling charts that have
+       *  one (e.g. the annual trend sitting beside the cumulative chart's
+       *  "Open"-marked plot). */
+      topBand?: boolean
     }
   | {
       type: "pie-with-list"

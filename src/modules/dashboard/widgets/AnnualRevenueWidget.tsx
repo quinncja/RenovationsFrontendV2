@@ -130,6 +130,9 @@ export function AnnualRevenueWidget({ colSpan }: { colSpan?: 1 | 2 }) {
             type: "line",
             series,
             enableArea: true,
+            // Align this plot's top edge with the neighboring cumulative
+            // chart, which keeps the 40px band for its "Open" marker label.
+            topBand: true,
             pulsePoint,
             axisBottomTickValues,
             dashedSeriesIds: [PROJECTED_SERIES_ID],
