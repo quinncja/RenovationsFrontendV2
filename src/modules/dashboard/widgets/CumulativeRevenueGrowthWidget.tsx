@@ -14,6 +14,7 @@ export function CumulativeRevenueGrowthWidget() {
       includeOpenPeriod
       overUnderApplies
       wipTitleSuffix
+      projectionQuery="revenueProjection"
     />
   )
 }

@@ -201,6 +201,12 @@ export type ChartConfig =
        *  data points on a sparse axis still read as part of one trend
        *  while the gap itself stays visibly "no data". */
       bridgeGaps?: boolean
+      /** Series ids to render as plan/projection overlays: dashed stroke, no
+       *  area fill, and supplementary in the slice tooltip (excluded from the
+       *  single-vs-multi branch choice and from growth math, shown as extra
+       *  rows instead). Keeps hypothetical lines visually and semantically
+       *  distinct from the solid actuals they sit beside. */
+      dashedSeriesIds?: string[]
     }
   | {
       type: "pie-with-list"
