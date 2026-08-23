@@ -141,13 +141,14 @@ function everyOtherYTicks(series: LineSeries[], ceiling?: number): number[] | un
 
 // ─── Slice tooltip ────────────────────────────────────────────────────────────
 
-function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel, overlayIds }: {
+function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel, overlayIds, planTooltip }: {
   slice: { points: readonly { data: { x: unknown; y: unknown }; seriesId: string }[] }
   series: LineSeries[]
   valueFormat?: (v: number) => string
   disableGrowth?: boolean
   wipMonthLabel?: string | null
   overlayIds?: string[]
+  planTooltip?: { delta?: boolean }
 }) {
   const points = slice.points
   const xLabel = String(points[0]?.data?.x ?? "")
@@ -156,35 +157,39 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   const headerLabel = wipMonthLabel != null && xLabel === wipMonthLabel ? `${xLabel} Billed + WIP` : xLabel
   const fmt = valueFormat ?? formatMoneyFull
 
-  // Dashed overlay series (plans/projections) are supplementary: they don't
-  // count toward the single-vs-multi branch choice or the growth math, and
-  // render as their own rows only at slices where they have a value.
+  // Dashed overlay series (plans/projections) never appear as data rows and
+  // don't count toward the single-vs-multi branch choice or the growth math.
+  // With `planTooltip` set, the overlay's value at this slice surfaces as a
+  // footer row in the growth row's visual language instead — built lazily per
+  // branch, where the actual value to compare against is known.
   const isOverlay = (id: string | number) => overlayIds?.includes(String(id)) ?? false
   const coreSeries = series.filter((s) => !isOverlay(s.id))
-  const overlayValueMap = new Map(
-    points.filter((p) => isOverlay(p.seriesId)).map((p) => [String(p.seriesId), p.data.y as number | null])
-  )
-  // An overlay point whose value duplicates a core series' value at the same
+  const planPoint = points.find((p) => isOverlay(p.seriesId))
+  const planValue = planTooltip != null ? ((planPoint?.data.y as number | null | undefined) ?? null) : null
+  // A plan point whose value duplicates a core series' value at the same
   // slice is a segment anchor (e.g. the projection line starting from last
-  // year's actual), not information — skip its row.
-  const coreValuesAtSlice = new Set(
-    points.filter((p) => !isOverlay(p.seriesId)).map((p) => p.data.y as number | null)
-  )
-  const overlayRowEls = series
-    .filter((s) => isOverlay(s.id))
-    .map((s) => ({ id: String(s.id), color: s.color, value: overlayValueMap.get(String(s.id)) }))
-    .filter((r): r is { id: string; color: string | undefined; value: number } => r.value != null && !coreValuesAtSlice.has(r.value))
-    .map((row) => (
-      <div key={row.id} className="chart-line-tooltip-row">
-        <span className="chart-line-tooltip-label" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          {row.color && <span className="chart-tooltip-dot" style={{ background: row.color }} />}
-          {row.id}
-        </span>
-        <span className="chart-line-tooltip-value" style={row.color ? { color: row.color } : undefined}>
-          {fmt(row.value)}
-        </span>
-      </div>
-    ))
+  // year's actual), not information — no footer there.
+  const planIsAnchor =
+    planValue != null &&
+    points.some((p) => !isOverlay(p.seriesId) && (p.data.y as number | null) === planValue)
+  const planFooter = (actual: number | null) => {
+    if (planValue == null || planIsAnchor) return null
+    const delta = planTooltip?.delta && actual != null ? actual - planValue : null
+    return (
+      <>
+        <div className="chart-line-tooltip-divider" />
+        <div className="chart-line-tooltip-growth-row">
+          <span className="chart-line-tooltip-growth-label">{delta != null ? "vs Plan:" : "Plan:"}</span>
+          <span
+            className="chart-line-tooltip-growth-value"
+            style={delta != null ? { color: delta >= 0 ? "#22c55e" : "#ef4444" } : undefined}
+          >
+            {delta != null ? `${delta >= 0 ? "+" : "−"}${fmt(Math.abs(delta))}` : fmt(planValue)}
+          </span>
+        </div>
+      </>
+    )
+  }
 
   // Single-series: large value + optional growth vs previous data point
   if (coreSeries.length === 1) {
@@ -213,7 +218,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
             {growth >= 0 ? "↗" : "↘"} {growth > 0 ? "+" : ""}{growth.toFixed(1)}% YoY
           </div>
         )}
-        {overlayRowEls}
+        {planFooter(currVal ?? null)}
       </div>
     )
   }
@@ -270,7 +275,6 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
           </div>
         )
       })}
-      {overlayRowEls}
       {growth != null && (
         <>
           <div className="chart-line-tooltip-divider" />
@@ -282,6 +286,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
           </div>
         </>
       )}
+      {planFooter(currentRow?.value ?? null)}
     </div>
   )
 }
@@ -1146,7 +1151,7 @@ function buildDashedSeriesLayers(dashedIds: string[]) {
 }
 
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
-  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds } = config
+  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip } = config
 
   // Dashed-overlay mode swaps the stock areas/lines layers for versions that
   // stroke the listed series dashed and skip their area fill. Muted highlight
@@ -1176,7 +1181,12 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
   // Compact charts keep a 40px top band: it gives a legend room to tuck into
   // the top-right corner (lifted -40) without nivo clipping it at the SVG edge,
   // and keeps the legend-less burn-up's plot top aligned with its neighbor.
-  const marginTop = compactTop ? 40 : (legend ? 40 : 20)
+  // A top-labeled x marker (the "Open" reference line) needs the same headroom
+  // for its label — widgets that moved their legend into the header (ChartLegend)
+  // still must not clip it.
+  const hasTopMarkerLabel =
+    markers?.some((m) => m.axis === "x" && m.legend != null && (m.legendPosition ?? "top") === "top") ?? false
+  const marginTop = compactTop || legend || hasTopMarkerLabel ? 40 : 20
   // "Muted" mode: when the caller is highlighting a specific x value, all
   // series fade to gray and the single matching point paints in its
   // own series color. Communicates "this is what you clicked" without
@@ -1258,7 +1268,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       }
       enableSlices="x"
       tooltip={() => null}
-      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} overlayIds={dashedSeriesIds} />}
+      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} overlayIds={dashedSeriesIds} planTooltip={planTooltip} />}
       axisLeft={{
         tickSize: 0,
         tickPadding: 10,

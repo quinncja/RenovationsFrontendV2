@@ -202,11 +202,17 @@ export type ChartConfig =
        *  while the gap itself stays visibly "no data". */
       bridgeGaps?: boolean
       /** Series ids to render as plan/projection overlays: dashed stroke, no
-       *  area fill, and supplementary in the slice tooltip (excluded from the
-       *  single-vs-multi branch choice and from growth math, shown as extra
-       *  rows instead). Keeps hypothetical lines visually and semantically
-       *  distinct from the solid actuals they sit beside. */
+       *  area fill, and invisible to the slice tooltip's data rows and growth
+       *  math (they never count toward the single-vs-multi branch choice).
+       *  Pair with `planTooltip` to surface the overlay's value as a footer
+       *  row instead. */
       dashedSeriesIds?: string[]
+      /** Surface the dashed overlay's value at each slice as a tooltip footer
+       *  row in the growth row's visual language. With `delta` set, slices
+       *  where the primary series also has a value read "vs Plan: +$X"
+       *  (green ahead / red behind); slices where only the plan has a value —
+       *  and all slices without `delta` — read "Plan: $X" in neutral ink. */
+      planTooltip?: { delta?: boolean }
     }
   | {
       type: "pie-with-list"

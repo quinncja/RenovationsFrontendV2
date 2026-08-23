@@ -7,6 +7,7 @@ import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import { shortMonth } from "../../../shared/utils/format"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import type { LineMarker, LineSeries } from "../../../shared/components/Chart/chart.types"
+import { ChartLegend } from "../../../shared/components/Chart/ChartLegend"
 import { PROJECTED_COLOR, PROJECTED_SERIES_ID, type RevenueProjection } from "../config/projectionOverlay"
 
 // Shared building block for the four "metric by month, current vs previous
@@ -214,6 +215,26 @@ export function MonthlyYearComparisonWidget({
     </Link>
   ) : undefined
 
+  // Legend lives in the widget header (plain-HTML ChartLegend), not inside the
+  // plot — nivo's in-SVG legend collides with the "Open" marker's top label.
+  const hasProjection = series?.some((s) => s.id === PROJECTED_SERIES_ID) ?? false
+  const legend = series ? (
+    <ChartLegend
+      items={[
+        { label: String(lastYear), color: PREVIOUS_YEAR_COLOR },
+        { label: String(year), color: currentYearColor },
+        ...(hasProjection ? [{ label: PROJECTED_SERIES_ID, color: PROJECTED_COLOR }] : []),
+      ]}
+    />
+  ) : undefined
+  const actions =
+    legend || viewLink ? (
+      <>
+        {legend}
+        {viewLink}
+      </>
+    ) : undefined
+
   // Flag the open month's tooltip as "Billed + WIP" only when WIP is actually
   // folded into one of the plotted lines (the toggle is on and the open year
   // is one of the two years on the chart).
@@ -228,20 +249,24 @@ export function MonthlyYearComparisonWidget({
   const displayTitle = wipTitleSuffix && wipMonthLabel != null ? `${title} (Incl. WIP)` : title
 
   return (
-    <Widget title={displayTitle} loading={isLoading} noData={!series} actions={viewLink}>
+    <Widget title={displayTitle} loading={isLoading} noData={!series} actions={actions}>
       {series && (
         <Chart
           config={{
             type: "line",
             series,
-            legend: true,
             markers,
             pulsePoint,
             wipMonthLabel,
             onPointClick,
             highlightedX,
             ...(projectionQuery
-              ? { dashedSeriesIds: [PROJECTED_SERIES_ID], legendItemWidth: 64 }
+              ? {
+                  dashedSeriesIds: [PROJECTED_SERIES_ID],
+                  // Cumulative-through-month vs plan-through-month is a fair
+                  // comparison, so the footer shows the signed delta.
+                  planTooltip: { delta: true },
+                }
               : {}),
           }}
         />

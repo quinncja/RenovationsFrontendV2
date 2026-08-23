@@ -6,9 +6,10 @@
 
 export const PROJECTED_SERIES_ID = "Projected"
 
-// Palette blue (CHART_COLORS[2]) — a distinct calm hue so the plan line never
-// reads as another year of actuals; the dash carries the "hypothetical" cue.
-export const PROJECTED_COLOR = "#3b82f6"
+// Muted copper — the brand copper desaturated and lifted, so the plan reads
+// as a quiet echo of the revenue line rather than a new hue entering the
+// system; the dash carries the "hypothetical" cue.
+export const PROJECTED_COLOR = "#c39c79"
 
 export interface RevenueProjection {
   year: number

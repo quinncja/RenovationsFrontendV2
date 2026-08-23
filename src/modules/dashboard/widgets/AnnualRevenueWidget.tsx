@@ -6,6 +6,9 @@ import useIsMobile from "../../../shared/hooks/useIsMobile"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import { PRE_2018_REVENUE } from "../config/historicalRevenue"
 import { PROJECTED_COLOR, PROJECTED_SERIES_ID, type RevenueProjection } from "../config/projectionOverlay"
+import { ChartLegend } from "../../../shared/components/Chart/ChartLegend"
+
+const REVENUE_COLOR = "#c27c3e" // brand copper (CHART_COLORS[0])
 
 interface OpenMonth {
   openMonthYear?: number
@@ -47,6 +50,7 @@ export function AnnualRevenueWidget({ colSpan }: { colSpan?: 1 | 2 }) {
 
     const revenueSeries = {
       id: "Revenue",
+      color: REVENUE_COLOR,
       data: years.map((d) => ({ x: String(d.year), y: plotted(d) })),
     }
 
@@ -106,8 +110,20 @@ export function AnnualRevenueWidget({ colSpan }: { colSpan?: 1 | 2 }) {
     data.annualRevenueTrend.some((d) => d.year === data.openMonthFinances!.openMonthYear)
   const title = wipActive ? "Annual Revenue Trend (Incl. WIP)" : "Annual Revenue Trend"
 
+  // Legend only when the projection overlay makes this two series — in the
+  // widget header (plain-HTML ChartLegend), never nivo's in-SVG legend.
+  const legend =
+    series && series.length > 1 ? (
+      <ChartLegend
+        items={[
+          { label: "Revenue", color: REVENUE_COLOR },
+          { label: PROJECTED_SERIES_ID, color: PROJECTED_COLOR },
+        ]}
+      />
+    ) : undefined
+
   return (
-    <Widget title={title} loading={isLoading} noData={!series}>
+    <Widget title={title} loading={isLoading} noData={!series} actions={legend}>
       {series && (
         <Chart
           config={{
@@ -117,9 +133,9 @@ export function AnnualRevenueWidget({ colSpan }: { colSpan?: 1 | 2 }) {
             pulsePoint,
             axisBottomTickValues,
             dashedSeriesIds: [PROJECTED_SERIES_ID],
-            // Legend only when the projection overlay makes this two series.
-            legend: series.length > 1,
-            legendItemWidth: 64,
+            // Full-year plan vs a year-to-date actual isn't a fair delta —
+            // show the plan figure itself.
+            planTooltip: {},
           }}
         />
       )}
