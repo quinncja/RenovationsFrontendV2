@@ -1014,7 +1014,7 @@ function buildValueColorLayer(valueColor: (v: number) => string) {
           return (
             <g key={serie.id}>
               {segments.map((seg, i) => (
-                <path key={i} d={lineGenerator(seg) ?? undefined} fill="none" stroke={`url(#${gid})`} strokeWidth={2} />
+                <path key={i} d={lineGenerator(seg) ?? undefined} fill="none" stroke={`url(#${gid})`} strokeWidth={2.5} />
               ))}
               {serie.data.map((p, i) =>
                 p.data.y == null || p.position.y == null ? null : (
@@ -1090,38 +1090,89 @@ function buildGapBridgeLayer() {
 // rest render as nivo would. Null points split paths into segments (nivo's
 // defined() behavior), and series paint in reverse order so series[0] stays on
 // top — both matching the stock layers.
+// Split a series into contiguous runs, breaking on null points (gaps).
+function toSegments(data: readonly ComputedLinePoint[]) {
+  const segments: { x: number; y: number }[][] = []
+  let cur: { x: number; y: number }[] = []
+  for (const p of data) {
+    if (p.data.y == null || p.position.y == null) {
+      if (cur.length) segments.push(cur)
+      cur = []
+    } else {
+      cur.push({ x: p.position.x, y: p.position.y })
+    }
+  }
+  if (cur.length) segments.push(cur)
+  return segments
+}
+
+// Area wash for line charts, matching barGradient's depth: anchored to the
+// zero baseline in user space so it mirrors around the x-axis — strong at
+// the top, fading to near-nothing at zero, then strengthening again toward
+// the bottom for negative stretches. A plain bbox gradient can't do this:
+// one area path spans both signs, so the negative side would read inverted.
+function GradientAreas({
+  series,
+  areaGenerator,
+  innerHeight,
+  yScale,
+  skip,
+}: {
+  series: readonly (ComputedLineSerie & { color?: string })[]
+  areaGenerator: (pts: { x: number; y: number }[]) => string | null
+  innerHeight: number
+  yScale: (v: number) => number
+  skip?: (id: string | number) => boolean
+}) {
+  const gid = useId()
+  const zero = Math.min(innerHeight, Math.max(0, yScale(0)))
+  const zeroPct = innerHeight > 0 ? (zero / innerHeight) * 100 : 100
+  const solid = [...series].reverse().filter((s) => !skip?.(s.id))
+  return (
+    <g pointerEvents="none">
+      <defs>
+        {solid.map((serie) => {
+          const c = serie.color ?? CHART_COLORS[0]
+          return (
+            <linearGradient key={serie.id} id={`${gid}-${serie.id}`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={innerHeight}>
+              <stop offset="0%" stopColor={shadeHex(c, 0.15)} stopOpacity={0.38} />
+              <stop offset={`${zeroPct}%`} stopColor={c} stopOpacity={0.02} />
+              <stop offset="100%" stopColor={shadeHex(c, -0.15)} stopOpacity={0.38} />
+            </linearGradient>
+          )
+        })}
+      </defs>
+      {solid.map((serie) => (
+        <g key={serie.id}>
+          {toSegments(serie.data).map((seg, i) => (
+            <path key={i} d={areaGenerator(seg) ?? undefined} fill={`url(#${gid}-${serie.id})`} />
+          ))}
+        </g>
+      ))}
+    </g>
+  )
+}
+
+const DefaultGradientAreas = (props: unknown) => {
+  const { series, areaGenerator, innerHeight, yScale } = props as {
+    series: readonly (ComputedLineSerie & { color?: string })[]
+    areaGenerator: (pts: { x: number; y: number }[]) => string | null
+    innerHeight: number
+    yScale: (v: number) => number
+  }
+  return <GradientAreas series={series} areaGenerator={areaGenerator} innerHeight={innerHeight} yScale={yScale} />
+}
+
 function buildDashedSeriesLayers(dashedIds: string[]) {
   const isDashed = (id: string | number) => dashedIds.includes(String(id))
-  const toSegments = (data: readonly ComputedLinePoint[]) => {
-    const segments: { x: number; y: number }[][] = []
-    let cur: { x: number; y: number }[] = []
-    for (const p of data) {
-      if (p.data.y == null || p.position.y == null) {
-        if (cur.length) segments.push(cur)
-        cur = []
-      } else {
-        cur.push({ x: p.position.x, y: p.position.y })
-      }
-    }
-    if (cur.length) segments.push(cur)
-    return segments
-  }
   const AreasLayer = function DashedModeAreas(props: unknown) {
-    const { series, areaGenerator } = props as {
+    const { series, areaGenerator, innerHeight, yScale } = props as {
       series: readonly (ComputedLineSerie & { color?: string })[]
       areaGenerator: (pts: { x: number; y: number }[]) => string | null
+      innerHeight: number
+      yScale: (v: number) => number
     }
-    return (
-      <g pointerEvents="none">
-        {[...series].reverse().filter((s) => !isDashed(s.id)).map((serie) => (
-          <g key={serie.id}>
-            {toSegments(serie.data).map((seg, i) => (
-              <path key={i} d={areaGenerator(seg) ?? undefined} fill={serie.color} fillOpacity={0.12} />
-            ))}
-          </g>
-        ))}
-      </g>
-    )
+    return <GradientAreas series={series} areaGenerator={areaGenerator} innerHeight={innerHeight} yScale={yScale} skip={isDashed} />
   }
   const LinesLayer = function DashedModeLines(props: unknown) {
     const { series, lineGenerator } = props as {
@@ -1138,7 +1189,7 @@ function buildDashedSeriesLayers(dashedIds: string[]) {
                 d={lineGenerator(seg) ?? undefined}
                 fill="none"
                 stroke={serie.color}
-                strokeWidth={2}
+                strokeWidth={2.5}
                 strokeDasharray={isDashed(serie.id) ? "6 5" : undefined}
               />
             ))}
@@ -1230,6 +1281,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       animate
       motionConfig={{ mass: 1, tension: 120, friction: 14, clamp: false, precision: 0.01, velocity: 0 }}
       enableArea={enableArea}
+      // Non-muted charts swap nivo's flat areas for GradientAreas (layers below).
       areaOpacity={0.12}
       enablePoints
       pointSize={6}
@@ -1294,7 +1346,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
         "grid",
         "markers",
         "axes",
-        dashedLayers && enableArea ? dashedLayers.AreasLayer : ("areas" as const),
+        dashedLayers && enableArea ? dashedLayers.AreasLayer : enableArea && !muted ? DefaultGradientAreas : ("areas" as const),
         "crosshair",
         // Gap bridges go under the solid line/points so dash ends tuck
         // beneath the flanking dots.
@@ -1313,7 +1365,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
         ...(pulsePoint ? [buildPulseLayer(pulsePoint)!] : []),
       ]}
       crosshairType="x"
-      lineWidth={2}
+      lineWidth={2.5}
       legends={
         legend
           ? [
