@@ -1352,6 +1352,252 @@ body{
   pointer-events: none;
 }
 
+/* ─── Period ↔ Year Summary (one widget, two columns) ─────────────────
+   Each column is its own uppercase eyebrow (no widget title above — the
+   eyebrows ARE the headers, with the column's selector on the right) over a
+   three-band P&L waterfall on its own white sheet. The columns need no
+   divider rule — the sheets separate them; on mobile they stack. */
+/* Two cards in one slot: the P&L pair takes three quarters of the row, the
+   Open Position card the last quarter. */
+.pys-slot {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 1fr);
+  gap: 1rem;
+  /* Both cards stretch to the taller of the two, so their bottom edges line
+     up with each other and with the widget row below. */
+  align-items: stretch;
+}
+@media (max-width: 1100px) {
+  .pys-slot { grid-template-columns: 1fr; }
+}
+.pys-widget { min-height: 0; }
+.pys-widget .widget-header { display: none; }
+/* No widget header on this card, so the eyebrow row IS the header: start it
+   at the card's padding edge and pull it up by half the selector's overhang,
+   so the eyebrow text lands on the same baseline as a normal widget title
+   (e.g. the Open Position card beside it). */
+.pys-widget .widget-body { padding-top: 0; }
+.pys-grid {
+  display: grid;
+  /* Fill the card: when the neighbouring Open Position card is taller, the
+     sheets grow with the card rather than leaving warm space beneath them. */
+  flex: 1;
+  align-items: stretch;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 1.25rem;
+}
+.pys-col { min-width: 0; display: flex; flex-direction: column; }
+/* No divider rule between the columns — each column's white sheet already
+   reads as its own statement against the widget's warm surface. */
+/* Standalone column (Open Position): no .pys-grid above it, so the column
+   itself has to claim the card's height for the sheet to fill it. */
+.pys-position-widget .pys-col { flex: 1; }
+/* Inside the sheet the AR / AP blocks speak at the summary table's volume —
+   the big Overdue-Billings figure would outshout the net line it's building
+   to. Only the closing net figure stays large, matching the Net Profit lines
+   in the cards beside it. */
+/* This sheet carries only three blocks, so its seams take the cap off and
+   absorb the slack — AR / AP / net spread evenly and the closing figure
+   lands on the same line as the Net Profit rows beside it. */
+.pys-position-widget .pys-seam { max-height: none; }
+.pys-position-widget .overdue-line { gap: 0.125rem; padding: 0; margin: 0; }
+.pys-position-widget .overdue-line-value {
+  font-size: var(--title3-size);
+  line-height: var(--title3-line-height);
+  font-weight: var(--font-weight-semibold);
+}
+.pys-position-widget .overdue-line-sub {
+  font-size: var(--callout-size);
+  line-height: var(--callout-line-height);
+}
+.pys-position-widget .overdue-line-title,
+.pys-position-widget .overdue-line-dir { font-size: var(--callout-size); }
+.pys-band-final .pys-label { white-space: nowrap; }
+.pys-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+  margin-top: -0.5rem;
+  margin-bottom: 0.75rem;
+}
+.pys-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+/* The reset chip wears the Daily Recap clock's outline (`.rpt-btn`): a quiet
+   gray ring on a transparent field with a neutral icon, filling with
+   --hover-bg on hover and taking a copper edge only on keyboard focus. Not
+   the copper-ringed chip the pinned-property reset wears — copper stays
+   reserved for state that's actually on. */
+.pys-actions .reset-to-default-btn {
+  box-sizing: border-box;
+  border: 1.5px solid var(--border-color);
+  border-radius: 999px;
+  background: none;
+  color: var(--primary-text);
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.pys-actions .reset-to-default-btn:hover,
+.pys-actions .reset-to-default-btn:active {
+  background: var(--hover-bg);
+  border-color: var(--border-color);
+  color: var(--primary-text);
+}
+.pys-actions .reset-to-default-btn:focus-visible {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent);
+}
+/* One row size across every line; the only variables are weight (regular
+   vs semibold) and ink. Rules mark the two seams of the waterfall, so six
+   rows read as three bands: inputs → result → conclusion. */
+.pys-title { margin-bottom: 0; }
+/* The statement itself: a white sheet inset in the widget's warm surface.
+   The eyebrow and its selector stay outside, on the warm ground. */
+.pys-sheet {
+  /* Fills its card, and the cards in a slot stretch to the tallest, so all
+     three sheets come out the same height. The seams cap how far the bands
+     spread (see .pys-seam max-height), so the extra height doesn't inflate
+     the row rhythm. */
+  flex: 1;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.125rem 1.25rem;
+  /* An even warm frame all the way round. The bottom and sides come from the
+     card's own 1.25rem padding; at the top, the eyebrow row is 2rem tall with
+     its text centred, so its 0.75rem margin plus that ~0.5rem of slack below
+     the text already makes the same 1.25rem — no margin of our own. */
+  box-shadow: var(--button-shadow);
+  /* Bands stay tight; the seams between them absorb any extra height, so a
+     taller row breathes evenly instead of stranding whitespace. */
+  display: flex;
+  flex-direction: column;
+  /* Anchors the selection ripple and clips it to the sheet's corners. */
+  position: relative;
+  overflow: hidden;
+}
+/* Selection sweep: a soft band of light runs top-left to bottom-right across
+   the sheet when the Margin chart (or a selector) moves this column to new
+   data — a pass over the surface, not a press on it. Neutral ink rather than
+   copper, so the accent stays reserved for state. The ripple remounts on each
+   selection (React key), which restarts the animation with no JS timing. */
+.pys-ripple {
+  position: absolute;
+  inset: -30%;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    color-mix(in srgb, var(--secondary-text) 13%, transparent) 50%,
+    transparent 62%
+  );
+  will-change: transform;
+  animation: pys-sweep 1.15s cubic-bezier(0.33, 0, 0.2, 1) forwards;
+}
+/* Rows ride above the sweep so the figures stay legible through it. */
+.pys-sheet > .pys-band,
+.pys-sheet > .pys-seam { position: relative; z-index: 1; }
+@keyframes pys-sweep {
+  from { transform: translate3d(-85%, -45%, 0); }
+  to { transform: translate3d(85%, 45%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pys-ripple { display: none; }
+}
+/* Three columns: an operator gutter, the label, the figure. The gutter is a
+   fixed width so every label starts on the same x — the operators read as a
+   column of math, not as indentation. */
+.pys-row {
+  display: grid;
+  grid-template-columns: 0.875rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0 0.5rem;
+  padding: 0.5625rem 0;
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+}
+.pys-op {
+  color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
+}
+.pys-label { color: var(--secondary-text); }
+.pys-value { text-align: right; }
+/* Results — Gross Profit and Net Profit — are what the rule above them
+   produces, so they carry the weight and the primary ink. Operands stay
+   quiet. */
+.pys-row-result .pys-op,
+.pys-row-result .pys-label,
+.pys-row-result .pys-value { font-weight: var(--font-weight-semibold); }
+.pys-row-result .pys-label { color: var(--primary-text); }
+/* A line carrying no operator has nothing to sit in the gutter, so its
+   label claims that column and starts at the sheet's left edge — only the
+   signed lines are indented, which is what makes the operators read as a
+   column. Margin is the exception: it qualifies Gross Profit, so it stays
+   aligned to that label and tucks up tight beneath it. */
+.pys-row-operand .pys-label { grid-column: 1 / 3; }
+.pys-row-qualifier {
+  margin-top: -0.5rem;
+  padding-bottom: 1rem;
+}
+/* Margin carries Gross Profit's weight and ink — it IS that figure,
+   expressed as a ratio. The figure itself still takes the margin-threshold
+   color when that setting is on, which outranks this. */
+.pys-row-qualifier .pys-label,
+.pys-row-qualifier .pys-value {
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+/* The closing line matches the Open Position card's net row exactly — same
+   uppercase callout label, same title2 figure — so the two cards' bottom
+   lines read as the same kind of statement. */
+.pys-band-final .pys-label {
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--secondary-text);
+}
+.pys-band-final .pys-op { color: var(--secondary-text); }
+.pys-band-final .pys-value {
+  font-size: var(--title2-size);
+  line-height: var(--title2-line-height);
+  font-weight: var(--font-weight-bold);
+}
+.pys-value {
+  color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Seams: a hairline centred in its own growable gap — one after the inputs,
+   one before the conclusion. Because they're flex items rather than band
+   borders, extra sheet height splits evenly between them and the rows above
+   and below each line keep the same distance from it. */
+.pys-seam {
+  flex: 1 1 0;
+  min-height: 1.5rem;
+  /* Caps how far a seam opens, so a tall row leaves warm ground under the
+     sheet rather than inflating it. */
+  max-height: 2.25rem;
+  display: flex;
+  align-items: center;
+}
+.pys-seam::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 1px;
+  background: var(--border-color);
+}
+
+@media (max-width: 768px) {
+  .pys-grid { grid-template-columns: 1fr; gap: 0.75rem 0; }
+  .pys-col + .pys-col { margin-top: 0.25rem; }
+}
+
 /* ─── Widget ─────────────────────────────────────────────────────────── */
 
 .widget {

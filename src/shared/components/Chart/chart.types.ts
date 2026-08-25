@@ -141,6 +141,9 @@ export type ChartConfig =
        *  diverging chart, which key was clicked based on the cursor's side of
        *  the zero line (e.g. "AR" above, "AP" below). */
       onBarClick?: (indexValue: string, key?: string) => void
+      /** Bar label to keep lit; every other band is washed out. Used to link
+       *  a chart selection to the card it drives. Null/undefined = no dim. */
+      selectedBarLabel?: string | null
     }
   | {
       type: "radial-bar"

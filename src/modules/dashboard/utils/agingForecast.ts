@@ -341,3 +341,41 @@ export function buildOverdueInvoices(
   out.sort((a, b) => b.daysOverdue - a.daysOverdue || b.amount - a.amount)
   return out
 }
+
+/**
+ * Every open invoice on one side, whether or not it has passed its mark —
+ * the set behind the Open Position card's AR / AP totals. Same row shape as
+ * buildOverdueInvoices; `daysOverdue` is negative for invoices not yet past
+ * due. Sorted oldest-due first.
+ */
+export function buildOpenInvoices(
+  rows: AgingOpenRow[] | null | undefined,
+  now: Date,
+  side: "AR" | "AP"
+): OverdueInvoice[] {
+  if (!Array.isArray(rows)) return []
+
+  const today = startOfDay(now)
+  const out: OverdueInvoice[] = []
+
+  for (const row of rows) {
+    const inv = resolveInvoice(row)
+    if (!inv || inv.side !== side) continue
+
+    out.push({
+      side,
+      amount: inv.amount,
+      recnum: row.recnum != null ? String(row.recnum) : "",
+      invnum: row.invnum != null ? String(row.invnum) : "",
+      counterparty: row.vndnum ?? "",
+      job: row.jobnme ?? "",
+      description: row.dscrpt ?? "",
+      invoiceDate: inv.invoiced,
+      due: inv.due,
+      daysOverdue: Math.round((today.getTime() - startOfDay(inv.due).getTime()) / MS_PER_DAY),
+    })
+  }
+
+  out.sort((a, b) => a.due.getTime() - b.due.getTime() || b.amount - a.amount)
+  return out
+}

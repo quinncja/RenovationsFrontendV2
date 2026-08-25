@@ -8,6 +8,7 @@ import useIsMobile from "../../../shared/hooks/useIsMobile"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import type { LineMarker } from "../../../shared/components/Chart/chart.types"
+import { useSummaryYear } from "./summaryYearContext"
 
 interface MarginRow {
   month: number
@@ -82,6 +83,11 @@ function symlogFromBars(bars: { label: string; value: number }[]) {
 
 export function MarginWidget() {
   const pageYear = usePageYear()
+  // Bars drive the Period & Year Summary card when it shares this page: a
+  // month bar pins that month (and the page's year, since the monthly chart
+  // plots the page year), a year bar moves the Year column to that year.
+  // Null when no summary card is on the page — the bars are then inert.
+  const summary = useSummaryYear()
   const marginColorsOn = useMarginColorsEnabled()
   const [includeOverUnder] = useIncludeOverUnder()
   const [range, setRange] = useState<ChartRange>("monthly")
@@ -167,6 +173,47 @@ export function MarginWidget() {
 
   const chart = range === "monthly" ? monthlyChart : yearlyChart
 
+  // The bar the summary card is currently showing — lit while the rest of
+  // the chart washes out, so the two read as one selection. Monthly only
+  // once the user has pinned a month (an unpinned column follows the open
+  // month, which the "Open" marker already flags); yearly always, since the
+  // Year column is always on some year.
+  const selectedBarLabel = useMemo(() => {
+    if (!summary) return null
+    // Yearly: only lit once the user is off the page year, so an untouched
+    // chart reads normally.
+    if (range === "yearly") return summary.year === pageYear ? null : String(summary.year)
+    if (summary.period == null || summary.year !== pageYear) return null
+    return shortMonth(summary.period)
+  }, [summary, range, pageYear])
+
+  // Bar labels are display strings ("Mar", "2024"), so map back to values.
+  const onBarClick = useMemo(() => {
+    if (!summary) return undefined
+    if (range === "monthly") {
+      return (label: string) => {
+        // Clicking the lit bar again clears the pin: the chart returns to
+        // full color and the Period column back to the open month.
+        if (label === selectedBarLabel) {
+          summary.setPeriod(null)
+          return
+        }
+        const month = MONTHS.find((m) => shortMonth(m) === label)
+        if (month) summary.selectMonth(pageYear, month)
+      }
+    }
+    return (label: string) => {
+      // Same toggle on the yearly view: re-clicking the lit year drops the
+      // Year column back to the page's year.
+      if (label === selectedBarLabel) {
+        summary.setYear(pageYear)
+        return
+      }
+      const year = Number(label)
+      if (Number.isFinite(year)) summary.setYear(year)
+    }
+  }, [summary, range, pageYear, selectedBarLabel])
+
   // Vertical "Open" reference at the in-progress month — same visual
   // language as the four monthly line charts on the home page. Only
   // rendered when the page year matches the actually-open year (otherwise
@@ -231,7 +278,16 @@ export function MarginWidget() {
         <SegmentedControl
           value={range}
           options={RANGE_OPTIONS}
-          onChange={setRange}
+          // Switching views drops any bar selection — the lit bar belongs to
+          // the view it was clicked in, so carrying it over would leave the
+          // summary card pinned to something the chart no longer shows.
+          onChange={(next) => {
+            setRange(next)
+            if (summary) {
+              summary.setPeriod(null)
+              summary.setYear(pageYear)
+            }
+          }}
           layoutId="marginWidgetRangeSeg"
           variant="ohr"
           ariaLabel="Margin chart range"
@@ -253,6 +309,8 @@ export function MarginWidget() {
             axisLeftTickValues: chart.ticks,
             axisBottomTickValues,
             emphasizeZero: true,
+            onBarClick,
+            selectedBarLabel,
             markers,
             wipMonthLabel: wipBarLabel,
             // Same card the default per-bar tooltip renders (incl. the WIP

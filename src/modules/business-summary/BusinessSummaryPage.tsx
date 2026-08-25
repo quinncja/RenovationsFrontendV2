@@ -5,6 +5,7 @@ import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { PeriodAndYearSummaryWidget } from "../dashboard/widgets/PeriodAndYearSummaryWidget"
+import { SummaryYearProvider } from "../dashboard/widgets/summaryYearContext"
 import { MarginWidget } from "../dashboard/widgets/MarginWidget"
 import { EmployeePerformanceWidget } from "../dashboard/widgets/EmployeePerformanceWidget"
 
@@ -14,17 +15,20 @@ export default function BusinessSummaryPage() {
   return (
     <PageDataProvider module="businessSummary" queries={PAGE_QUERIES.businessSummary} params={{ year }}>
       <Page title="Company Overview" actions={<YearSelector value={year} onChange={setYear} />}>
-        <MotionList className="widget-grid widget-grid-2 dashboard-home-grid">
-          <MotionItem className="col-span-full">
-            <PeriodAndYearSummaryWidget />
-          </MotionItem>
-          <MotionItem>
-            <MarginWidget />
-          </MotionItem>
-          <MotionItem>
-            <EmployeePerformanceWidget />
-          </MotionItem>
-        </MotionList>
+        {/* Page-level so the Margin chart's bars drive the summary card. */}
+        <SummaryYearProvider>
+          <MotionList className="widget-grid widget-grid-2 dashboard-home-grid">
+            <MotionItem className="col-span-full">
+              <PeriodAndYearSummaryWidget />
+            </MotionItem>
+            <MotionItem>
+              <MarginWidget />
+            </MotionItem>
+            <MotionItem>
+              <EmployeePerformanceWidget />
+            </MotionItem>
+          </MotionList>
+        </SummaryYearProvider>
       </Page>
     </PageDataProvider>
   )

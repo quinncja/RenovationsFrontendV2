@@ -14,13 +14,13 @@ export interface MarginRow {
   gross_profit: number
 }
 
-interface FetchState {
+interface FetchState<T> {
   year: number
-  rows: MarginRow[] | null
+  rows: T[] | null
 }
 
 /**
- * Returns `marginPerformance` rows for the requested `year`.
+ * Returns rows of a year-scoped dashboard query for the requested `year`.
  *
  * Free path: when `year` matches the page year, reuses the bundled query
  * already in PageDataProvider — no extra request.
@@ -30,34 +30,28 @@ interface FetchState {
  * effect stays free of sync setState calls (React 19 set-state-in-effect
  * rule).
  */
-export function useMarginPerformanceFor(year: number): {
-  rows: MarginRow[] | null
+function useYearScopedRows<T>(queryName: string, year: number): {
+  rows: T[] | null
   isLoading: boolean
 } {
   const pageYear = usePageYear()
-  const page = useWidgetData<{ marginPerformance: MarginRow[] | null }>([
-    "marginPerformance",
-  ])
+  const page = useWidgetData<Record<string, T[] | null>>([queryName])
   const usingPage = year === pageYear
-  const pageRows = Array.isArray(page.data?.marginPerformance)
-    ? page.data!.marginPerformance!
-    : null
+  const pageRows = Array.isArray(page.data?.[queryName]) ? page.data![queryName]! : null
 
-  const [override, setOverride] = useState<FetchState>({ year: pageYear, rows: null })
+  const [override, setOverride] = useState<FetchState<T>>({ year: pageYear, rows: null })
 
   useEffect(() => {
     if (usingPage) return
     const ctrl = new AbortController()
     fetchPageData({
       module: "dashboard",
-      queries: ["marginPerformance"],
+      queries: [queryName],
       params: { year },
       signal: ctrl.signal,
     })
       .then((d) => {
-        const rows = Array.isArray(d.marginPerformance)
-          ? (d.marginPerformance as MarginRow[])
-          : null
+        const rows = Array.isArray(d[queryName]) ? (d[queryName] as T[]) : null
         setOverride({ year, rows })
       })
       .catch((err) => {
@@ -65,10 +59,29 @@ export function useMarginPerformanceFor(year: number): {
         setOverride({ year, rows: null })
       })
     return () => ctrl.abort()
-  }, [year, usingPage])
+  }, [queryName, year, usingPage])
 
   const rows = usingPage ? pageRows : override.year === year ? override.rows : null
   const isLoading = usingPage ? page.isLoading : override.year !== year
 
   return { rows, isLoading }
+}
+
+/** `marginPerformance` rows for `year` (see useYearScopedRows). */
+export function useMarginPerformanceFor(year: number) {
+  return useYearScopedRows<MarginRow>("marginPerformance", year)
+}
+
+// One row of `monthlyOverheadComparison`: every 6xxx GL account, per
+// (month, year) for `year` AND `year - 1`, capped at the open period like
+// marginPerformance — so filter by `year` before summing.
+export interface OverheadRow {
+  month: number
+  year: number
+  overhead: number
+}
+
+/** `monthlyOverheadComparison` rows for `year` (see useYearScopedRows). */
+export function useMonthlyOverheadFor(year: number) {
+  return useYearScopedRows<OverheadRow>("monthlyOverheadComparison", year)
 }

@@ -7,8 +7,8 @@ import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
 import { useSummaryYear } from "./summaryYearContext"
-import { useMarginPerformanceFor, type MarginRow } from "./useMarginPerformanceFor"
-import { SummarySnapshotCard } from "./SummarySnapshotCard"
+import { useMarginPerformanceFor, useMonthlyOverheadFor, type MarginRow, type OverheadRow } from "./useMarginPerformanceFor"
+import { SummaryColumn } from "./SummaryColumn"
 
 function totalsFor(rows: MarginRow[] | null) {
   if (!rows || rows.length === 0) {
@@ -31,6 +31,15 @@ function totalsFor(rows: MarginRow[] | null) {
     // margin (see CurrentPeriodSummaryWidget).
     margin: income !== 0 ? grossProfit / Math.abs(income) : null,
   }
+}
+
+// monthlyOverheadComparison carries `year` and `year - 1`; sum only the
+// displayed year's rows (already capped at the open period, so this is YTD
+// for the current year and full-year for prior years).
+function overheadFor(rows: OverheadRow[] | null, year: number) {
+  let total = 0
+  for (const r of rows ?? []) if (r.year === year) total += r.overhead ?? 0
+  return total
 }
 
 interface OpenMonth {
@@ -63,19 +72,21 @@ export function YearSummaryWidget() {
   const year = ctx ? ctx.year : localYear
   const setYear = ctx ? ctx.setYear : setLocalYear
 
-  const { rows, isLoading: loading } = useMarginPerformanceFor(year)
+  const { rows, isLoading: marginLoading } = useMarginPerformanceFor(year)
+  const { rows: overheadRows, isLoading: overheadLoading } = useMonthlyOverheadFor(year)
+  const loading = marginLoading || overheadLoading
 
   // marginPerformance already includes the open month's *confirmed* billings
   // (it's fetched with oldestOpenPeriod). When the toggle is on and the
   // displayed year is the open year, also fold in the open period's over/under
   // (WIP) — a revenue-side adjustment, so it lifts income & gross profit (and
-  // thus margin) but never costs.
+  // thus margin and net) but never costs.
   const open = openData?.openMonthFinances ?? null
   const overUnderApplied = includeOverUnder && open?.openMonthYear === year
   const totals = useMemo(() => {
     const base = totalsFor(rows)
-    if (!overUnderApplied) return base
-    const wip = open?.openMonthOverUnder ?? 0
+    const overhead = overheadFor(overheadRows, year)
+    const wip = overUnderApplied ? open?.openMonthOverUnder ?? 0 : 0
     const income = base.income + wip
     const grossProfit = base.grossProfit + wip
     return {
@@ -83,19 +94,20 @@ export function YearSummaryWidget() {
       cogs: base.cogs,
       grossProfit,
       margin: income !== 0 ? grossProfit / Math.abs(income) : null,
+      overhead,
+      net: grossProfit - overhead,
     }
-  }, [rows, overUnderApplied, open])
+  }, [rows, overheadRows, year, overUnderApplied, open])
 
   const currentYearNum = new Date().getFullYear()
-  const meta = year === currentYearNum ? "Year to date" : "Full year"
   // Reset chip mirrors the period half: visible when the displayed year
   // isn't the current calendar year. Click jumps back to current year.
   const showReset = year !== currentYearNum
 
   return (
-    <SummarySnapshotCard
-      title={overUnderApplied ? "Year Summary + WIP" : "Year Summary"}
-      className="year-summary-widget"
+    <SummaryColumn
+      eyebrow={overUnderApplied ? "Year Summary + WIP" : "Year Summary"}
+      pulseKey={String(year)}
       actions={
         <>
           {showReset && (
@@ -112,21 +124,36 @@ export function YearSummaryWidget() {
           <YearSelector value={year} onChange={setYear} />
         </>
       }
-      headlineLabel={String(year)}
-      headlineMeta={meta}
-      stats={[
-        {
-          title: "Margin",
-          value: totals.margin,
-          // Margin is a ratio; format explicitly so a >100% margin isn't
-          // misread by the generic "percent" preset's magnitude heuristic.
-          format: formatRatioPercent,
-          // marginTextColor's thresholds are in whole-%.
-          valueColor: marginColorsOn && totals.margin != null ? marginTextColor(totals.margin * 100) : undefined,
-        },
-        { title: includeOverUnder ? `Billed Income + ${isMobile ? "WIP" : "Work Completed"}` : "Billed Income", value: totals.income },
-        { title: "COGS", value: totals.cogs },
-        { title: "Gross Profit", value: totals.grossProfit },
+      groups={[
+        { kind: "input", lines: [
+          {
+            // Name the year on the two lines that bracket the statement, so a
+            // glance at the top or the bottom says which year this is.
+            label: `${year} Billed Income${includeOverUnder ? ` + ${isMobile ? "WIP" : "Work Completed"}` : ""}`,
+            value: totals.income,
+          },
+          { label: "COGS", role: "minus", value: totals.cogs },
+        ] },
+        { kind: "result", lines: [
+          { label: "Gross Profit", role: "result", value: totals.grossProfit },
+          {
+            label: "Margin",
+            role: "qualifier",
+            value: totals.margin,
+            // Margin is a ratio; format it explicitly (a >100% margin would be
+            // misread by the generic "percent" preset's magnitude heuristic).
+            format: formatRatioPercent,
+            // marginTextColor's thresholds are in whole-percentage units
+            // (20+ green / 15+ amber / red), so multiply the ratio at the call
+            // site — consistent with the formatter above.
+            valueColor: marginColorsOn && totals.margin != null ? marginTextColor(totals.margin * 100) : undefined,
+            skelCh: 5,
+          },
+          { label: "Overhead", role: "minus", value: totals.overhead },
+        ] },
+        { kind: "final", lines: [
+          { label: `${year} Net Profit`, role: "result", value: totals.net, valueColor: !loading && totals.net < 0 ? "#ef4444" : undefined },
+        ] },
       ]}
       loading={loading}
     />

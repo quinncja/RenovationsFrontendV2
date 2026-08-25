@@ -102,9 +102,13 @@ export const PAGE_QUERIES = {
   // Business Summary — Period & Year Summary, Margin (MoM), Employee Performance.
   businessSummary: [
     "marginPerformance",
+    // Overhead + Net rows of the Period & Year Summary lists.
+    "monthlyOverheadComparison",
     "annualMarginTrend",
     "openMonthFinances",
     "employeePerformance",
+    // Open Position column of the Period & Year Summary widget.
+    "agingSummaryOpen",
   ],
 
   // Job Costing

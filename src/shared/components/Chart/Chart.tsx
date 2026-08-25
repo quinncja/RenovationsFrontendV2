@@ -319,7 +319,7 @@ function shadeHex(hex: string, amt: number): string {
 }
 
 function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> }) {
-  const { data, keys, indexBy, groupMode = "stacked", compactTop = false, color = CHART_COLORS[0], barGradient, colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, axisBottomTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, wipMonthLabel, onBarClick, barTooltip, oppositeAxisLabels } = config
+  const { data, keys, indexBy, groupMode = "stacked", compactTop = false, color = CHART_COLORS[0], barGradient, colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, axisBottomTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, wipMonthLabel, onBarClick, barTooltip, oppositeAxisLabels, selectedBarLabel } = config
 
   const dark = useDarkMode()
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
@@ -351,6 +351,9 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
   const zeroLineColor = dark ? "rgba(220,205,185,0.45)" : "rgba(25,55,90,0.40)"
   // Faint column highlight painted behind the hovered category's bars.
   const sliceHighlight = dark ? "rgba(255,255,255,0.07)" : "rgba(15,23,42,0.06)"
+  // Wash painted over the un-selected bands — the card surface at partial
+  // opacity, so dimmed bars fade into the card rather than turning muddy.
+  const dimScrim = dark ? "rgba(38,34,32,0.66)" : "rgba(255,255,255,0.66)"
   // Y-axis markers (zero-line + any caller-supplied horizontal lines) go
   // through nivo's built-in `markers` prop. X-axis markers go to a custom
   // layer below — nivo's built-in bar markers anchor at the band's *start*
@@ -504,6 +507,63 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
   }
 
   type SliceBar = { data: { indexValue: string | number; data: Record<string, unknown> }; x: number; width: number }
+
+  // Selection wash: when the chart drives another card (a clicked bar pinning
+  // the summary beside it), every band but the selected one fades toward the
+  // card surface, so the lit bar and the card read as one thing.
+  //
+  // This layer's identity MUST stay stable. nivo renders layers as components,
+  // and the sibling layers below are re-created on every render — React then
+  // treats each render as a new component type and remounts the subtree, which
+  // would hand us brand-new <rect>s already at their final opacity and no CSS
+  // transition would ever run. Hence useMemo with no deps plus a ref for the
+  // values that change.
+  const dimRef = useRef({ selectedBarLabel, dimScrim })
+  dimRef.current = { selectedBarLabel, dimScrim }
+  const BarDimLayer = useMemo(
+    () =>
+      function DimLayer({ bars, innerHeight }: { bars: readonly SliceBar[]; innerHeight: number }) {
+        const { selectedBarLabel: selected, dimScrim: scrim } = dimRef.current
+        const bands = new Map<string, { x: number; width: number }>()
+        for (const b of bars) {
+          const key = String(b.data.indexValue)
+          const existing = bands.get(key)
+          if (!existing) {
+            bands.set(key, { x: b.x, width: b.width })
+          } else {
+            const left = Math.min(existing.x, b.x)
+            const right = Math.max(existing.x + existing.width, b.x + b.width)
+            existing.x = left
+            existing.width = right - left
+          }
+        }
+        const dimming = selected != null && bands.has(selected)
+        return (
+          <g>
+            {[...bands.entries()].map(([key, band]) => (
+              <rect
+                key={`dim-${key}`}
+                // Inflated by the bars' border stroke, which straddles their
+                // edge — an exact-width scrim leaves a saturated outline.
+                x={band.x - 2}
+                y={-2}
+                width={band.width + 4}
+                height={innerHeight + 4}
+                fill={scrim}
+                pointerEvents="none"
+                // Opacity as an inline CSS property, not the SVG presentation
+                // attribute: WebKit won't transition an attribute change.
+                style={{
+                  opacity: dimming && key !== selected ? 1 : 0,
+                  transition: "opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
+              />
+            ))}
+          </g>
+        )
+      },
+    []
+  )
   const BarSliceLayer = ({
     bars,
     innerHeight,
@@ -727,6 +787,7 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
         "axes",
         "bars",
         ...(oppositeAxisLabels && !stacked ? [BarValueLabelsLayer] : []),
+        BarDimLayer,
         "markers",
         "legends",
         "annotations",

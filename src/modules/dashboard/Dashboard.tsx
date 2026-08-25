@@ -7,6 +7,7 @@ import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import { useAuth } from "../../core/auth/AuthProvider"
 import { effectiveRole, isGeneralManager, ALL_JOBS_DETAIL_ID, type AppRole } from "../../core/auth/roles"
 import { DashboardLayoutProvider, useDashboardLayout } from "./context/DashboardLayoutContext"
+import { SummaryYearProvider } from "./widgets/summaryYearContext"
 import { SectionPager } from "./components/SectionPager"
 import { SectionEditor } from "./components/SectionEditor"
 import { EditModeToolbar } from "./components/EditModeToolbar"
@@ -71,7 +72,11 @@ export default function Dashboard() {
   return (
     <PageDataProvider module="dashboard" queries={PAGE_QUERIES.adminDashboard} params={{ year }}>
       <DashboardLayoutProvider>
-        <AdminDashboard year={year} onYearChange={setYear} />
+        {/* Page-level so the Margin chart's bars and the Period & Year
+            Summary card share one year/period selection. */}
+        <SummaryYearProvider>
+          <AdminDashboard year={year} onYearChange={setYear} />
+        </SummaryYearProvider>
       </DashboardLayoutProvider>
     </PageDataProvider>
   )

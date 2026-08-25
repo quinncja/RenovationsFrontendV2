@@ -1,30 +1,38 @@
+import { Widget } from "../../../shared/components/Widget/Widget"
 import { CurrentPeriodSummaryWidget } from "./CurrentPeriodSummaryWidget"
 import { YearSummaryWidget } from "./YearSummaryWidget"
-import { SummaryYearProvider } from "./summaryYearContext"
+import { OpenPositionWidget } from "./OpenPositionWidget"
+import { SummaryYearProvider, useSummaryYear } from "./summaryYearContext"
 
-// Layout wrapper: Period Summary and Year Summary share a data shape
-// (Margin / Income / COGS / Gross Profit) and are visually bridged into a
-// single snapshot unit. Exposing them as a single registry entry means the
-// dashboard layout treats the pair as one slot — they can't be reordered
-// apart, resized independently, or lose their visual bridge.
+// One dashboard slot, two cards. The Period Summary / Year Summary pair
+// shares the P&L waterfall (Income → COGS → Gross Profit / Margin →
+// Overhead → Net) inside one card taking three quarters of the row; the
+// Open Position card (total AR / AP right now) is its own card in the last
+// quarter. Registering them as one slot means the layout can't split or
+// resize them independently.
 //
-// `.summary-snapshot-pair` is the generic seam class shared with the
-// EmployeeDetailPage's employee-scoped summary pair, so both contexts get
-// the fused two-card look from one CSS rule.
+// The SummaryYearProvider gives both columns a shared "effective year" so
+// the Year column's selector also drives the Period column. Either column
+// falls back to the page year when rendered outside this provider.
 //
-// The SummaryYearProvider gives both halves a shared "effective year" so
-// the Year half's per-widget year selector also drives the Period half.
-// Without it the two halves would diverge: the Year half would refetch for
-// the picked year while the Period half kept reading the page year. Either
-// inner widget falls back to the page year when rendered outside this
-// provider (e.g. CurrentPeriodSummaryWidget standalone on BusinessSummary).
+// The employee-scoped pair (EmployeeDetailPage / GM home) still uses the
+// fused `.summary-snapshot-pair` stat-tile look.
 export function PeriodAndYearSummaryWidget() {
-  return (
-    <SummaryYearProvider>
-      <div className="summary-snapshot-pair">
-        <CurrentPeriodSummaryWidget />
-        <YearSummaryWidget />
-      </div>
-    </SummaryYearProvider>
+  // The page normally hosts the provider (so the Margin chart can drive
+  // these columns); fall back to a local one when this card is rendered on
+  // its own.
+  const hosted = useSummaryYear() != null
+  const slot = (
+    <div className="pys-slot">
+      <Widget className="current-period-widget pys-widget">
+        <div className="pys-grid">
+          <CurrentPeriodSummaryWidget />
+          <YearSummaryWidget />
+        </div>
+      </Widget>
+      <OpenPositionWidget />
+    </div>
   )
+
+  return hosted ? slot : <SummaryYearProvider>{slot}</SummaryYearProvider>
 }
