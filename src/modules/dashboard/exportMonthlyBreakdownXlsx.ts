@@ -11,6 +11,7 @@ import {
   USERNAME_KEYS,
 } from "../../shared/components/MonthlyDetailTable/MonthlyDetailTable"
 import type { SheetRow, StyledCell } from "../../shared/utils/exportXlsx"
+import { XLSX_GOLD, XLSX_INK, XLSX_INK_SOFT, XLSX_MUTED, XLSX_HEAD_FILL, XLSX_STRIPE, xlsxCellBorder, xlsxTotalBorder } from "../../shared/utils/xlsxTheme"
 
 // Builds the styled cell matrix for the Monthly Breakdown XLSX export. The base
 // report is two sections — Monthly Summary (one row per month + total) followed
@@ -23,22 +24,19 @@ import type { SheetRow, StyledCell } from "../../shared/utils/exportXlsx"
 // per-category breakdown — via the optional fields on BreakdownExportInput.
 // Callers that omit them get the original two-section layout unchanged.
 
-// ── Colors (brand copper) ──────────────────────────────────────────────────────
+// ── Colors: shared muted export palette (xlsxTheme.ts) ────────────────────────
 
-const BRAND       = "C27C3E" // copper — title text / accents
-const BRAND_DARK  = "9A5626" // deeper copper — header fills (white text stays legible)
-const BRAND_LIGHT = "F7EEE3" // light copper — zebra stripe / KPI values
-const GRAY_BG     = "F5F6F8"
-const BORDER_CLR  = "D0D5DD"
-const WHITE       = "FFFFFF"
-const BLACK       = "000000"
-const MUTED       = "6B7280"
+const BRAND       = XLSX_GOLD      // accent text only
+const HEAD_FILL   = XLSX_HEAD_FILL // section bands / headers / label cells
+const STRIPE      = XLSX_STRIPE    // zebra + totals
+const INK         = XLSX_INK
+const INK_SOFT    = XLSX_INK_SOFT
+const MUTED       = XLSX_MUTED
 
 const MONEY_FMT = "#,##0.00"
 const PCT_FMT   = '0.0"%"'
 
-const thinBorder = { style: "thin" as const, color: { rgb: BORDER_CLR } }
-const cellBorder = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }
+const cellBorder = xlsxCellBorder
 
 // ── Reusable styles ──────────────────────────────────────────────────────────
 
@@ -53,15 +51,15 @@ const subtitleStyle: StyledCell["s"] = {
 }
 
 const sectionStyle: StyledCell["s"] = {
-  font: { bold: true, color: { rgb: WHITE }, sz: 14 },
-  fill: { fgColor: { rgb: BRAND_DARK } },
+  font: { bold: true, color: { rgb: INK }, sz: 14 },
+  fill: { fgColor: { rgb: HEAD_FILL } },
   alignment: { horizontal: "left", vertical: "center" },
   border: cellBorder,
 }
 
 const tableHeaderStyle: StyledCell["s"] = {
-  font: { bold: true, color: { rgb: WHITE }, sz: 12 },
-  fill: { fgColor: { rgb: BRAND_DARK } },
+  font: { bold: true, color: { rgb: INK_SOFT }, sz: 11 },
+  fill: { fgColor: { rgb: HEAD_FILL } },
   alignment: { horizontal: "right", vertical: "center" },
   border: cellBorder,
 }
@@ -73,8 +71,8 @@ const tableHeaderLeftStyle: StyledCell["s"] = {
 
 function bodyStyle(stripe: boolean): StyledCell["s"] {
   return {
-    font: { sz: 12 },
-    fill: stripe ? { fgColor: { rgb: BRAND_LIGHT } } : undefined,
+    font: { sz: 12, color: { rgb: INK } },
+    fill: stripe ? { fgColor: { rgb: STRIPE } } : undefined,
     border: cellBorder,
     alignment: { vertical: "center" },
   }
@@ -104,9 +102,9 @@ function bodyCenterStyle(stripe: boolean): StyledCell["s"] {
 }
 
 const totalLabelStyle: StyledCell["s"] = {
-  font: { bold: true, sz: 12 },
-  fill: { fgColor: { rgb: GRAY_BG } },
-  border: { top: { style: "medium" as const, color: { rgb: BLACK } }, bottom: thinBorder, left: thinBorder, right: thinBorder },
+  font: { bold: true, sz: 12, color: { rgb: INK } },
+  fill: { fgColor: { rgb: STRIPE } },
+  border: xlsxTotalBorder,
   alignment: { vertical: "center" },
 }
 
@@ -123,15 +121,14 @@ const totalPctStyle: StyledCell["s"] = {
 }
 
 const kpiLabelStyle: StyledCell["s"] = {
-  font: { bold: true, sz: 12 },
-  fill: { fgColor: { rgb: GRAY_BG } },
+  font: { bold: true, sz: 12, color: { rgb: INK } },
+  fill: { fgColor: { rgb: HEAD_FILL } },
   border: cellBorder,
   alignment: { horizontal: "left", vertical: "center" },
 }
 
 const kpiValueStyle: StyledCell["s"] = {
-  font: { bold: true, sz: 12, color: { rgb: BRAND_DARK } },
-  fill: { fgColor: { rgb: BRAND_LIGHT } },
+  font: { bold: true, sz: 12, color: { rgb: BRAND } },
   border: cellBorder,
   numFmt: MONEY_FMT,
   alignment: { horizontal: "right", vertical: "center" },

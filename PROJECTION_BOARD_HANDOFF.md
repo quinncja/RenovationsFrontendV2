@@ -60,7 +60,7 @@ Design language: dashboard's "refined simplicity / copper restraint" (copper ONL
 - Three grid zones (Project / Economics / Schedule) separated by **two vertical hairlines** (`.pj-zone-start` on Units and Jan cells), NOT background washes. Computed columns are plain secondary ink.
 - Totals row = the page's statement moment: warm parchment/ink gradient (same recipe as `.jc-command-bar`, `--pj-s1/s2` defined on `.pj-grid`), sticky bottom.
 - Thin light-gray scrollbars (`scrollbar-width: thin` + `scrollbar-color`); the grid's bottom 9px are painted with the totals gradient so the horizontal scrollbar sits visually inside the golden bar.
-- Active cell: soft translucent copper halo, 200ms ease in/out.
+- Active cell: ONE `ActiveCellEditor` per grid (`ActiveCellEditor.tsx`), mounted once inside `.pj-grid-scroll` and retargeted between cells with a transform glide (140ms); cells are memoized dumb anchors that call `useEditorHost().open()` on focus. No per-cell portal/AnimatePresence, no backdrop-filter, and NO Motion: Motion's `x`/`y`/`scale` are composed on the main thread each frame, so the chip animates with plain CSS transitions on `transform`/`opacity` (compositor thread; classes `pj-editor-shown` / `pj-editor-glide` / `pj-editor-instant`, `will-change: transform` on the one wrapper). `activeCell` lives in its own context (`useActiveCell`) so focus never re-renders the sheet.
 - Monthly Summary styled as a P&L: Units/Cumulative recede, Net bold between rules, sticky right Total column.
 - Header control bar `.pj-control-bar`: jc-surface container holding the year well + divider + History button.
 
@@ -77,11 +77,74 @@ Another: sticky `colSpan` header cells cover scrolled columns — the "Project" 
 - Visual verification: static harness at `frontend/.scratch/pj-harness.html` (gitignored) linked to `src/App.css`, screenshotted with playwright chromium + **webkit** (user runs Safari) via the npx cache at `~/.npm/_npx/705bc6b22212b352/node_modules`. Regenerate it after markup changes — its HTML is hand-mirrored from the components.
 - Local frontend cannot hit prod with dev-bypass (401s); real Firebase login required for live testing.
 
-## Remaining work
+## Live collaboration (added 2026-08-22)
+
+Google-Sheets-style presence over one WebSocket per client at `wss://api.rddashboard.com/projections/ws?token=<idToken>&year=<year>`:
+
+- **Backend** `@projections/services/projectionsRealtime.js` — `ws` hub (`noServer` + `server.on('upgrade')` in `index.js`; `initRealtime` exported from the module). Auth on upgrade mirrors `/users/sse`: query-param token → `verifyFirebaseToken` + `emailAllowed` + the executive-tier role set; Origin header checked against `corsOrigins` (CORS middleware never sees upgrades). **`ws` is a guarded require** — a Pi boot before `npm install` runs comes up with collab disabled and a loud log line, never a crash. Heartbeat pings every 30s (Cloudflare's 100s idle timeout) and reap dead sockets; per-connection cap of 25 msgs/sec.
+- **Protocol** — client sends `focus {rowId, field}` / `blur` / `preview {rowId, field, text}` (throttled 120ms, relayed only while the sender holds that cell). Server sends `welcome {connId, revision, peers}`, `presence {peers}`, `preview`, and `sheet {sheet}` — the full serialized sheet broadcast from the service's `commit()`, which all five mutation paths funnel through.
+- **Concurrency** — mutations are serialized per year via an in-process promise-chain lock in `projections.service.js` (closes the read-modify-write race on the revision check; valid because the deploy is one process). Frontend 409s are now soft: the failed batch goes back into pending (newer keystrokes win), the peer's sheet is adopted, and the flush retries; only 3 consecutive failures surface the conflict banner.
+- **Frontend** `useProjectionCollab.ts` — hook + `CollabContext` (null-safe: `EditableCell` works without a provider). Reconnect with capped exponential backoff (the 2-min deploy cycle drops sockets); a held cell is re-announced on reconnect; a `welcome` revision ahead of ours triggers `board.resync()` (silent refetch). Remote sheet frames adopt via `board.adoptRemoteSheet` — revision-guarded, pending edits replayed on top.
+- **UI** — peer cell: `.pj-cell-shell` wrapper, ring in the peer's `hashColor` (inline `--pj-peer`), name flag above the corner, live draft ghosted italic in place of the value (`.pj-remote-previewing`). Local focus + peer on the same cell = copper chip with the peer ring as outer halo. Header roster: initials chips deduped by uid (`PresenceRoster`). Copper stays the local user's color only. The Monthly Summary overhead pill is NOT wired for presence (bespoke input, low value).
+- **Dev bypass** skips the socket entirely (no token); the page just runs solo.
+- **Deploy note**: push backend first, then **`npm install` on the Pi once** (the git-pull cron does not install deps). Until then the server logs the disabled warning and everything else works.
+
+## Undo/redo (added 2026-08-22)
+
+Cmd+Z / Cmd+Shift+Z (Ctrl / Ctrl+Y on Windows) over the user's **own** cell edits, Google-Sheets style:
+
+- **Where** — history lives in `useProjectionBoard`: `applyEdit` records `{edit, before, label}` on an undo stack (cap 100, redo stack cleared on new edits); `undo()`/`redo()` replay the inverse through the same `pushEdit` optimistic pipeline. Because replays travel pending→flush→commit, they land in the audit log and **broadcast to collab peers via the WS hub automatically** — no extra realtime wiring. Peers' edits are never recorded locally, so you only undo your own changes.
+- **Row-gone guard** — a history entry whose row was deleted (by anyone) is skipped, popping until a valid entry is found. Structural ops (add/delete row, restore) are NOT undoable. Stacks clear on `load()` (year switch, conflict reload).
+- **Keyboard** — window listener in `ProjectionsPage`. A focused board cell (`.pj-cell-input`/`.pj-overhead-input`) is blurred first so a half-typed draft commits as its own step (Cmd+Z mid-edit = discard draft). Any OTHER input/textarea (e.g. drawer's version label) keeps native text undo — the handler bails.
+- **Toast** — `.pj-history-toast`: "Undid % Win for 4512 N Ashland", card-surface pill fixed bottom-center, fade-in only (no y-travel), 2.6s auto-dismiss, re-keyed per action. Labels built in `useProjectionBoard` (`FIELD_LABELS` + month/actual formatting + row address/name).
+
+## Row order + column sort (added 2026-08-24)
+
+Both tables (Unit Projection, Pipeline) can be rearranged by drag and sorted by column:
+
+- **Drag to rearrange** — `RowDrag.tsx`: `RowDragTable` (dnd-kit `DndContext` + vertical `SortableContext`, PointerSensor distance 5 + KeyboardSensor) wraps each `<table>`; every `<tr>` is a `SortableRow`; the handle is `RowGrip`, a left-edge grabber inside the sticky Address cell (`.pj-row-grip`, shown on row hover; every lead cell incl. the pinned strip's Address indents `1.75rem` for it). The order is **shared sheet state**, not a viewer preference: `board.reorderRows(section, order, movedRowId)` applies the new order locally at once, then `PUT /projections/rows/order {year, revision, section, order[], movedRowId}` rewrites `sortOrder` for that section (order must be an exact permutation; revision-checked; one audit entry `row:reorder` / `pipeline:reorder` with the moved row's label and old→new position; broadcast to collab peers via `commit()`). The history drawer renders it as "Moved <row>".
+- **Column sort** — `rowOrder.ts`: `useProjectionSort("grid" | "pipeline")` persisted per viewer in localStorage (`pj-sort:grid`, `pj-sort:pipeline`) with the Jobcost cycle: text columns asc → desc → clear, numeric desc → asc → clear (third click unsorts back to the sheet's drag order). Headers are the shared `SortTh` (`.pj-table th .co-th-btn` restyles it into the pj header voice; active = copper). Every column sorts, months and computed columns included (`orderRows` reads computed values via `computeRow`, ties fall back to `sortOrder`). (Changed 2026-08-24, superseding the old grip lock.) Rows drag under a sort too: `RowDragTable` registers the DISPLAYED order, so a drop persists exactly the arrangement on screen with the row where it landed as the new sheet `sortOrder`, and `reorderAndUnsort` (both tables) then calls `clearSort()` so the new order shows. `pj-row-grip-locked` now only applies to the draft row.
+- **Pinned header clone** — the compact strip's label row is a DOM clone with no React handlers, so clicks on it are delegated (`pinHeaderClick`) to the matching live header button, and `useOverlayScroll` takes a second `headerKey` (`${sortKey}|${sortDir}`) so the clone is rebuilt whenever the arrows change.
+- The new-row entrance moved from `motion.tr` to a CSS keyframe class (`.pj-row-new`) because dnd-kit owns the row's transform now.
+- **Backend deploy owed**: `reorderRows` service/controller/route are committed-to-working-tree only (see git status); push backend first, then the frontend branch, per repo policy.
+
+## Errors: top toast, never a reload (added 2026-08-24)
+
+- Save/load errors and the conflict notice render as `.pj-notice-toast` (fixed top-center pill, history-toast surface recipe), not an inline banner. The old `.pj-banner` CSS is gone.
+- A failed non-409 flush puts its batch **back into pending** (newer keystrokes win) and shows the toast with "N unsaved edits kept, not lost"; the finally-block auto-flush is suppressed after a failure so a down server isn't hammered. A failed structural op is remembered as a thunk in `retryRef`.
+- `board.retry()` flushes staged edits / re-runs the failed op; it only calls `load()` when there is no sheet at all (initial load failure). `board.reload` still exists for the conflict path, which intentionally adopts the server's version.
+
+
 
 1. **Verify seed in prod**: `GET /projections/sheet?year=2026` with a real admin token should return 43 rows (or check Pi logs for `Projection board: seeded 2026 sheet (43 rows)`).
 2. **Merge `projection-board` → main** to ship the page (backend already live).
-3. Real-login e2e in prod: edit cells, watch history/versions, restore, conflict path (two tabs), add/delete row.
+3. Real-login e2e in prod: edit cells, watch history/versions, restore, conflict path (two tabs), add/delete row, **drag-reorder (both tables, and with a peer watching), column sort persistence across reloads**.
 4. Mobile pass — the page has only a basic ≤768px fallback (stat strip 2-col, grid scrolls); no `useIsMobile` treatment yet.
-5. Future (user-stated intent): home-page widgets reading projection data — build as backend queries over `ProjectionSheet` + `projectionCalc` (that's why nothing derived is stored).
+5. ~~Future (user-stated intent): home-page widgets reading projection data — build as backend queries over `ProjectionSheet` + `projectionCalc` (that's why nothing derived is stored).~~ **DONE (Aug 23)**: `revenueProjection` query in the dashboard query map (executive-tier gated, Mongo-backed, read-only — no sheet auto-create) feeds a dashed blue "Projected" overlay on the Annual Revenue Trend (prior-year actual → full-year scheduled revenue) and Cumulative Revenue Growth (full-year projected cumulative) widgets. Backend on main; frontend rides this branch. Prod e2e owed with the rest.
 6. Housekeeping: `ProjectionEdit` has no TTL (grows forever — fine for now, revisit); snapshot list capped at 100 with no pruning.
+
+## Active-cell chip (Aug 24)
+- `EditorChip` (ProjectionGrid.tsx) is Motion-driven: `AnimatePresence` + `motion.span.pj-editor-surface` (opacity/scale) + `motion.input` (opacity only; text never moves). One `shown = flush && isPresent` boolean drives open, tuck (anchor crossing a sticky band), re-emerge, and exit. No CSS keyframes, no cloned "exiting" copy, no fallback timers, no `::before`.
+- `usePresence` makes the exiting input inert (readOnly, tabIndex -1, pointer-events none). Portal target persists past the session so the exit plays inside the scroller.
+- Tweens: in 160ms `[0.2,0,0,1]`, out 120ms `[0.4,0,1,1]`, no overshoot; `useReducedMotion` → duration 0.
+
+## Award: pipeline → Unit Projection (added 2026-08-24)
+
+A pipeline row becomes a real project two ways, both landing at the **bottom of the Unit Projection grid** with its months untouched (0 = fully unscheduled), highlighted with `pj-row-new`, scrolled into view, cursor in **January**:
+
+- **Gutter arrow** — `.pj-row-award` (`ArrowUpFromLine`, copper on hover) beside the trash in the Pipeline gutter (`.pj-pipeline .pj-gutter` is 4rem to fit both). Click plays a 220ms send-off (`pj-row-leaving`: lift + fade + copper wash) and then moves the row for real. Reduced motion skips the send-off.
+- **Drag up** — `RowDrag.tsx` now has ONE `DndContext` for the board (`ProjectionDnd`, mounted in `ProjectionsPage` around both tables, `onAward={board.awardRow}`). Each table is a `RowDragTable section="rows"|"pipeline"` (a `SortableContext` that registers its rowIds/onReorder/renderGhost with the provider). Pipeline rows travel as a portaled `DragOverlay` ghost (`.pj-award-ghost`: name / address / value + hint) while their slot stays as a faded placeholder (`pj-row-lifted`); grid rows still move in place (`pj-row-dragging`). The grid card is a `useDroppable` (`GRID_DROP_ID`, via `useAwardDropTarget`) and shows a dashed copper ring while a pipeline row is in hand (`pj-grid-award-target`), solid + glow when over it (`pj-grid-award-over`). Custom collision: a pipeline row hits the grid card by `pointerWithin` first, otherwise `closestCenter` restricted to its own section, so dragging near the pipeline's top never snaps to the grid's last row. Drop animation is suppressed on an award so the ghost doesn't glide back to a slot that no longer exists.
+
+Board hook: `moveRow(rowId, to, label)` applies the move locally (leave one list, append to the other with `sortOrder = max+1`, recompute summary) and sets `landed {rowId, seq}` (the grid's landing effect keys on `seq` so undo→redo lands again), then `POST /projections/rows/:rowId/move {year, revision, to}`. `awardRow(rowId)` = `moveRow(…, "rows", label)`; history entry `kind: "move"` — undo moves it back to the pipeline (`to: "pipeline"`, audit `row:return`; months are kept so a redo restores any schedule typed meanwhile), redo awards again. Toast: "Returned X to the pipeline" / "Awarded X again".
+
+Backend: `moveRow` in `projections.service.js` (sheet lock, revision check, idempotent if already in the target section, one audit entry `pipeline:award` / `row:return` with old/new = section names). The history drawer renders both, plus the previously-unlabelled `pipeline:add` / `pipeline:delete`.
+
+**Deploy state:** backend `moveRow` + route are written but NOT yet pushed to main (push = deploy). Deploy backend first; the frontend award falls back to the error toast (404) until it's live. Real-login e2e of both paths (click + drag, undo/redo, collab peer receiving the move) is owed — the drag path in particular was only typechecked/built, not driven in a browser.
+
+## Aug 24 · Excel export + day-grouped history
+
+- `exportProjection.ts`: ONE sheet in page order (Summary KPIs → Unit Projection → Pipeline → Monthly Summary) in the dashboard report dress (exportMonthlyBreakdownXlsx.ts structure: copper 20pt title, Fiscal Year / Exported lines, section bands, bordered zebra rows, gray totals) but in the board's muted palette (off-white bands, dark text, gold as accent text only; no solid copper fills). Board cell fills carry over. Values only, no formulas. Filenames `Projection_Board_<year>_<date>` / `..._<label>_<day>`.
+- Header **Export** button (current board, Sage actuals as the Actual block). Drawer **Versions** tab: per-version **Excel** button (GET `/projections/snapshots/:id`).
+- Drawer **Changes** tab: entries grouped by Chicago business day (Today / Yesterday / weekday date), time + one-line sentence per edit, author shown only when a day has more than one person. Fetches up to 500 entries.
+- Backend `getSnapshot` now returns `pipeline` + `actuals` (deployed to main Aug 24).
+- Aug 24: palette unified across ALL exports via `src/shared/utils/xlsxTheme.ts` (breakdown/overhead, job cost report, upcoming billings now share the muted dress).

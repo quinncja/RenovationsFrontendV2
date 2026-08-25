@@ -209,9 +209,9 @@ export type ChartConfig =
       dashedSeriesIds?: string[]
       /** Surface the dashed overlay's value at each slice as a tooltip footer
        *  row in the growth row's visual language. With `delta` set, slices
-       *  where the primary series also has a value read "vs Plan: +$X"
+       *  where the primary series also has a value read "vs Projected: +$X"
        *  (green ahead / red behind); slices where only the plan has a value —
-       *  and all slices without `delta` — read "Plan: $X" in neutral ink. */
+       *  and all slices without `delta` — read "Projected: $X" in neutral ink. */
       planTooltip?: { delta?: boolean }
       /** Reserve the 40px top band even with no in-plot legend or top marker
        *  label, so this plot's top edge aligns with sibling charts that have

@@ -17,7 +17,10 @@ export interface RevenueProjection {
   monthly: number[]
   /** Running sum of `monthly`. */
   cumulative: number[]
-  /** Full-year scheduled revenue — equals cumulative[11]. */
+  /** Full-year projected contract (win-adjusted units × price, all rows) —
+   *  the board's "Projected Contract" card. Not the schedule sum. */
   total: number
+  /** Revenue scheduled into months — equals cumulative[11]. */
+  scheduledTotal?: number
   updatedAt?: string
 }

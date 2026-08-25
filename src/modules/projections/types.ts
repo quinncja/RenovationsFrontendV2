@@ -1,3 +1,9 @@
+/** Decorative colors on one cell — palette tokens (see cellStyles.ts), never raw CSS. */
+export interface CellStyle {
+  fill?: string
+  ink?: string
+}
+
 export interface ProjectionRow {
   rowId: string
   address: string
@@ -11,6 +17,9 @@ export interface ProjectionRow {
   grossMargin: number
   /** Units scheduled Jan..Dec — always 12 entries. */
   months: number[]
+  /** Sparse per-cell colors, keyed the same way edits address cells
+   *  (`units`, `month:3`, …). Absent on unstyled rows. */
+  styles?: Record<string, CellStyle>
   sortOrder: number
 }
 
@@ -22,6 +31,34 @@ export interface RowComputed {
   grossProfit: number
   unitsScheduled: number
   unitsRemaining: number
+}
+
+/** Booked monthly actuals as stored — net is derived in the summary. */
+export interface SheetActuals {
+  revenue: number[]
+  cogs: number[]
+  overhead: number[]
+}
+
+export interface PipelineSummary {
+  count: number
+  units: number
+  value: number
+  grossProfit: number
+}
+
+export interface ActualsSummary {
+  revenue: number[]
+  cogs: number[]
+  overhead: number[]
+  net: number[]
+  cumulativeNet: number[]
+  /** false = month not entered yet (all three inputs are 0). */
+  hasMonth: boolean[]
+  totalRevenue: number
+  totalCogs: number
+  totalOverhead: number
+  totalNet: number
 }
 
 export interface ProjectionSummary {
@@ -39,6 +76,8 @@ export interface ProjectionSummary {
   scheduledUnits: number
   scheduledRevenue: number
   scheduledNet: number
+  pipeline: PipelineSummary
+  actuals: ActualsSummary
 }
 
 export interface UserStamp {
@@ -55,6 +94,9 @@ export interface ProjectionSheet {
   updatedAt: string
   updatedBy: UserStamp | null
   rows: ProjectionRow[]
+  /** Bidding-stage projects — excluded from the summary P&L. */
+  pipeline: ProjectionRow[]
+  actuals: SheetActuals
   summary: ProjectionSummary
 }
 
@@ -87,4 +129,14 @@ export interface ProjectionSnapshotMeta {
   takenBy: UserStamp | null
   at: string
   revision: number
+}
+
+/** A stored version in full (GET /projections/snapshots/:id). */
+export interface ProjectionSnapshot extends ProjectionSnapshotMeta {
+  year: number
+  overheadMonthly: number
+  rows: ProjectionRow[]
+  pipeline: ProjectionRow[]
+  actuals: SheetActuals
+  summary: ProjectionSummary
 }

@@ -102,9 +102,18 @@
   --caption2-weight-emphasized: var(--font-weight-semibold);
 }
 
+html {
+  /* The page never scrolls horizontally, so a sideways swipe that starts on
+     a non-scrolling element (grid frame, header, overlay thumbs) would chain
+     to the document and become Safari back/forward navigation. Cut that
+     chain at the root; horizontal scrolling stays inside its own scroller. */
+  overscroll-behavior-x: none;
+}
+
 body{
   height: 100vh;
   overflow: hidden;
+  overscroll-behavior-x: none;
   background-color: var(--background-color);
   /* Subtle ambient copper glow (same as the login page), behind all content */
   background-image: var(--app-bg-glow);
@@ -9959,7 +9968,7 @@ button.jc-kind-chip:hover {
 
 @keyframes nav-flyout-in {
   from { opacity: 0; translate: -6px 0; }
-  to   { opacity: 1; translate: 0 0; }
+  to   { opacity: 1; }
 }
 
 /* Quiet section eyebrow — context only, no decoration. */
@@ -18222,92 +18231,32 @@ button.co-hero-project:hover svg { color: inherit; }
   gap: 0.75rem;
 }
 
-/* One cohesive control bar (year + history) on the jobcost command-bar
-   surface recipe, instead of a stray select next to a stray pill. */
-.pj-control-bar {
-  --pj-cb-s1: light-dark(#fdfcfa, #2b241e);
-  --pj-cb-s2: light-dark(#f4f1ec, #1f1a15);
-  --pj-cb-line: light-dark(var(--border-color), rgba(240, 232, 222, 0.1));
-  --pj-cb-well: light-dark(rgb(from var(--primary-text) r g b / 0.06), rgba(240, 232, 222, 0.08));
-  --pj-cb-text: light-dark(var(--primary-text), rgba(240, 232, 222, 0.93));
-  --pj-cb-muted: light-dark(var(--secondary-text), rgba(240, 232, 222, 0.55));
-  --pj-cb-shadow-ink: light-dark(var(--primary-text), #000);
+/* History: the year-selector's quiet outline pill, so the pair reads exactly
+   like the header controls on every other page. */
+.pj-history-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.3125rem;
-  padding: 0.25rem;
-  border-radius: 12px;
-  border: 1px solid var(--pj-cb-line);
-  background: linear-gradient(180deg, var(--pj-cb-s1) 0%, var(--pj-cb-s2) 100%);
-  box-shadow:
-    inset 0 1px 0 light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.07)),
-    0 1px 2px rgb(from var(--pj-cb-shadow-ink) r g b / 0.06),
-    0 12px 24px -20px rgb(from var(--pj-cb-shadow-ink) r g b / 0.3);
-}
-.pj-select-wrap {
-  position: relative;
-  display: inline-flex;
-}
-.pj-year-select {
-  appearance: none;
-  -webkit-appearance: none;
-  height: 1.9375rem;
-  box-sizing: border-box;
-  padding: 0 1.6875rem 0 0.75rem;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  background: var(--pj-cb-well);
-  color: var(--pj-cb-text);
-  font-family: var(--font-family);
-  font-size: 0.8125rem;
-  font-weight: var(--font-weight-semibold);
-  font-variant-numeric: tabular-nums;
+  gap: 0.4rem;
+  background-color: transparent;
+  border: 1.5px solid var(--border-color);
+  border-radius: 999px;
+  color: var(--secondary-text);
   cursor: pointer;
-  transition: border-color 160ms ease;
-}
-.pj-year-select:hover {
-  border-color: var(--pj-cb-line);
-}
-.pj-year-select:focus {
-  outline: none;
-}
-.pj-year-select:focus-visible {
-  border-color: var(--pj-cb-line);
-}
-.pj-select-caret {
-  position: absolute;
-  right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none;
-  color: var(--pj-cb-muted);
-}
-.pj-control-divider {
-  width: 1px;
-  height: 1.125rem;
-  background: var(--pj-cb-line);
-  flex-shrink: 0;
-}
-.pj-control-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4375rem;
-  height: 1.9375rem;
-  padding: 0 0.8125rem;
-  border: none;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--pj-cb-muted);
-  font-family: var(--font-family);
-  font-size: 0.8125rem;
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: background-color 160ms ease, color 160ms ease;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 0.4rem 0.85rem;
   white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.pj-control-btn:hover {
-  background: var(--pj-cb-well);
-  color: var(--pj-cb-text);
+.pj-history-btn:hover {
+  background-color: var(--hover-bg);
+  color: var(--primary-text);
+}
+.pj-history-btn:focus-visible {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent);
 }
 
 .pj-save-indicator {
@@ -18321,37 +18270,6 @@ button.co-hero-project:hover svg { color: inherit; }
   color: #4d8f66;
 }
 
-.pj-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1.125rem;
-  border-radius: 12px;
-  margin-bottom: 1.25rem;
-  border: 1px solid var(--border-color);
-  background: var(--card-color);
-  box-shadow: var(--button-shadow);
-}
-.pj-banner-conflict {
-  border-color: rgb(from var(--primary-color) r g b / 0.45);
-}
-.pj-banner-error {
-  border-color: rgba(179, 87, 79, 0.5);
-}
-.pj-banner-dismiss {
-  margin-left: auto;
-  border: none;
-  background: transparent;
-  color: var(--secondary-text);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  padding: 0.25rem 0.625rem;
-  border-radius: 999px;
-}
-.pj-banner-dismiss:hover {
-  background: var(--hover-bg);
-  color: var(--primary-text);
-}
 
 .pj-stat-strip {
   display: grid;
@@ -18363,31 +18281,208 @@ button.co-hero-project:hover svg { color: inherit; }
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+/* Scorecard treatment (same recipe as the Estimation Performance cards): the
+   figure carries the card at large-title weight, the caption is a quiet
+   qualifying line beneath it — not loose body text. */
+.pj-stat-strip .stat-widget {
+  gap: 0.55rem;
+  padding: 1.125rem 1.25rem 1rem;
+}
+.pj-stat-strip .stat-widget-value,
+.pj-stat-strip .stat-widget-skeleton {
+  font-size: var(--large-title-size);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.pj-stat-strip .stat-widget-skeleton {
+  height: calc(var(--large-title-size) * 1.05);
+}
+.pj-stat-caption {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.72rem;
+  color: var(--secondary-text);
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── The grid card ── */
 
-.pj-grid {
+/* Surface + shadow tokens for every card that hosts an overlay-scroll table
+   (the grid and the monthly summary) — the pj-veil-* gradients resolve
+   against --pj-edge-shadow, so it must be in scope wherever they render. */
+.pj-grid,
+.pj-summary {
   --pj-s1: light-dark(#fdfcfa, #2b241e);
   --pj-s2: light-dark(#f4f1ec, #1f1a15);
-  padding: 0;
-  overflow: hidden;
+  --pj-edge-shadow: light-dark(rgba(31, 26, 21, 0.1), rgba(0, 0, 0, 0.3));
 }
 
-/* Slim, quiet scrollbars. The horizontal one lives at the container's bottom
-   edge, directly beneath the sticky Totals row — the golden strip painted on
-   the container's last 9px puts its (transparent-tracked) thumb visually
-   inside the Totals surface instead of on a stray white gutter. */
+.pj-grid {
+  padding: 0;
+  /* clip, not hidden: identical corner clipping without making the card a
+     scroll container (which would trap sticky descendants). */
+  overflow: clip;
+}
+
+/* Anchor for the edge veils and scrollbar thumbs. The grid measures its
+   sticky geometry into CSS vars here (see useOverlayScroll.tsx): --pj-lft
+   Address-column width, --pj-r1 group-row height, --pj-top/--pj-btm
+   thead/tfoot heights. The top border closes the table region off from the
+   card head above it. */
+.pj-grid-frame {
+  position: relative;
+  /* The visible top rule is .pj-pin-rule (sticky, so it pins under the card
+     head and the column labels dock beneath it); this transparent border
+     only holds its 1px of layout. */
+  border-top: 1px solid transparent;
+}
+/* No pin pane below the desktop breakpoint, so the frame draws its own rule. */
+@media (max-width: 768px) {
+  .pj-grid-frame {
+    border-top-color: var(--border-color);
+  }
+}
+
+/* The scroll surface. Native scrollbars are hidden — depending on system
+   settings they either overlay or carve opaque gutters into the card — and
+   replaced by the .pj-sb-* overlay thumbs, which always float over the grid.
+   No max-height: in normal view the table runs full height and vertical
+   scroll belongs to the page — only horizontal scroll is internal (the
+   header pins against the page via the scroll-driven animation below).
+   Full-screen mode reinstates internal vertical scroll via flex sizing.
+   overscroll-behavior keeps a horizontal fling from turning into browser
+   back/forward navigation. */
 .pj-grid-scroll {
   overflow: auto;
-  max-height: min(66vh, 46rem);
-  scrollbar-width: thin;
-  scrollbar-color: rgb(from var(--secondary-text) r g b / 0.28) transparent;
-  background: linear-gradient(0deg, var(--pj-s2) 0, var(--pj-s2) 9px, transparent 9px);
+  /* Offset parent for the active-cell chip (.pj-cell-editor), which is
+     portaled in here and positioned in content coordinates. */
+  position: relative;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  /* No rail beneath the totals bar: the horizontal thumb is a flat bar
+     riding the table's inner bottom edge (over the totals row's foot), so
+     the totals bar is the last thing in the card. --pj-rail is kept at 0 so
+     the veil/track geometry needs no special-casing. */
+  --pj-rail: 0px;
 }
-.pj-summary-scroll,
+/* Full screen scrolls internally: hold the sticky totals above the rail. */
+.pj-grid-expanded .pj-totals-row td {
+  bottom: var(--pj-rail, 0px);
+}
+.pj-grid-scroll::-webkit-scrollbar {
+  display: none;
+}
 .pj-drawer-body {
   scrollbar-width: thin;
   scrollbar-color: rgb(from var(--secondary-text) r g b / 0.28) transparent;
+}
+/* Same overlay-scroll treatment as the grid: native bars hidden, pj-sb-*
+   thumbs float over the table instead. */
+.pj-summary-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.pj-summary-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Scroll affordances ──
+   The frame carries pj-can-left/right/up/down (set from scroll position).
+   Each direction gets ONE overlay veil, positioned flush against the sticky
+   edge it belongs to via the measured vars — a single gradient per edge, so
+   there are no per-cell shadow seams and nothing to reconcile with the
+   scrollbars. Where two veils meet in a corner they simply overlap. */
+.pj-veil {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+  /* Above the sticky header cells (3) and totals cells (2) so the left/right
+     veils run the full height of the table, headers and totals bar
+     included; below the thumb tracks (5) and the pinned strip (6). */
+  z-index: 4;
+}
+.pj-veil-up {
+  top: calc(var(--pj-top, 0px) + var(--pj-tools, 0px));
+  left: 0;
+  right: 0;
+  height: 12px;
+  background: linear-gradient(to bottom, var(--pj-edge-shadow), transparent);
+}
+.pj-veil-down {
+  bottom: calc(var(--pj-btm, 0px) + var(--pj-rail, 0px) + var(--pj-add, 0px));
+  left: 0;
+  right: 0;
+  height: 12px;
+  background: linear-gradient(to top, var(--pj-edge-shadow), transparent);
+}
+.pj-veil-left {
+  left: var(--pj-lft, 0px);
+  top: var(--pj-tools, 0px);
+  bottom: 0;
+  width: 14px;
+  background: linear-gradient(to right, var(--pj-edge-shadow), transparent);
+}
+/* Sits just left of a sticky trailing column when one exists (--pj-rgt is 0
+   otherwise), mirroring how the left veil hugs the sticky lead column. */
+.pj-veil-right {
+  right: var(--pj-rgt, 0px);
+  top: var(--pj-tools, 0px);
+  bottom: 0;
+  width: 26px;
+  background: linear-gradient(to left, var(--pj-edge-shadow), transparent);
+}
+.pj-can-up .pj-veil-up,
+.pj-can-down .pj-veil-down,
+.pj-can-left .pj-veil-left,
+.pj-can-right .pj-veil-right {
+  opacity: 1;
+}
+
+/* ── Overlay scrollbar thumbs ──
+   Slim macOS-style bars that float over the grid (the horizontal one rides
+   the totals bar). Vertical track spans the body region between the sticky
+   header and Totals; horizontal starts past the sticky Address column. They
+   fade in on hover or while scrolling/dragging. */
+.pj-sb-track {
+  position: absolute;
+  z-index: 5;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  touch-action: none;
+}
+.pj-grid-frame:hover .pj-sb-track,
+.pj-scrolling .pj-sb-track,
+.pj-sb-dragging .pj-sb-track {
+  opacity: 1;
+}
+.pj-sb-v {
+  top: calc(var(--pj-top, 0px) + var(--pj-tools, 0px));
+  bottom: calc(var(--pj-btm, 0px) + var(--pj-rail, 0px) + var(--pj-add, 0px));
+  right: 0; /* attached to the table's inner right edge, like the h bar */
+  width: 3px;
+  opacity: 0.55;
+}
+.pj-sb-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 999px;
+  background: rgb(from var(--secondary-text) r g b / 0.3);
+  cursor: default;
+}
+.pj-sb-v .pj-sb-thumb {
+  width: 100%;
+  /* Rectangular bars, not pills: squared where they meet the table edge,
+     barely softened on the inner side so they read as part of the border. */
+  border-radius: 1px 0 0 1px;
+}
+.pj-sb-thumb:hover,
+.pj-sb-dragging .pj-sb-thumb {
+  background: rgb(from var(--secondary-text) r g b / 0.6);
 }
 
 /* Hairline quieter than the border token — the grid's rules should whisper. */
@@ -18431,9 +18526,531 @@ button.co-hero-project:hover svg { color: inherit; }
   color: rgb(from var(--secondary-text) r g b / 0.75);
   border-bottom: none;
 }
-/* Second header row sits below the group row when both are sticky. */
+/* Second header row sits below the group row when both are sticky; the offset
+   is the group row's measured height, so the rows can never drift apart. */
 .pj-table thead tr:nth-child(2) th {
-  top: 2.0625rem;
+  top: var(--pj-r1, 2.0625rem);
+}
+
+/* ── Page-scroll header pinning: the compact strip ──
+   In normal view the thead must pin against the PAGE, but position: sticky
+   can never do that from inside the horizontal scroller (it binds there and
+   never engages — the page owns vertical scroll), a JS scroll-follow
+   translate flickers in Safari, and scroll-driven animations aren't shipped
+   in Firefox. So the pinned header is a SEPARATE element that sticks
+   natively: a zero-height sticky strip at the frame's top (no layout space,
+   pins exactly when the frame's top passes the viewport top, and being
+   frame-contained it departs with the card automatically). Inside it,
+   useOverlayScroll mounts a width-synced clone of the column-label row,
+   shifted by translateX(-scrollLeft) from the scroller's scroll handler —
+   JS runs only during horizontal scrolling, never on the page's vertical
+   scroll. A static Address label overlays the clone's left edge (the real
+   column is sticky-left; the clone fakes it by covering), and the context
+   chip (mini title + format bar + expand) floats at the right. An
+   IntersectionObserver sentinel toggles .pj-pinned on the frame, and the
+   hook's pin morph FLIP-animates each piece of the strip from its card-head
+   counterpart (and the clone from the live label row), so the header is
+   seen condensing into the strip and expanding back out of it. Desktop normal view only — full-screen and mobile
+   scroll inside the card, where the real thead's own sticky rules pin. */
+/* The strip's sticky containing block: an absolute pane over the frame that
+   ENDS at the totals bar (--pj-btm = tfoot height, measured by
+   useOverlayScroll). CSS sticky can't leave its containing block, so the
+   browser slides the strip away with the last data row and brings it back
+   the same way. No scroll listeners involved. */
+.pj-grid {
+  --pj-head-tuck: 1px;
+}
+.pj-pin-bound {
+  position: absolute;
+  /* Starts on the frame's top rule (1px above its padding edge): the rule
+     inside pins first, and the strip's margin places it exactly over the
+     live label row, so its sticky engages the moment that row reaches the
+     pinned rule. */
+  top: -1px;
+  left: 0;
+  right: 0;
+  bottom: var(--pj-btm, 0px);
+  /* Above the sticky head (7): the docked rule and strip tuck over its
+     bottom padding. */
+  z-index: 8;
+  pointer-events: none;
+  display: none;
+}
+/* The frame's top rule, as a sticky 1px line: it scrolls with the table
+   until it meets the pinned card head, pins there while the zone eyebrows
+   scroll under, and the column labels dock beneath it. -2rem counteracts
+   .page's top padding (same correction as .page-header-sticky); the head's
+   lift and height come from useOverlayScroll's measurements. */
+.pj-pin-rule {
+  position: sticky;
+  /* Tucked --pj-head-tuck up under the pinned head (its bottom padding), and
+     layered above it: the docked rule and labels cover the head's lower
+     edge, where Safari leaves the backdrop blur ragged. */
+  top: calc(-2rem - var(--pj-head-lift, 0px) + var(--pj-head, 0px) - var(--pj-head-tuck));
+  height: 1px;
+  background: var(--border-color);
+  z-index: 6;
+}
+.pj-pin-strip {
+  position: sticky;
+  /* Directly beneath the pinned rule. */
+  top: calc(-2rem - var(--pj-head-lift, 0px) + var(--pj-head, 0px) - var(--pj-head-tuck) + 1px);
+  /* Normal position = the live label row's top: the pane starts 1px above
+     the frame's padding edge, the rule takes that 1px, and .pj-pin-space
+     fills the rest. A margin would do, except Safari offsets a sticky box
+     by its margin edge, which would hold the stuck strip that far below the
+     head. */
+  z-index: 6;
+}
+.pj-pin-space {
+  height: var(--pj-lbl, 0px);
+}
+/* In normal view the card head itself carries the tools; the strip's band
+   only serves full screen, where the head is hidden. */
+.pj-grid:not(.pj-grid-expanded) .pj-pin-tools {
+  display: none;
+}
+
+/* ── Pin scope: the sticky card head ──
+   Wraps the card head, subtitle and frame. The head is natively sticky here
+   and pins the instant the card's top scrolls away (no JS on the crossing
+   beyond a class toggle for the dress); the subtitle scrolls under it and
+   useOverlayScroll fades it in step with how much the head covers. The
+   scope ENDS at the totals bar (the frame's negative bottom margin shrinks
+   the scope by the tfoot's height; the scope's own margin gives it back to
+   the card), so the head slides away with the last data row exactly as the
+   clone strip does. Desktop normal view only. */
+.pj-pin-scope {
+  position: relative;
+  /* flow-root: contains the frame's negative bottom margin so it actually
+     shrinks the scope. As a plain block, that margin collapsed through the
+     scope's own bottom margin and the scope still ended at the table's
+     bottom, so the head was never pushed and the strip rode over it. */
+  display: flow-root;
+  /* Ends one strip height above the totals bar (--pj-strip, measured):
+     the strip's bound ends AT the bar, so with the head's scope ending a
+     strip higher, both are pushed up at the same moment and leave as one
+     stacked unit. Ending on the same line pushed the (taller) head first,
+     sliding it under the strip. */
+  margin-bottom: calc(var(--pj-btm, 0px) + var(--pj-strip, 0px));
+}
+/* flow-root: the card is padding-less and overflow: clip is not a formatting
+   context, so without it the scope's bottom margin would collapse through
+   the card and the frame's overflowing totals bar would be clipped. */
+.pj-grid:not(.pj-grid-expanded) {
+  display: flow-root;
+}
+.pj-pin-scope > .pj-grid-frame {
+  margin-bottom: calc(-1 * (var(--pj-btm, 0px) + var(--pj-strip, 0px)));
+}
+@media (min-width: 769px) {
+  .pj-grid:not(.pj-grid-expanded) .pj-summary-head {
+    position: sticky;
+    /* Pins HEAD_LIFT (useOverlayScroll) above the viewport edge so the airy
+       top padding tucks away and the band reads compact. */
+    top: calc(-2rem - var(--pj-head-lift, 0px));
+    z-index: 7;
+  }
+}
+/* The glass pane under the pinned head: a full-bleed layer that fades in as
+   the head pins (the same recipe as the strip), so the background reads as
+   dissolving into blur rather than switching. */
+.pj-summary-head::before {
+  content: "";
+  position: absolute;
+  /* Starts at the lift line, not the head's top: the head pins with its
+     top --pj-head-lift above the scrollport, and Safari samples a backdrop
+     only for the part of a backdrop-filtered box inside the scrollport but
+     paints the result from the box's own top edge, leaving the bottom
+     --pj-head-lift of the head unblurred (rows showing sharp through the
+     glass). Kept fully inside the scrollport, the pane blurs edge to edge;
+     the uncovered strip above it is only ever off-screen. */
+  inset: var(--pj-head-lift, 0px) 0 0 0;
+  z-index: -1;
+  background: light-dark(rgba(255, 255, 255, 0.5), rgba(38, 34, 32, 0.5));
+  -webkit-backdrop-filter: blur(3px) saturate(1.15);
+  backdrop-filter: blur(3px) saturate(1.15);
+  /* No rule or shadow beneath: the blur alone separates the head from what
+     scrolls under it (and from the pinned column labels). */
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+.pj-head-pinned .pj-summary-head::before {
+  opacity: 1;
+}
+/* Pinned dress: the title condenses into a glass pill and the format bar
+   and expand button drop their chip borders for glass pills of their own.
+   Geometry is preserved (the row height is set by the 1.875rem buttons
+   either way), so nothing beneath shifts when the dress changes. Only
+   compositor properties move: the text scales via transform (no font-size
+   reflow), the pill is a ::before that fades in, and the title translates
+   right by the pill's inset so the pill's left edge lands on the card
+   padding. */
+.pj-summary-head .widget-title {
+  display: inline-flex;
+  align-items: center;
+  height: 1.875rem;
+  transition: transform 220ms ease;
+  will-change: transform;
+}
+/* The text box is sized at 1 / 0.846 so that, scaled, it and the pill it
+   carries land at the strip's exact geometry (1.875rem tall, 0.875rem side
+   padding) with no reflow and no leftover space inside the pill. */
+.pj-summary-head .pj-title-text {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 2.2163rem;
+  transform-origin: left center;
+  transition: transform 220ms ease;
+  will-change: transform;
+}
+.pj-summary-head .pj-title-text::before {
+  content: "";
+  position: absolute;
+  inset: 0 -1.0343rem;
+  z-index: -1;
+  border-radius: 999px;
+  background: var(--pj-glass-bg);
+  -webkit-backdrop-filter: var(--pj-glass-filter);
+  backdrop-filter: var(--pj-glass-filter);
+  border: 1px solid var(--pj-glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--pj-glass-rim),
+    0 4px 14px -4px var(--pj-edge-shadow);
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+.pj-head-pinned .pj-summary-head .widget-title {
+  transform: translateX(0.875rem);
+}
+.pj-head-pinned .pj-summary-head .pj-title-text::before {
+  opacity: 1;
+}
+.pj-head-pinned .pj-summary-head .pj-title-text {
+  /* 0.6875rem / 0.8125rem: the strip's label size, without reflow. */
+  transform: scale(0.846);
+}
+.pj-summary-head .pj-format-bar,
+.pj-summary-head .pj-expand-btn {
+  transition:
+    background-color 200ms ease,
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+.pj-head-pinned .pj-summary-head .pj-format-bar,
+.pj-head-pinned .pj-summary-head .pj-expand-btn {
+  background: var(--pj-glass-bg);
+  -webkit-backdrop-filter: var(--pj-glass-filter);
+  backdrop-filter: var(--pj-glass-filter);
+  border-color: var(--pj-glass-edge);
+  box-shadow:
+    inset 0 1px 0 var(--pj-glass-rim),
+    0 4px 14px -4px var(--pj-edge-shadow);
+}
+.pj-head-pinned .pj-summary-head .pj-expand-btn:hover {
+  background: var(--hover-bg);
+}
+/* Armed while pinned: the glass rule above outranks the bar's own painting
+   wash (.pj-format-bar.pj-format-bar-painting, two classes), which left the
+   pinned bar plain white in paint mode. Restate the wash at this strength;
+   the blur and glass edge stay. */
+.pj-head-pinned .pj-summary-head .pj-format-bar.pj-format-bar-painting {
+  background: linear-gradient(
+    180deg,
+    light-dark(#fbf9f6, rgba(240, 232, 222, 0.1)) 0%,
+    light-dark(#f4f0e9, rgba(240, 232, 222, 0.05)) 100%
+  );
+}
+/* The subtitle lives outside the sticky head so it can scroll beneath it;
+   useOverlayScroll writes its opacity while the head is pinned. */
+.pj-summary-sub {
+  padding: 0 1.25rem 0.875rem;
+  min-width: 0;
+}
+.pj-summary-sub .widget-description {
+  display: block;
+  margin-top: -10px;
+}
+.pj-grid-expanded .pj-summary-sub {
+  display: none;
+}
+@media (min-width: 769px) {
+  .pj-grid:not(.pj-grid-expanded) .pj-pin-bound {
+    display: block;
+  }
+}
+.pj-grid {
+  /* Liquid-glass recipe shared by the pinned strip and its pills: a
+     translucent, saturated blur of whatever scrolls beneath, a bright inner
+     rim along the top edge (the "lens" highlight), and a soft drop. */
+  --pj-glass-bg: light-dark(rgba(255, 255, 255, 0.62), rgba(38, 34, 32, 0.6));
+  --pj-glass-rim: light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.12));
+  --pj-glass-edge: light-dark(rgba(25, 55, 90, 0.12), rgba(255, 255, 255, 0.1));
+  --pj-glass-filter: blur(4px) saturate(1.2);
+}
+.pj-pin-inner {
+  position: relative;
+  overflow: clip;
+  background: var(--pj-glass-bg);
+  border-bottom: 1px solid var(--pj-glass-edge);
+  /* No top rule of its own: .pj-pin-rule, the frame's real top border,
+     pins just above it. */
+  /* Rests exactly over the live label row (see .pj-pin-bound) and IS the
+     visible label row in normal view, at rest and stuck alike: the live
+     row's contents are hidden beneath it (below), so there is no handoff
+     to time — the strip is simply natively sticky, and .pj-pinned only
+     eases the glass tint in. Any swap at the crossing (IntersectionObserver
+     + a render) lands a frame late, by which point the live row has already
+     scrolled a few pixels under the head: a visible jump. */
+  background: transparent;
+  transition: background-color 160ms ease;
+  /* The pane above is pointer-inert; the strip takes clicks (sorting). */
+  pointer-events: auto;
+}
+/* Glass and drop only while standing over scrolled content: at rest the
+   strip is a transparent box over the live label row, where a blur would
+   re-sample the frame's veils (washing them out within the row) and a
+   shadow would paint beneath nothing. */
+.pj-pinned .pj-pin-inner,
+.pj-grid-expanded .pj-pin-inner {
+  -webkit-backdrop-filter: var(--pj-glass-filter);
+  backdrop-filter: var(--pj-glass-filter);
+  box-shadow: 0 6px 12px -6px var(--pj-edge-shadow);
+}
+.pj-pinned .pj-pin-inner {
+  background: light-dark(rgba(255, 255, 255, 0.72), rgba(38, 34, 32, 0.72));
+}
+/* The live row's contents stay invisible under the strip in normal desktop
+   view (the strip's click handler forwards sorts to the live buttons). The
+   cells keep their size (visibility, not display), so the geometry the clone
+   is measured from never changes. */
+@media (min-width: 769px) {
+  /* Only while PINNED. At rest the live row is the visible one: it scrolls
+     natively with the eyebrow row (rubber-band included), which the
+     strip's scroll-driven clone can only approximate — in Safari the clone
+     ran a frame off the native scroll and stayed put during overscroll,
+     separating from the row above. The strip takes over at the crossing. */
+  .pj-grid:not(.pj-grid-expanded) .pj-pinned .pj-grid-scroll thead tr:last-child th > * {
+    visibility: hidden;
+  }
+  /* Its vertical rules too: the strip's clone draws the zone rules and the
+     Address rule on top of this row, and two coincident hairlines read as
+     one darker line than the eyebrow row's. */
+  .pj-grid:not(.pj-grid-expanded) .pj-pinned .pj-grid-scroll thead tr:last-child th {
+    border-left-color: transparent;
+    border-right-color: transparent;
+  }
+  .pj-grid:not(.pj-grid-expanded) .pj-grid-frame:not(.pj-pinned) .pj-pin-strip {
+    visibility: hidden;
+  }
+}
+/* The strip's own left/right veils: it sits above the frame's veils, so it
+   carries its own pair, positioned off the same measured vars and toggled by
+   the same pj-can-* frame classes, so the pinned header shows the same
+   scroll-ahead shadow as the header it replaces. Above .pj-pin-addr (4). */
+.pj-pin-inner::before,
+.pj-pin-inner::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.pj-pin-inner::before {
+  left: var(--pj-lft, 0px);
+  width: 14px;
+  background: linear-gradient(to right, var(--pj-edge-shadow), transparent);
+}
+.pj-pin-inner::after {
+  right: var(--pj-rgt, 0px);
+  width: 26px;
+  background: linear-gradient(to left, var(--pj-edge-shadow), transparent);
+}
+/* Only while the strip is standing over scrolled content (pinned, or full
+   screen): at rest it sits over the live label row, where the frame's own
+   full-height veils already run, and the two would stack into a doubled
+   shadow on the header band. */
+.pj-pinned.pj-can-left .pj-pin-inner::before,
+.pj-pinned.pj-can-right .pj-pin-inner::after,
+.pj-grid-expanded .pj-can-left .pj-pin-inner::before,
+.pj-grid-expanded .pj-can-right .pj-pin-inner::after {
+  opacity: 1;
+}
+/* The clone row rides here; the table dress (.pj-table th) styles it. */
+.pj-pin-track {
+  width: max-content;
+}
+/* Scroll-driven slide: the clone follows the sheet's horizontal scroll on
+   the compositor. The scroll-event follower in useOverlayScroll trails the
+   table in Safari during momentum scrolling; it remains as the fallback
+   where scroll timelines are unsupported (an animation overrides the inline
+   transform it sets). --pj-xmax is the sheet's horizontal travel. */
+@supports (animation-timeline: scroll()) {
+  .pj-grid-frame {
+    timeline-scope: --pj-x;
+  }
+  .pj-grid-scroll {
+    scroll-timeline: --pj-x x;
+  }
+  .pj-pin-track {
+    animation: pj-track-slide linear both;
+    animation-timeline: --pj-x;
+  }
+}
+@keyframes pj-track-slide {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-1 * var(--pj-xmax, 0px)));
+  }
+}
+.pj-pin-track .pj-table th {
+  border-bottom: none;
+  /* The glass strip supplies the surface; opaque cells would kill the blur. */
+  background: transparent;
+  /* Never sticky: the clone rides the track's translate, and .pj-pin-addr
+     plays the sticky Address role. A sticky clone cell would pin against
+     the page (or, full screen, its padded edge) and drift mid-row. */
+  position: static;
+}
+/* The cloned gutter must not carry the live gutter's sticky-right fade:
+   inside the strip it would pin mid-row and wash the first month label. */
+.pj-pin-track .pj-table th.pj-gutter,
+.pj-can-right .pj-pin-track .pj-table th.pj-gutter {
+  position: static;
+  background: transparent;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+/* The clone's labels never pass under the Address slot: the track is
+   clipped to start at the column's edge (the slot stays glass, so the
+   address cells scrolling beneath it show through like every other
+   column's do under the strip). The negative margin keeps the clone's
+   columns aligned with the live row. */
+.pj-pin-clip {
+  /* clip-path, not overflow: clip — WebKit composites an overflow-clipping
+     box whose child is scroll-animated as an opaque layer, which hid the
+     frame's left veil across the label row. */
+  clip-path: inset(0);
+  margin-left: var(--pj-lft, 0px);
+}
+.pj-pin-clip .pj-pin-track {
+  margin-left: calc(-1 * var(--pj-lft, 0px));
+}
+.pj-pin-addr {
+  position: absolute;
+  inset: 0 auto 0 0;
+  /* Above the clone cells' z-index 3 (.pj-table th) so scrolled labels pass
+     underneath, mirroring the real table's sticky Address column. */
+  z-index: 4;
+  width: var(--pj-lft, 0px);
+  /* --pj-lft is the real column's offsetWidth (padding + border included);
+     no global border-box reset in this app, so opt in here or the padding
+     widens the overlay past the real column's edge. */
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 0 0.875rem;
+  /* Covers the clone's scrolled labels; at rest it is the card surface (as
+     the live Address cell beneath it), pinned it is its own pane of glass. */
+  /* No surface and no blur of its own: the clone track is clipped at this
+     slot's edge (.pj-pin-clip), so nothing needs covering, and the strip
+     (.pj-pin-inner) already supplies the glass. A nested backdrop-filter
+     would sample the strip's tint instead of the rows beneath, rendering
+     the slot opaque. */
+  background: transparent;
+  /* The live Address column runs edge-free, so the slot does too. */
+  border-right: none;
+  transition: background-color 160ms ease;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
+  color: var(--secondary-text);
+}
+/* The pinned tool band: a light-to-medium blur pane ABOVE the column-label
+   stripe, carrying three equal-height glass pills — table identity at the
+   left; paint palette and full screen as two separate pills at the right —
+   so the tools the full card head provides stay reachable while the head
+   itself is scrolled away. A sibling of .pj-pin-inner (not inside it — the
+   inner clips for the scrolling clone). Carries its own copy of the strip's
+   transition for the same entrance. */
+.pj-pin-tools {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: light-dark(rgba(255, 255, 255, 0.55), rgba(38, 34, 32, 0.55));
+  -webkit-backdrop-filter: blur(8px) saturate(1.2);
+  backdrop-filter: blur(8px) saturate(1.2);
+  /* Above .pj-pin-inner so the label stripe emerges from beneath the band
+     during the pin morph (it travels down from the scrolled-off row). */
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
+}
+.pj-pinned .pj-pin-tools {
+  opacity: 1;
+  pointer-events: auto;
+}
+.pj-pin-pill-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.pj-pin-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.5625rem;
+  padding: 0 0.375rem;
+  height: 2rem;
+  box-sizing: border-box;
+  background: var(--pj-glass-bg);
+  -webkit-backdrop-filter: var(--pj-glass-filter);
+  backdrop-filter: var(--pj-glass-filter);
+  border: 1px solid var(--pj-glass-edge);
+  border-radius: 999px;
+  box-shadow:
+    inset 0 1px 0 var(--pj-glass-rim),
+    0 4px 14px -4px var(--pj-edge-shadow);
+}
+.pj-pin-pill-name {
+  padding: 0 0.875rem;
+}
+.pj-pin-pill-paint {
+  padding: 0 0.5rem;
+}
+/* A single icon: the pill collapses to a circle matching the standalone
+   expand button in the card head. */
+.pj-pin-pill-expand {
+  padding: 0;
+  width: 2rem;
+  justify-content: center;
+  border-radius: 999px;
+}
+/* Inside a pill the format bar and expand button are content, not chips of
+   their own: the pill supplies the border and surface. */
+.pj-pin-pill .pj-format-bar,
+.pj-pin-pill .pj-expand-btn {
+  border-color: transparent;
+  background: transparent;
+}
+.pj-pin-pill .pj-expand-btn:hover {
+  background: var(--hover-bg);
+}
+.pj-pin-title {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.03em;
+  color: var(--secondary-text);
+  white-space: nowrap;
 }
 
 .pj-table td {
@@ -18455,6 +19072,11 @@ button.co-hero-project:hover svg { color: inherit; }
   left: 0;
   background: var(--card-color);
   z-index: 2;
+}
+/* The summary keeps a rule on its lead column; the grid's pinned Address
+   column runs edge-free, separated from the scrolling columns only by the
+   scroll-edge veil once content passes beneath it. */
+.pj-summary-table .pj-sticky {
   border-right: 1px solid var(--border-color);
 }
 .pj-table thead .pj-sticky {
@@ -18480,7 +19102,8 @@ button.co-hero-project:hover svg { color: inherit; }
 .pj-cell-input {
   border: none;
   outline: none;
-  background: transparent;
+  /* --pj-cell-fill comes from the pj-fill-* palette classes below. */
+  background: var(--pj-cell-fill, transparent);
   font: inherit;
   color: inherit;
   width: 9.5rem;
@@ -18499,17 +19122,209 @@ button.co-hero-project:hover svg { color: inherit; }
 .pj-num .pj-cell-input {
   text-align: right;
 }
-/* THE copper moment on this page: the active cell. A soft halo that breathes
-   in and out rather than a hard ring. */
+/* Active cell: the editor is its OWN component on its own layer — portaled
+   into the scroll container and absolutely positioned over the anchor cell
+   in content coordinates, sized to its content. The table beneath is never
+   touched, so layout shift is structurally impossible; and because the chip
+   is part of the scrolled content, scrolling moves it on the compositor
+   with no script involved. It reads as a rounded glassy chip with a quiet
+   gray hairline and a soft drop — the shadow does the popping. */
 .pj-cell-input {
-  transition: box-shadow 200ms ease, background-color 200ms ease;
+  transition: box-shadow 200ms ease, background-color 200ms ease, border-radius 200ms ease;
 }
-.pj-cell-input:focus {
-  box-shadow: inset 0 0 0 1.5px rgb(from var(--primary-color) r g b / 0.5);
-  background: rgb(from var(--primary-color) r g b / 0.05);
+.pj-cell-editor {
+  /* Portaled outside the table, so mirror .pj-table's type exactly — the
+     editor text must match the grid, not the page default. */
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+}
+/* The active-cell chip (ActiveCellEditor.tsx): ONE per grid, always mounted
+   as an absolute child of .pj-grid-scroll (position: relative) in the
+   scroller's content space, so scrolling moves it on the compositor. The
+   wrapper is a zero-width point on the anchor's leading corner (inline
+   height only); Motion glides it between cells with a transform. The body
+   hangs off that point (leftward for numeric cells via right: 0, rightward
+   for text via left: 0) and takes its width from the draft, so typing never
+   moves the anchored edge. Inside the body: the SURFACE (solid, ring,
+   shadow, fill tint) is the only thing that scales/fades, and the input
+   carries the text and never moves, so glyphs stay pixel-fixed over the
+   anchor. No backdrop-filter: the surface is 96% opaque so the blur was
+   invisible, and re-sampling a blurred backdrop under a scale tween over a
+   large table is what made the open/close animation drop frames.
+   z 1: above ordinary cells, BELOW every sticky band (project column /
+   trailing column / totals at z 2, thead at 3), so the chip passes under
+   them like any cell. .pj-editor-lifted (anchor clear of every boundary)
+   raises it above every band (z 5 > the totals lead cell's 4) so its bleed
+   and shadow lift over the column's edge and the totals bar's top edge. */
+.pj-editor-chip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  z-index: 1;
+  pointer-events: none;
+  isolation: isolate;
+  /* Always mounted, so promoting it is a constant one-layer cost; transform
+     and opacity then animate entirely on the compositor thread. */
+  will-change: transform;
+  /* Jump between cells by default (first open, remeasure); the glide class
+     turns the transform into a compositor-driven transition. */
+  transition: none;
+}
+.pj-editor-chip.pj-editor-glide {
+  transition: transform 140ms cubic-bezier(0.2, 0, 0, 1);
+}
+.pj-editor-chip.pj-editor-lifted {
+  z-index: 5;
+}
+/* Pinned-column chip: the sticky Address cell's editor is portaled INTO
+   that cell (a sticky cell is the containing block for absolute children)
+   and positioned in the cell's own coordinates, so it rides the cell on
+   the compositor under horizontal scroll, frame-exact. Its z-index only
+   ranks it inside the cell, so the lift over the header / totals bands is
+   applied to the CELL (.pj-sticky-lifted, z 5 > thead's 4) while the anchor
+   is clear of them; otherwise the cell keeps its z 2 and the chip tucks
+   under the bands like the cell's own text. The input carries the lead
+   column's grip indent so its text sits exactly over the cell's. */
+.pj-editor-chip.pj-editor-pinned {
+  z-index: 3;
+  /* No transition override: a pinned → pinned move glides like the grid
+     (.pj-editor-glide, via a FLIP start offset in ActiveCellEditor); any
+     other pinned landing keeps the chip's default jump. */
+}
+.pj-table td.pj-sticky.pj-sticky-lifted {
+  z-index: 5;
+}
+.pj-editor-pinned .pj-cell-input.pj-cell-editor,
+/* The pinned chip is portaled INTO td.pj-sticky, so the lead column's own
+   grip-indent rule (.pj-table td.pj-sticky .pj-cell-input) outranks the
+   line above and shaved the bleed off the inset, landing the editor text
+   4px left of the column. Restated at higher specificity. */
+.pj-table td.pj-sticky .pj-editor-pinned .pj-cell-input.pj-cell-editor {
+  /* Same inset both sides: the left matches the lead column's grip indent
+     PLUS the chip's bleed (so the text sits exactly over the cell's), and
+     the right mirrors it so the chip reads balanced when it grows past the
+     cell for a long address. */
+  padding-inline: calc(1.75rem + 4px);
+}
+/* Anchor flush with the scroller's left edge (the sticky lead column): the
+   surface can't bleed past it without being clipped by overflow, so it
+   starts at the anchor's edge instead. The input keeps its padding, so the
+   text stays pixel-aligned over the anchor. */
+.pj-editor-edge-left .pj-editor-surface {
+  left: 4px;
+}
+/* Open/tuck/exit: the surface scales + fades, the text only fades. Exit is
+   a touch quicker so the chip is gone before a sticky band covers it. */
+.pj-editor-surface,
+.pj-cell-input.pj-cell-editor {
+  opacity: 0;
+  transition: opacity 120ms cubic-bezier(0.4, 0, 1, 1), transform 120ms cubic-bezier(0.4, 0, 1, 1);
+}
+.pj-editor-surface {
+  transform: scale(0.9);
+  /* NO will-change here: a permanently composited surface under a
+     non-composited input paints ABOVE the input in Safari once the grid
+     sits inside a nested scroller (.page is overflow:auto), so the text
+     vanished after the open tween. Left un-promoted, the surface and input
+     share the chip's layer in DOM order; WebKit promotes the surface only
+     for the 160ms scale/opacity tween and demotes it after. */
+}
+.pj-editor-shown .pj-editor-surface,
+.pj-editor-shown .pj-cell-input.pj-cell-editor {
+  opacity: 1;
+  transition-duration: 160ms;
+  transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+.pj-editor-shown .pj-editor-surface {
+  transform: scale(1);
+}
+.pj-editor-instant,
+.pj-editor-instant .pj-editor-surface,
+.pj-editor-instant .pj-cell-input.pj-cell-editor {
+  transition: none;
+}
+.pj-editor-body {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+.pj-editor-body-num {
+  left: auto;
+  right: 0;
+}
+/* Width probe for the draft: inherits the input's exact font by living
+   beside it, so the measurement is engine-exact and scoped to this subtree. */
+.pj-editor-mirror {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
+  font-size: var(--body-size);
+  line-height: var(--body-line-height);
+  font-variant-numeric: tabular-nums;
+}
+.pj-editor-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 9px;
+  background: light-dark(rgba(255, 255, 255, 0.96), rgba(58, 49, 41, 0.96));
+  /* Fill tint as an image layer over the base (see the palette block
+     further down for --pj-cell-fill). */
+  background-image: linear-gradient(var(--pj-cell-fill, transparent), var(--pj-cell-fill, transparent));
+  box-shadow:
+    inset 0 1px 0 light-dark(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.08)),
+    0 0 0 1px light-dark(rgba(31, 26, 21, 0.18), rgba(255, 255, 255, 0.16)),
+    0 2px 5px light-dark(rgba(31, 26, 21, 0.07), rgba(0, 0, 0, 0.3)),
+    0 10px 22px -10px light-dark(rgba(31, 26, 21, 0.28), rgba(0, 0, 0, 0.55));
+  pointer-events: none;
+}
+.pj-cell-input.pj-cell-editor {
+  /* Fills the wrapper. Padding is the cell's own plus the 4px bleed on each
+     side, so the text lands exactly over the anchor's. Never transforms,
+     never scales — Motion only fades it for the tuck/exit. Width is
+     not transitioned either: animating it makes the input auto-scroll its
+     text toward the caret (reads as text sliding in). */
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  /* No transform / will-change on the input either: see .pj-editor-surface.
+     Forcing this onto its own layer (translateZ(0)) fixed the document-
+     scrolled harness but still lost to the composited surface inside the
+     page's nested scroller in Safari. */
+  width: 100%;
+  height: 100%;
+  background: none;
+  box-shadow: none;
+  border-radius: 9px;
+  pointer-events: auto;
+  box-sizing: border-box;
+  padding: calc(0.5625rem + 4px) calc(0.875rem + 4px);
+  /* Opacity transition comes from the .pj-editor-* block above. */
+}
+/* The in-table hover wash must never land on the chip's input (an exiting
+   chip under the pointer is unfocused). */
+.pj-cell-input.pj-cell-editor:hover {
+  background-image: none;
+}
+.pj-editor-num {
+  text-align: right;
+}
+/* Month cells use tighter padding; mirror it (plus the bleed) on their
+   editor so the text lands exactly over the anchor. */
+.pj-cell-input.pj-cell-editor.pj-kind-unit {
+  padding-inline: calc(0.5625rem + 4px);
 }
 .pj-cell-input:hover:not(:focus) {
-  background: var(--hover-bg);
+  /* An image layer, so the hover wash sits ON TOP of a painted cell's fill
+     instead of replacing it. */
+  background-image: linear-gradient(var(--hover-bg), var(--hover-bg));
 }
 
 /* Computed columns: output, not input — secondary ink, no wash, no border.
@@ -18552,7 +19367,36 @@ button.co-hero-project:hover svg { color: inherit; }
 }
 .pj-gutter {
   width: 2.25rem;
-  text-align: center;
+  text-align: right;
+  /* Not a column: pinned to the card's right edge, with a small soft fade
+     from the card color so the trash floats over the scrolling cells
+     instead of hiding at the far end of a thirty-column scroll. */
+  position: sticky;
+  right: 0;
+  z-index: 2;
+}
+.pj-table thead .pj-gutter {
+  z-index: 4;
+}
+/* td-qualified to outrank `.pj-table td`'s padding reset. */
+.pj-table td.pj-gutter {
+  padding-left: 0;
+  padding-right: 0.5rem;
+}
+/* The fade exists only while columns are actually sliding beneath the
+   strip (frame carries pj-can-right); at the scroll end it is a plain
+   transparent cell so no wash sits against the card edge. It is a mask,
+   not a painted gradient, so each band keeps its own surface (card, hover
+   tint, the totals bar's ink gradient) and fades the same way. */
+.pj-can-right .pj-table .pj-gutter,
+.pj-can-right .pj-table tbody tr:hover td.pj-gutter {
+  background: var(--card-color);
+  -webkit-mask-image: linear-gradient(to left, #000 35%, transparent);
+  mask-image: linear-gradient(to left, #000 35%, transparent);
+}
+.pj-can-right .pj-totals-row td.pj-gutter {
+  -webkit-mask-image: linear-gradient(to left, #000 35%, transparent);
+  mask-image: linear-gradient(to left, #000 35%, transparent);
 }
 .pj-row-delete {
   border: none;
@@ -18574,76 +19418,347 @@ button.co-hero-project:hover svg { color: inherit; }
   background: rgba(179, 87, 79, 0.1);
 }
 
-.pj-grid-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.625rem 1rem;
-  border-top: 1px solid var(--border-color);
+/* The add-project line: the table's final row, sitting right on the totals
+   bar and reading as ONE full-width button. Every cell is a click target
+   (create + start editing that column), so the whole row lights on hover.
+   Its cells carry NO padding and the label mirrors .pj-cell-input's box
+   exactly, so swapping the line for the draft row (and back) never moves a
+   pixel. No hairline beneath (the totals bar's top rule does that job). */
+.pj-table tr.pj-add-tr td {
+  border-bottom: none;
+  padding: 0;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.pj-table tbody tr.pj-add-tr:hover td,
+.pj-table tbody tr.pj-add-tr:hover td.pj-sticky {
+  background: var(--hover-bg);
+  box-shadow: none;
+}
+.pj-table tbody tr.pj-add-tr:hover .pj-add-row {
+  color: var(--primary-text);
 }
 .pj-add-row {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.375rem;
+  width: 100%;
   border: none;
   background: transparent;
   color: var(--secondary-text);
-  font-family: var(--font-family);
-  font-size: var(--body-size);
+  font: inherit;
   font-weight: var(--font-weight-semibold);
-  padding: 0.4rem 0.75rem;
+  line-height: var(--body-line-height);
+  /* Same box as an Address cell (incl. its 1.75rem grip indent), so the
+     label's text sits on the column's text line and the row never moves. */
+  position: relative;
+  padding: 0.5625rem 1.75rem;
+  border-radius: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 120ms ease;
+}
+/* The label never widens the project column: the column's width comes from
+   the Address cells (and the header's floor), never from this text. */
+.pj-table tr.pj-add-tr td.pj-sticky {
+  max-width: 0;
+  overflow: hidden;
+}
+.pj-table th.pj-sticky {
+  box-sizing: border-box;
+  min-width: 13rem; /* = .pj-cell-input width + its 1.75rem inline padding */
+}
+.pj-add-row {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The plus sits in the grip's slot (see .pj-row-grip), never in the flow. */
+.pj-add-row svg {
+  position: absolute;
+  left: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.pj-add-row:focus-visible {
+  outline: 2px solid var(--accent-color, #b87333);
+  outline-offset: -2px;
+}
+/* Draft mode: the line is now a live row, dressed exactly like its
+   neighbours (no tint, ordinary pointer). */
+.pj-table tr.pj-add-tr.pj-add-draft td {
+  cursor: default;
+}
+.pj-table tbody tr.pj-add-tr.pj-add-draft:hover td {
+  background: transparent;
+}
+.pj-table tbody tr.pj-add-tr.pj-add-draft td.pj-sticky {
+  background: var(--card-color);
+}
+/* Contained pill in the card head's top-right. */
+.pj-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  background: var(--card-color);
+  color: var(--secondary-text);
+  /* Fixed square so it stays a circle in every host (the pinned pill and
+     the full-screen head stretch flex children into pills otherwise). */
+  width: 1.875rem;
+  height: 1.875rem;
+  padding: 0;
+  flex: none;
+  align-self: center;
+  line-height: 0;
   border-radius: 999px;
   cursor: pointer;
 }
-.pj-add-row:hover {
+.pj-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.pj-expand-btn:hover {
   background: var(--hover-bg);
   color: var(--primary-text);
 }
 
+/* ── Full-screen mode ──
+   The card lifts to a fixed overlay (same floating-inset treatment as the
+   history drawer) under the modal layer (200+), so the delete confirm still
+   stacks above it. The frame turns into a flex column so the scroll area —
+   normally capped at 66vh — stretches to whatever the viewport allows. */
+.pj-expand-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  background: light-dark(rgba(31, 26, 21, 0.35), rgba(0, 0, 0, 0.55));
+}
+.pj-grid-expanded {
+  position: fixed;
+  inset: 0.75rem;
+  z-index: 181;
+  display: flex;
+  flex-direction: column;
+}
+/* The pin scope wraps the frame (see .pj-pin-scope); in full screen it has
+   to pass the card's flex height straight through, or the frame's flex: 1
+   has no flex parent, the scroller is never height-bound, and the rows run
+   off the bottom of the fixed card with no internal scroll. Its normal-view
+   bottom margin (tfoot compensation) is meaningless here. */
+.pj-grid-expanded .pj-pin-scope {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+.pj-grid-expanded .pj-grid-frame {
+  border-top: none;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+.pj-grid-expanded .pj-grid-scroll {
+  flex: 1;
+  min-height: 0;
+}
+/* Full screen: the SAME strip as widget view, by construction. The bound
+   overlays the frame's top (absolute, as in normal view) and is forced
+   pinned: tools band + the width-synced clone stripe + Address overlay. The
+   scroller keeps the tools band's height as top padding (--pj-tools,
+   measured by useOverlayScroll) and its real thead sits directly under the
+   clone stripe, invisible but still in layout so column widths (and the
+   clone's width sync) are untouched. Rows scroll up beneath the glass.
+   Applies at every width (the strip's desktop-only rule is scoped to
+   :not(.pj-grid-expanded)). */
+.pj-grid.pj-grid-expanded .pj-summary-head {
+  display: none;
+}
+.pj-grid-expanded .pj-pin-bound {
+  display: block;
+  top: 0;
+  bottom: 0;
+}
+.pj-grid-expanded .pj-pin-rule,
+.pj-grid-expanded .pj-pin-space {
+  display: none;
+}
+/* Static, not sticky: the bound already sits at the frame's top, and a
+   sticky strip here would be pushed down by the page's padding inset
+   (rows showing above the tools band). */
+.pj-grid-expanded .pj-pin-strip {
+  position: static;
+}
+.pj-grid-expanded .pj-pin-tools,
+.pj-grid-expanded .pj-pin-inner {
+  opacity: 1;
+  pointer-events: auto;
+}
+.pj-grid-expanded .pj-grid-scroll {
+  padding-top: var(--pj-tools, 0px);
+}
+.pj-grid-expanded .pj-grid-scroll .pj-table .pj-group-row {
+  display: none;
+}
+/* The live label row is layout only in full screen: the clone strip in the
+   bound IS the visible header. Left sticky it would pin at the scrollport
+   top (under the glass tools band) with its opaque cells and paint a second
+   header through the blur, so it goes static and its contents invisible at
+   every width (the normal-view rule is desktop-only and :not(expanded)). */
+/* The live label row is layout only in full screen (column widths and the
+   clone's width sync come from it): static, transparent, contents hidden.
+   Sticky it would pin under the glass as a second header or an opaque bar. */
+.pj-grid-expanded .pj-grid-scroll thead tr:last-child th {
+  position: static;
+  background: transparent;
+  border-bottom-color: transparent;
+}
+.pj-grid-expanded .pj-grid-scroll thead tr:last-child th > * {
+  visibility: hidden;
+}
+/* Full-screen header glass, two weights: the tools band (title + paint
+   options) is the heavier frost; the column-label strip beneath it is a
+   lighter one, ruled top and bottom exactly like the widget's label row
+   (frame top rule + thead bottom border) so the columns read as a header. */
+.pj-grid-expanded .pj-pin-tools {
+  background: light-dark(rgba(255, 255, 255, 0.55), rgba(38, 34, 32, 0.55));
+  -webkit-backdrop-filter: blur(8px) saturate(1.2);
+  backdrop-filter: blur(8px) saturate(1.2);
+}
+.pj-grid-expanded .pj-pin-inner {
+  background: light-dark(rgba(255, 255, 255, 0.72), rgba(38, 34, 32, 0.72));
+  -webkit-backdrop-filter: blur(4px) saturate(1.2);
+  backdrop-filter: blur(4px) saturate(1.2);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: none;
+}
+/* Full screen: the add-project line pins just above the totals bar (which
+   pins at the very bottom), so a new project is always one click away
+   however far the list scrolls. Opaque, so rows pass beneath it; the sticky
+   Address cell keeps its left pin and gains the bottom one. */
+.pj-grid-expanded .pj-table tr.pj-add-tr td {
+  position: sticky;
+  bottom: calc(var(--pj-btm, 0px) + var(--pj-rail, 0px));
+  /* Above the data rows' sticky Address cells (2), which otherwise paint
+     their text through this pinned line as rows scroll beneath it. */
+  z-index: 5;
+  background: var(--card-color);
+  border-top: 1px solid var(--pj-hairline);
+}
+/* Outranks the pre-sideways-scroll glass rule
+   (.pj-grid-frame:not(.pj-can-left) ... td.pj-sticky { transparent }), which
+   would otherwise let the last row show through the pinned line's Address
+   cell. */
+.pj-grid-expanded .pj-grid-frame .pj-table tbody tr.pj-add-tr td.pj-sticky,
+.pj-grid-expanded .pj-grid-frame:not(.pj-can-left) .pj-table tbody tr.pj-add-tr td.pj-sticky {
+  z-index: 6;
+  background: var(--card-color);
+  box-shadow: none;
+}
+/* Hover stays OPAQUE here: --hover-bg is a 5% translucent tint, which on a
+   pinned line lets the rows scrolling beneath bleed through and swallow
+   the label. Blend the tint into the card color instead. */
+.pj-grid-expanded .pj-table tbody tr.pj-add-tr:not(.pj-add-draft):hover td,
+.pj-grid-expanded .pj-grid-frame .pj-table tbody tr.pj-add-tr:not(.pj-add-draft):hover td.pj-sticky,
+.pj-grid-expanded .pj-grid-frame:not(.pj-can-left) .pj-table tbody tr.pj-add-tr:not(.pj-add-draft):hover td.pj-sticky {
+  background: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+  box-shadow: none;
+}
+/* The draft stays opaque too (the normal-view draft rules make it
+   transparent, which is fine in flow but lets rows show through a pinned
+   line). */
+.pj-grid-expanded .pj-table tbody tr.pj-add-tr.pj-add-draft td,
+.pj-grid-expanded .pj-table tbody tr.pj-add-tr.pj-add-draft:hover td,
+.pj-grid-expanded .pj-table tbody tr.pj-add-tr.pj-add-draft td.pj-sticky {
+  background: var(--card-color);
+}
+.pj-pin-title-value {
+  font-weight: var(--font-weight-regular);
+  margin-left: 0.25rem;
+}
+
+/* ── Pipeline: bidding-stage projects, same dress as the grid ── */
+
+.pj-pipeline .pj-summary-sub {
+  padding-bottom: 1rem;
+}
+/* Fewer columns than the grid — stretch to the card edge on wide screens so
+   the totals bar never stops short (the gutter column absorbs the slack). */
+.pj-pipeline .pj-table {
+  width: 100%;
+}
+/* (The gutter itself stays a fixed 2.25rem strip now that it is pinned
+   right; auto table layout spreads the slack across the data columns.) */
 /* ── Monthly summary: a P&L statement, not another grid ── */
 
 .pj-summary {
   padding: 0;
   overflow: hidden;
 }
+/* Head dress mirrors the dashboard's .widget-header: centered row, and the
+   title group uses .widget-title/.widget-description (uppercase secondary
+   title, quiet description, 0.2rem apart). */
 .pj-summary-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.125rem 1.375rem 0.875rem;
+  /* 1.25rem matches the dashboard .card padding the widget headers sit in;
+     the subtitle (.pj-summary-sub) carries the bottom spacing. */
+  padding: 1.25rem 1.25rem 0.5rem;
+  /* Positioned in every view (sticky on desktop) so the ::before glass pane
+     has an anchor; isolated so its z-index:-1 stays inside the head. */
+  position: relative;
+  isolation: isolate;
 }
 .pj-summary-title-group {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+  min-width: 0;
 }
+/* The titles here are h2s (the dashboard's widget titles are spans) — strip
+   the UA h2 margins or they inflate the title/description spacing. */
+.pj-summary-title-group .widget-title {
+  margin: 0;
+}
+.pj-summary-title-group .widget-description {
+  margin-top: -10px;
+  padding-bottom: 5px;
+}
+/* Overhead / month: the directory search pill (.co-search-input), verbatim
+   — 1.5px border pill, transparent, focus only darkens the edge to the
+   text color. Label is quiet body copy beside it. */
 .pj-overhead-control {
   display: inline-flex;
   align-items: center;
-  gap: 0.5625rem;
+  gap: 0.625rem;
   white-space: nowrap;
+  font-size: var(--body-size); /* matches the summary's data cells */
+  color: var(--secondary-text);
 }
 .pj-overhead-input {
-  font-family: var(--font-family);
+  height: 2.125rem; /* = --co-control-h, which is scoped to the directory pages */
+  width: 7.5rem;
+  padding: 0 0.875rem;
   font-size: var(--body-size);
+  font-family: var(--font-family);
   font-variant-numeric: tabular-nums;
-  color: var(--primary-text);
   background: transparent;
-  border: 1px solid var(--border-color);
+  border: 1.5px solid var(--border-color);
   border-radius: 999px;
-  padding: 0.375rem 0.75rem;
-  width: 6.75rem;
+  color: var(--primary-text);
   text-align: right;
   outline: none;
-  transition: border-color 140ms ease;
-}
-.pj-overhead-input:hover {
-  border-color: rgb(from var(--secondary-text) r g b / 0.4);
+  box-sizing: border-box;
+  transition: border-color 140ms;
 }
 .pj-overhead-input:focus {
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 1px var(--primary-color);
+  border-color: var(--primary-text);
 }
 
 .pj-summary-scroll {
@@ -18659,6 +19774,8 @@ button.co-hero-project:hover svg { color: inherit; }
   color: var(--primary-text);
 }
 .pj-summary-table th {
+  /* Rules the month header off from the card head, like the tables above. */
+  border-top: 1px solid var(--border-color);
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
   letter-spacing: 0.03em;
@@ -18674,49 +19791,147 @@ button.co-hero-project:hover svg { color: inherit; }
   border-bottom: 1px solid var(--pj-hairline);
   white-space: nowrap;
 }
-.pj-summary-table tbody tr:last-child td {
-  border-bottom: none;
-}
+/* ── Weight scale, applied deliberately across the whole statement ──
+   regular  : every data cell and every row label
+   semibold : the month header, the Total column, and the carry rows
+              (Net in Projected/Actual, Variance in Net vs plan)
+   bold     : the band eyebrows only
+   Nothing else sets a weight. */
 .pj-summary-label {
   text-align: left !important;
   min-width: 8.5rem;
   font-size: 0.75rem;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-regular, 400);
   letter-spacing: 0.02em;
   color: var(--secondary-text);
 }
+/* Section bands splitting the statement into PROJECTED / ACTUAL / NET VS
+   PLAN. Each group is its own <tbody> whose first row is a band dressed
+   exactly like the grid/pipeline totals bar (.pj-totals-row): the warm
+   ink gradient, a solid rule above and below, and the same tracked
+   uppercase eyebrow. No spacer gap between blocks — the band itself is
+   the separator, so the statement reads as one continuous sheet with
+   three labeled bars, the way the tables above it do. */
+.pj-summary-table .pj-summary-section td {
+  text-align: left;
+  padding: 0.6875rem 0.9375rem;
+  background: linear-gradient(180deg, var(--pj-s1) 0%, var(--pj-s2) 100%);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+/* The first band sits directly under the month header, whose bottom rule
+   already separates them — a second line here would double up. */
+.pj-summary-table .pj-summary-group:first-of-type .pj-summary-section td {
+  border-top: none;
+}
+.pj-summary-section-label {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+}
+.pj-summary-section-note {
+  margin-left: 0.625rem;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-regular, 400);
+  letter-spacing: 0;
+  text-transform: none;
+  color: rgb(from var(--secondary-text) r g b / 0.75);
+}
+/* The sticky label cell is wider than the band's text — keep the note on
+   one line so the label column doesn't wrap and reflow the row height. */
+.pj-summary-section .pj-sticky {
+  white-space: nowrap;
+}
+/* Blank months (not yet booked / nothing scheduled) recede. */
+.pj-summary-blank {
+  color: rgb(from var(--secondary-text) r g b / 0.55);
+}
+/* Net vs plan: the whole block is a comparison, so its headline row is the
+   bold one and negatives already carry the red ink. */
+.pj-summary-group-variance .pj-summary-variance td {
+  font-weight: var(--font-weight-semibold);
+}
+/* Last row of every group: no trailing rule — the next band carries its
+   own top rule (a double line otherwise), and the sheet ends clean. */
+.pj-summary-table .pj-summary-group tr:last-child td {
+  border-bottom: none;
+}
+
 /* Statement hierarchy: counts and running balance recede, Net carries. */
 .pj-summary-units td {
   color: var(--secondary-text);
 }
 .pj-summary-net td {
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-semibold);
   border-top: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
 }
 .pj-summary-cumulative td {
   color: var(--secondary-text);
 }
-.pj-summary-total-col {
+/* Sticky trailing column — the counterpart of .pj-sticky, measured into
+   --pj-rgt by useOverlayScroll so the right veil and thumb sit inside it. */
+.pj-sticky-right {
   position: sticky;
   right: 0;
   z-index: 2;
   background: var(--card-color);
-  font-weight: var(--font-weight-semibold);
   border-left: 1px solid var(--border-color);
 }
-
-/* ── Skeletons (mirror the loaded stack) ── */
-
-.pj-skeleton-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.875rem;
-  padding: 1.375rem;
+.pj-summary-total-col {
+  font-weight: var(--font-weight-semibold);
 }
-.pj-skeleton-row {
-  height: 1.375rem;
-  width: 100%;
+
+/* ── Skeletons (mirror the loaded stack: heads, header band, rows with an
+   address column plus right-aligned numeric cells, totals bar) ── */
+
+.pj-skel-table {
+  border-top: 1px solid var(--border-color);
+  overflow: hidden;
+  /* Same scroll rail as the loaded grid (.pj-grid-scroll). */
+  padding-bottom: 14px;
+  background:
+    linear-gradient(to top, var(--pj-s2) 0, var(--pj-s2) 13px, var(--border-color) 13px, var(--border-color) 14px, transparent 14px)
+    no-repeat;
+}
+/* Row paddings are tuned so each band's height matches its loaded
+   counterpart (cells: 0.5625rem padding + body line; th/totals likewise). */
+.pj-skel-tr {
+  display: grid;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.75rem 0.875rem;
+  border-bottom: 1px solid var(--pj-hairline);
+}
+.pj-skel-tr .skel-line {
+  height: 0.875rem;
+  justify-self: end;
+}
+.pj-skel-tr .pj-skel-addr {
+  justify-self: start;
+}
+.pj-skel-th {
+  padding: 0.75rem 0.875rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.pj-skel-th .skel-line {
+  height: 0.5625rem;
+}
+/* Mirrors the add-project row (tr.pj-add-tr): a short line above totals. */
+.pj-skel-add {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.55rem 0.875rem;
+  border-bottom: none;
+}
+.pj-skel-totals {
+  border-bottom: none;
+  border-top: 1px solid var(--border-color);
+  background: linear-gradient(180deg, var(--pj-s1) 0%, var(--pj-s2) 100%);
+  padding: 0.8125rem 0.875rem;
 }
 
 /* ── History / versions drawer ── */
@@ -18726,7 +19941,7 @@ button.co-hero-project:hover svg { color: inherit; }
   top: 0.75rem;
   right: 0.75rem;
   bottom: 0.75rem;
-  width: min(23.5rem, calc(100vw - 1.5rem));
+  width: min(29rem, calc(100vw - 1.5rem));
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -18827,6 +20042,135 @@ button.co-hero-project:hover svg { color: inherit; }
   border-color: var(--primary-color);
   color: var(--primary-color);
 }
+/* Changes tab: one group per business day. Editorial ledger: an eyebrow
+   day label with a hairline rule, then airy rows laid out edge to edge as
+   time · subject · value change. Weight carries hierarchy, not color. */
+.pj-drawer-body.pj-drawer-body-changes {
+  padding: 0 1.5rem 2rem;
+}
+.pj-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+.pj-day-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.875rem;
+  padding: 1.625rem 0 0.75rem;
+  position: sticky;
+  top: 0;
+  background: var(--card-color);
+  z-index: 1;
+}
+/* Fade hanging off the pinned day label: rows scrolling under it dissolve
+   over a short gradient (full width of the drawer) rather than cutting at a
+   hard edge. Soft, not a hairline. */
+.pj-day-head::after {
+  content: "";
+  position: absolute;
+  left: -1.5rem;
+  right: -1.5rem;
+  top: 100%;
+  height: 1.25rem;
+  background: linear-gradient(to bottom, var(--card-color), rgb(from var(--card-color) r g b / 0));
+  box-shadow: 0 -1px 0 0 var(--card-color); /* seals the seam with the head */
+  pointer-events: none;
+}
+.pj-day-head {
+  box-shadow: 0 6px 14px -8px light-dark(rgba(31, 26, 21, 0.18), rgba(0, 0, 0, 0.55));
+}
+.pj-day-label {
+  flex-shrink: 0;
+  font-size: var(--caption1-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--primary-text);
+}
+.pj-day-rule {
+  flex: 1;
+  height: 1px;
+  background: rgb(from var(--secondary-text) r g b / 0.16);
+  transform: translateY(-0.2em);
+}
+.pj-day-meta {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  min-width: 0;
+  max-width: 55%;
+  font-size: var(--caption1-size);
+  letter-spacing: 0.02em;
+  color: var(--secondary-text);
+}
+.pj-day-count {
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.pj-day-items {
+  display: flex;
+  flex-direction: column;
+}
+/* One row per project: identity on the left, that day's changes on the
+   right, each with the person who made them. */
+.pj-day-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  column-gap: 1.5rem;
+  row-gap: 0.2rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid rgb(from var(--secondary-text) r g b / 0.07);
+}
+.pj-day-item:last-child {
+  border-bottom: none;
+}
+.pj-day-address {
+  grid-column: 1 / -1;
+  margin-bottom: 0.1rem;
+  font-size: var(--body-size);
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+}
+.pj-day-fields {
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--secondary-text);
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pj-day-who {
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-regular);
+  color: var(--secondary-text);
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  text-align: right;
+}
+.pj-day-count-sm {
+  font-variant-numeric: tabular-nums;
+}
+.pj-snapshot-actions {
+  display: inline-flex;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+.pj-restore-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.pj-history-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
 .pj-snapshot-form {
   display: flex;
   gap: 0.5rem;
@@ -18857,4 +20201,776 @@ button.co-hero-project:hover svg { color: inherit; }
   .pj-grid-scroll {
     max-height: 60vh;
   }
+}
+
+/* ─ Projections: live collaboration ─────────────────────────────────
+   Presence rendering: a peer's held cell wears a thin ring in their stable
+   hash color (--pj-peer, set inline), a small name flag above its corner, and
+   their in-progress draft ghosted in place of the value. The roster in the
+   header shows one initials chip per person. Copper stays reserved for the
+   LOCAL user's focus — peer color never uses the copper family's job. */
+.pj-cell-shell {
+  position: relative;
+  display: inline-block;
+}
+.pj-cell-input.pj-remote-held {
+  border-radius: 9px;
+  box-shadow: inset 0 0 0 1.5px var(--pj-peer);
+}
+/* Local focus and a peer on the same cell: the chip treatment wins, with
+   the peer ring kept as an outer halo so neither signal is lost. */
+.pj-cell-input.pj-remote-held:focus {
+  box-shadow:
+    inset 0 1px 0 light-dark(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.08)),
+    0 0 0 1px light-dark(rgba(31, 26, 21, 0.18), rgba(255, 255, 255, 0.16)),
+    0 0 0 2.5px var(--pj-peer),
+    0 2px 5px light-dark(rgba(31, 26, 21, 0.07), rgba(0, 0, 0, 0.3)),
+    0 10px 22px -10px light-dark(rgba(31, 26, 21, 0.28), rgba(0, 0, 0, 0.55));
+}
+.pj-cell-input.pj-remote-previewing {
+  color: var(--secondary-text);
+  font-style: italic;
+}
+.pj-peer-flag {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  transform: translateY(-58%);
+  z-index: 3;
+  padding: 0.0625rem 0.4375rem;
+  border-radius: 999px;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  color: #fff;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 1px 3px light-dark(rgba(31, 26, 21, 0.25), rgba(0, 0, 0, 0.5));
+}
+
+.pj-presence {
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+}
+.pj-presence-chip {
+  width: 24px;
+  height: 24px;
+  margin-left: -6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--card-color);
+  display: grid;
+  place-items: center;
+  font-size: 0.5625rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #fff;
+}
+.pj-presence-more {
+  background: var(--secondary-text);
+}
+/* Sign-in photo variant: the photo fills the chip, ringed (border-color set
+   inline) in the same hash color as that person's cell highlights. */
+.pj-presence-chip.pj-presence-photo {
+  object-fit: cover;
+  border-width: 1.5px;
+  border-style: solid;
+  background: var(--card-color);
+}
+
+/* Undo/redo toast: transient confirmation of what Cmd+Z just did. Plain
+   card surface, bottom center, fade in place — no y-travel per the motion
+   rules. Re-keyed per action so rapid undos restart the fade. */
+.pj-history-toast {
+  position: fixed;
+  bottom: 1.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0.55rem 1rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  box-shadow: light-dark(0 14px 36px rgba(0, 0, 0, 0.18), 0 14px 36px rgba(0, 0, 0, 0.55));
+  color: var(--primary-text);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: pjToastIn 160ms ease-out;
+}
+/* While a brush is armed the paint pill owns the bottom-center slot, so the
+   undo/redo toast steps up above it (pill height + a clear gap). */
+body.pj-painting .pj-history-toast {
+  bottom: calc(1.75rem + 3.5rem + 1rem);
+}
+.pj-history-toast svg {
+  color: var(--secondary-text);
+  flex-shrink: 0;
+}
+@keyframes pjToastIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pj-history-toast { animation: none; }
+}
+
+/* ─ Projections: cell colors ─────────────────────────────────────────
+   Curated palette for the decorative paint-fill feature (CellFormat.tsx).
+   One base color per fill token (--pj-c-*) drives both the soft in-cell tint
+   and the head-bar swatch. Tokens — not colors — are what's stored, so this
+   block is the single place the palette lives. */
+.pj-table,
+.pj-editor-chip,
+.pj-format-bar,
+.pj-paint-pill {
+  --pj-c-red: light-dark(#c14b3c, #e07a6b);
+  --pj-c-amber: light-dark(#d0912b, #e6ba3f);
+  --pj-c-green: light-dark(#48965f, #6fbd8a);
+  --pj-c-blue: light-dark(#4678b8, #7ba7dd);
+  --pj-c-purple: light-dark(#8461b8, #a98cd9);
+  --pj-c-copper: light-dark(#c27c3e, #d69a5e);
+  --pj-c-gray: light-dark(#8a8177, #a49a8e);
+}
+
+/* Fills: low-alpha tints, so hairlines, zone rules, and the row hover light
+   all read through them. */
+.pj-cell-input.pj-fill-red,
+td.pj-computed.pj-fill-red { --pj-cell-fill: color-mix(in srgb, var(--pj-c-red) 15%, transparent); }
+.pj-cell-input.pj-fill-amber,
+td.pj-computed.pj-fill-amber { --pj-cell-fill: color-mix(in srgb, var(--pj-c-amber) 17%, transparent); }
+.pj-cell-input.pj-fill-green,
+td.pj-computed.pj-fill-green { --pj-cell-fill: color-mix(in srgb, var(--pj-c-green) 15%, transparent); }
+.pj-cell-input.pj-fill-blue,
+td.pj-computed.pj-fill-blue { --pj-cell-fill: color-mix(in srgb, var(--pj-c-blue) 14%, transparent); }
+.pj-cell-input.pj-fill-purple,
+td.pj-computed.pj-fill-purple { --pj-cell-fill: color-mix(in srgb, var(--pj-c-purple) 14%, transparent); }
+.pj-cell-input.pj-fill-copper,
+td.pj-computed.pj-fill-copper { --pj-cell-fill: color-mix(in srgb, var(--pj-c-copper) 16%, transparent); }
+.pj-cell-input.pj-fill-gray,
+td.pj-computed.pj-fill-gray { --pj-cell-fill: color-mix(in srgb, var(--pj-c-gray) 14%, transparent); }
+
+/* The floating editor keeps the cell's colors, at the SAME strength: a
+   painted chip swaps the glass base for the card color and layers the
+   in-cell tint (same percentages as .pj-cell-input.pj-fill-* above) as an
+   image on its surface, so an active painted cell matches the resting one
+   exactly. The tint paints on the chip's surface, so .pj-editor-chip
+   is in the palette-var scope list above. */
+.pj-editor-chip[class*="pj-fill-"] .pj-editor-surface {
+  background-color: var(--card-color);
+  /* And no glass bevel (the inset top highlight): over a tint it reads as
+     a 1px unpainted strip along the top edge. */
+  box-shadow:
+    0 0 0 1px light-dark(rgba(31, 26, 21, 0.18), rgba(255, 255, 255, 0.16)),
+    0 2px 5px light-dark(rgba(31, 26, 21, 0.07), rgba(0, 0, 0, 0.3)),
+    0 10px 22px -10px light-dark(rgba(31, 26, 21, 0.28), rgba(0, 0, 0, 0.55));
+}
+.pj-editor-chip.pj-fill-red { --pj-cell-fill: color-mix(in srgb, var(--pj-c-red) 15%, transparent); }
+.pj-editor-chip.pj-fill-amber { --pj-cell-fill: color-mix(in srgb, var(--pj-c-amber) 17%, transparent); }
+.pj-editor-chip.pj-fill-green { --pj-cell-fill: color-mix(in srgb, var(--pj-c-green) 15%, transparent); }
+.pj-editor-chip.pj-fill-blue { --pj-cell-fill: color-mix(in srgb, var(--pj-c-blue) 14%, transparent); }
+.pj-editor-chip.pj-fill-purple { --pj-cell-fill: color-mix(in srgb, var(--pj-c-purple) 14%, transparent); }
+.pj-editor-chip.pj-fill-copper { --pj-cell-fill: color-mix(in srgb, var(--pj-c-copper) 16%, transparent); }
+.pj-editor-chip.pj-fill-gray { --pj-cell-fill: color-mix(in srgb, var(--pj-c-gray) 14%, transparent); }
+
+/* The swatch bar: always open in the card head, a contained neutral pill of
+   fill swatches. Click with a cell focused = color it; with nothing focused =
+   arm paint mode. */
+.pj-format-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1875rem 0.375rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+}
+
+.pj-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgb(from var(--primary-text) r g b / 0.14);
+  /* Circles: the swatches only ever sit inside fully-round pills (the head
+     bar, the painting pill) — a squarer radius fights the container's curve. */
+  border-radius: 999px;
+  background: var(--card-color);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  font-family: var(--font-family);
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+  transition: transform 100ms ease, box-shadow 100ms ease;
+}
+.pj-swatch:hover {
+  transform: scale(1.12);
+}
+/* Hit area: each swatch owns the full-height stripe it sits in (bar padding
+   + border above/below, half the gap either side), so a click anywhere in
+   its column lands. The circle itself stays 22px; only the invisible
+   target grows. Not for the painting pill's swatch (it isn't a control). */
+.pj-format-bar .pj-swatch {
+  position: relative;
+}
+.pj-format-bar .pj-swatch::after {
+  content: "";
+  position: absolute;
+  /* A button's abs-pos children are contained by its CONTENT box (1px
+     inside the border), so the insets carry an extra 1px: this reaches 4px
+     past the circle above/below and 2px either side. */
+  inset: -5px -3px;
+}
+/* The active cell's current fill (or the armed brush) wears an overlay
+   INSIDE the circle: a card-colored gap then a band in a darker cut of the
+   swatch's own color (--pj-swatch-ring, set per fill below), both inset, so
+   the mark reads as a ring floating within the swatch and the bar's
+   footprint never changes. Clicking the marked swatch clears the cell's
+   fill (CellFormat.tsx). */
+.pj-swatch-current {
+  box-shadow:
+    inset 0 0 0 2px var(--card-color),
+    inset 0 0 0 3.5px var(--pj-swatch-ring, var(--secondary-text));
+}
+/* Armed: the bar wears the project header's warm wash (the .co-hero /
+   jobcost head gradient) — a quiet "you're in a mode" surface, border and
+   glyph unchanged. Same specificity as the pinned pill's transparent
+   override, later in the sheet, so it wins there too. */
+.pj-format-bar {
+  transition: background-color 120ms ease;
+}
+.pj-format-bar.pj-format-bar-painting,
+.pj-pin-pill:has(.pj-format-bar-painting) {
+  background: linear-gradient(
+    180deg,
+    light-dark(#fbf9f6, rgba(240, 232, 222, 0.1)) 0%,
+    light-dark(#f4f0e9, rgba(240, 232, 222, 0.05)) 100%
+  );
+}
+/* Pinned: the wrapper pill is the visible surface, so it takes the wash and
+   the bar inside stays transparent (no inner pill floating in the outer). */
+.pj-pin-pill .pj-format-bar.pj-format-bar-painting {
+  background: transparent;
+}
+.pj-format-bar-painting .pj-format-bar-icon {
+  color: var(--primary-text);
+}
+/* The bucket leading the bar: a quiet glyph. */
+.pj-format-bar-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  margin-right: 0.125rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--secondary-text);
+  cursor: pointer;
+  transition: color 100ms ease, background-color 100ms ease;
+}
+.pj-format-bar-icon:hover {
+  color: var(--primary-text);
+  background: var(--hover-bg);
+}
+/* Fill swatches show the tint at higher strength than the in-cell wash so
+   they stay tellable-apart at 22px. */
+.pj-swatch-fill-red { background: color-mix(in srgb, var(--pj-c-red) 42%, var(--card-color)); --pj-swatch-ring: color-mix(in srgb, var(--pj-c-red) 78%, var(--primary-text)); }
+.pj-swatch-fill-amber { background: color-mix(in srgb, var(--pj-c-amber) 46%, var(--card-color)); --pj-swatch-ring: color-mix(in srgb, var(--pj-c-amber) 78%, var(--primary-text)); }
+.pj-swatch-fill-green { background: color-mix(in srgb, var(--pj-c-green) 42%, var(--card-color)); --pj-swatch-ring: color-mix(in srgb, var(--pj-c-green) 78%, var(--primary-text)); }
+.pj-swatch-fill-blue { background: color-mix(in srgb, var(--pj-c-blue) 40%, var(--card-color)); --pj-swatch-ring: color-mix(in srgb, var(--pj-c-blue) 78%, var(--primary-text)); }
+.pj-swatch-fill-purple { background: color-mix(in srgb, var(--pj-c-purple) 40%, var(--card-color)); --pj-swatch-ring: color-mix(in srgb, var(--pj-c-purple) 78%, var(--primary-text)); }
+.pj-swatch-fill-copper { background: color-mix(in srgb, var(--pj-c-copper) 44%, var(--card-color)); --pj-swatch-ring: color-mix(in srgb, var(--pj-c-copper) 78%, var(--primary-text)); }
+.pj-swatch-fill-gray { background: color-mix(in srgb, var(--pj-c-gray) 40%, var(--card-color)); --pj-swatch-ring: color-mix(in srgb, var(--pj-c-gray) 78%, var(--primary-text)); }
+.pj-swatch-clear {
+  color: var(--secondary-text);
+}
+
+/* Paint mode: bucket targeting over the cells, and a persistent pill (same
+   dress as the undo toast, but clickable) naming the armed brush. */
+body.pj-painting .pj-cell-input {
+  cursor: cell;
+}
+/* Both pills live bottom-center — while painting, undo toasts step up a row. */
+body.pj-painting .pj-history-toast {
+  bottom: 4.5rem;
+}
+/* Mid-drag: the sweep must not start a text selection across the sheet. */
+body.pj-paint-stroke,
+body.pj-paint-stroke * {
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* Derived columns take paint too: the cursor and the fill land on the <td>
+   itself (it has no input). */
+body.pj-painting td.pj-computed {
+  cursor: cell;
+}
+.pj-table td.pj-computed {
+  background: var(--pj-cell-fill, transparent);
+}
+/* Derived cells hover like inputs do (same wash, layered over any fill),
+   so the pointer reads the whole row as one surface even where nothing
+   can be typed. */
+.pj-table tbody tr:hover td.pj-computed:hover {
+  background-image: linear-gradient(var(--hover-bg), var(--hover-bg));
+}
+/* Keep a painted derived cell's fill through the row-hover wash (which
+   otherwise replaces td backgrounds). */
+.pj-table tbody tr:hover td.pj-computed[class*="pj-fill-"] {
+  background: var(--pj-cell-fill);
+}
+/* The marquee: ONE dashed rectangle tracing the dragged area's outer bounds
+   (never per-cell rings), in the brush's own color at reduced strength — or
+   neutral when erasing. An absolute child of the scroller in content
+   coordinates (CellFormat.tsx layoutMarquee), so it rides the scroll; z 1
+   keeps it under the sticky bands like the cells it outlines. The fill
+   itself lands on release. */
+.pj-paint-marquee {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  box-sizing: border-box;
+  border: 1.5px dashed color-mix(in srgb, var(--pj-sel-ring, var(--secondary-text)) 70%, transparent);
+  border-radius: 3px;
+}
+.pj-paint-pill {
+  position: fixed;
+  bottom: 1.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0.55rem 1rem;
+  /* The same warm wash as the armed swatch bar. */
+  background: linear-gradient(
+    180deg,
+    light-dark(#fbf9f6, #2c2723) 0%,
+    light-dark(#f4f0e9, #262220) 100%
+  );
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  box-shadow: light-dark(0 14px 36px rgba(0, 0, 0, 0.18), 0 14px 36px rgba(0, 0, 0, 0.55));
+  color: var(--primary-text);
+  font-family: var(--font-family);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  cursor: pointer;
+  animation: pjToastIn 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pj-paint-pill { animation: none; }
+}
+.pj-paint-pill svg {
+  color: var(--secondary-text);
+  flex-shrink: 0;
+}
+.pj-paint-pill-swatch {
+  cursor: inherit;
+  transition: none;
+}
+.pj-paint-pill-swatch:hover {
+  transform: none;
+}
+.pj-paint-pill-hint {
+  color: var(--secondary-text);
+}
+.pj-paint-pill-x {
+  margin-left: 2px;
+}
+
+/* ── Projection tables: sortable headers + drag-to-rearrange rows ── */
+/* Header buttons wear the .pj-table th voice (small tracked caps), not the
+   spend-rank subheadline size co-th-btn was sized for. Active = copper. */
+.pj-table th .co-th-btn,
+.pj-pin-addr .co-th-btn {
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  line-height: inherit;
+}
+.pj-table th .co-th-btn:hover,
+.pj-pin-addr .co-th-btn:hover {
+  color: var(--primary-text);
+}
+.pj-table th .co-th-btn-active,
+.pj-table th .co-th-btn-active:hover,
+.pj-pin-addr .co-th-btn-active,
+.pj-pin-addr .co-th-btn-active:hover {
+  color: var(--primary-color);
+}
+/* Grip room: every lead cell (labels, rows, totals, the pinned strip's
+   Address) indents the same amount so the column stays flush. */
+.pj-table th.pj-sticky,
+.pj-table td.pj-sticky .pj-cell-input,
+.pj-totals-row td.pj-sticky,
+.pj-pin-addr {
+  /* Right matches left so the address sits centered in its column. */
+  padding-inline: 1.75rem;
+}
+.pj-table td.pj-sticky {
+  position: sticky; /* restated: the grip positions against this cell */
+}
+.pj-row-grip {
+  position: absolute;
+  left: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  /* Above .pj-cell-shell (position: relative, later in the DOM) — without
+     this the input's wrapper paints over the grip and swallows the press. */
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.375rem;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--secondary-text);
+  cursor: grab;
+  touch-action: none;
+  opacity: 0;
+  transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+.pj-table tbody tr:hover .pj-row-grip,
+.pj-row-grip:focus-visible {
+  opacity: 1;
+}
+.pj-row-grip:hover {
+  color: var(--primary-text);
+  background: rgb(from var(--primary-text) r g b / 0.06);
+}
+.pj-row-grip:active {
+  cursor: grabbing;
+}
+/* A column sort is active: the grip stays discoverable but reads as locked. */
+.pj-row-grip-locked,
+.pj-row-grip-locked:hover {
+  cursor: not-allowed;
+  color: rgb(from var(--secondary-text) r g b / 0.45);
+  background: transparent;
+}
+/* The lifted row: card surface, soft drop, above its neighbors. dnd-kit
+   drives the transform; the transition on the resting rows is its own. */
+.pj-table tr.pj-row-dragging {
+  position: relative;
+  z-index: 5;
+}
+.pj-table tr.pj-row-dragging td {
+  background: var(--card-color);
+  box-shadow: 0 6px 18px rgb(from var(--primary-text) r g b / 0.12);
+}
+.pj-table tr.pj-row-dragging .pj-row-grip {
+  opacity: 1;
+  cursor: grabbing;
+  color: var(--primary-color);
+}
+/* New-row entrance: fade in under a copper wash that clears as it settles
+   (was a framer motion.tr; the row's transform slot now belongs to drag). */
+@keyframes pj-row-new {
+  from { opacity: 0; background-color: rgba(194, 124, 62, 0.12); }
+  to { opacity: 1; background-color: rgba(194, 124, 62, 0); }
+}
+.pj-table tr.pj-row-new {
+  animation: pj-row-new 600ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pj-table tr.pj-row-new { animation: none; }
+}
+
+/* ── Projections: award (pipeline → Unit Projection) ──
+   Two ways in: the gutter's award arrow (row hover, beside the trash) and
+   dragging a pipeline row up onto the Unit Projection card. Copper is the
+   one accent here and it means "this becomes a real project". */
+.pj-pipeline .pj-gutter {
+  width: 4rem;
+}
+.pj-row-award {
+  border: none;
+  background: transparent;
+  color: var(--secondary-text);
+  padding: 0.3rem;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 0.125rem;
+  transition: opacity 120ms ease, color 120ms ease, background-color 120ms ease;
+}
+.pj-table tbody tr:hover .pj-row-award {
+  opacity: 1;
+}
+.pj-row-award:hover,
+.pj-row-award:focus-visible {
+  color: var(--primary-color);
+  background: rgba(194, 124, 62, 0.12);
+  opacity: 1;
+}
+/* Award confetti: pops out of the landed row's lead cell (AwardConfetti.tsx).
+   Fixed at the burst origin, portaled to body; each piece flies out along
+   --dx/--dy, drifts down at the end, spins, and fades. */
+.pj-confetti {
+  position: fixed;
+  width: 0;
+  height: 0;
+  z-index: 70;
+  pointer-events: none;
+}
+.pj-confetti-piece {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  will-change: transform, opacity;
+  animation: pj-confetti-fly 1600ms cubic-bezier(0.2, 0.7, 0.3, 1) var(--delay, 0ms) both;
+}
+@keyframes pj-confetti-fly {
+  0% { transform: translate(0, 0) rotate(0deg) scale(0.6); opacity: 1; }
+  15% { transform: translate(calc(var(--dx) * 0.45), calc(var(--dy) * 0.55)) rotate(calc(var(--rot) * 0.3)) scale(1.05); opacity: 1; }
+  70% { transform: translate(calc(var(--dx) * 0.95), calc(var(--dy) * 0.9 + 10px)) rotate(calc(var(--rot) * 0.85)); opacity: 0.95; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 44px)) rotate(var(--rot)) scale(0.7); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pj-confetti { display: none; }
+}
+/* Send-off: the awarded row lifts and fades before it leaves the table
+   (its arrival in the grid then plays pj-row-new). */
+@keyframes pj-row-leave {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-0.625rem); }
+}
+.pj-table tr.pj-row-leaving {
+  animation: pj-row-leave 220ms ease-in both;
+  pointer-events: none;
+}
+.pj-table tr.pj-row-leaving td {
+  background: rgba(194, 124, 62, 0.08);
+}
+/* While a pipeline row travels as the floating ghost, its slot stays as a
+   faded placeholder. */
+.pj-table tr.pj-row-lifted td {
+  opacity: 0.35;
+}
+.pj-table tr.pj-row-lifted .pj-row-grip {
+  opacity: 1;
+  cursor: grabbing;
+}
+/* The Unit Projection card as a drop target: a quiet copper ring while a
+   pipeline row is in hand, filled in when the row is over it. */
+.pj-grid.pj-grid-award-target {
+  outline: 1.5px dashed rgba(194, 124, 62, 0.45);
+  outline-offset: 3px;
+  transition: outline-color 140ms ease, box-shadow 140ms ease;
+}
+.pj-grid.pj-grid-award-over {
+  outline: 2px solid var(--primary-color);
+  box-shadow: 0 0 0 6px rgba(194, 124, 62, 0.14);
+}
+/* The ghost carried by the pointer: name, address, value, and what a drop
+   will do. Portaled to body so neither table's scroll frame can clip it. */
+.pj-award-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem 0.5rem 0.625rem;
+  border-radius: 10px;
+  background: var(--card-color);
+  color: var(--primary-text);
+  border: 1px solid rgb(from var(--primary-text) r g b / 0.12);
+  box-shadow: 0 10px 28px rgb(from var(--primary-text) r g b / 0.18);
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  cursor: grabbing;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.pj-award-ghost-over {
+  border-color: var(--primary-color);
+  box-shadow: 0 10px 28px rgba(194, 124, 62, 0.28);
+}
+.pj-award-ghost-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 8px;
+  background: rgba(194, 124, 62, 0.12);
+  color: var(--primary-color);
+  flex: none;
+}
+.pj-award-ghost-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+  max-width: 18rem;
+}
+.pj-award-ghost-body strong {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pj-award-ghost-sub {
+  color: var(--secondary-text);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pj-award-ghost-hint {
+  color: var(--secondary-text);
+  font-size: 0.75rem;
+  padding-left: 0.625rem;
+  border-left: 1px solid rgb(from var(--primary-text) r g b / 0.12);
+  white-space: nowrap;
+}
+.pj-award-ghost-over .pj-award-ghost-hint {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pj-table tr.pj-row-leaving { animation: none; opacity: 0; }
+}
+
+/* ── Projections: top-of-page notices (save errors, conflict) ──
+   A fixed pill under the navbar, the history toast's surface recipe. It
+   never pushes the board around; the sheet stays where it is and every
+   staged edit stays staged until Retry lands it. */
+.pj-notice-toast {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  max-width: min(40rem, calc(100vw - 2rem));
+  padding: 0.55rem 0.6rem 0.55rem 1rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  box-shadow: light-dark(0 14px 36px rgba(0, 0, 0, 0.18), 0 14px 36px rgba(0, 0, 0, 0.55));
+  color: var(--primary-text);
+  font-weight: var(--font-weight-medium);
+  animation: pjToastIn 160ms ease-out;
+}
+/* Kind shows in the glyph and the action, never in the frame. */
+.pj-notice-error > svg { color: #b3574f; flex-shrink: 0; }
+.pj-notice-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+.pj-notice-sub {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-regular);
+  color: var(--secondary-text);
+}
+.pj-notice-btn {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  color: var(--secondary-text);
+  font: inherit;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+.pj-notice-btn:hover { background: var(--hover-bg); color: var(--primary-text); }
+.pj-notice-btn-primary { color: var(--primary-color); }
+.pj-notice-btn-primary:hover { background: rgb(from var(--primary-color) r g b / 0.1); color: var(--primary-color); }
+@media (prefers-reduced-motion: reduce) { .pj-notice-toast { animation: none; } }
+
+/* ─── Projection formula tip ───────────────────────────────────────────
+   Hovering a derived (computed) cell floats the equation above it. Portaled
+   + fixed so the table's scroll wrapper can't clip it; --pj-tip-arrow is
+   the arrow's x offset within the card (the cell's center), so the card can
+   slide inside the viewport while the arrow keeps pointing at the cell. */
+.pj-formula-tip {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  background: var(--card-color);
+  color: var(--primary-text);
+  border: 1px solid rgb(from var(--secondary-text) r g b / 0.12);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px light-dark(rgba(31, 26, 21, 0.06), rgba(0, 0, 0, 0.3)),
+    0 12px 28px -12px light-dark(rgba(31, 26, 21, 0.28), rgba(0, 0, 0, 0.6));
+  padding: 0.625rem 1rem 0.6875rem;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  white-space: nowrap;
+  max-width: min(28rem, calc(100vw - 1rem));
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.125rem;
+  transform-origin: var(--pj-tip-arrow, 50%) 100%;
+  animation: pj-formula-tip-in 0.18s cubic-bezier(0.2, 0.9, 0.3, 1.2) forwards;
+}
+.pj-formula-tip::before,
+.pj-formula-tip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: var(--pj-tip-arrow, 50%);
+  border: 7px solid transparent;
+  border-bottom: 0;
+  border-top-color: rgb(from var(--secondary-text) r g b / 0.12);
+  translate: -50% 0;
+}
+.pj-formula-tip::after {
+  border-width: 6px;
+  border-bottom: 0;
+  border-top-color: var(--card-color);
+}
+.pj-formula-tip-sym {
+  color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.75rem;
+}
+.pj-formula-tip-sub {
+  display: flex;
+  gap: 0.375rem;
+  align-items: baseline;
+  justify-content: center;
+  white-space: normal;
+  font-variant-numeric: tabular-nums;
+}
+.pj-formula-tip-eq {
+  color: var(--secondary-text);
+}
+.pj-formula-tip-result {
+  font-weight: var(--font-weight-semibold);
+}
+@keyframes pj-formula-tip-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pj-formula-tip { animation: pj-formula-tip-fade 0.14s ease forwards; }
+}
+@keyframes pj-formula-tip-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }

@@ -179,7 +179,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
       <>
         <div className="chart-line-tooltip-divider" />
         <div className="chart-line-tooltip-growth-row">
-          <span className="chart-line-tooltip-growth-label">{delta != null ? "vs Plan:" : "Plan:"}</span>
+          <span className="chart-line-tooltip-growth-label">{delta != null ? "vs Projected:" : "Projected:"}</span>
           <span
             className="chart-line-tooltip-growth-value"
             style={delta != null ? { color: delta >= 0 ? "#22c55e" : "#ef4444" } : undefined}
