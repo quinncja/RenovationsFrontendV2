@@ -3,6 +3,7 @@ export const PAGE_QUERIES = {
   adminDashboard: [
     "annualRevenueTrend",
     "cumulativeRevenueGrowth",
+    "revenueProjection",
     "monthlyRevenueComparison",
     "monthlyDirectExpenseComparison",
     "monthlyOverheadComparison",

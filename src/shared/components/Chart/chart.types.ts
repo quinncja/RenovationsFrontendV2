@@ -201,6 +201,23 @@ export type ChartConfig =
        *  data points on a sparse axis still read as part of one trend
        *  while the gap itself stays visibly "no data". */
       bridgeGaps?: boolean
+      /** Series ids to render as plan/projection overlays: dashed stroke, no
+       *  area fill, and invisible to the slice tooltip's data rows and growth
+       *  math (they never count toward the single-vs-multi branch choice).
+       *  Pair with `planTooltip` to surface the overlay's value as a footer
+       *  row instead. */
+      dashedSeriesIds?: string[]
+      /** Surface the dashed overlay's value at each slice as a tooltip footer
+       *  row in the growth row's visual language. With `delta` set, slices
+       *  where the primary series also has a value read "vs Projected: +$X"
+       *  (green ahead / red behind); slices where only the plan has a value —
+       *  and all slices without `delta` — read "Projected: $X" in neutral ink. */
+      planTooltip?: { delta?: boolean }
+      /** Reserve the 40px top band even with no in-plot legend or top marker
+       *  label, so this plot's top edge aligns with sibling charts that have
+       *  one (e.g. the annual trend sitting beside the cumulative chart's
+       *  "Open"-marked plot). */
+      topBand?: boolean
     }
   | {
       type: "pie-with-list"

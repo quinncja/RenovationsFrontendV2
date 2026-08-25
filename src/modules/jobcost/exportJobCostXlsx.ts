@@ -1,6 +1,7 @@
 import { formatDate } from "../../shared/utils/format"
 import type { SheetRow, StyledCell } from "../../shared/utils/exportXlsx"
 import type { ChangeOrder } from "../change-orders/types"
+import { XLSX_GOLD, XLSX_INK, XLSX_INK_SOFT, XLSX_MUTED, XLSX_HEAD_FILL, XLSX_STRIPE, XLSX_NEG, XLSX_POS, xlsxCellBorder, xlsxTotalBorder } from "../../shared/utils/xlsxTheme"
 
 // Job-cost report builder — same export shape as the 93E version (SheetRow[],
 // auto-filtered transaction detail), but styled with RD's copper palette and
@@ -60,20 +61,18 @@ const MONTH_FULL = [
   "July", "August", "September", "October", "November", "December",
 ]
 
-// ── RD palette (copper + warm neutrals) ──────────────────────────────────────
+// ── Colors: shared muted export palette (xlsxTheme.ts) ────────────────────────
 
-const BRAND       = "C27C3E"  // copper accent
-const BRAND_LIGHT = "FAF2E7"  // tinted row stripe (very warm cream)
-const GRAY_BG     = "F5F1EC"  // warm gray for label cells
-const BORDER_CLR  = "D7CFC6"  // warm border line
-const WHITE       = "FFFFFF"
-const BLACK       = "19375A"  // navy used elsewhere by RD for primary text
-const SUBTEXT     = "6B7A8D"  // muted secondary text
-const RED         = "DC2626"
-const GREEN       = "15803D"
+const BRAND       = XLSX_GOLD      // accent text only
+const STRIPE      = XLSX_STRIPE    // zebra + totals
+const HEAD_FILL   = XLSX_HEAD_FILL // section bands / headers / label cells
+const INK         = XLSX_INK
+const INK_SOFT    = XLSX_INK_SOFT
+const SUBTEXT     = XLSX_MUTED
+const RED         = XLSX_NEG
+const GREEN       = XLSX_POS
 
-const thinBorder = { style: "thin" as const, color: { rgb: BORDER_CLR } }
-const cellBorder = { top: thinBorder, bottom: thinBorder, left: thinBorder, right: thinBorder }
+const cellBorder = xlsxCellBorder
 
 // ── Reusable styles ─────────────────────────────────────────────────────────
 
@@ -88,15 +87,15 @@ const subtitleStyle: StyledCell["s"] = {
 }
 
 const sectionStyle: StyledCell["s"] = {
-  font: { bold: true, color: { rgb: WHITE }, sz: 14 },
-  fill: { fgColor: { rgb: BRAND } },
+  font: { bold: true, color: { rgb: INK }, sz: 14 },
+  fill: { fgColor: { rgb: HEAD_FILL } },
   alignment: { horizontal: "left", vertical: "center" },
   border: cellBorder,
 }
 
 const tableHeaderStyle: StyledCell["s"] = {
-  font: { bold: true, color: { rgb: WHITE }, sz: 12 },
-  fill: { fgColor: { rgb: BRAND } },
+  font: { bold: true, color: { rgb: INK_SOFT }, sz: 11 },
+  fill: { fgColor: { rgb: HEAD_FILL } },
   alignment: { horizontal: "right", vertical: "center" },
   border: cellBorder,
 }
@@ -107,14 +106,14 @@ const tableHeaderLeftStyle: StyledCell["s"] = {
 }
 
 const labelStyle: StyledCell["s"] = {
-  font: { bold: true, sz: 12, color: { rgb: BLACK } },
-  fill: { fgColor: { rgb: GRAY_BG } },
+  font: { bold: true, sz: 12, color: { rgb: INK } },
+  fill: { fgColor: { rgb: HEAD_FILL } },
   border: cellBorder,
   alignment: { vertical: "center" },
 }
 
 const valueStyle: StyledCell["s"] = {
-  font: { sz: 12 },
+  font: { sz: 12, color: { rgb: INK } },
   border: cellBorder,
   alignment: { vertical: "center" },
 }
@@ -133,8 +132,8 @@ const valuePct: StyledCell["s"] = {
 
 function bodyStyle(stripe: boolean): StyledCell["s"] {
   return {
-    font: { sz: 12 },
-    fill: stripe ? { fgColor: { rgb: BRAND_LIGHT } } : undefined,
+    font: { sz: 12, color: { rgb: INK } },
+    fill: stripe ? { fgColor: { rgb: STRIPE } } : undefined,
     border: cellBorder,
     alignment: { vertical: "center" },
   }
@@ -149,25 +148,25 @@ function bodyPctStyle(stripe: boolean): StyledCell["s"] {
 }
 
 const totalLabelStyle: StyledCell["s"] = {
-  font: { bold: true, sz: 12 },
-  fill: { fgColor: { rgb: GRAY_BG } },
-  border: { top: { style: "medium" as const, color: { rgb: BLACK } }, bottom: thinBorder, left: thinBorder, right: thinBorder },
+  font: { bold: true, sz: 12, color: { rgb: INK } },
+  fill: { fgColor: { rgb: STRIPE } },
+  border: xlsxTotalBorder,
   alignment: { vertical: "center" },
 }
 
 const totalMoneyStyle: StyledCell["s"] = {
-  font: { bold: true, sz: 12 },
-  fill: { fgColor: { rgb: GRAY_BG } },
+  font: { bold: true, sz: 12, color: { rgb: INK } },
+  fill: { fgColor: { rgb: STRIPE } },
   numFmt: '#,##0.00',
-  border: { top: { style: "medium" as const, color: { rgb: BLACK } }, bottom: thinBorder, left: thinBorder, right: thinBorder },
+  border: xlsxTotalBorder,
   alignment: { horizontal: "right", vertical: "center" },
 }
 
 const totalPctStyle: StyledCell["s"] = {
-  font: { bold: true, sz: 12 },
-  fill: { fgColor: { rgb: GRAY_BG } },
+  font: { bold: true, sz: 12, color: { rgb: INK } },
+  fill: { fgColor: { rgb: STRIPE } },
   numFmt: '0.0%',
-  border: { top: { style: "medium" as const, color: { rgb: BLACK } }, bottom: thinBorder, left: thinBorder, right: thinBorder },
+  border: xlsxTotalBorder,
   alignment: { horizontal: "right", vertical: "center" },
 }
 
@@ -195,7 +194,7 @@ function sectionHeader(label: string, colSpan: number): SheetRow {
 function emptyRow(): SheetRow { return [] }
 
 function varianceColor(variance: number) {
-  const color = variance < 0 ? RED : variance > 0 ? GREEN : BLACK
+  const color = variance < 0 ? RED : variance > 0 ? GREEN : INK
   return { font: { sz: 12, color: { rgb: color } } }
 }
 

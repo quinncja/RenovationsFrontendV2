@@ -12,7 +12,8 @@ import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/I
 import { SortableHeader } from "../../shared/components/SortableHeader"
 import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
 import useIsMobile from "../../shared/hooks/useIsMobile"
-import { downloadXlsx } from "../../shared/utils/exportXlsx"
+import { downloadXlsx, type SheetRow, type StyledCell } from "../../shared/utils/exportXlsx"
+import { XLSX_INK, XLSX_INK_SOFT, XLSX_HEAD_FILL, XLSX_STRIPE, xlsxCellBorder } from "../../shared/utils/xlsxTheme"
 import { formatMoney, formatMoneyFull, formatDate } from "../../shared/utils/format"
 import {
   buildAgingForecast,
@@ -206,9 +207,24 @@ function UpcomingBillingsContent() {
     // Balances split into AR In / AP Out columns (the other side left blank)
     // so each column sums independently in the spreadsheet.
     const header = ["Week", "Type", "Client / Vendor", "Invoice", "Job", "Due", "Overdue on", "AR In", "AP Out"]
-    const rows: (string | number)[][] = [header]
-    for (const inv of invoices) {
-      rows.push([
+    const MONEY_COLS = new Set([7, 8])
+    const headStyle = (i: number): StyledCell["s"] => ({
+      font: { bold: true, sz: 11, color: { rgb: XLSX_INK_SOFT } },
+      fill: { fgColor: { rgb: XLSX_HEAD_FILL } },
+      border: xlsxCellBorder,
+      alignment: { horizontal: MONEY_COLS.has(i) ? "right" : "left", vertical: "center" },
+    })
+    const bodyStyle = (i: number, stripe: boolean): StyledCell["s"] => ({
+      font: { sz: 12, color: { rgb: XLSX_INK } },
+      fill: stripe ? { fgColor: { rgb: XLSX_STRIPE } } : undefined,
+      border: xlsxCellBorder,
+      alignment: { horizontal: MONEY_COLS.has(i) ? "right" : "left", vertical: "center" },
+      ...(MONEY_COLS.has(i) ? { numFmt: "#,##0.00" } : {}),
+    })
+    const rows: SheetRow[] = [header.map((h, i) => ({ v: h, s: headStyle(i) }))]
+    invoices.forEach((inv, r) => {
+      const stripe = r % 2 === 1
+      const cells: (string | number)[] = [
         inv.weekLabel,
         inv.side,
         inv.counterparty,
@@ -218,8 +234,9 @@ function UpcomingBillingsContent() {
         formatDate(inv.mark),
         inv.side === "AR" ? inv.amount : "",
         inv.side === "AP" ? inv.amount : "",
-      ])
-    }
+      ]
+      rows.push(cells.map((v, i) => ({ v, s: bodyStyle(i, stripe) })))
+    })
     const date = new Date().toISOString().slice(0, 10)
     downloadXlsx(rows, `Upcoming_Billings_${date}.xlsx`, "Upcoming Billings", {
       autoFilterRow: 0,

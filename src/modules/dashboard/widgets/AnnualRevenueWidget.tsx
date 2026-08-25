@@ -5,6 +5,10 @@ import { useWidgetData } from "../../../shared/context/PageContext"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import { PRE_2018_REVENUE } from "../config/historicalRevenue"
+import { PROJECTED_COLOR, PROJECTED_SERIES_ID, type RevenueProjection } from "../config/projectionOverlay"
+import { ChartLegend } from "../../../shared/components/Chart/ChartLegend"
+
+const REVENUE_COLOR = "#c27c3e" // brand copper (CHART_COLORS[0])
 
 interface OpenMonth {
   openMonthYear?: number
@@ -17,7 +21,8 @@ export function AnnualRevenueWidget({ colSpan }: { colSpan?: 1 | 2 }) {
   const { data, isLoading } = useWidgetData<{
     annualRevenueTrend: { year: number; revenue: number }[] | null
     openMonthFinances: OpenMonth | null
-  }>(["annualRevenueTrend", "openMonthFinances"])
+    revenueProjection: RevenueProjection | null
+  }>(["annualRevenueTrend", "openMonthFinances", "revenueProjection"])
 
   const series = useMemo(() => {
     const raw = data?.annualRevenueTrend
@@ -40,14 +45,36 @@ export function AnnualRevenueWidget({ colSpan }: { colSpan?: 1 | 2 }) {
         ? (open.openMonthIncome ?? 0) + (includeOverUnder ? open.openMonthOverUnder ?? 0 : 0)
         : 0
 
-    return [{
+    const plotted = (d: { year: number; revenue: number }) =>
+      d.year === openYear ? d.revenue + openContribution : d.revenue
+
+    const revenueSeries = {
       id: "Revenue",
-      data: years.map((d) => ({
-        x: String(d.year),
-        y: d.year === openYear ? d.revenue + openContribution : d.revenue,
-      })),
-    }]
-  }, [data?.annualRevenueTrend, data?.openMonthFinances, includeOverUnder])
+      color: REVENUE_COLOR,
+      data: years.map((d) => ({ x: String(d.year), y: plotted(d) })),
+    }
+
+    // Projection Board overlay: a dashed segment from the prior year's actual
+    // to the sheet's full-year scheduled revenue — "where the year is planned
+    // to land" above (or below) the actual-to-date point.
+    const proj = data?.revenueProjection
+    const prev = proj ? years.find((d) => d.year === proj.year - 1) : undefined
+    if (proj && proj.total > 0 && prev) {
+      return [
+        revenueSeries,
+        {
+          id: PROJECTED_SERIES_ID,
+          color: PROJECTED_COLOR,
+          data: [
+            { x: String(prev.year), y: plotted(prev) },
+            { x: String(proj.year), y: proj.total },
+          ],
+        },
+      ]
+    }
+
+    return [revenueSeries]
+  }, [data?.annualRevenueTrend, data?.openMonthFinances, data?.revenueProjection, includeOverUnder])
 
   // "You are here" pulse on the current calendar year's data point. The
   // chart shows years as x-values (`String(year)`), so the seriesId +
@@ -83,10 +110,37 @@ export function AnnualRevenueWidget({ colSpan }: { colSpan?: 1 | 2 }) {
     data.annualRevenueTrend.some((d) => d.year === data.openMonthFinances!.openMonthYear)
   const title = wipActive ? "Annual Revenue Trend (Incl. WIP)" : "Annual Revenue Trend"
 
+  // Legend only when the projection overlay makes this two series — in the
+  // widget header (plain-HTML ChartLegend), never nivo's in-SVG legend.
+  const legend =
+    series && series.length > 1 ? (
+      <ChartLegend
+        items={[
+          { label: "Revenue", color: REVENUE_COLOR },
+          { label: PROJECTED_SERIES_ID, color: PROJECTED_COLOR },
+        ]}
+      />
+    ) : undefined
+
   return (
-    <Widget title={title} loading={isLoading} noData={!series}>
+    <Widget title={title} loading={isLoading} noData={!series} actions={legend}>
       {series && (
-        <Chart config={{ type: "line", series, enableArea: true, pulsePoint, axisBottomTickValues }} />
+        <Chart
+          config={{
+            type: "line",
+            series,
+            enableArea: true,
+            // Align this plot's top edge with the neighboring cumulative
+            // chart, which keeps the 40px band for its "Open" marker label.
+            topBand: true,
+            pulsePoint,
+            axisBottomTickValues,
+            dashedSeriesIds: [PROJECTED_SERIES_ID],
+            // Full-year plan vs a year-to-date actual isn't a fair delta —
+            // show the plan figure itself.
+            planTooltip: {},
+          }}
+        />
       )}
     </Widget>
   )

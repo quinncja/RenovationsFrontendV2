@@ -6,7 +6,9 @@ import { Chart } from "../../../shared/components/Chart/Chart"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import { shortMonth } from "../../../shared/utils/format"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
-import type { LineMarker } from "../../../shared/components/Chart/chart.types"
+import type { LineMarker, LineSeries } from "../../../shared/components/Chart/chart.types"
+import { ChartLegend } from "../../../shared/components/Chart/ChartLegend"
+import { PROJECTED_COLOR, PROJECTED_SERIES_ID, type RevenueProjection } from "../config/projectionOverlay"
 
 // Shared building block for the four "metric by month, current vs previous
 // year" widgets on the dashboard home (Gross Revenue, Total Direct Expense,
@@ -64,6 +66,11 @@ interface Props {
    *  chart-click → monthly-table filter). See ChartConfig for semantics. */
   onPointClick?: (xValue: string) => void
   highlightedX?: string | null
+  /** Query returning a RevenueProjection payload (the Projection Board's
+   *  revenue schedule). When set and the payload covers the page year, a
+   *  dashed full-year "Projected" line joins the two actual-year lines —
+   *  cumulative metrics get the `cumulative` array, others `monthly`. */
+  projectionQuery?: string
 }
 
 export function MonthlyYearComparisonWidget({
@@ -77,13 +84,14 @@ export function MonthlyYearComparisonWidget({
   wipTitleSuffix,
   onPointClick,
   highlightedX,
+  projectionQuery,
 }: Props) {
   const year = usePageYear()
   const lastYear = year - 1
   const [includeOverUnder] = useIncludeOverUnder()
   const { data, isLoading } = useWidgetData<{
-    [key: string]: MonthRow[] | OpenMonthPayload | null
-  }>([queryName, "openMonthFinances"])
+    [key: string]: MonthRow[] | OpenMonthPayload | RevenueProjection | null
+  }>(projectionQuery ? [queryName, "openMonthFinances", projectionQuery] : [queryName, "openMonthFinances"])
 
   // Read the actual open period for the "you are here" marker. The widget
   // only draws the marker when the open year is one of the years we're
@@ -134,11 +142,31 @@ export function MonthlyYearComparisonWidget({
       return { id: `${y}`, color, data: points }
     }
 
-    return [
+    const result: LineSeries[] = [
       toSeries(year, currentYearColor),
       toSeries(lastYear, PREVIOUS_YEAR_COLOR),
     ]
-  }, [data, queryName, valueKey, year, lastYear, currentYearColor, includeOpenPeriod, openMonth, openYear, openIncome, overUnderApplies, includeOverUnder, openOverUnder])
+
+    // Projection Board overlay: the plan's full-year schedule as a dashed
+    // line beside the two actual-year lines. `includeOpenPeriod` doubles as
+    // the cumulative flag — cumulative charts plot the running sum, plain
+    // monthly charts the per-month values. Only drawn when the sheet's year
+    // is the page year (a prior-year page has actuals for the whole year;
+    // overlaying another year's plan there would be noise).
+    const proj = projectionQuery ? (data?.[projectionQuery] as RevenueProjection | null | undefined) : null
+    if (proj && proj.year === year) {
+      const values = includeOpenPeriod ? proj.cumulative : proj.monthly
+      if (Array.isArray(values) && values.some((v) => v > 0)) {
+        result.push({
+          id: PROJECTED_SERIES_ID,
+          color: PROJECTED_COLOR,
+          data: values.slice(0, 12).map((v, m) => ({ x: shortMonth(m + 1), y: v })),
+        })
+      }
+    }
+
+    return result
+  }, [data, queryName, valueKey, year, lastYear, currentYearColor, includeOpenPeriod, openMonth, openYear, openIncome, overUnderApplies, includeOverUnder, openOverUnder, projectionQuery])
 
   // Vertical dashed reference at the open month. Only relevant when one
   // of the years we're plotting is the open year — otherwise the marker
@@ -187,6 +215,26 @@ export function MonthlyYearComparisonWidget({
     </Link>
   ) : undefined
 
+  // Legend lives in the widget header (plain-HTML ChartLegend), not inside the
+  // plot — nivo's in-SVG legend collides with the "Open" marker's top label.
+  const hasProjection = series?.some((s) => s.id === PROJECTED_SERIES_ID) ?? false
+  const legend = series ? (
+    <ChartLegend
+      items={[
+        { label: String(lastYear), color: PREVIOUS_YEAR_COLOR },
+        { label: String(year), color: currentYearColor },
+        ...(hasProjection ? [{ label: PROJECTED_SERIES_ID, color: PROJECTED_COLOR }] : []),
+      ]}
+    />
+  ) : undefined
+  const actions =
+    legend || viewLink ? (
+      <>
+        {legend}
+        {viewLink}
+      </>
+    ) : undefined
+
   // Flag the open month's tooltip as "Billed + WIP" only when WIP is actually
   // folded into one of the plotted lines (the toggle is on and the open year
   // is one of the two years on the chart).
@@ -201,10 +249,26 @@ export function MonthlyYearComparisonWidget({
   const displayTitle = wipTitleSuffix && wipMonthLabel != null ? `${title} (Incl. WIP)` : title
 
   return (
-    <Widget title={displayTitle} loading={isLoading} noData={!series} actions={viewLink}>
+    <Widget title={displayTitle} loading={isLoading} noData={!series} actions={actions}>
       {series && (
         <Chart
-          config={{ type: "line", series, legend: true, markers, pulsePoint, wipMonthLabel, onPointClick, highlightedX }}
+          config={{
+            type: "line",
+            series,
+            markers,
+            pulsePoint,
+            wipMonthLabel,
+            onPointClick,
+            highlightedX,
+            ...(projectionQuery
+              ? {
+                  dashedSeriesIds: [PROJECTED_SERIES_ID],
+                  // Cumulative-through-month vs plan-through-month is a fair
+                  // comparison, so the footer shows the signed delta.
+                  planTooltip: { delta: true },
+                }
+              : {}),
+          }}
         />
       )}
     </Widget>

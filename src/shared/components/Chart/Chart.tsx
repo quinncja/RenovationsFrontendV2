@@ -141,12 +141,14 @@ function everyOtherYTicks(series: LineSeries[], ceiling?: number): number[] | un
 
 // ─── Slice tooltip ────────────────────────────────────────────────────────────
 
-function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel }: {
+function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel, overlayIds, planTooltip }: {
   slice: { points: readonly { data: { x: unknown; y: unknown }; seriesId: string }[] }
   series: LineSeries[]
   valueFormat?: (v: number) => string
   disableGrowth?: boolean
   wipMonthLabel?: string | null
+  overlayIds?: string[]
+  planTooltip?: { delta?: boolean }
 }) {
   const points = slice.points
   const xLabel = String(points[0]?.data?.x ?? "")
@@ -155,11 +157,45 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   const headerLabel = wipMonthLabel != null && xLabel === wipMonthLabel ? `${xLabel} Billed + WIP` : xLabel
   const fmt = valueFormat ?? formatMoneyFull
 
+  // Dashed overlay series (plans/projections) never appear as data rows and
+  // don't count toward the single-vs-multi branch choice or the growth math.
+  // With `planTooltip` set, the overlay's value at this slice surfaces as a
+  // footer row in the growth row's visual language instead — built lazily per
+  // branch, where the actual value to compare against is known.
+  const isOverlay = (id: string | number) => overlayIds?.includes(String(id)) ?? false
+  const coreSeries = series.filter((s) => !isOverlay(s.id))
+  const planPoint = points.find((p) => isOverlay(p.seriesId))
+  const planValue = planTooltip != null ? ((planPoint?.data.y as number | null | undefined) ?? null) : null
+  // A plan point whose value duplicates a core series' value at the same
+  // slice is a segment anchor (e.g. the projection line starting from last
+  // year's actual), not information — no footer there.
+  const planIsAnchor =
+    planValue != null &&
+    points.some((p) => !isOverlay(p.seriesId) && (p.data.y as number | null) === planValue)
+  const planFooter = (actual: number | null) => {
+    if (planValue == null || planIsAnchor) return null
+    const delta = planTooltip?.delta && actual != null ? actual - planValue : null
+    return (
+      <>
+        <div className="chart-line-tooltip-divider" />
+        <div className="chart-line-tooltip-growth-row">
+          <span className="chart-line-tooltip-growth-label">{delta != null ? "vs Projected:" : "Projected:"}</span>
+          <span
+            className="chart-line-tooltip-growth-value"
+            style={delta != null ? { color: delta >= 0 ? "#22c55e" : "#ef4444" } : undefined}
+          >
+            {delta != null ? `${delta >= 0 ? "+" : "−"}${fmt(Math.abs(delta))}` : fmt(planValue)}
+          </span>
+        </div>
+      </>
+    )
+  }
+
   // Single-series: large value + optional growth vs previous data point
-  if (series.length === 1) {
-    const point = points[0]
+  if (coreSeries.length === 1) {
+    const point = points.find((p) => String(p.seriesId) === String(coreSeries[0].id)) ?? points[0]
     const currVal = point.data.y as number
-    const seriesData = series[0]?.data ?? []
+    const seriesData = coreSeries[0]?.data ?? []
     const idx = seriesData.findIndex((p) => String(p.x) === xLabel)
     let growth: number | null = null
     if (!disableGrowth && idx > 0) {
@@ -182,6 +218,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
             {growth >= 0 ? "↗" : "↘"} {growth > 0 ? "+" : ""}{growth.toFixed(1)}% YoY
           </div>
         )}
+        {planFooter(currVal ?? null)}
       </div>
     )
   }
@@ -190,7 +227,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   // Build rows for all series, not just points present in the slice.
   // Nivo uses "seriesId" (with s), not "serieId".
   const sliceMap = new Map(points.map((p) => [String(p.seriesId), p]))
-  const rowsBySerie = series.map((s) => {
+  const rowsBySerie = coreSeries.map((s) => {
     const point = sliceMap.get(String(s.id))
     return { id: s.id, value: point != null ? (point.data.y as number | null) : null }
   })
@@ -249,6 +286,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
           </div>
         </>
       )}
+      {planFooter(currentRow?.value ?? null)}
     </div>
   )
 }
@@ -1047,8 +1085,78 @@ function buildGapBridgeLayer() {
   }
 }
 
+// dashedSeriesIds mode: replaces nivo's "areas" + "lines" layers so the listed
+// series stroke dashed with no area fill (plan/projection overlays), while the
+// rest render as nivo would. Null points split paths into segments (nivo's
+// defined() behavior), and series paint in reverse order so series[0] stays on
+// top — both matching the stock layers.
+function buildDashedSeriesLayers(dashedIds: string[]) {
+  const isDashed = (id: string | number) => dashedIds.includes(String(id))
+  const toSegments = (data: readonly ComputedLinePoint[]) => {
+    const segments: { x: number; y: number }[][] = []
+    let cur: { x: number; y: number }[] = []
+    for (const p of data) {
+      if (p.data.y == null || p.position.y == null) {
+        if (cur.length) segments.push(cur)
+        cur = []
+      } else {
+        cur.push({ x: p.position.x, y: p.position.y })
+      }
+    }
+    if (cur.length) segments.push(cur)
+    return segments
+  }
+  const AreasLayer = function DashedModeAreas(props: unknown) {
+    const { series, areaGenerator } = props as {
+      series: readonly (ComputedLineSerie & { color?: string })[]
+      areaGenerator: (pts: { x: number; y: number }[]) => string | null
+    }
+    return (
+      <g pointerEvents="none">
+        {[...series].reverse().filter((s) => !isDashed(s.id)).map((serie) => (
+          <g key={serie.id}>
+            {toSegments(serie.data).map((seg, i) => (
+              <path key={i} d={areaGenerator(seg) ?? undefined} fill={serie.color} fillOpacity={0.12} />
+            ))}
+          </g>
+        ))}
+      </g>
+    )
+  }
+  const LinesLayer = function DashedModeLines(props: unknown) {
+    const { series, lineGenerator } = props as {
+      series: readonly (ComputedLineSerie & { color?: string })[]
+      lineGenerator: (pts: { x: number; y: number }[]) => string | null
+    }
+    return (
+      <g pointerEvents="none">
+        {[...series].reverse().map((serie) => (
+          <g key={serie.id}>
+            {toSegments(serie.data).map((seg, i) => (
+              <path
+                key={i}
+                d={lineGenerator(seg) ?? undefined}
+                fill="none"
+                stroke={serie.color}
+                strokeWidth={2}
+                strokeDasharray={isDashed(serie.id) ? "6 5" : undefined}
+              />
+            ))}
+          </g>
+        ))}
+      </g>
+    )
+  }
+  return { AreasLayer, LinesLayer }
+}
+
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
-  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps } = config
+  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip, topBand } = config
+
+  // Dashed-overlay mode swaps the stock areas/lines layers for versions that
+  // stroke the listed series dashed and skip their area fill. Muted highlight
+  // mode keeps the stock layers — everything grays out uniformly there anyway.
+  const dashedLayers = dashedSeriesIds?.length && !valueColor ? buildDashedSeriesLayers(dashedSeriesIds) : null
 
   const dark = useDarkMode()
   const isMobile = window.innerWidth <= 768
@@ -1073,7 +1181,12 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
   // Compact charts keep a 40px top band: it gives a legend room to tuck into
   // the top-right corner (lifted -40) without nivo clipping it at the SVG edge,
   // and keeps the legend-less burn-up's plot top aligned with its neighbor.
-  const marginTop = compactTop ? 40 : (legend ? 40 : 20)
+  // A top-labeled x marker (the "Open" reference line) needs the same headroom
+  // for its label — widgets that moved their legend into the header (ChartLegend)
+  // still must not clip it.
+  const hasTopMarkerLabel =
+    markers?.some((m) => m.axis === "x" && m.legend != null && (m.legendPosition ?? "top") === "top") ?? false
+  const marginTop = compactTop || legend || hasTopMarkerLabel || topBand ? 40 : 20
   // "Muted" mode: when the caller is highlighting a specific x value, all
   // series fade to gray and the single matching point paints in its
   // own series color. Communicates "this is what you clicked" without
@@ -1155,7 +1268,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       }
       enableSlices="x"
       tooltip={() => null}
-      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} />}
+      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} overlayIds={dashedSeriesIds} planTooltip={planTooltip} />}
       axisLeft={{
         tickSize: 0,
         tickPadding: 10,
@@ -1181,14 +1294,18 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
         "grid",
         "markers",
         "axes",
-        "areas",
+        dashedLayers && enableArea ? dashedLayers.AreasLayer : ("areas" as const),
         "crosshair",
         // Gap bridges go under the solid line/points so dash ends tuck
         // beneath the flanking dots.
         ...(bridgeGaps ? [buildGapBridgeLayer()] : []),
         // valueColor mode swaps nivo's line + point layers for the gradient
         // layer (slices/mesh stay, so tooltips are unchanged).
-        ...(valueColor ? [buildValueColorLayer(valueColor)] : (["lines", "points"] as const)),
+        ...(valueColor
+          ? [buildValueColorLayer(valueColor)]
+          : dashedLayers
+            ? [dashedLayers.LinesLayer, "points" as const]
+            : (["lines", "points"] as const)),
         "slices",
         "mesh",
         "legends",
