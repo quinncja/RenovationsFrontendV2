@@ -820,15 +820,18 @@ body{
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent);
 }
 
+/* Active state borrows the jobcost segmented thumb (.jc-seg-thumb): copper
+   crown-to-base gradient, soft contact shadow, 1px white top highlight. */
 .over-under-toggle--active {
-  background-color: var(--primary-color);
-  border-color: var(--primary-color);
+  background: linear-gradient(180deg, var(--primary-color-hover) 0%, var(--primary-color) 100%);
+  border-color: transparent;
   color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
 .over-under-toggle--active:hover:not(:disabled) {
-  background-color: var(--primary-color-hover);
-  border-color: var(--primary-color-hover);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--primary-color-hover) 88%, white) 0%, var(--primary-color-hover) 100%);
+  border-color: transparent;
   color: #fff;
 }
 

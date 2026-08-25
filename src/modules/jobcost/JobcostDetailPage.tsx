@@ -1380,10 +1380,11 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                 // (brand orange) — same line the home page revenue + directory
                 // history charts use; `Billed` takes the next palette color.
                 series: trajSeries,
-                // Two cumulative lines plus a budget marker — no area fill (it
-                // would muddy the overlap). Legend is rendered in the header
-                // (actions) instead of nivo's in-plot legend.
-                enableArea: false,
+                // Two cumulative lines plus a budget marker. The gradient area
+                // wash fades to near-nothing at the baseline, so the overlap
+                // stays readable. Legend is rendered in the header (actions)
+                // instead of nivo's in-plot legend.
+                enableArea: true,
                 legend: false,
                 compactTop: true,
                 disableGrowthTooltip: true,
