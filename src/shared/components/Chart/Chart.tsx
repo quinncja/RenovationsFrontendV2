@@ -293,10 +293,17 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
 
 // ─── Bar chart ────────────────────────────────────────────────────────────────
 
-// Lighten (amt > 0) or darken (amt < 0) a hex color by mixing toward
-// white/black. Non-hex inputs (CSS vars etc.) pass through untouched, which
+// Lighten (amt > 0) or darken (amt < 0) a hex or hsl() color by mixing toward
+// white/black. Other inputs (CSS vars etc.) pass through untouched, which
 // degrades a gradient built from them to a flat fill instead of breaking.
 function shadeHex(hex: string, amt: number): string {
+  // hsl(...) strings (colorRamp / hashColor output) shade via lightness.
+  const hs = /^hsl\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*\)$/i.exec(hex)
+  if (hs) {
+    const l = Number(hs[3])
+    const nl = amt >= 0 ? l + (100 - l) * amt : l * (1 + amt)
+    return `hsl(${hs[1]}, ${hs[2]}%, ${Math.round(nl * 10) / 10}%)`
+  }
   const m = /^#([0-9a-f]{6})$/i.exec(hex)
   if (!m) return hex
   const n = parseInt(m[1], 16)
@@ -1419,6 +1426,25 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
   const listTotal = preview.reduce((sum, item) => sum + item.value, 0)
   const total = centerTotal != null ? centerTotal : listTotal
 
+  // Slice depth to match barGradient: one top-to-bottom gradient per distinct
+  // slice color (lighter crown, deeper base) so the whole ring reads lit from
+  // above, plus a faint darker border. Ids namespaced per instance — SVG defs
+  // resolve document-wide.
+  const pieGradId = useId()
+  const pieGradColors = [...new Set(pieData.map((d) => d.color))]
+  const pieDefs = pieGradColors.map((c, i) => ({
+    id: `${pieGradId}pieDepth${i}`,
+    type: "linearGradient",
+    colors: [
+      { offset: 0, color: shadeHex(c, 0.22) },
+      { offset: 100, color: shadeHex(c, -0.18) },
+    ],
+  }))
+  const pieFill = pieData.map((d) => ({
+    match: { id: d.id },
+    id: `${pieGradId}pieDepth${pieGradColors.indexOf(d.color)}`,
+  }))
+
   const primaryFill = dark ? "#e2e8f0" : "#1e293b"
   const subtextFill = dark ? "#94a3b8" : "#64748b"
 
@@ -1462,6 +1488,10 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
           data={pieData}
           theme={nivoTheme}
           colors={{ datum: "data.color" }}
+          defs={pieDefs}
+          fill={pieFill}
+          borderWidth={1}
+          borderColor={{ from: "color", modifiers: [["darker", 0.5]] }}
           margin={{ top: 12, right: 12, bottom: 12, left: 12 }}
           innerRadius={0.55}
           padAngle={2}
