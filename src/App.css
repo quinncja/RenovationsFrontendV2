@@ -5,6 +5,11 @@
   --primary-color: #c27c3e;
   --primary-color-hover: #d18a4c;
   --primary-color-active: #a86a34;
+  /* Copper button texture (shared by every solid-copper action): crown-to-base
+     gradient, soft contact shadow, 1px white top highlight. */
+  --copper-btn-bg: linear-gradient(180deg, var(--primary-color-hover) 0%, var(--primary-color) 100%);
+  --copper-btn-bg-hover: linear-gradient(180deg, color-mix(in srgb, var(--primary-color-hover) 88%, white) 0%, var(--primary-color-hover) 100%);
+  --copper-btn-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28);
   --secondary-color: rgb(from var(--primary-color) r g b / 0.9);
   --background-color: light-dark(#f7f8fd, #1a1714);
   --card-color: light-dark(#ffffff, #262220);
@@ -246,7 +251,8 @@ body{
 .auth-submit {
   margin-top: 0.75rem;
   height: 2.625rem;
-  background: var(--primary-color);
+  background: var(--copper-btn-bg);
+  box-shadow: var(--copper-btn-shadow);
   color: white;
   font-weight: 600;
   border-radius: 6px;
@@ -257,7 +263,7 @@ body{
 }
 
 .auth-submit:hover:not(:disabled) {
-  background: var(--primary-color-hover);
+  background: var(--copper-btn-bg-hover);
 }
 
 /* Neutral gray until the form is actionable; copper only when live. */
@@ -823,14 +829,14 @@ body{
 /* Active state borrows the jobcost segmented thumb (.jc-seg-thumb): copper
    crown-to-base gradient, soft contact shadow, 1px white top highlight. */
 .over-under-toggle--active {
-  background: linear-gradient(180deg, var(--primary-color-hover) 0%, var(--primary-color) 100%);
+  background: var(--copper-btn-bg);
   border-color: transparent;
   color: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  box-shadow: var(--copper-btn-shadow);
 }
 
 .over-under-toggle--active:hover:not(:disabled) {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--primary-color-hover) 88%, white) 0%, var(--primary-color-hover) 100%);
+  background: var(--copper-btn-bg-hover);
   border-color: transparent;
   color: #fff;
 }
@@ -909,12 +915,13 @@ body{
 }
 
 .period-selector-btn--active {
-  background-color: var(--primary-color);
+  background: var(--copper-btn-bg);
+  box-shadow: var(--copper-btn-shadow);
   color: #fff;
 }
 
 .period-selector-btn--active:hover:not(:disabled) {
-  background-color: var(--primary-color);
+  background: var(--copper-btn-bg);
 }
 
 .period-selector-btn:disabled {
@@ -10444,8 +10451,8 @@ button.jc-kind-chip:hover {
   transition: all 140ms ease;
   white-space: nowrap;
 }
-.secondary-button:hover {
-  border-color: var(--primary-text);
+.secondary-button:hover:not(:disabled) {
+  background: var(--hover-bg);
   color: var(--primary-text);
 }
 .secondary-button:disabled {
@@ -10454,8 +10461,12 @@ button.jc-kind-chip:hover {
 }
 
 /* Filled red button for destructive confirmations — pairs with .primary-button. */
+/* Same texture as the copper buttons (--copper-btn-*), keyed to red. */
 .danger-button {
-  background: #ef4444 !important;
+  --danger-color: #ef4444;
+  --danger-color-hover: #f25c5c;
+  background: linear-gradient(180deg, var(--danger-color-hover) 0%, var(--danger-color) 100%) !important;
+  box-shadow: var(--copper-btn-shadow);
   color: #fff !important;
   font-weight: var(--font-weight-semibold);
   font-size: 0.875rem;
@@ -10466,7 +10477,7 @@ button.jc-kind-chip:hover {
   gap: 0.375rem;
 }
 .danger-button:hover {
-  background: #dc2626 !important;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--danger-color-hover) 88%, white) 0%, var(--danger-color-hover) 100%) !important;
 }
 .danger-button:disabled {
   opacity: 0.5;
@@ -10618,12 +10629,13 @@ button.jc-kind-chip:hover {
 }
 
 .edit-mode-toolbar .btn-primary {
-  background: var(--primary-color);
+  background: var(--copper-btn-bg);
+  box-shadow: var(--copper-btn-shadow);
   color: white;
 }
 
 .edit-mode-toolbar .btn-primary:hover:not(:disabled) {
-  background: var(--primary-color-hover);
+  background: var(--copper-btn-bg-hover);
 }
 
 .edit-mode-toolbar .btn-primary:disabled {
@@ -13182,7 +13194,8 @@ svg.placeholder-illustration {
 
 /* ── Primary Button ── */
 .primary-button {
-  background: var(--primary-color) !important;
+  background: var(--copper-btn-bg) !important;
+  box-shadow: var(--copper-btn-shadow);
   color: white !important;
   font-weight: var(--font-weight-semibold);
   font-size: 0.875rem;
@@ -13195,7 +13208,7 @@ svg.placeholder-illustration {
 }
 
 .primary-button:hover {
-  background: var(--primary-color-hover) !important;
+  background: var(--copper-btn-bg-hover) !important;
 }
 
 /* ── Icon Button ── */
@@ -13233,7 +13246,8 @@ svg.placeholder-illustration {
 }
 
 .toggle-button.active {
-  background: var(--primary-color) !important;
+  background: var(--copper-btn-bg) !important;
+  box-shadow: var(--copper-btn-shadow);
   color: white !important;
 }
 
@@ -15591,8 +15605,9 @@ button.co-hero-project:hover svg { color: inherit; }
 
 /* Active filter — the one copper moment in this surface. */
 .rcnt-chip--active {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
+  background: var(--copper-btn-bg);
+  box-shadow: var(--copper-btn-shadow);
+  border-color: transparent;
   color: #fff;
 }
 
@@ -15718,7 +15733,8 @@ button.co-hero-project:hover svg { color: inherit; }
   padding: 0.5625rem 1.375rem;
   border: none;
   border-radius: 8px;
-  background: var(--primary-color);
+  background: var(--copper-btn-bg);
+  box-shadow: var(--copper-btn-shadow);
   color: #fff;
   font-family: var(--font-family);
   font-size: 0.9375rem;
@@ -15728,7 +15744,7 @@ button.co-hero-project:hover svg { color: inherit; }
 }
 
 .idle-overlay-btn:hover {
-  background: var(--primary-color-hover);
+  background: var(--copper-btn-bg-hover);
 }
 
 .idle-overlay-btn:active {
@@ -16825,18 +16841,18 @@ button.co-hero-project:hover svg { color: inherit; }
   height: 3rem;
   border-radius: 999px;
   border: none;
-  background: var(--primary-color);
+  background: var(--copper-btn-bg);
   color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 8px 22px -8px rgb(from var(--primary-color) r g b / 0.65);
+  box-shadow: var(--copper-btn-shadow), 0 8px 22px -8px rgb(from var(--primary-color) r g b / 0.65);
   transition: background-color 0.14s ease;
 }
 
 .arr-advance:hover {
-  background: var(--primary-color-hover);
+  background: var(--copper-btn-bg-hover);
 }
 
 .arr-advance:disabled {
@@ -17195,17 +17211,17 @@ button.co-hero-project:hover svg { color: inherit; }
   height: 3rem;
   border-radius: 999px;
   border: none;
-  background: var(--primary-color);
+  background: var(--copper-btn-bg);
   color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 8px 22px -8px rgb(from var(--primary-color) r g b / 0.65);
+  box-shadow: var(--copper-btn-shadow), 0 8px 22px -8px rgb(from var(--primary-color) r g b / 0.65);
   transition: background-color 0.14s ease;
 }
 .adm-advance:hover {
-  background: var(--primary-color-hover);
+  background: var(--copper-btn-bg-hover);
 }
 .adm-advance:focus-visible {
   outline: 2px solid var(--primary-color);
