@@ -2164,24 +2164,43 @@ span.skel-text {
 /* Drawn-vs-limit meter — same build as the jobcost billing-position meter
    (copper fill on a faint track). The fill turns red when overdrawn rather than
    adding a foreign striped overflow segment. */
+/* Outer shell borrows the pill toggle's look (.over-under-toggle): full-round,
+   gray ground, no border. The 12px fill track sits inset inside. */
 .bank-meter {
   position: relative;
-  height: 12px;
+  box-sizing: border-box;
   margin: 0.6rem 0 0.55rem;
-  border-radius: 6px;
+  padding: 3px;
+  border-radius: 999px;
   background: color-mix(in srgb, var(--primary-text) 9%, transparent);
+  /* Same recessed well as the jobcost segmented toggle (.jc-seg). */
+  box-shadow: inset 0 1px 2px light-dark(rgb(from var(--primary-text) r g b / 0.1), rgba(0, 0, 0, 0.25));
+}
+.bank-meter-track {
+  position: relative;
+  height: 12px;
+  border-radius: 6px;
   overflow: hidden;
 }
+/* Fill mirrors the margin chart's `barGradient` bars: brighter crown fading
+   into a deeper base; the thumb-style shadow gives it lift in the well. */
 .bank-meter-fill {
+  --meter-color: var(--primary-color);
   position: absolute;
   inset: 0 auto 0 0;
   height: 100%;
+  box-sizing: border-box;
   border-radius: 6px;
-  background: var(--primary-color);
+  background: linear-gradient(
+    to left,
+    color-mix(in srgb, var(--meter-color) 78%, white),
+    color-mix(in srgb, var(--meter-color) 82%, black)
+  );
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28);
   transition: width 0.5s ease;
 }
 .bank-meter--over .bank-meter-fill {
-  background: #ef4444;
+  --meter-color: #ef4444;
 }
 .bank-loc-foot {
   display: flex;

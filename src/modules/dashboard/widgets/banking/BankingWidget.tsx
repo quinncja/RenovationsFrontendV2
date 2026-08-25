@@ -231,7 +231,9 @@ export function BankingWidget() {
           <div className="bank-row">
             <span className="bank-row-label">Line of Credit</span>
             <div className={`bank-meter${over ? " bank-meter--over" : ""}`}>
-              <div className="bank-meter-fill" style={{ width: `${Math.min(100, pctDrawn)}%` }} />
+              <div className="bank-meter-track">
+                <div className="bank-meter-fill" style={{ width: `${Math.min(100, pctDrawn)}%` }} />
+              </div>
             </div>
             {locReady && (
               <div className="bank-loc-foot">
