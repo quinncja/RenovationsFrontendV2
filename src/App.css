@@ -13729,7 +13729,11 @@ svg.placeholder-illustration {
   gap: 0.625rem;
 }
 
+/* Glyph badge. Variants set --icon-color; the base rule turns it into the
+   same depth treatment as the meter fill / bar gradient: lighter crown to
+   deeper base, soft contact shadow, 1px white top highlight. */
 .report-icon {
+  --icon-color: #7c8794;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -13740,31 +13744,20 @@ svg.placeholder-illustration {
   font-weight: var(--font-weight-bold);
   font-size: 1rem;
   flex-shrink: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--icon-color) 88%, white),
+    color-mix(in srgb, var(--icon-color) 88%, black)
+  );
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
-.report-icon-red {
-  background: #e0483d;
-}
-
-.report-icon-orange {
-  background: #e8893a;
-}
-
-.report-icon-gray {
-  background: light-dark(#7c8794, #5b6470);
-}
-
-.report-icon-navy {
-  background: #19375a;
-}
-
-.report-icon-teal {
-  background: #2f7d72;
-}
-
-.report-icon-plum {
-  background: #6b4d78;
-}
+.report-icon-red { --icon-color: #e0483d; }
+.report-icon-orange { --icon-color: #e8893a; }
+.report-icon-gray { --icon-color: light-dark(#7c8794, #5b6470); }
+.report-icon-navy { --icon-color: #19375a; }
+.report-icon-teal { --icon-color: #2f7d72; }
+.report-icon-plum { --icon-color: #6b4d78; }
 
 .report-card-count {
   font-size: 2.5rem;
