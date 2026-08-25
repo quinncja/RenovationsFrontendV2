@@ -1196,13 +1196,17 @@ function GradientAreas({
   const zero = Math.min(innerHeight, Math.max(0, yScale(0)))
   const zeroPct = innerHeight > 0 ? (zero / innerHeight) * 100 : 100
   const solid = [...series].reverse().filter((s) => !skip?.(s.id))
+  // Series ids are human labels ("Work Completed"), so they can't go into a
+  // gradient id verbatim: url(#gid-Work Completed) never resolves and the area
+  // falls back to black. Index the defs instead.
+  const gradFor = (i: number) => `${gid}-a${i}`
   return (
     <g pointerEvents="none">
       <defs>
-        {solid.map((serie) => {
+        {solid.map((serie, i) => {
           const c = serie.color ?? CHART_COLORS[0]
           return (
-            <linearGradient key={serie.id} id={`${gid}-${serie.id}`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={innerHeight}>
+            <linearGradient key={serie.id} id={gradFor(i)} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2={innerHeight}>
               <stop offset="0%" stopColor={shadeHex(c, 0.15)} stopOpacity={0.38} />
               <stop offset={`${zeroPct}%`} stopColor={c} stopOpacity={0.02} />
               <stop offset="100%" stopColor={shadeHex(c, -0.15)} stopOpacity={0.38} />
@@ -1210,10 +1214,10 @@ function GradientAreas({
           )
         })}
       </defs>
-      {solid.map((serie) => (
+      {solid.map((serie, si) => (
         <g key={serie.id}>
           {toSegments(serie.data).map((seg, i) => (
-            <path key={i} d={areaGenerator(seg) ?? undefined} fill={`url(#${gid}-${serie.id})`} />
+            <path key={i} d={areaGenerator(seg) ?? undefined} fill={`url(#${gradFor(si)})`} />
           ))}
         </g>
       ))}
