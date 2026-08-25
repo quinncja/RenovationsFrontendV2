@@ -514,12 +514,13 @@ export default function ProjectionsPage() {
       const dir: HistoryToastState["dir"] = key === "y" || e.shiftKey ? "redo" : "undo"
       // flushSync so the replayed value is rendered before the cell is
       // focused: the anchor's onFocus hands the editor the value it shows.
-      let result: ReturnType<typeof undo> = null
+      // Boxed: TS narrows a plain `let` to null across the flushSync callback.
+      const box: { result: ReturnType<typeof undo> } = { result: null }
       flushSync(() => {
-        result = dir === "redo" ? redo() : undo()
+        box.result = dir === "redo" ? redo() : undo()
       })
-      if (!result) return
-      const { label, cell } = result as NonNullable<typeof result>
+      if (!box.result) return
+      const { label, cell } = box.result
       // The cell the step changed becomes the active cell (opens the editor
       // chip on it, scrolling it into view) unless it already is.
       if (cell) {

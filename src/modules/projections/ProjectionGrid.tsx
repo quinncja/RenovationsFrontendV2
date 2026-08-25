@@ -299,6 +299,7 @@ export function useDraftRow({ ordered, scrollRef, onAddRow, onEdit }: DraftRowOp
 
   /** Commit handler for the draft row's cells. */
   const commit = (edit: CellEdit) => {
+    if (edit.rowId == null) return // sheet-level edits never come from a draft row
     if (created.current.has(edit.rowId)) {
       onEdit(edit)
       return

@@ -603,6 +603,9 @@ export function exportProjectionWorkbook(src: ExportSource, filename: string): v
   XLSX.utils.book_append_sheet(wb, ws, `Projections ${src.year}`)
   // Cached values ride along, but ask Excel to recalculate on open so the
   // formulas own the numbers from the first look.
-  wb.Workbook = { ...(wb.Workbook ?? {}), CalcPr: { fullCalcOnLoad: true } }
+  // (CalcPr is written by SheetJS but missing from xlsx-js-style's WBProps
+  // typing; spreading a variable sidesteps the excess-property check.)
+  const calcPr = { CalcPr: { fullCalcOnLoad: true } }
+  wb.Workbook = { ...(wb.Workbook ?? {}), ...calcPr }
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }

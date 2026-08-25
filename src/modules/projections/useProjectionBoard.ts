@@ -332,7 +332,7 @@ export function useProjectionBoard(year: number) {
     if (!current || pendingRef.current.size === 0 || inFlight.current) return
     const edits: CellEdit[] = []
     for (const [key, edit] of pendingRef.current) {
-      if (unbornRows.current.has(edit.rowId)) continue
+      if (edit.rowId != null && unbornRows.current.has(edit.rowId)) continue
       edits.push(edit)
       pendingRef.current.delete(key)
     }
@@ -391,7 +391,7 @@ export function useProjectionBoard(year: number) {
       // Edits typed while the request was in flight — send them now (not
       // after a failure: those are waiting on Retry, and looping would hammer
       // a server that just said no).
-      if (!failed.current && [...pendingRef.current.values()].some((e) => !unbornRows.current.has(e.rowId))) flush()
+      if (!failed.current && [...pendingRef.current.values()].some((e) => e.rowId == null || !unbornRows.current.has(e.rowId))) flush()
     }
   }, [adoptServerSheet, handleWriteError, markSaved])
 
