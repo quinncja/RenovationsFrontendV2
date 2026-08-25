@@ -816,7 +816,7 @@ body{
 }
 
 .over-under-toggle:hover:not(:disabled) {
-  border-color: var(--primary-color);
+  background-color: var(--hover-bg);
   color: var(--primary-text);
 }
 
@@ -4709,7 +4709,7 @@ button.wc-detail-line:focus-visible .wc-detail-line-chevron {
 }
 
 .jc-filter-btn:hover {
-  border-color: var(--primary-text);
+  background: var(--hover-bg);
   color: var(--primary-text);
 }
 
@@ -6574,7 +6574,7 @@ button.jc-kind-chip:hover {
   white-space: nowrap;
 }
 .jc-export-btn:hover {
-  border-color: var(--primary-text);
+  background: var(--hover-bg);
   color: var(--primary-text);
 }
 .jc-export-btn:disabled {
@@ -6609,7 +6609,6 @@ button.jc-kind-chip:hover {
 
 
 .jc-view-project-btn:hover {
-  border-color: var(--primary-color);
   color: var(--primary-color);
   background: color-mix(in srgb, var(--primary-color) 8%, transparent);
 }
@@ -9449,7 +9448,6 @@ button.jc-kind-chip:hover {
 }
 
 .wr-refresh:hover {
-  border-color: var(--primary-color);
   color: var(--primary-text);
   background: light-dark(#ffffff, rgba(26, 23, 20, 0.6));
 }
@@ -11273,8 +11271,8 @@ svg.placeholder-illustration {
 }
 
 .widget-size-toggle:hover {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
+  background: var(--hover-bg);
+  color: var(--primary-text);
 }
 
 .widget-size-toggle.active {
@@ -12075,7 +12073,7 @@ svg.placeholder-illustration {
 }
 
 .settings-toggle:hover {
-  border-color: var(--primary-color);
+  background: var(--hover-bg);
   color: var(--primary-text);
 }
 
@@ -12097,7 +12095,7 @@ svg.placeholder-illustration {
 }
 
 .settings-pill:hover:not(:disabled) {
-  border-color: var(--primary-color);
+  background: var(--hover-bg);
   color: var(--primary-text);
 }
 
@@ -20070,8 +20068,8 @@ button.co-hero-project:hover svg { color: inherit; }
   transition: border-color 140ms ease, color 140ms ease;
 }
 .pj-restore-btn:hover {
-  border-color: var(--primary-color);
-  color: var(--primary-color);
+  background: var(--hover-bg);
+  color: var(--primary-text);
 }
 /* Changes tab: one group per business day. Editorial ledger: an eyebrow
    day label with a hairline rule, then airy rows laid out edge to edge as
