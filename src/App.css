@@ -21389,14 +21389,15 @@ body.pj-painting td.pj-computed {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-  padding: 1.25rem 1.375rem;
+  padding: 1.75rem 2rem 2rem;
+  overflow-y: auto;
   min-width: 0;
   min-height: 0;
 }
 .ohr-detail-title { display: flex; flex-direction: column; gap: 0.25rem; }
 .ohr-detail-title { gap: 0; }
 .ohr-detail-name { margin: 0; line-height: 1.2; }
-.ohr-detail-value { font-size: 1.75rem; margin-top: 0.5rem; }
+.ohr-detail-value { font-size: 1.85rem; margin-top: 0.75rem; }
 .ohr-detail-head-actions { display: flex; align-items: center; gap: 0.75rem; }
 /* Same 3:1 shape as the grid panel's chart, so the morph keeps the line's
    proportions instead of stretching it tall. */
@@ -21406,20 +21407,21 @@ body.pj-painting td.pj-computed {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  margin: 1rem -0.5rem 0 -0.75rem;
+  margin: 2rem -0.5rem 0 -0.75rem;
 }
 .ohr-detail-chart .chart-container { min-height: 0; }
 .ohr-detail-hint {
-  margin: 0.25rem 0 0;
+  margin: 0.75rem 0 0;
   font-size: var(--callout-size);
   color: var(--secondary-text);
+  text-align: center;
 }
 .ohr-detail-pie {
-  margin-top: 1rem;
+  margin-top: 2.25rem;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 .ohr-detail-pie .pie-with-list { justify-content: center; }
 .ohr-detail-pie .pie-with-list-chart--md { width: 220px; }
