@@ -40,7 +40,7 @@ const settleEase = [0.25, 0.46, 0.45, 0.94] as const
 
 const rowsVariants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.035, delayChildren: 0.22 } },
+  show: { transition: { staggerChildren: 0.03, delayChildren: 0.26 } },
   exit: { transition: { staggerChildren: 0.012, staggerDirection: -1 } },
 }
 const rowVariants = {
@@ -88,12 +88,18 @@ export function OverheadCategoryDetail({
   const [openKey, setOpenKey] = useState<number | null>(null)
   const [yearItems, setYearItems] = useState<Record<number, YearItems>>({})
   const listRef = useRef<HTMLDivElement>(null)
+  // The nivo chart mounts only once the morph has landed: measuring and
+  // painting an SVG mid-spring is what made the open stutter.
+  const [settled, setSettled] = useState(false)
 
   // Fresh state per open: the page's current toggle, nothing expanded.
   useEffect(() => {
     if (open) {
       setView(initialView)
       setOpenKey(null)
+      setSettled(false)
+      const t = window.setTimeout(() => setSettled(true), 260)
+      return () => window.clearTimeout(t)
     }
   }, [open, initialView])
 
@@ -215,51 +221,26 @@ export function OverheadCategoryDetail({
               transition={{ layout: openSpring, duration: 0.2, ease: settleEase }}
             >
               {/* ── Left: the panel, grown ── */}
-              <motion.div className="ohr-detail-left" layout>
+              <div className="ohr-detail-left">
                 <motion.div
                   className="ohr-detail-title"
-                  layout="position"
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, transition: { delay: 0.06, duration: 0.22 } }}
+                  animate={{ opacity: 1, transition: { delay: 0.08, duration: 0.22 } }}
                   exit={{ opacity: 0, transition: { duration: 0.08 } }}
                 >
-                  <div className="ohr-multi-head">
-                    <span className="ohr-trend-swatch" style={{ background: category.color }} />
-                    <span className="ohr-multi-name ohr-detail-name">{category.name}</span>
-                    <span className="ohr-multi-pct">{pct != null ? `${pct.toFixed(pct >= 10 ? 0 : 1)}%` : "—"}</span>
-                  </div>
+                  <h2 className="title2 emphasized ohr-detail-name" style={{ color: category.color }}>{category.name}</h2>
+                  <span className="reports-modal-subtitle">
+                    {pct != null ? `${pct.toFixed(pct >= 10 ? 0 : 1)}% of ${view === "monthly" ? `${pageYear} ` : ""}overhead` : "—"}
+                  </span>
                   <div className="ohr-multi-value ohr-detail-value">{formatMoneyFull(total)}</div>
                 </motion.div>
                 <motion.div
-                  className="ohr-detail-toolbar"
-                  layout="position"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, transition: { delay: 0.2, duration: 0.25 } }}
-                  exit={{ opacity: 0, transition: { duration: 0.1 } }}
-                >
-                  <SegmentedControl
-                    variant="ohr"
-                    ariaLabel="Category detail view"
-                    layoutId="ohrDetailViewThumb"
-                    value={view}
-                    options={[
-                      { key: "monthly", label: "Monthly" },
-                      { key: "yearly", label: "Yearly" },
-                    ]}
-                    onChange={(v) => {
-                      setView(v)
-                      setOpenKey(null)
-                    }}
-                  />
-                </motion.div>
-                <motion.div
                   className="ohr-detail-chart"
-                  layout
                   initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, transition: { delay: 0.16, duration: 0.3 } }}
+                  animate={{ opacity: settled ? 1 : 0, transition: { duration: 0.28 } }}
                   exit={{ opacity: 0, transition: { duration: 0.1 } }}
                 >
-                  {series && (
+                  {series && settled && (
                     <Chart
                       config={{
                         type: "line",
@@ -293,12 +274,11 @@ export function OverheadCategoryDetail({
                 >
                   Click a {view === "monthly" ? "month" : "year"} on the chart to open its costs.
                 </motion.p>
-              </motion.div>
+              </div>
 
               {/* ── Right: costs by month | year ── */}
               <motion.div
                 className="ohr-detail-right"
-                layout
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1, transition: { delay: 0.14, duration: 0.24 } }}
                 exit={{ opacity: 0, transition: { duration: 0.1 } }}
@@ -311,9 +291,25 @@ export function OverheadCategoryDetail({
                       {category.id !== "__other__" && category.id !== "OWNERS_SALARY" ? ` · Account ${category.id}` : ""}
                     </span>
                   </div>
-                  <button className="button modal-close" onClick={onClose} aria-label="Close">
-                    <X size={16} />
-                  </button>
+                  <div className="ohr-detail-head-actions">
+                    <SegmentedControl
+                      variant="ohr"
+                      ariaLabel="Category detail view"
+                      layoutId="ohrDetailViewThumb"
+                      value={view}
+                      options={[
+                        { key: "monthly", label: "Monthly" },
+                        { key: "yearly", label: "Yearly" },
+                      ]}
+                      onChange={(v) => {
+                        setView(v)
+                        setOpenKey(null)
+                      }}
+                    />
+                    <button className="button modal-close" onClick={onClose} aria-label="Close">
+                      <X size={16} />
+                    </button>
+                  </div>
                 </div>
                 <motion.div
                   ref={listRef}

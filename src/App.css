@@ -21377,10 +21377,12 @@ body.pj-painting td.pj-computed {
 .ohr-detail {
   pointer-events: auto;
   display: grid;
-  grid-template-columns: minmax(320px, 2fr) 3fr;
-  width: min(1280px, 100%);
-  height: min(860px, 95vh);
+  grid-template-columns: minmax(380px, 11fr) 13fr;
+  width: min(1320px, 100%);
+  /* Only as tall as the cost list needs; scrolls past the viewport cap. */
+  max-height: 95vh;
   overflow: hidden;
+  will-change: transform;
   background: color-mix(in srgb, var(--primary-text) 3%, var(--card-color));
   box-shadow: 0 24px 64px -24px rgba(0, 0, 0, 0.45);
 }
@@ -21393,15 +21395,19 @@ body.pj-painting td.pj-computed {
   min-height: 0;
 }
 .ohr-detail-title { display: flex; flex-direction: column; gap: 0.25rem; }
-.ohr-detail-name { font-size: 0.9rem; }
-.ohr-detail-value { font-size: 1.75rem; }
-.ohr-detail-toolbar { margin-top: 0.75rem; display: flex; }
+.ohr-detail-title { gap: 0; }
+.ohr-detail-name { margin: 0; line-height: 1.2; }
+.ohr-detail-value { font-size: 1.75rem; margin-top: 0.5rem; }
+.ohr-detail-head-actions { display: flex; align-items: center; gap: 0.75rem; }
+/* Same 3:1 shape as the grid panel's chart, so the morph keeps the line's
+   proportions instead of stretching it tall. */
 .ohr-detail-chart {
-  height: 260px;
+  aspect-ratio: 3 / 1;
+  min-height: 160px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  margin: 0.5rem -0.5rem 0 -0.75rem;
+  margin: 1rem -0.5rem 0 -0.75rem;
 }
 .ohr-detail-chart .chart-container { min-height: 0; }
 .ohr-detail-hint {
@@ -21413,6 +21419,7 @@ body.pj-painting td.pj-computed {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  max-height: 95vh;
   min-width: 0;
   background: var(--card-color);
   border-left: 1px solid var(--border-color);
