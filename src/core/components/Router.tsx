@@ -135,7 +135,7 @@ export default function Router() {
             <Route path="/cash-flow" element={<RequireRole allowed={["executive", "admin"]}><CashFlow /></RequireRole>} />
             <Route path="/revenue-map" element={<RequireRole allowed={["executive", "admin"]}><RevenueMap /></RequireRole>} />
             <Route path="/org-chart" element={<RequireRole allowed={["executive", "admin"]}><OrgChart /></RequireRole>} />
-            <Route path="/project-process" element={<RequireRole allowed={["executive", "admin"]}><ProjectProcessPage /></RequireRole>} />
+            <Route path="/project-process" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><ProjectProcessPage /></RequireRole>} />
 
             {/* Users — admin/executive */}
             <Route path="/users" element={<RequireRole allowed={["executive", "admin"]}><Users /></RequireRole>} />

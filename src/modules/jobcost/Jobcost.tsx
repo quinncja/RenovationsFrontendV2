@@ -1675,8 +1675,6 @@ export default function Jobcost() {
   // company list via a toolbar toggle; everyone else always sees all projects.
   const { claims } = useAuth()
   const isManager = claims["role"] === "manager"
-  // The Project Process flowchart route is executive/admin only.
-  const canViewProcess = claims["role"] === "executive" || claims["role"] === "admin"
   const navigate = useNavigate()
   const [showAllProjects, setShowAllProjects] = useLocalStorage("jobcostShowAllProjects", false)
   // The "when" pair (year + phase) starts fresh from the user's default-range
@@ -2174,7 +2172,7 @@ export default function Jobcost() {
       actions={
         isMobile ? (
           <YearSelector value={year} onChange={handleYearChange} allowAllTime />
-        ) : canViewProcess ? (
+        ) : (
           <button
             type="button"
             className="button primary-button"
@@ -2183,7 +2181,7 @@ export default function Jobcost() {
           >
             <Workflow size={16} /> View Project Process Flowchart
           </button>
-        ) : undefined
+        )
       }
     >
       <MotionList className="inv-page-stack">

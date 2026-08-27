@@ -127,6 +127,8 @@ const managerNav: NavEntry[] = [
   // and rejects create/delete; the page hides those affordances.
   navItems.changeOrders,
   navItems.dailyReports,
+  // Top-level for PMs (no Charts group in this nav): the process flowchart.
+  navItems.projectProcess,
 ]
 
 // A General Manager oversees the PMs rather than a single job: same non-admin
@@ -140,6 +142,7 @@ const generalManagerNav: NavEntry[] = [
   navItems.dailyReports,
   navItems.employees,
   navItems.changeOrders,
+  navItems.projectProcess,
 ]
 
 export const roles = {
