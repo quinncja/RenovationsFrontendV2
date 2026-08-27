@@ -1596,17 +1596,24 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
     showPercent = false,
     chartSize = "sm",
     centerTotal,
+    hideList = false,
+    activeId,
+    centerText,
   } = config
   const preview = items.slice(0, previewCount)
+  const hasActive = activeId != null
 
   const dark = useDarkMode()
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
 
+  // With a controlled active slice the rest sit back: same hue, mostly
+  // transparent, so the active one reads as the only solid piece.
   const pieData = preview.map((item, i) => ({
     id: item.id,
     label: item.label,
     value: item.value,
     color: colors[i % colors.length],
+    faded: hasActive && item.id !== activeId,
   }))
 
   const listTotal = preview.reduce((sum, item) => sum + item.value, 0)
@@ -1618,17 +1625,27 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
   // resolve document-wide.
   const pieGradId = useId()
   const pieGradColors = [...new Set(pieData.map((d) => d.color))]
-  const pieDefs = pieGradColors.map((c, i) => ({
-    id: `${pieGradId}pieDepth${i}`,
-    type: "linearGradient",
-    colors: [
-      { offset: 0, color: shadeHex(c, 0.22) },
-      { offset: 100, color: shadeHex(c, -0.18) },
-    ],
-  }))
+  const pieDefs = pieGradColors.flatMap((c, i) => [
+    {
+      id: `${pieGradId}pieDepth${i}`,
+      type: "linearGradient",
+      colors: [
+        { offset: 0, color: shadeHex(c, 0.22) },
+        { offset: 100, color: shadeHex(c, -0.18) },
+      ],
+    },
+    {
+      id: `${pieGradId}pieFaded${i}`,
+      type: "linearGradient",
+      colors: [
+        { offset: 0, color: shadeHex(c, 0.22), opacity: 0.22 },
+        { offset: 100, color: shadeHex(c, -0.18), opacity: 0.22 },
+      ],
+    },
+  ])
   const pieFill = pieData.map((d) => ({
     match: { id: d.id },
-    id: `${pieGradId}pieDepth${pieGradColors.indexOf(d.color)}`,
+    id: `${pieGradId}${d.faded ? "pieFaded" : "pieDepth"}${pieGradColors.indexOf(d.color)}`,
   }))
 
   const primaryFill = dark ? "#e2e8f0" : "#1e293b"
@@ -1642,9 +1659,9 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
           y={centerY - 9}
           textAnchor="middle"
           dominantBaseline="central"
-          style={{ fontSize: 16, fontWeight: 700, fontFamily: "Figtree, -apple-system, sans-serif", fill: primaryFill }}
+          style={{ fontSize: centerText ? 22 : 16, fontWeight: 700, fontFamily: "Figtree, -apple-system, sans-serif", fill: primaryFill }}
         >
-          {formatMoney(total)}
+          {centerText ? centerText.primary : formatMoney(total)}
         </text>
         <text
           x={centerX}
@@ -1653,7 +1670,7 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
           dominantBaseline="central"
           style={{ fontSize: 8, letterSpacing: "0.06em", fontFamily: "Figtree, -apple-system, sans-serif", fill: subtextFill }}
         >
-          {centerLabel}
+          {centerText ? centerText.secondary : centerLabel}
         </text>
       </>
     )
@@ -1676,19 +1693,21 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
           colors={{ datum: "data.color" }}
           defs={pieDefs}
           fill={pieFill}
-          borderWidth={1}
+          borderWidth={hasActive ? 0 : 1}
           borderColor={{ from: "color", modifiers: [["darker", 0.5]] }}
           margin={{ top: 12, right: 12, bottom: 12, left: 12 }}
           innerRadius={0.55}
           padAngle={2}
           cornerRadius={3}
           activeOuterRadiusOffset={6}
+          activeId={hasActive ? activeId : undefined}
+          onActiveIdChange={hasActive ? () => {} : undefined}
           enableArcLabels={false}
           enableArcLinkLabels={false}
           animate
           motionConfig={{ tension: 120, friction: 14 }}
           layers={
-            centerLabel
+            centerLabel || centerText
               ? ["arcs", "arcLabels", "arcLinkLabels", "legends", CenterLayer]
               : ["arcs", "arcLabels", "arcLinkLabels", "legends"]
           }
@@ -1709,7 +1728,7 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
       </div>
       )}
 
-      <ol className="spend-list">
+      {!hideList && <ol className="spend-list">
         {preview.map((item, i) => {
           const pct = total > 0 ? (item.value / total) * 100 : 0
           return (
@@ -1734,7 +1753,7 @@ function PieWithList({ config }: { config: Extract<ChartConfig, { type: "pie-wit
             </li>
           )
         })}
-      </ol>
+      </ol>}
     </div>
   )
 }

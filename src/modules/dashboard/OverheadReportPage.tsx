@@ -24,7 +24,7 @@ import type { LineMarker, SpendItem } from "../../shared/components/Chart/chart.
 import { useOnboarding } from "../../core/onboarding/OnboardingProvider"
 import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
 import { SegmentedControl } from "../../shared/components/SegmentedControl"
-import { OverheadCategoryDetail, catNameLayoutId, catValueLayoutId, type DetailCategory } from "./OverheadCategoryDetail"
+import { OverheadCategoryDetail, ALL_ID, type DetailCategory } from "./OverheadCategoryDetail"
 import { buildCategoryTrend, type CategoryHistoryRow, type TrendGroup } from "./overheadTrend"
 import { useAuth } from "../../core/auth/AuthProvider"
 import { isTechRole } from "../../core/auth/roles"
@@ -612,7 +612,9 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
   // detail morphs out of that panel (layoutId); from the donut, list or Other
   // modal it simply fades in. The panel is only an origin for the top-N
   // categories that have one.
-  const openModal = (id: string, fromPanel = false) => {
+  const openModal = (id: string) => {
+    if (id === ALL_ID) return openAllDetail()
+    if (id === OTHER_ID) return openOtherDetail()
     const cat = categories.find((c) => String(c.account_number) === id)
     if (!cat) return
     const topIdx = topCats.findIndex((c) => String(c.account_number) === id)
@@ -622,7 +624,6 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
       color: topIdx >= 0 ? SERIES_PALETTE[topIdx % SERIES_PALETTE.length] : SERIES_OTHER_COLOR,
       match: (r) => String(r.account_number) === id,
       matchItem: (li) => String(collapseValue(li.lgract)) === id,
-      layoutId: fromPanel && topIdx >= 0 ? `ohr-cat-${id}` : undefined,
     })
   }
 
@@ -635,16 +636,25 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
       color: SERIES_OTHER_COLOR,
       match: (r) => !topIds.has(String(r.account_number)),
       matchItem: (li) => !topIds.has(String(collapseValue(li.lgract))),
-      layoutId: `ohr-cat-${OTHER_ID}`,
     })
   }
+
+  // Every category at once: the detail's donut reaches this by clicking the
+  // active slice.
+  const openAllDetail = () =>
+    setModalCategory({
+      id: ALL_ID,
+      name: "All Overhead",
+      color: BRAND_ORANGE,
+      match: () => true,
+      matchItem: () => true,
+    })
 
   // Donut/list click: the synthetic "Other" slice opens the tail modal; a real
   // category opens its cost detail.
   const handleCatClick = (id: string) => (id === OTHER_ID ? setOtherModalOpen(true) : openModal(id))
-  // Panel click: same, except Other opens as its own category and real
-  // categories grow out of their panel.
-  const handlePanelClick = (id: string) => (id === OTHER_ID ? openOtherDetail() : openModal(id, true))
+  // Panel click: same, except Other opens as its own category.
+  const handlePanelClick = (id: string) => (id === OTHER_ID ? openOtherDetail() : openModal(id))
 
   // Line items span the full posted year while the pie is capped at the open
   // month — cap the modal the same way so its total matches the slice.
@@ -920,31 +930,19 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                 {categoryTrend.series.map((s) => {
                   const pct =
                     categoryTrend.grandTotal > 0 ? (Math.max(s.total, 0) / categoryTrend.grandTotal) * 100 : null
-                  // While a detail is open only its origin panel stays a
-                  // shared element; the rest drop their layoutIds so framer
-                  // isn't re-measuring eleven charts on every layout tick.
-                  const lifted = modalCategory?.layoutId === `ohr-cat-${s.accountId}`
-                  const shared = modalCategory == null || lifted
-                  const spring = { layout: { type: "spring", bounce: 0, visualDuration: 0.42 } } as const
                   return (
-                    <motion.div
+                    <div
                       key={s.id}
-                      className={`ohr-multi-panel${lifted ? " ohr-multi-panel-lifted" : ""}`}
-                      layoutId={shared ? `ohr-cat-${s.accountId}` : undefined}
-                      style={{ borderRadius: 10 }}
+                      className="ohr-multi-panel"
                       onClick={() => handlePanelClick(s.accountId)}
                       title={`View ${s.id} costs`}
                     >
                       <div className="ohr-multi-head">
                         <span className="ohr-trend-swatch" style={{ background: s.color }} />
-                        <motion.span className="ohr-multi-name" layoutId={shared ? catNameLayoutId(s.accountId) : undefined} transition={spring}>
-                          {s.id}
-                        </motion.span>
+                        <span className="ohr-multi-name">{s.id}</span>
                         <span className="ohr-multi-pct">{pct != null ? `${pct.toFixed(pct >= 10 ? 0 : 1)}%` : "—"}</span>
                       </div>
-                      <motion.div className="ohr-multi-value" layoutId={shared ? catValueLayoutId(s.accountId) : undefined} transition={spring}>
-                        {formatMoneyFull(s.total)}
-                      </motion.div>
+                      <div className="ohr-multi-value">{formatMoneyFull(s.total)}</div>
                       <div className="ohr-multi-chart" onClick={(e) => e.stopPropagation()}>
                         <Chart
                           config={{
@@ -970,7 +968,7 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                           }}
                         />
                       </div>
-                    </motion.div>
+                    </div>
                   )
                 })}
               </div>
@@ -1084,6 +1082,9 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
         initialView={categoryTrendView}
         sliceTotals={trendSliceTotals}
         grandTotals={trendGrandTotals}
+        pieItems={pieItems}
+        pieColors={pieColors}
+        onSwitch={openModal}
       />
     </Page>
   )

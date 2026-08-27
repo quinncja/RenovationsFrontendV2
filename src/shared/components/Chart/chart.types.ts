@@ -264,4 +264,10 @@ export type ChartConfig =
       chartSize?: "sm" | "md" | "lg"
       /** Override the center total (defaults to sum of displayed items) */
       centerTotal?: number | null
+      /** Donut only, no ranked list beside it. */
+      hideList?: boolean
+      /** Controlled active slice (popped out); every other slice fades. */
+      activeId?: string | null
+      /** Replace the center's money + label with arbitrary text. */
+      centerText?: { primary: string; secondary?: string }
     }

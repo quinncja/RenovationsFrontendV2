@@ -13273,14 +13273,7 @@ svg.placeholder-illustration {
   min-width: 0;
 }
 .ohr-multi-panel:hover { background: var(--hover-bg); }
-/* While its detail modal is open the panel is only the surface the modal
-   grew out of: its content hides instantly so the morph is one gray slab
-   growing, not two copies of the text crossfading at different scales. */
-.ohr-multi-panel-lifted .ohr-multi-chart,
-.ohr-multi-panel-lifted .ohr-trend-swatch,
-.ohr-multi-panel-lifted .ohr-multi-pct { visibility: hidden; }
-/* Everything that isn't a shared element simply appears once the morph has
-   landed: a short CSS fade, no per-item choreography competing for frames. */
+/* Detail content appears with one short fade once the card has landed. */
 .ohr-detail-static { opacity: 0; }
 .ohr-detail-static.is-in { opacity: 1; transition: opacity 160ms ease-out; }
 .ohr-multi-head {
@@ -21386,7 +21379,7 @@ body.pj-painting td.pj-computed {
   grid-template-columns: minmax(380px, 11fr) 13fr;
   width: min(1320px, 100%);
   /* Fixed height in both views; the cost list scrolls inside. */
-  height: min(860px, 92vh);
+  height: min(740px, 88vh);
   overflow: hidden;
   will-change: transform;
   background: color-mix(in srgb, var(--primary-text) 3%, var(--card-color));
@@ -21421,6 +21414,16 @@ body.pj-painting td.pj-computed {
   font-size: var(--callout-size);
   color: var(--secondary-text);
 }
+.ohr-detail-pie {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+.ohr-detail-pie .pie-with-list { justify-content: center; }
+.ohr-detail-pie .pie-with-list-chart--md { width: 220px; }
+.ohr-detail-pie .ohr-detail-hint { text-align: center; }
 .ohr-detail-right {
   display: flex;
   flex-direction: column;

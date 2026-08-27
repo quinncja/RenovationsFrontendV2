@@ -9,7 +9,7 @@ import { collapseValue } from "../../shared/components/MonthlyDetailTable/Monthl
 import { useModalLayer } from "../../shared/hooks/useModalLayer"
 import { fetchPageData } from "../../shared/api/pageApi"
 import { shortMonth, fullMonth, formatMoneyFull, formatDate } from "../../shared/utils/format"
-import type { LineMarker } from "../../shared/components/Chart/chart.types"
+import type { LineMarker, SpendItem } from "../../shared/components/Chart/chart.types"
 import { buildCategoryTrend, type CategoryHistoryRow, type TrendGroup, type TrendView, type TrendSeries } from "./overheadTrend"
 
 type LineItem = Record<string, unknown>
@@ -25,8 +25,6 @@ export interface DetailCategory {
   match: (r: CategoryHistoryRow) => boolean
   /** Same test against a line item. */
   matchItem: (li: LineItem) => boolean
-  /** Which panel to morph out of; absent when opened from the donut/list. */
-  layoutId?: string
 }
 
 /** Line items for one posting year. The page already holds the selected
@@ -35,11 +33,9 @@ type YearItems = LineItem[] | "loading" | "error"
 
 const PRIOR_YEAR_DOT_COLOR = "#a9b2be"
 
-const openSpring = { type: "spring", bounce: 0, visualDuration: 0.42 } as const
 
-/** Shared-element ids: the panel's name and total morph into the modal's. */
-export const catNameLayoutId = (id: string) => `ohr-cat-name-${id}`
-export const catValueLayoutId = (id: string) => `ohr-cat-value-${id}`
+/** Sentinel category id for the "every category" view. */
+export const ALL_ID = "__all__"
 
 /**
  * Full-screen category drill-down. The left pane is the Category Trend panel
@@ -59,6 +55,9 @@ export function OverheadCategoryDetail({
   initialView,
   sliceTotals,
   grandTotals,
+  pieItems,
+  pieColors,
+  onSwitch,
 }: {
   category: DetailCategory | null
   onClose: () => void
@@ -73,11 +72,19 @@ export function OverheadCategoryDetail({
   sliceTotals: Record<TrendView, Record<string, number>>
   /** All-category overhead for each view's range (the share denominator). */
   grandTotals: Record<TrendView, number>
+  /** The report's category donut (same items + colors), shown under the
+   *  chart. Clicking another slice switches the detail to that category;
+   *  clicking the active one widens to every category. */
+  pieItems: SpendItem[]
+  pieColors: string[]
+  onSwitch: (id: string) => void
 }) {
   const open = category !== null
   const { overlayZ, contentZ } = useModalLayer(open)
   const [view, setView] = useState<TrendView>(initialView)
   const [openKey, setOpenKey] = useState<number | null>(null)
+  // Switching category keeps the view but closes any open row.
+  useEffect(() => setOpenKey(null), [category?.id])
   const [yearItems, setYearItems] = useState<Record<number, YearItems>>({})
   const listRef = useRef<HTMLDivElement>(null)
   // The nivo chart mounts only once the morph has landed: measuring and
@@ -90,7 +97,7 @@ export function OverheadCategoryDetail({
       setView(initialView)
       setOpenKey(null)
       setSettled(false)
-      const t = window.setTimeout(() => setSettled(true), 300)
+      const t = window.setTimeout(() => setSettled(true), 120)
       return () => window.clearTimeout(t)
     }
   }, [open, initialView])
@@ -186,7 +193,11 @@ export function OverheadCategoryDetail({
     ? [{ axis: "x", value: selectedX, lineStyle: { stroke: category?.color, strokeWidth: 1.5, strokeDasharray: "3 4", strokeOpacity: 0.9 } }]
     : undefined
   const total = series?.total ?? 0
-  const pct = grandTotals[view] > 0 ? (Math.max(total, 0) / grandTotals[view]) * 100 : null
+  const isAll = category?.id === ALL_ID
+  const pct = isAll ? 100 : grandTotals[view] > 0 ? (Math.max(total, 0) / grandTotals[view]) * 100 : null
+  const pieTotal = pieItems.reduce((s, it) => s + it.value, 0)
+  const activeItem = !isAll ? pieItems.find((it) => it.id === category?.id) : undefined
+  const piePct = isAll ? 100 : activeItem && pieTotal > 0 ? (activeItem.value / pieTotal) * 100 : null
 
   return createPortal(
     <AnimatePresence>
@@ -207,34 +218,22 @@ export function OverheadCategoryDetail({
             <motion.div
               key="card"
               className="ohr-detail"
-              layoutId={category.layoutId}
               style={{ borderRadius: 16 }}
-              initial={category.layoutId ? undefined : { opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={category.layoutId ? undefined : { opacity: 0, scale: 0.96, transition: { duration: 0.16 } }}
-              transition={{ layout: openSpring, duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
+              transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
             >
               {/* ── Left: the panel, grown ── */}
               <div className="ohr-detail-left">
                 <div className="ohr-detail-title">
-                  <motion.h2
-                    className="title2 emphasized ohr-detail-name"
-                    style={{ color: category.color }}
-                    layoutId={category.layoutId ? catNameLayoutId(category.id) : undefined}
-                    transition={{ layout: openSpring }}
-                  >
+                  <h2 className="title2 emphasized ohr-detail-name" style={{ color: category.color }}>
                     {category.name}
-                  </motion.h2>
+                  </h2>
                   <span className={`reports-modal-subtitle ohr-detail-static${settled ? " is-in" : ""}`}>
                     {pct != null ? `${pct.toFixed(pct >= 10 ? 0 : 1)}% of ${view === "monthly" ? `${pageYear} ` : ""}overhead` : "—"}
                   </span>
-                  <motion.div
-                    className="ohr-multi-value ohr-detail-value"
-                    layoutId={category.layoutId ? catValueLayoutId(category.id) : undefined}
-                    transition={{ layout: openSpring }}
-                  >
-                    {formatMoneyFull(total)}
-                  </motion.div>
+                  <div className="ohr-multi-value ohr-detail-value">{formatMoneyFull(total)}</div>
                 </div>
                 <div className={`ohr-detail-chart ohr-detail-static${settled ? " is-in" : ""}`}>
                   {series && settled && (
@@ -268,6 +267,27 @@ export function OverheadCategoryDetail({
                 <p className={`ohr-detail-hint ohr-detail-static${settled ? " is-in" : ""}`}>
                   Click a {view === "monthly" ? "month" : "year"} on the chart to open its costs.
                 </p>
+                <div className={`ohr-detail-pie ohr-detail-static${settled ? " is-in" : ""}`}>
+                  <Chart
+                    config={{
+                      type: "pie-with-list",
+                      items: pieItems,
+                      previewCount: pieItems.length,
+                      colors: pieColors,
+                      chartSize: "md",
+                      hideList: true,
+                      activeId: isAll ? null : category.id,
+                      centerText: {
+                        primary: piePct != null ? `${piePct.toFixed(piePct >= 10 ? 0 : 1)}%` : "—",
+                        secondary: isAll ? "ALL CATEGORIES" : "OF OVERHEAD",
+                      },
+                      onItemClick: (id) => onSwitch(id === category.id ? ALL_ID : id),
+                    }}
+                  />
+                  <p className="ohr-detail-hint">
+                    {isAll ? "Click a slice to focus one category." : "Click another slice to switch, or this one for all categories."}
+                  </p>
+                </div>
               </div>
 
               {/* ── Right: costs by month | year ── */}
@@ -277,7 +297,7 @@ export function OverheadCategoryDetail({
                     <h2 className="title2 emphasized">Costs</h2>
                     <span className="reports-modal-subtitle">
                       {view === "monthly" ? `${pageYear}, by month` : "By year"}
-                      {category.id !== "__other__" && category.id !== "OWNERS_SALARY" ? ` · Account ${category.id}` : ""}
+                      {category.id !== "__other__" && category.id !== "OWNERS_SALARY" && !isAll ? ` · Account ${category.id}` : ""}
                     </span>
                   </div>
                   <div className="ohr-detail-head-actions">
