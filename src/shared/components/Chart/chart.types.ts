@@ -218,6 +218,9 @@ export type ChartConfig =
        *  `label` swaps "Projected" for e.g. a prior year; `invertColor` reads
        *  a positive delta as bad (spending above last year = red). */
       planTooltip?: { delta?: boolean; label?: string; invertColor?: boolean }
+      /** Keep dashed series in the tooltip as ordinary rows (prior-year
+       *  comparison look) instead of hiding them behind `planTooltip`. */
+      dashedSeriesAsRows?: boolean
       /** Multi-series slice tooltip variant for "composition over time" charts:
        *  rows ranked by value at that slice, each carrying its share of the
        *  slice total, with a Total footer. Implies no growth row. */

@@ -160,7 +160,7 @@ function everyOtherYTicks(series: LineSeries[], ceiling?: number, divisions = 8)
 
 // ─── Slice tooltip ────────────────────────────────────────────────────────────
 
-function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel, overlayIds, planTooltip, share, shareTotals, shareLabel, airy }: {
+function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel, overlayIds, planTooltip, share, shareTotals, shareLabel, overlayAsRows }: {
   slice: { points: readonly { data: { x: unknown; y: unknown }; seriesId: string }[] }
   series: LineSeries[]
   valueFormat?: (v: number) => string
@@ -171,8 +171,8 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   share?: boolean
   shareTotals?: Record<string, number>
   shareLabel?: string
-  /** Sparkline panels: borderless, softer, roomier tooltip to match. */
-  airy?: boolean
+  /** Treat dashed overlay series as ordinary data rows (year-vs-year look). */
+  overlayAsRows?: boolean
 }) {
   const points = slice.points
   const xLabel = String(points[0]?.data?.x ?? "")
@@ -186,7 +186,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   // With `planTooltip` set, the overlay's value at this slice surfaces as a
   // footer row in the growth row's visual language instead — built lazily per
   // branch, where the actual value to compare against is known.
-  const isOverlay = (id: string | number) => overlayIds?.includes(String(id)) ?? false
+  const isOverlay = (id: string | number) => (!overlayAsRows && overlayIds?.includes(String(id))) ?? false
   const coreSeries = series.filter((s) => !isOverlay(s.id))
   const planPoint = points.find((p) => isOverlay(p.seriesId))
   const planValue = planTooltip != null ? ((planPoint?.data.y as number | null | undefined) ?? null) : null
@@ -235,7 +235,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
       : undefined
 
     return (
-      <div className={`chart-line-tooltip${airy ? " chart-line-tooltip--airy" : ""}`}>
+      <div className="chart-line-tooltip">
         <TooltipPing />
         <div className="chart-line-tooltip-header">{headerLabel}</div>
         <div className="chart-line-tooltip-single-value">{fmt(currVal)}</div>
@@ -364,6 +364,15 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
             <span className="chart-line-tooltip-growth-value" style={{ color: growthColor }}>
               {growth >= 0 ? "↗" : "↘"} {growth > 0 ? "+" : ""}{growth.toFixed(1)}%
             </span>
+          </div>
+        </>
+      )}
+      {shareTotals?.[xLabel] != null && shareTotals[xLabel] > 0 && currentRow?.value != null && (
+        <>
+          {growth == null && <div className="chart-line-tooltip-divider" />}
+          <div className="chart-line-tooltip-growth-row">
+            <span className="chart-line-tooltip-growth-label">Share of {shareLabel ?? "total"}:</span>
+            <span className="chart-line-tooltip-growth-value">{((currentRow.value / shareTotals[xLabel]) * 100).toFixed(1)}%</span>
           </div>
         </>
       )}
@@ -1356,7 +1365,7 @@ function buildDashedSeriesLayers(dashedIds: string[], dotted = false) {
 }
 
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
-  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip, topBand, sliceShare, sliceShareTotals, yTickCount, stacked = false, sparkline = false, sliceShareLabel } = config
+  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip, topBand, sliceShare, sliceShareTotals, yTickCount, stacked = false, sparkline = false, sliceShareLabel, dashedSeriesAsRows } = config
 
   // Dashed-overlay mode swaps the stock areas/lines layers for versions that
   // stroke the listed series dashed and skip their area fill. Muted highlight
@@ -1485,7 +1494,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       }
       enableSlices="x"
       tooltip={() => null}
-      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} overlayIds={dashedSeriesIds} planTooltip={planTooltip} share={sliceShare} shareTotals={sliceShareTotals} shareLabel={sliceShareLabel} airy={sparkline} />}
+      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} overlayIds={dashedSeriesIds} planTooltip={planTooltip} share={sliceShare} shareTotals={sliceShareTotals} shareLabel={sliceShareLabel} overlayAsRows={dashedSeriesAsRows} />}
       axisLeft={sparkline ? {
         tickSize: 0,
         tickPadding: 6,

@@ -700,11 +700,10 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
         x: x.label,
         y: x.posted ? raw.filter((r) => g.match(r) && inScope(r, x.key)).reduce((s, r) => s + (r.net || 0), 0) : null,
       }))
-      // Monthly view: the same months of the prior year, capped at the last
-      // posted month so the panel's delta is apples-to-apples mid-year.
+      // Monthly view: the whole prior year, so the axis always spans Jan–Dec
+      // and the dotted line shows where the rest of this year is headed.
       const prevData = monthly
         ? xs
-            .filter((x) => x.posted)
             .map((x) => ({
               x: x.label,
               y: raw
@@ -1124,19 +1123,21 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                           config={{
                             type: "line",
                             sparkline: true,
-                            // Sparklines have no axis, so plotting unposted
-                            // months as gaps just looks cut off — trim them.
-                            // Monthly view overlays the prior year as a muted
-                            // dashed line over the same posted months.
+                            // Monthly view keeps unposted months as null so
+                            // the axis spans the full year; the prior year is
+                            // dotted underneath across all twelve months.
+                            // Series are named by year so the tooltip reads
+                            // like the year-vs-year charts (prior row, current
+                            // row, growth), then the share-of-month footer.
                             series: [
-                              { id: s.id, color: s.color, data: s.data.filter((p) => p.y != null) },
-                              ...(s.prevData ? [{ id: "__prev__", color: PRIOR_YEAR_DOT_COLOR, data: s.prevData }] : []),
+                              { id: s.prevData ? String(pageYear) : s.id, color: s.color, data: s.prevData ? s.data : s.data.filter((p) => p.y != null) },
+                              ...(s.prevData ? [{ id: String(lastYear), color: PRIOR_YEAR_DOT_COLOR, data: s.prevData }] : []),
                             ],
-                            dashedSeriesIds: s.prevData ? ["__prev__"] : undefined,
-                            planTooltip: s.prevData ? { delta: true, label: String(lastYear), invertColor: true } : undefined,
+                            dashedSeriesIds: s.prevData ? [String(lastYear)] : undefined,
+                            dashedSeriesAsRows: true,
                             curve: "monotoneX",
                             yFormat: formatMoneyFull,
-                            disableGrowthTooltip: true,
+                            disableGrowthTooltip: !s.prevData,
                             sliceShareTotals: categoryTrend.sliceTotals,
                             sliceShareLabel: categoryTrendView === "monthly" ? "month" : "year",
                           }}

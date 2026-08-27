@@ -13320,32 +13320,6 @@ svg.placeholder-illustration {
 
 /* Share-of-slice tooltip rows: value, a thin share bar, percent. The bar
    makes the composition readable at a glance across a dozen rows. */
-.chart-line-tooltip--airy {
-  border: none;
-  border-radius: 12px;
-  padding: 10px 14px 8px;
-  gap: 4px;
-  min-width: 180px;
-  box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), 0 1px 3px rgba(15, 23, 42, 0.06);
-}
-.chart-line-tooltip--airy .chart-line-tooltip-header {
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  margin-bottom: 0;
-}
-.chart-line-tooltip--airy .chart-line-tooltip-single-value {
-  font-size: 1.35rem;
-  font-weight: var(--font-weight-semibold);
-  margin: 0 0 6px;
-}
-.chart-line-tooltip--airy .chart-line-tooltip-divider {
-  background: color-mix(in srgb, var(--border-color) 55%, transparent);
-  margin: 2px 0;
-}
-.chart-line-tooltip--airy .chart-line-tooltip-growth-row { padding: 3px 0; gap: 28px; }
-.chart-line-tooltip--airy .chart-line-tooltip-growth-label { font-size: 0.78rem; }
-.chart-line-tooltip--airy .chart-line-tooltip-growth-value { font-size: 0.82rem; font-variant-numeric: tabular-nums; }
-
 .chart-line-tooltip--share { min-width: 320px; }
 .chart-line-tooltip--share .chart-line-tooltip-row { gap: 16px; padding: 1px 0; }
 .chart-line-tooltip--share .chart-line-tooltip-label {
