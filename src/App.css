@@ -21445,7 +21445,10 @@ body.pj-painting td.pj-computed {
 .ohr-detail-list {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  /* Always reserve the gutter so an expanding row doesn't shift the list
+     sideways the moment it overflows. */
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
   padding: 0 1.375rem 1.375rem;
   display: flex;
   flex-direction: column;
