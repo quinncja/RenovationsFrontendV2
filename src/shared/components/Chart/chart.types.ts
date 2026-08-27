@@ -214,8 +214,10 @@ export type ChartConfig =
        *  row in the growth row's visual language. With `delta` set, slices
        *  where the primary series also has a value read "vs Projected: +$X"
        *  (green ahead / red behind); slices where only the plan has a value —
-       *  and all slices without `delta` — read "Projected: $X" in neutral ink. */
-      planTooltip?: { delta?: boolean }
+       *  and all slices without `delta` — read "Projected: $X" in neutral ink.
+       *  `label` swaps "Projected" for e.g. a prior year; `invertColor` reads
+       *  a positive delta as bad (spending above last year = red). */
+      planTooltip?: { delta?: boolean; label?: string; invertColor?: boolean }
       /** Multi-series slice tooltip variant for "composition over time" charts:
        *  rows ranked by value at that slice, each carrying its share of the
        *  slice total, with a Total footer. Implies no growth row. */

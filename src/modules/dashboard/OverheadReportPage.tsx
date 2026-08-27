@@ -697,7 +697,28 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
         x: x.label,
         y: x.posted ? raw.filter((r) => g.match(r) && inScope(r, x.key)).reduce((s, r) => s + (r.net || 0), 0) : null,
       }))
-      return { id: g.id, accountId: g.accountId, color: g.color, data: points, total: points.reduce((s, p) => s + (p.y ?? 0), 0) }
+      // Monthly view: the same months of the prior year, capped at the last
+      // posted month so the panel's delta is apples-to-apples mid-year.
+      const prevData = monthly
+        ? xs
+            .filter((x) => x.posted)
+            .map((x) => ({
+              x: x.label,
+              y: raw
+                .filter((r) => g.match(r) && r.year === pageYear - 1 && r.month === x.key)
+                .reduce((s, r) => s + (r.net || 0), 0),
+            }))
+        : null
+      const hasPrev = prevData != null && raw.some((r) => g.match(r) && r.year === pageYear - 1)
+      return {
+        id: g.id,
+        accountId: g.accountId,
+        color: g.color,
+        data: points,
+        total: points.reduce((s, p) => s + (p.y ?? 0), 0),
+        prevData: hasPrev ? prevData : null,
+        prevTotal: hasPrev ? prevData!.reduce((s, p) => s + p.y, 0) : null,
+      }
     })
     const grandTotal = series.reduce((s, x) => s + Math.max(x.total, 0), 0)
     // Whole-period overhead per x (every category, not just the drawn lines)
@@ -1059,7 +1080,7 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
             title="Category Trend"
             description={
               categoryTrendView === "monthly"
-                ? `Each category on its own scale, ${pageYear}. Hover for the share of that month; click a category for its costs.`
+                ? `Each category on its own scale, ${pageYear}, with ${lastYear} dashed behind it. Hover for the share of that month; click a category for its costs.`
                 : "Each category on its own scale, every year. Hover for the share of that year; click a category for its costs."
             }
             loading={isLoading}
@@ -1095,7 +1116,23 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                         <span className="ohr-multi-name">{s.id}</span>
                         <span className="ohr-multi-pct">{pct != null ? `${pct.toFixed(pct >= 10 ? 0 : 1)}%` : "—"}</span>
                       </div>
-                      <div className="ohr-multi-value">{formatMoneyFull(s.total)}</div>
+                      <div className="ohr-multi-value">
+                        {formatMoneyFull(s.total)}
+                        {s.prevTotal != null && (() => {
+                          const delta = s.total - s.prevTotal
+                          const pctDelta = s.prevTotal !== 0 ? (delta / Math.abs(s.prevTotal)) * 100 : null
+                          const up = delta >= 0
+                          return (
+                            <span
+                              className={`ohr-multi-delta${Math.abs(delta) < 1 ? "" : up ? " ohr-multi-delta--up" : " ohr-multi-delta--down"}`}
+                              title={`${formatMoneyFull(s.prevTotal)} same period ${lastYear}`}
+                            >
+                              {Math.abs(delta) < 1 ? null : up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                              {pctDelta != null ? `${Math.abs(pctDelta).toFixed(0)}%` : formatMoneyFull(Math.abs(delta))} vs {lastYear}
+                            </span>
+                          )
+                        })()}
+                      </div>
                       <div className="ohr-multi-chart" onClick={(e) => e.stopPropagation()}>
                         <Chart
                           config={{
@@ -1103,7 +1140,14 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                             sparkline: true,
                             // Sparklines have no axis, so plotting unposted
                             // months as gaps just looks cut off — trim them.
-                            series: [{ id: s.id, color: s.color, data: s.data.filter((p) => p.y != null) }],
+                            // Monthly view overlays the prior year as a muted
+                            // dashed line over the same posted months.
+                            series: [
+                              { id: s.id, color: s.color, data: s.data.filter((p) => p.y != null) },
+                              ...(s.prevData ? [{ id: "__prev__", color: PREVIOUS_YEAR_COLOR, data: s.prevData }] : []),
+                            ],
+                            dashedSeriesIds: s.prevData ? ["__prev__"] : undefined,
+                            planTooltip: s.prevData ? { delta: true, label: String(lastYear), invertColor: true } : undefined,
                             curve: "monotoneX",
                             yFormat: formatMoneyFull,
                             disableGrowthTooltip: true,

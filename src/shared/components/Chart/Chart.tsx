@@ -167,7 +167,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   disableGrowth?: boolean
   wipMonthLabel?: string | null
   overlayIds?: string[]
-  planTooltip?: { delta?: boolean }
+  planTooltip?: { delta?: boolean; label?: string; invertColor?: boolean }
   share?: boolean
   shareTotals?: Record<string, number>
   shareLabel?: string
@@ -197,14 +197,16 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   const planFooter = (actual: number | null) => {
     if (planValue == null || planIsAnchor) return null
     const delta = planTooltip?.delta && actual != null ? actual - planValue : null
+    const planLabel = planTooltip?.label ?? "Projected"
+    const good = delta != null && (planTooltip?.invertColor ? delta <= 0 : delta >= 0)
     return (
       <>
         <div className="chart-line-tooltip-divider" />
         <div className="chart-line-tooltip-growth-row">
-          <span className="chart-line-tooltip-growth-label">{delta != null ? "vs Projected:" : "Projected:"}</span>
+          <span className="chart-line-tooltip-growth-label">{delta != null ? `vs ${planLabel}:` : `${planLabel}:`}</span>
           <span
             className="chart-line-tooltip-growth-value"
-            style={delta != null ? { color: delta >= 0 ? "#22c55e" : "#ef4444" } : undefined}
+            style={delta != null ? { color: good ? "#22c55e" : "#ef4444" } : undefined}
           >
             {delta != null ? `${delta >= 0 ? "+" : "−"}${fmt(Math.abs(delta))}` : fmt(planValue)}
           </span>
