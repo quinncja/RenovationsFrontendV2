@@ -26,6 +26,8 @@ import type { LineMarker, SpendItem } from "../../shared/components/Chart/chart.
 import { useOnboarding } from "../../core/onboarding/OnboardingProvider"
 import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
 import { SegmentedControl } from "../../shared/components/SegmentedControl"
+import { useAuth } from "../../core/auth/AuthProvider"
+import { isTechRole } from "../../core/auth/roles"
 
 // Full overhead-spending report (Finances → Overhead Report). Where the
 // dashboard's /dashboard/breakdown/overhead drill-down shows one chart and
@@ -59,6 +61,9 @@ interface MonthRow {
 interface CategoryRow {
   account_number: number | string
   account_name: string
+  /** Real 6xxx account; differs from account_number only for the virtual
+   *  Owners Salary split (see OWNERS_SALARY_ID). */
+  parent_account?: number | string
   current_amount: number
   previous_amount: number
 }
@@ -71,6 +76,7 @@ interface AnnualRow {
 interface CategoryHistoryRow {
   account_number: number | string
   account_name: string
+  parent_account?: number | string
   year: number
   month: number
   net: number
@@ -82,6 +88,37 @@ interface OpenMonthPayload {
 }
 
 type LineItem = Record<string, unknown>
+
+// The backend splits ledger transactions described "Monthly Draw" out of their
+// real account into this virtual one. Only the tech role sees it as its own
+// category for now; every other role gets the rows folded back into the parent
+// account so their numbers are unchanged.
+const OWNERS_SALARY_ID = "OWNERS_SALARY"
+
+function foldOwnersSalary<T extends { account_number: number | string; parent_account?: number | string }>(
+  rows: T[],
+  keyOf: (r: T) => string,
+  merge: (into: T, from: T) => void,
+  restoreName: (r: T, parentName: string | undefined) => T,
+): T[] {
+  const namesByAccount = new Map<string, string>()
+  rows.forEach((r) => {
+    if (String(r.account_number) !== OWNERS_SALARY_ID)
+      namesByAccount.set(String(r.account_number), (r as unknown as { account_name: string }).account_name)
+  })
+  const out = new Map<string, T>()
+  rows.forEach((r) => {
+    const isDraw = String(r.account_number) === OWNERS_SALARY_ID
+    const base = isDraw
+      ? restoreName({ ...r, account_number: r.parent_account ?? r.account_number }, namesByAccount.get(String(r.parent_account)))
+      : { ...r }
+    const k = keyOf(base)
+    const existing = out.get(k)
+    if (existing) merge(existing, base)
+    else out.set(k, base)
+  })
+  return Array.from(out.values())
+}
 
 interface PageData extends Record<string, unknown> {
   monthlyOverheadComparison: MonthRow[] | null
@@ -460,12 +497,48 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
   const openMonth = data?.openMonthFinances?.openMonthPeriod ?? null
   const openYear = data?.openMonthFinances?.openMonthYear ?? null
 
+  const { claims } = useAuth()
+  const showOwnersSalary = isTechRole(claims["role"] as string | undefined)
+
   const categories = useMemo(() => {
     const raw = data?.overheadCategoryComparison
-    return Array.isArray(raw) ? raw : []
-  }, [data])
+    if (!Array.isArray(raw)) return []
+    if (showOwnersSalary) return raw
+    return foldOwnersSalary(
+      raw,
+      (r) => String(r.account_number),
+      (into, from) => {
+        into.current_amount = (into.current_amount || 0) + (from.current_amount || 0)
+        into.previous_amount = (into.previous_amount || 0) + (from.previous_amount || 0)
+      },
+      (r, name) => ({ ...r, account_name: name ?? r.account_name }),
+    )
+  }, [data, showOwnersSalary])
 
-  const lineItems = data?.overheadLineItems ?? null
+  const categoryHistory = useMemo(() => {
+    const raw = data?.overheadCategoryHistory
+    if (!Array.isArray(raw)) return raw
+    if (showOwnersSalary) return raw
+    return foldOwnersSalary(
+      raw,
+      (r) => `${r.account_number}|${r.year}|${r.month}`,
+      (into, from) => {
+        into.net = (into.net || 0) + (from.net || 0)
+      },
+      (r, name) => ({ ...r, account_name: name ?? r.account_name }),
+    )
+  }, [data, showOwnersSalary])
+
+  // Line items keep their real lgract from the backend; for the tech role the
+  // Monthly Draw rows are re-keyed to the virtual account so the category
+  // modal and Monthly Spending table agree with the donut.
+  const lineItems = useMemo(() => {
+    const raw = data?.overheadLineItems ?? null
+    if (!raw || !showOwnersSalary) return raw
+    return raw.map((li) =>
+      Number(li.is_owner_draw) === 1 ? { ...li, lgract: OWNERS_SALARY_ID, category: "Owners Salary" } : li,
+    )
+  }, [data, showOwnersSalary])
 
   // ── Totals (both sides capped at the same month by the backend query) ──
   const totalCurrent = categories.reduce((s, c) => s + (c.current_amount || 0), 0)
@@ -585,7 +658,7 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
   // year, month-13 adjustments included so totals reconcile with Annual
   // Overhead. Each entry also carries its total over the shown range.
   const categoryTrend = useMemo(() => {
-    const raw = data?.overheadCategoryHistory
+    const raw = categoryHistory
     if (!Array.isArray(raw) || raw.length === 0 || topCats.length === 0) return null
     const topIds = new Set(topCats.map((c) => String(c.account_number)))
     const groups = [
@@ -634,7 +707,7 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
       if (x.posted) sliceTotals[x.label] = series.reduce((s, ser) => s + (ser.data[i].y ?? 0), 0)
     })
     return { series, grandTotal, lastPosted, sliceTotals }
-  }, [data, topCats, restCats, pageYear, categoryTrendView])
+  }, [categoryHistory, topCats, restCats, pageYear, categoryTrendView])
 
   // ── Top movers vs last year ──
   // Ranked by whichever metric the widget's toggle has in the lead. Percent
