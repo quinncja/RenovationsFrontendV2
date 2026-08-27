@@ -920,23 +920,29 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                 {categoryTrend.series.map((s) => {
                   const pct =
                     categoryTrend.grandTotal > 0 ? (Math.max(s.total, 0) / categoryTrend.grandTotal) * 100 : null
+                  // While a detail is open only its origin panel stays a
+                  // shared element; the rest drop their layoutIds so framer
+                  // isn't re-measuring eleven charts on every layout tick.
+                  const lifted = modalCategory?.layoutId === `ohr-cat-${s.accountId}`
+                  const shared = modalCategory == null || lifted
+                  const spring = { layout: { type: "spring", bounce: 0, visualDuration: 0.42 } } as const
                   return (
                     <motion.div
                       key={s.id}
-                      className={`ohr-multi-panel${modalCategory?.layoutId === `ohr-cat-${s.accountId}` ? " ohr-multi-panel-lifted" : ""}`}
-                      layoutId={`ohr-cat-${s.accountId}`}
+                      className={`ohr-multi-panel${lifted ? " ohr-multi-panel-lifted" : ""}`}
+                      layoutId={shared ? `ohr-cat-${s.accountId}` : undefined}
                       style={{ borderRadius: 10 }}
                       onClick={() => handlePanelClick(s.accountId)}
                       title={`View ${s.id} costs`}
                     >
                       <div className="ohr-multi-head">
                         <span className="ohr-trend-swatch" style={{ background: s.color }} />
-                        <motion.span className="ohr-multi-name" layoutId={catNameLayoutId(s.accountId)} transition={{ layout: { type: "spring", bounce: 0, visualDuration: 0.42 } }}>
+                        <motion.span className="ohr-multi-name" layoutId={shared ? catNameLayoutId(s.accountId) : undefined} transition={spring}>
                           {s.id}
                         </motion.span>
                         <span className="ohr-multi-pct">{pct != null ? `${pct.toFixed(pct >= 10 ? 0 : 1)}%` : "—"}</span>
                       </div>
-                      <motion.div className="ohr-multi-value" layoutId={catValueLayoutId(s.accountId)} transition={{ layout: { type: "spring", bounce: 0, visualDuration: 0.42 } }}>
+                      <motion.div className="ohr-multi-value" layoutId={shared ? catValueLayoutId(s.accountId) : undefined} transition={spring}>
                         {formatMoneyFull(s.total)}
                       </motion.div>
                       <div className="ohr-multi-chart" onClick={(e) => e.stopPropagation()}>

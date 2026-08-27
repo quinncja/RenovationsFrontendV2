@@ -130,9 +130,9 @@ export function OverheadCategoryDetail({
       })
       if (adjustments.length && (monthCap == null || pageYear !== new Date().getFullYear()))
         list.push({ key: 13, label: "Year-end adjustments", total: adjustments.reduce((s, li) => s + netOf(li), 0), count: adjustments.length, items: adjustments as YearItems })
-      return list
+      return list.reverse()
     }
-    return series.data
+    return series.data.slice().reverse()
       .filter((p) => p.y != null)
       .map((p) => {
         const fetched = itemsFor(p.key)
@@ -243,8 +243,10 @@ export function OverheadCategoryDetail({
                         type: "line",
                         sparkline: true,
                         series: [
+                          // Same id in both views so nivo tweens the path
+                          // when the toggle flips instead of remounting it.
                           {
-                            id: series.prevData ? String(pageYear) : series.id,
+                            id: String(pageYear),
                             color: series.color,
                             data: series.prevData ? series.data : series.data.filter((p) => p.y != null),
                           },

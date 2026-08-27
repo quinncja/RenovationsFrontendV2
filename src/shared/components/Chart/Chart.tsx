@@ -1325,7 +1325,7 @@ const DefaultGradientAreas = (props: unknown) => {
   return <GradientAreas series={series} areaGenerator={areaGenerator} innerHeight={innerHeight} yScale={yScale} />
 }
 
-function buildDashedSeriesLayers(dashedIds: string[], dotted = false) {
+function buildDashedSeriesLayers(dashedIds: string[], dotted = false, overlayOnly = false, colorOf?: (id: string) => string | undefined) {
   const isDashed = (id: string | number) => dashedIds.includes(String(id))
   const AreasLayer = function DashedModeAreas(props: unknown) {
     const { series, areaGenerator, innerHeight, yScale } = props as {
@@ -1343,14 +1343,16 @@ function buildDashedSeriesLayers(dashedIds: string[], dotted = false) {
     }
     return (
       <g pointerEvents="none">
-        {[...series].reverse().map((serie) => (
+        {[...series].reverse().filter((serie) => !overlayOnly || isDashed(serie.id)).map((serie) => (
           <g key={serie.id}>
             {toSegments(serie.data).map((seg, i) => (
               <path
                 key={i}
                 d={lineGenerator(seg) ?? undefined}
                 fill="none"
-                stroke={serie.color}
+                // overlayOnly mode paints nivo's copy transparent, so take
+                // the stroke from the configured series instead.
+                stroke={colorOf?.(String(serie.id)) ?? serie.color}
                 strokeWidth={2.5}
                 strokeLinecap={isDashed(serie.id) && dotted ? "round" : undefined}
                 strokeDasharray={isDashed(serie.id) ? (dotted ? "0.1 4.5" : "6 5") : undefined}
@@ -1370,7 +1372,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
   // Dashed-overlay mode swaps the stock areas/lines layers for versions that
   // stroke the listed series dashed and skip their area fill. Muted highlight
   // mode keeps the stock layers — everything grays out uniformly there anyway.
-  const dashedLayers = dashedSeriesIds?.length && !valueColor ? buildDashedSeriesLayers(dashedSeriesIds, sparkline) : null
+  const dashedLayers = dashedSeriesIds?.length && !valueColor ? buildDashedSeriesLayers(dashedSeriesIds, sparkline, sparkline, (id) => series.find((s) => String(s.id) === id)?.color) : null
 
   const dark = useDarkMode()
   const isMobile = window.innerWidth <= 768
@@ -1444,7 +1446,11 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
         muted
           ? () => MUTED_COLOR
           : hasSeriesColors
-            ? (serie: { color?: string }) => serie.color ?? CHART_COLORS[0]
+            ? (serie: { id?: string | number; color?: string }) =>
+                // Sparkline overlays are drawn by the dotted layer; nivo's own
+                // (animated) lines layer paints them invisible so the main
+                // line still tweens between data sets.
+                sparkline && dashedSeriesIds?.includes(String(serie.id)) ? "transparent" : (serie.color ?? CHART_COLORS[0])
             : CHART_COLORS
       }
       // Mobile right inset is wide enough that the centered last x-label isn't clipped.
@@ -1541,7 +1547,9 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
         ...(valueColor
           ? [buildValueColorLayer(valueColor)]
           : dashedLayers
-            ? [dashedLayers.LinesLayer, "points" as const]
+            ? sparkline
+              ? ["lines" as const, dashedLayers.LinesLayer, "points" as const]
+              : [dashedLayers.LinesLayer, "points" as const]
             : (["lines", "points"] as const)),
         "slices",
         "mesh",
