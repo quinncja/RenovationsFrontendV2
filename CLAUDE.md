@@ -25,3 +25,13 @@ with that fallback. The back button is desktop-only; mobile uses the bottom nav.
 
 When adding the call: if `navigate` was used *only* for jobcost in that file, remove
 the now-unused `const navigate = useNavigate()` and its import (`noUnusedLocals` is on).
+
+## Pre-push check: use the exact Cloudflare build command
+
+Cloudflare deploys `main` by running `npm run build`, which is `tsc -b && vite build`.
+`tsc -b` follows the project references (`tsconfig.app.json` etc.) and is stricter than
+`tsc --noEmit -p .`; on 2026-08-27 the latter passed while `tsc -b` failed on two real
+strict-null errors and the production build broke.
+
+**Before every push to `main`, run `npm run build` (never just `tsc --noEmit -p .`) and
+require it to succeed.** Push = deploy, so a green local `npm run build` is the gate.
