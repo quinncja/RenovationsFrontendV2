@@ -46,6 +46,9 @@ const REORDER_SPRING: Transition = {
 
 const BRAND_ORANGE = "#c27c3e"
 const PREVIOUS_YEAR_COLOR = "#94a3b8"
+// Category Trend prior-year dotted overlay: lighter still so it sits behind
+// the coloured line rather than competing with it.
+const PRIOR_YEAR_DOT_COLOR = "#a9b2be"
 // Muted clay / sage rather than alert red / green: on a report where most
 // numbers grow most years, full-saturation red made the whole page read as an
 // alarm. Direction still reads, but as information, not a siren.
@@ -717,7 +720,6 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
         data: points,
         total: points.reduce((s, p) => s + (p.y ?? 0), 0),
         prevData: hasPrev ? prevData : null,
-        prevTotal: hasPrev ? prevData!.reduce((s, p) => s + p.y, 0) : null,
       }
     })
     const grandTotal = series.reduce((s, x) => s + Math.max(x.total, 0), 0)
@@ -1116,23 +1118,7 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                         <span className="ohr-multi-name">{s.id}</span>
                         <span className="ohr-multi-pct">{pct != null ? `${pct.toFixed(pct >= 10 ? 0 : 1)}%` : "—"}</span>
                       </div>
-                      <div className="ohr-multi-value">
-                        {formatMoneyFull(s.total)}
-                        {s.prevTotal != null && (() => {
-                          const delta = s.total - s.prevTotal
-                          const pctDelta = s.prevTotal !== 0 ? (delta / Math.abs(s.prevTotal)) * 100 : null
-                          const up = delta >= 0
-                          return (
-                            <span
-                              className={`ohr-multi-delta${Math.abs(delta) < 1 ? "" : up ? " ohr-multi-delta--up" : " ohr-multi-delta--down"}`}
-                              title={`${formatMoneyFull(s.prevTotal)} same period ${lastYear}`}
-                            >
-                              {Math.abs(delta) < 1 ? null : up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                              {pctDelta != null ? `${Math.abs(pctDelta).toFixed(0)}%` : formatMoneyFull(Math.abs(delta))} vs {lastYear}
-                            </span>
-                          )
-                        })()}
-                      </div>
+                      <div className="ohr-multi-value">{formatMoneyFull(s.total)}</div>
                       <div className="ohr-multi-chart" onClick={(e) => e.stopPropagation()}>
                         <Chart
                           config={{
@@ -1144,7 +1130,7 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                             // dashed line over the same posted months.
                             series: [
                               { id: s.id, color: s.color, data: s.data.filter((p) => p.y != null) },
-                              ...(s.prevData ? [{ id: "__prev__", color: PREVIOUS_YEAR_COLOR, data: s.prevData }] : []),
+                              ...(s.prevData ? [{ id: "__prev__", color: PRIOR_YEAR_DOT_COLOR, data: s.prevData }] : []),
                             ],
                             dashedSeriesIds: s.prevData ? ["__prev__"] : undefined,
                             planTooltip: s.prevData ? { delta: true, label: String(lastYear), invertColor: true } : undefined,

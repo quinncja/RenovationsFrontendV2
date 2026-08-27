@@ -160,7 +160,7 @@ function everyOtherYTicks(series: LineSeries[], ceiling?: number, divisions = 8)
 
 // ─── Slice tooltip ────────────────────────────────────────────────────────────
 
-function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel, overlayIds, planTooltip, share, shareTotals, shareLabel }: {
+function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel, overlayIds, planTooltip, share, shareTotals, shareLabel, airy }: {
   slice: { points: readonly { data: { x: unknown; y: unknown }; seriesId: string }[] }
   series: LineSeries[]
   valueFormat?: (v: number) => string
@@ -171,6 +171,8 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   share?: boolean
   shareTotals?: Record<string, number>
   shareLabel?: string
+  /** Sparkline panels: borderless, softer, roomier tooltip to match. */
+  airy?: boolean
 }) {
   const points = slice.points
   const xLabel = String(points[0]?.data?.x ?? "")
@@ -233,7 +235,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
       : undefined
 
     return (
-      <div className="chart-line-tooltip">
+      <div className={`chart-line-tooltip${airy ? " chart-line-tooltip--airy" : ""}`}>
         <TooltipPing />
         <div className="chart-line-tooltip-header">{headerLabel}</div>
         <div className="chart-line-tooltip-single-value">{fmt(currVal)}</div>
@@ -1314,7 +1316,7 @@ const DefaultGradientAreas = (props: unknown) => {
   return <GradientAreas series={series} areaGenerator={areaGenerator} innerHeight={innerHeight} yScale={yScale} />
 }
 
-function buildDashedSeriesLayers(dashedIds: string[]) {
+function buildDashedSeriesLayers(dashedIds: string[], dotted = false) {
   const isDashed = (id: string | number) => dashedIds.includes(String(id))
   const AreasLayer = function DashedModeAreas(props: unknown) {
     const { series, areaGenerator, innerHeight, yScale } = props as {
@@ -1341,7 +1343,8 @@ function buildDashedSeriesLayers(dashedIds: string[]) {
                 fill="none"
                 stroke={serie.color}
                 strokeWidth={2.5}
-                strokeDasharray={isDashed(serie.id) ? "6 5" : undefined}
+                strokeLinecap={isDashed(serie.id) && dotted ? "round" : undefined}
+                strokeDasharray={isDashed(serie.id) ? (dotted ? "0.1 4.5" : "6 5") : undefined}
               />
             ))}
           </g>
@@ -1358,7 +1361,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
   // Dashed-overlay mode swaps the stock areas/lines layers for versions that
   // stroke the listed series dashed and skip their area fill. Muted highlight
   // mode keeps the stock layers — everything grays out uniformly there anyway.
-  const dashedLayers = dashedSeriesIds?.length && !valueColor ? buildDashedSeriesLayers(dashedSeriesIds) : null
+  const dashedLayers = dashedSeriesIds?.length && !valueColor ? buildDashedSeriesLayers(dashedSeriesIds, sparkline) : null
 
   const dark = useDarkMode()
   const isMobile = window.innerWidth <= 768
@@ -1482,7 +1485,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       }
       enableSlices="x"
       tooltip={() => null}
-      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} overlayIds={dashedSeriesIds} planTooltip={planTooltip} share={sliceShare} shareTotals={sliceShareTotals} shareLabel={sliceShareLabel} />}
+      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} overlayIds={dashedSeriesIds} planTooltip={planTooltip} share={sliceShare} shareTotals={sliceShareTotals} shareLabel={sliceShareLabel} airy={sparkline} />}
       axisLeft={sparkline ? {
         tickSize: 0,
         tickPadding: 6,
