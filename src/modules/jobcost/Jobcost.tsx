@@ -2175,7 +2175,7 @@ export default function Jobcost() {
         ) : (
           <button
             type="button"
-            className="button primary-button"
+            className="button secondary-button"
             onClick={() => navigate("/project-process")}
             title="Open the Project Process flowchart"
           >
