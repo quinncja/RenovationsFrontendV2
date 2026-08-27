@@ -1,9 +1,9 @@
 import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, useDeferredValue, memo, type ReactNode } from "react"
 import { motion, AnimatePresence, useMotionValue, useTransform, type MotionValue, type Transition } from "framer-motion"
 import { useVirtualizer } from "@tanstack/react-virtual"
-import { useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import { useJobcostNav } from "./useJobcostNav"
-import { ArrowUp, ArrowDown, ChevronRight, ChevronDown, ExternalLink, ChartNoAxesColumn, DatabaseZap, Building2, Hammer, Pin, RotateCcw } from "lucide-react"
+import { ArrowUp, ArrowDown, ChevronRight, ChevronDown, ExternalLink, ChartNoAxesColumn, DatabaseZap, Building2, Hammer, Pin, RotateCcw, Workflow } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { SortTh } from "../../shared/components/SortTh"
 import { SegmentedControl } from "../../shared/components/SegmentedControl"
@@ -1675,6 +1675,9 @@ export default function Jobcost() {
   // company list via a toolbar toggle; everyone else always sees all projects.
   const { claims } = useAuth()
   const isManager = claims["role"] === "manager"
+  // The Project Process flowchart route is executive/admin only.
+  const canViewProcess = claims["role"] === "executive" || claims["role"] === "admin"
+  const navigate = useNavigate()
   const [showAllProjects, setShowAllProjects] = useLocalStorage("jobcostShowAllProjects", false)
   // The "when" pair (year + phase) starts fresh from the user's default-range
   // preference (Settings: open phase / this month / all phases) on every real
@@ -2168,7 +2171,20 @@ export default function Jobcost() {
   return (
     <Page
       title="Job Costing"
-      actions={isMobile ? <YearSelector value={year} onChange={handleYearChange} allowAllTime /> : undefined}
+      actions={
+        isMobile ? (
+          <YearSelector value={year} onChange={handleYearChange} allowAllTime />
+        ) : canViewProcess ? (
+          <button
+            type="button"
+            className="button primary-button"
+            onClick={() => navigate("/project-process")}
+            title="Open the Project Process flowchart"
+          >
+            <Workflow size={16} /> View Project Process Flowchart
+          </button>
+        ) : undefined
+      }
     >
       <MotionList className="inv-page-stack">
         {/* Desktop command bar: a dark control deck, deliberately a different
