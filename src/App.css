@@ -13276,7 +13276,13 @@ svg.placeholder-illustration {
 /* While its detail modal is open the panel is only the surface the modal
    grew out of: its content hides instantly so the morph is one gray slab
    growing, not two copies of the text crossfading at different scales. */
-.ohr-multi-panel-lifted > * { visibility: hidden; }
+.ohr-multi-panel-lifted .ohr-multi-chart,
+.ohr-multi-panel-lifted .ohr-trend-swatch,
+.ohr-multi-panel-lifted .ohr-multi-pct { visibility: hidden; }
+/* Everything that isn't a shared element simply appears once the morph has
+   landed: a short CSS fade, no per-item choreography competing for frames. */
+.ohr-detail-static { opacity: 0; }
+.ohr-detail-static.is-in { opacity: 1; transition: opacity 160ms ease-out; }
 .ohr-multi-head {
   display: flex;
   align-items: center;

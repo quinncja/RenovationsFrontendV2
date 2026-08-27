@@ -36,18 +36,10 @@ type YearItems = LineItem[] | "loading" | "error"
 const PRIOR_YEAR_DOT_COLOR = "#a9b2be"
 
 const openSpring = { type: "spring", bounce: 0, visualDuration: 0.42 } as const
-const settleEase = [0.25, 0.46, 0.45, 0.94] as const
 
-const rowsVariants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.03, delayChildren: 0.26 } },
-  exit: { transition: { staggerChildren: 0.012, staggerDirection: -1 } },
-}
-const rowVariants = {
-  hidden: { opacity: 0, y: 10 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.28, ease: settleEase } },
-  exit: { opacity: 0, y: 4, transition: { duration: 0.1 } },
-}
+/** Shared-element ids: the panel's name and total morph into the modal's. */
+export const catNameLayoutId = (id: string) => `ohr-cat-name-${id}`
+export const catValueLayoutId = (id: string) => `ohr-cat-value-${id}`
 
 /**
  * Full-screen category drill-down. The left pane is the Category Trend panel
@@ -83,7 +75,7 @@ export function OverheadCategoryDetail({
   grandTotals: Record<TrendView, number>
 }) {
   const open = category !== null
-  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
+  const { overlayZ, contentZ } = useModalLayer(open)
   const [view, setView] = useState<TrendView>(initialView)
   const [openKey, setOpenKey] = useState<number | null>(null)
   const [yearItems, setYearItems] = useState<Record<number, YearItems>>({})
@@ -98,7 +90,7 @@ export function OverheadCategoryDetail({
       setView(initialView)
       setOpenKey(null)
       setSettled(false)
-      const t = window.setTimeout(() => setSettled(true), 260)
+      const t = window.setTimeout(() => setSettled(true), 300)
       return () => window.clearTimeout(t)
     }
   }, [open, initialView])
@@ -202,10 +194,12 @@ export function OverheadCategoryDetail({
         <>
           <motion.div
             key="overlay"
-            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
+            // No backdrop blur here: blurring a page full of SVG charts is
+            // what fought the morph for frames.
+            className="modal-overlay"
             style={{ zIndex: overlayZ }}
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            animate={{ opacity: 1, transition: { duration: 0.2 } }}
             exit={{ opacity: 0, transition: { duration: 0.18 } }}
             onClick={onClose}
           />
@@ -218,28 +212,31 @@ export function OverheadCategoryDetail({
               initial={category.layoutId ? undefined : { opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={category.layoutId ? undefined : { opacity: 0, scale: 0.96, transition: { duration: 0.16 } }}
-              transition={{ layout: openSpring, duration: 0.2, ease: settleEase }}
+              transition={{ layout: openSpring, duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
             >
               {/* ── Left: the panel, grown ── */}
               <div className="ohr-detail-left">
-                <motion.div
-                  className="ohr-detail-title"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, transition: { delay: 0.08, duration: 0.22 } }}
-                  exit={{ opacity: 0, transition: { duration: 0.08 } }}
-                >
-                  <h2 className="title2 emphasized ohr-detail-name" style={{ color: category.color }}>{category.name}</h2>
-                  <span className="reports-modal-subtitle">
+                <div className="ohr-detail-title">
+                  <motion.h2
+                    className="title2 emphasized ohr-detail-name"
+                    style={{ color: category.color }}
+                    layoutId={category.layoutId ? catNameLayoutId(category.id) : undefined}
+                    transition={{ layout: openSpring }}
+                  >
+                    {category.name}
+                  </motion.h2>
+                  <span className={`reports-modal-subtitle ohr-detail-static${settled ? " is-in" : ""}`}>
                     {pct != null ? `${pct.toFixed(pct >= 10 ? 0 : 1)}% of ${view === "monthly" ? `${pageYear} ` : ""}overhead` : "—"}
                   </span>
-                  <div className="ohr-multi-value ohr-detail-value">{formatMoneyFull(total)}</div>
-                </motion.div>
-                <motion.div
-                  className="ohr-detail-chart"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: settled ? 1 : 0, transition: { duration: 0.28 } }}
-                  exit={{ opacity: 0, transition: { duration: 0.1 } }}
-                >
+                  <motion.div
+                    className="ohr-multi-value ohr-detail-value"
+                    layoutId={category.layoutId ? catValueLayoutId(category.id) : undefined}
+                    transition={{ layout: openSpring }}
+                  >
+                    {formatMoneyFull(total)}
+                  </motion.div>
+                </div>
+                <div className={`ohr-detail-chart ohr-detail-static${settled ? " is-in" : ""}`}>
                   {series && settled && (
                     <Chart
                       config={{
@@ -265,24 +262,14 @@ export function OverheadCategoryDetail({
                       }}
                     />
                   )}
-                </motion.div>
-                <motion.p
-                  className="ohr-detail-hint"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1, transition: { delay: 0.3, duration: 0.25 } }}
-                  exit={{ opacity: 0, transition: { duration: 0.1 } }}
-                >
+                </div>
+                <p className={`ohr-detail-hint ohr-detail-static${settled ? " is-in" : ""}`}>
                   Click a {view === "monthly" ? "month" : "year"} on the chart to open its costs.
-                </motion.p>
+                </p>
               </div>
 
               {/* ── Right: costs by month | year ── */}
-              <motion.div
-                className="ohr-detail-right"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, transition: { delay: 0.14, duration: 0.24 } }}
-                exit={{ opacity: 0, transition: { duration: 0.1 } }}
-              >
+              <div className={`ohr-detail-right ohr-detail-static${settled ? " is-in" : ""}`}>
                 <div className="ohr-detail-right-head">
                   <div>
                     <h2 className="title2 emphasized">Costs</h2>
@@ -292,6 +279,7 @@ export function OverheadCategoryDetail({
                     </span>
                   </div>
                   <div className="ohr-detail-head-actions">
+                    {settled && (
                     <SegmentedControl
                       variant="ohr"
                       ariaLabel="Category detail view"
@@ -306,19 +294,13 @@ export function OverheadCategoryDetail({
                         setOpenKey(null)
                       }}
                     />
+                    )}
                     <button className="button modal-close" onClick={onClose} aria-label="Close">
                       <X size={16} />
                     </button>
                   </div>
                 </div>
-                <motion.div
-                  ref={listRef}
-                  className="ohr-detail-list"
-                  variants={rowsVariants}
-                  initial="hidden"
-                  animate="show"
-                  exit="exit"
-                >
+                <div ref={listRef} className="ohr-detail-list">
                   {rows.length === 0 && (
                     <p className="reports-modal-empty body-text text-secondary">No costs recorded for this category.</p>
                   )}
@@ -326,9 +308,8 @@ export function OverheadCategoryDetail({
                     const isOpen = openKey === row.key
                     const items = isOpen ? (row.items ?? (view === "yearly" ? yearItems[row.key] ?? "loading" : [])) : null
                     return (
-                      <motion.div
+                      <div
                         key={`${view}-${row.key}`}
-                        variants={rowVariants}
                         data-row-key={row.key}
                         className={`ohr-cost-card${isOpen ? " ohr-cost-card-open" : ""}`}
                       >
@@ -374,11 +355,11 @@ export function OverheadCategoryDetail({
                             </motion.div>
                           )}
                         </AnimatePresence>
-                      </motion.div>
+                      </div>
                     )
                   })}
-                </motion.div>
-              </motion.div>
+                </div>
+              </div>
             </motion.div>
           </div>
         </>

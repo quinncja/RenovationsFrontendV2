@@ -24,7 +24,7 @@ import type { LineMarker, SpendItem } from "../../shared/components/Chart/chart.
 import { useOnboarding } from "../../core/onboarding/OnboardingProvider"
 import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
 import { SegmentedControl } from "../../shared/components/SegmentedControl"
-import { OverheadCategoryDetail, type DetailCategory } from "./OverheadCategoryDetail"
+import { OverheadCategoryDetail, catNameLayoutId, catValueLayoutId, type DetailCategory } from "./OverheadCategoryDetail"
 import { buildCategoryTrend, type CategoryHistoryRow, type TrendGroup } from "./overheadTrend"
 import { useAuth } from "../../core/auth/AuthProvider"
 import { isTechRole } from "../../core/auth/roles"
@@ -931,10 +931,14 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                     >
                       <div className="ohr-multi-head">
                         <span className="ohr-trend-swatch" style={{ background: s.color }} />
-                        <span className="ohr-multi-name">{s.id}</span>
+                        <motion.span className="ohr-multi-name" layoutId={catNameLayoutId(s.accountId)} transition={{ layout: { type: "spring", bounce: 0, visualDuration: 0.42 } }}>
+                          {s.id}
+                        </motion.span>
                         <span className="ohr-multi-pct">{pct != null ? `${pct.toFixed(pct >= 10 ? 0 : 1)}%` : "—"}</span>
                       </div>
-                      <div className="ohr-multi-value">{formatMoneyFull(s.total)}</div>
+                      <motion.div className="ohr-multi-value" layoutId={catValueLayoutId(s.accountId)} transition={{ layout: { type: "spring", bounce: 0, visualDuration: 0.42 } }}>
+                        {formatMoneyFull(s.total)}
+                      </motion.div>
                       <div className="ohr-multi-chart" onClick={(e) => e.stopPropagation()}>
                         <Chart
                           config={{
