@@ -863,7 +863,7 @@ function UpcomingBillingsContent() {
                           <Fact label={`Past ${pastLen} weeks`} value="n/a" sub={`${meta.code} payment history is not exposed by Sage`} />
                         )}
                         <Fact
-                          label={`Next ${forecast.weeks.length - 1} weeks`}
+                          label={`Next ${(forecast?.weeks.length ?? 1) - 1} weeks`}
                           value={formatMoney(full.nextTotal)}
                           sub="reaching 30 days past due"
                         />

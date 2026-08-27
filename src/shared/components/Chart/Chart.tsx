@@ -270,7 +270,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
       <div className="chart-line-tooltip">
         <TooltipPing />
         <div className="chart-line-tooltip-header">{headerLabel}</div>
-        <div className="chart-line-tooltip-single-value">{fmt(currVal)}</div>
+        <div className="chart-line-tooltip-single-value">{currVal == null ? "—" : fmt(currVal)}</div>
         {planTooltip?.actualLabel && planValue != null && !planIsAnchor && (
           <div className="chart-line-tooltip-growth">{planTooltip.actualLabel}</div>
         )}

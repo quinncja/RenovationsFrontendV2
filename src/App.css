@@ -21674,14 +21674,9 @@ body.pj-painting td.pj-computed {
    viewport handler either way. */
 .cf-chart { position: absolute; }
 .cf-chart-title { left: 24px; top: 20px; font-size: 16px; }
-.cf-tooltip {
-  background: var(--card-color);
-  border-radius: 6px;
-  padding: 8px 12px;
-  font-size: 0.8125rem;
-  color: var(--primary-text);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
-}
+/* Portal tooltip: fixed at the real cursor, outside the scaled world. */
+.cf-tip { position: fixed; z-index: 10000; pointer-events: none; }
+.cf-tip .chart-line-tooltip-header { display: flex; align-items: center; gap: 6px; }
 .pp-empty {
   position: absolute;
   inset: 0;
