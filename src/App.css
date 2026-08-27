@@ -10543,9 +10543,6 @@ button.jc-kind-chip:hover {
   opacity: 0.4;
   cursor: not-allowed;
 }
-/* Job Costing header link to the process flowchart: regular weight, it's a
-   wayfinding link rather than an action. */
-.jc-process-link { font-weight: var(--font-weight-regular); }
 
 /* Filled red button for destructive confirmations — pairs with .primary-button. */
 /* Same texture as the copper buttons (--copper-btn-*), keyed to red. */
