@@ -77,6 +77,12 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
   const panelRefs = useRef<(HTMLElement | null)[]>([])
 
   const lastIndex = sections.length - 1
+  // Identity of the section ORDER, not just the count. The layout can be
+  // swapped wholesale after mount (prefs bootstrap replacing the cached /
+  // default layout), which remounts the keyed panels at their CSS default
+  // opacity (0.3). Effects keyed on this re-run the fade pass so a new top
+  // section isn't left translucent until the first scroll.
+  const sectionKey = sections.map((s) => s.id).join("|")
   const active = Math.max(0, Math.min(activeSectionIndex, lastIndex))
 
   const setActiveRef = useRef(setActiveSectionIndex)
@@ -265,7 +271,7 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
   useEffect(() => {
     if (isMobile) return
     const fitAll = () => {
-      for (let i = 0; i < sections.length; i++) fitSection(i)
+      for (let i = 0; i < fitRefs.current.length; i++) fitSection(i)
     }
     const ro = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -280,7 +286,7 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
       ro.disconnect()
       window.removeEventListener("resize", fitAll)
     }
-  }, [sections.length, fitSection, isMobile])
+  }, [sectionKey, fitSection, isMobile])
 
   // Watch every panel for size changes (widgets settling after data load) and
   // counter any movement of the anchor in the same frame, before paint — the
@@ -302,7 +308,7 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
     })
     for (const el of panelRefs.current) if (el) ro.observe(el)
     return () => ro.disconnect()
-  }, [sections.length, measureAnchor, isMobile])
+  }, [sectionKey, measureAnchor, isMobile])
 
   useEffect(() => {
     if (isMobile) return
@@ -327,7 +333,7 @@ export function SectionPager({ enterAnimation = false }: { enterAnimation?: bool
       window.removeEventListener("resize", onScroll)
       if (raf) cancelAnimationFrame(raf)
     }
-  }, [sections.length, applyFades, isMobile])
+  }, [sectionKey, applyFades, isMobile])
 
   // Arrow keys page between sections with the SAME smooth scroll the dots use.
   // Native arrow scrolling line-steps the snap container (the jumpy default), so

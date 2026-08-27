@@ -14088,8 +14088,14 @@ svg.placeholder-illustration {
   box-shadow: light-dark(0 6px 20px rgba(0, 0, 0, 0.18), 0 6px 20px rgba(255, 255, 255, 0.07));
 }
 
+/* Disabled while loading (skeleton count) or offline. Only the OFFLINE state
+   dims: a loading card at 0.7 read as a translucent, "inactive" Reports
+   section on the home page while the rest of the dashboard showed opaque
+   skeletons. */
 .report-card:disabled {
   cursor: default;
+}
+.report-card--offline {
   opacity: 0.7;
 }
 

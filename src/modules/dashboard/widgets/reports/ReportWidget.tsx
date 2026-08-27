@@ -147,7 +147,7 @@ export function ReportWidget({ reportId, compact = false }: { reportId: ReportWi
       {compact ? (
         <button
           type="button"
-          className="report-pill"
+          className={`report-pill${disconnected ? " report-card--offline" : ""}`}
           onClick={() => setOpen(true)}
           disabled={isLoading || disconnected}
           title={report.subtitle}
@@ -165,7 +165,7 @@ export function ReportWidget({ reportId, compact = false }: { reportId: ReportWi
       ) : (
         <button
           type="button"
-          className="card report-card"
+          className={`card report-card${disconnected ? " report-card--offline" : ""}`}
           onClick={() => setOpen(true)}
           disabled={isLoading || disconnected}
         >
