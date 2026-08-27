@@ -13251,6 +13251,115 @@ svg.placeholder-illustration {
 
 /* YoY pill in the top-right corner of each summary tile ("▼ 4% vs ’25").
    The inline style carries the color + tinted background. */
+/* Category Trend: small multiples. One panel per category, each sparkline on
+   its own scale; the panel is the legend, the stat, and the drill-down
+   button in one. Neutral surface, hover = fill only (no borders). */
+.ohr-multi {
+  display: grid;
+  /* ~4 per row on a wide card, 3 on a laptop; sparklines need width to read. */
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 0.875rem;
+  flex: 1;
+}
+.ohr-multi-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.875rem 1rem 0.625rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--primary-text) 3%, var(--card-color));
+  cursor: pointer;
+  transition: background-color 0.15s;
+  min-width: 0;
+}
+.ohr-multi-panel:hover { background: var(--hover-bg); }
+.ohr-multi-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.ohr-multi-name {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--secondary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ohr-multi-pct {
+  font-size: 0.8rem;
+  color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
+}
+.ohr-multi-value {
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+.ohr-multi-chart {
+  height: 124px;
+  display: flex;
+  flex-direction: column;
+  margin: 0.25rem -0.5rem 0 -0.75rem;
+  cursor: default;
+}
+.ohr-multi-chart .chart-container { min-height: 0; }
+@media (max-width: 768px) {
+  .ohr-multi { grid-template-columns: 1fr 1fr; }
+}
+.ohr-trend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Share-of-slice tooltip rows: value, a thin share bar, percent. The bar
+   makes the composition readable at a glance across a dozen rows. */
+.chart-line-tooltip--share { min-width: 320px; }
+.chart-line-tooltip--share .chart-line-tooltip-row { gap: 16px; padding: 1px 0; }
+.chart-line-tooltip--share .chart-line-tooltip-label {
+  color: var(--primary-text);
+  font-size: var(--subheadline-size);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chart-line-tooltip-share {
+  display: grid;
+  grid-template-columns: 7.5ch 56px 4ch;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.chart-line-tooltip-share-value {
+  color: var(--primary-text);
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  text-align: right;
+}
+.chart-line-tooltip-share-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--primary-text) 8%, transparent);
+  overflow: hidden;
+}
+.chart-line-tooltip-share-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+}
+.chart-line-tooltip-share-pct {
+  color: var(--secondary-text);
+  font-size: var(--subheadline-size);
+  text-align: right;
+}
+
 .ohr-kpi-pill {
   font-size: 0.7rem;
   font-weight: var(--font-weight-semibold);

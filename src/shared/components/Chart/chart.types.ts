@@ -216,6 +216,26 @@ export type ChartConfig =
        *  (green ahead / red behind); slices where only the plan has a value —
        *  and all slices without `delta` — read "Projected: $X" in neutral ink. */
       planTooltip?: { delta?: boolean }
+      /** Multi-series slice tooltip variant for "composition over time" charts:
+       *  rows ranked by value at that slice, each carrying its share of the
+       *  slice total, with a Total footer. Implies no growth row. */
+      sliceShare?: boolean
+      /** Stack the series as composition bands (series[0] at the bottom).
+       *  Areas use nivo's flat fill at a readable opacity instead of the
+       *  single-line gradient; points are hidden so a dozen bands stay clean. */
+      stacked?: boolean
+      /** Small-multiple mode: no axes, grid or points, tight margins, area
+       *  on. The slice tooltip stays, so hovering still reads the value. */
+      sparkline?: boolean
+      /** Denominator per x label for `sliceShare` (e.g. the month's total
+       *  overhead across ALL categories). Without it the share is taken over
+       *  the drawn series only, which breaks down once a series is isolated. */
+      sliceShareTotals?: Record<string, number>
+      /** Noun for the single-series share footer ("Share of month"). */
+      sliceShareLabel?: string
+      /** Target number of y gridlines (default 8). Lower for dense multi-line
+       *  charts where the grid competes with the data. */
+      yTickCount?: number
       /** Reserve the 40px top band even with no in-plot legend or top marker
        *  label, so this plot's top edge aligns with sibling charts that have
        *  one (e.g. the annual trend sitting beside the cumulative chart's

@@ -47,6 +47,7 @@ export const PAGE_QUERIES = {
     "overheadLineItems",
     "overheadCategoryComparison",
     "annualOverheadTrend",
+    "overheadCategoryHistory",
   ],
 
   // Upcoming Billings breakdown — the per-invoice open AR/AP rows behind the chart.

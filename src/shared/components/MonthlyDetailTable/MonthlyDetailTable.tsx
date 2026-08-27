@@ -19,6 +19,9 @@ interface MonthlyDetailTableProps {
   totalLabel?: string
   /** When set, render only this month, auto-expanded. Hides the rest. */
   filterMonth?: number | null
+  /** Extra columns to leave out for this caller (e.g. the raw ledger account
+   *  once the row carries a human-readable category). */
+  hideColumns?: string[]
 }
 
 export const NUMERIC_KEYS = new Set(["dbtamt", "crdamt", "net", "amount"])
@@ -75,6 +78,7 @@ const COLUMN_ORDER = [
   "lgrrec",
   "dscrpt",
   "status",
+  "category",
   "lgract",
   "dbtamt",
   "crdamt",
@@ -105,6 +109,7 @@ const COLUMN_LABELS: Record<string, string> = {
   upddte: "Updated Date",
   updusr: "Updated User",
   linnum: "Line #",
+  category: "Category",
   lgract: "Ledger Acc",
   subact: "Sub Acc",
   dbtamt: "Debit Amount",
@@ -218,6 +223,7 @@ export function MonthlyDetailTable({
   isLoading,
   totalLabel = "Total",
   filterMonth = null,
+  hideColumns,
 }: MonthlyDetailTableProps) {
   const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set())
   const [sortKey, setSortKey] = useState<string | null>(null)
@@ -249,7 +255,8 @@ export function MonthlyDetailTable({
       for (const key of Object.keys(row)) seen.add(key)
     }
     seen.delete("month")
-    const visible = Array.from(seen).filter((k) => !isHiddenColumn(k))
+    const hidden = new Set((hideColumns ?? []).map((k) => k.toLowerCase()))
+    const visible = Array.from(seen).filter((k) => !isHiddenColumn(k) && !hidden.has(k.toLowerCase()))
     const orderIndex = (k: string) => {
       const idx = COLUMN_ORDER.indexOf(k.toLowerCase())
       return idx === -1 ? COLUMN_ORDER.length : idx
@@ -260,7 +267,7 @@ export function MonthlyDetailTable({
       if (ai !== bi) return ai - bi
       return a.localeCompare(b)
     })
-  }, [lineItems])
+  }, [lineItems, hideColumns])
 
   const sortedMonths = useMemo(() => {
     const all = [...monthlyTotals].sort((a, b) => a.month - b.month)

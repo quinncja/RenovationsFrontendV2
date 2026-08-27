@@ -103,7 +103,26 @@ const CHART_COLORS = [
 // span all the way to the axis top — e.g. a budget reference line sitting well
 // above the plotted data still gets gridlines up to it instead of the grid
 // stopping at the data max and the line floating in a blank band above.
-function everyOtherYTicks(series: LineSeries[], ceiling?: number): number[] | undefined {
+/** Round a magnitude UP to 1 or 2 significant digits ($13,400 → $14K). */
+function niceCeil(v: number): number {
+  if (v <= 0) return 0
+  const mag = Math.pow(10, Math.floor(Math.log10(v)))
+  const norm = v / mag
+  const step = norm >= 5 ? 1 : norm >= 2 ? 0.5 : 0.2
+  return Math.ceil(norm / step) * step * mag
+}
+
+function sparklineTicks(series: LineSeries[]): number[] | undefined {
+  const allY = series.flatMap((s) => s.data.map((p) => p.y)).filter((v): v is number => typeof v === "number")
+  if (allY.length === 0) return undefined
+  const max = niceCeil(Math.max(0, ...allY) * 1.05)
+  const min = -niceCeil(Math.max(0, -Math.min(0, ...allY)) * 1.05)
+  const ticks = min < 0 ? [min, 0] : [0]
+  if (max > 0) ticks.push(max)
+  return ticks.length > 1 ? ticks : undefined
+}
+
+function everyOtherYTicks(series: LineSeries[], ceiling?: number, divisions = 8): number[] | undefined {
   const allY = series
     .flatMap((s) => s.data.map((p) => p.y))
     .filter((v): v is number => typeof v === "number")
@@ -113,7 +132,7 @@ function everyOtherYTicks(series: LineSeries[], ceiling?: number): number[] | un
   const min = Math.min(0, ...allY)
   const range = max - min
   if (range === 0) return undefined
-  const rawStep = range / 8
+  const rawStep = range / divisions
   if (rawStep === 0) return undefined
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)))
   const niceStep = Math.ceil(rawStep / magnitude) * magnitude
@@ -141,7 +160,7 @@ function everyOtherYTicks(series: LineSeries[], ceiling?: number): number[] | un
 
 // ─── Slice tooltip ────────────────────────────────────────────────────────────
 
-function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel, overlayIds, planTooltip }: {
+function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel, overlayIds, planTooltip, share, shareTotals, shareLabel }: {
   slice: { points: readonly { data: { x: unknown; y: unknown }; seriesId: string }[] }
   series: LineSeries[]
   valueFormat?: (v: number) => string
@@ -149,6 +168,9 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   wipMonthLabel?: string | null
   overlayIds?: string[]
   planTooltip?: { delta?: boolean }
+  share?: boolean
+  shareTotals?: Record<string, number>
+  shareLabel?: string
 }) {
   const points = slice.points
   const xLabel = String(points[0]?.data?.x ?? "")
@@ -218,7 +240,62 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
             {growth >= 0 ? "↗" : "↘"} {growth > 0 ? "+" : ""}{growth.toFixed(1)}% YoY
           </div>
         )}
+        {shareTotals?.[xLabel] != null && shareTotals[xLabel] > 0 && currVal != null && (
+          <>
+            <div className="chart-line-tooltip-divider" />
+            <div className="chart-line-tooltip-growth-row">
+              <span className="chart-line-tooltip-growth-label">Share of {shareLabel ?? "total"}:</span>
+              <span className="chart-line-tooltip-growth-value">{((currVal / shareTotals[xLabel]) * 100).toFixed(1)}%</span>
+            </div>
+          </>
+        )}
         {planFooter(currVal ?? null)}
+      </div>
+    )
+  }
+
+  // Composition mode: every series ranked by value at this slice, each with
+  // its share of the slice total. Series with no point here (e.g. months past
+  // the open period) are left out rather than shown as "—".
+  if (share) {
+    const rows = coreSeries
+      .map((s) => {
+        const v = points.find((p) => String(p.seriesId) === String(s.id))?.data.y
+        return { id: String(s.id), color: s.color, value: typeof v === "number" ? v : null }
+      })
+      .filter((r): r is { id: string; color: string | undefined; value: number } => r.value != null)
+      .sort((a, b) => b.value - a.value)
+    const total = shareTotals?.[xLabel] ?? rows.reduce((sum, r) => sum + r.value, 0)
+    return (
+      <div className="chart-line-tooltip chart-line-tooltip--share">
+        <TooltipPing />
+        <div className="chart-line-tooltip-header">{headerLabel}</div>
+        {rows.map((r) => {
+          const pct = total > 0 ? (r.value / total) * 100 : null
+          return (
+            <div key={r.id} className="chart-line-tooltip-row">
+              <span className="chart-line-tooltip-label" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span className="chart-tooltip-dot" style={{ background: r.color }} />
+                {r.id}
+              </span>
+              <span className="chart-line-tooltip-share">
+                <span className="chart-line-tooltip-share-value">{fmt(r.value)}</span>
+                <span className="chart-line-tooltip-share-bar">
+                  <span
+                    className="chart-line-tooltip-share-fill"
+                    style={{ width: `${Math.max(0, Math.min(100, pct ?? 0))}%`, background: r.color }}
+                  />
+                </span>
+                <span className="chart-line-tooltip-share-pct">{pct != null ? `${pct.toFixed(pct >= 10 ? 0 : 1)}%` : "—"}</span>
+              </span>
+            </div>
+          )
+        })}
+        <div className="chart-line-tooltip-divider" />
+        <div className="chart-line-tooltip-growth-row">
+          <span className="chart-line-tooltip-growth-label">{shareTotals ? "Total overhead" : "Total"}</span>
+          <span className="chart-line-tooltip-growth-value">{fmt(total)}</span>
+        </div>
       </div>
     )
   }
@@ -1274,7 +1351,7 @@ function buildDashedSeriesLayers(dashedIds: string[]) {
 }
 
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
-  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip, topBand } = config
+  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip, topBand, sliceShare, sliceShareTotals, yTickCount, stacked = false, sparkline = false, sliceShareLabel } = config
 
   // Dashed-overlay mode swaps the stock areas/lines layers for versions that
   // stroke the listed series dashed and skip their area fill. Muted highlight
@@ -1287,7 +1364,18 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
   // Extend ticks/grid to the numeric maxValue (e.g. a budget ceiling above the
   // data) so the gridlines reach it instead of stopping at the data max.
   const yTickCeiling = typeof maxValue === "number" ? maxValue : undefined
-  const yTicks = everyOtherYTicks(series, yTickCeiling)
+  // Stacked bands: ticks/bounds must come from the per-x column totals, not
+  // the raw series values, or the axis tops out at the tallest single band.
+  const tickSeries = useMemo<LineSeries[]>(() => {
+    if (!stacked) return series
+    const sums = new Map<string, number>()
+    series.forEach((s) => s.data.forEach((p) => { if (typeof p.y === "number") sums.set(String(p.x), (sums.get(String(p.x)) ?? 0) + p.y) }))
+    return [{ id: "__stack__", data: Array.from(sums, ([x, y]) => ({ x, y })) }]
+  }, [series, stacked])
+  // Sparklines keep a whisper of an axis: $0 and a rounded ceiling (plus a
+  // rounded floor when the data dips negative) — the generic tick heuristic
+  // is tuned for full-size plots and gets dense at this height.
+  const yTicks = sparkline ? sparklineTicks(tickSeries) : everyOtherYTicks(tickSeries, yTickCeiling, yTickCount)
   // Markers with `labelBackground` get a custom backed pill (buildMarkerLabelsLayer)
   // instead of nivo's plain text — strip their legend here so nivo draws only
   // the line, then the custom layer renders the pill atop it.
@@ -1297,7 +1385,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
   // tick so the topmost gridline sits flush at the plot edge — no empty band
   // between the last gridline and a budget reference line above the data.
   const effectiveMax =
-    yTickCeiling != null && yTicks && yTicks.length
+    (yTickCeiling != null || sparkline) && yTicks && yTicks.length
       ? yTicks[yTicks.length - 1]
       : maxValue
   const hasSeriesColors = series.some((s) => s.color)
@@ -1324,7 +1412,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
     return map
   }, [series])
 
-  const allY = series.flatMap((s) => s.data.map((p) => p.y)).filter((v): v is number => typeof v === "number")
+  const allY = tickSeries.flatMap((s) => s.data.map((p) => p.y)).filter((v): v is number => typeof v === "number")
   const minY = allY.length > 0 ? Math.min(...allY) : 0
   // All-positive data keeps a 0 floor. When values dip negative, pin the floor
   // to the lowest generated tick (which everyOtherYTicks guarantees sits at/
@@ -1346,16 +1434,16 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
             : CHART_COLORS
       }
       // Mobile right inset is wide enough that the centered last x-label isn't clipped.
-      margin={{ top: marginTop, right: isMobile ? 22 : 24, bottom: compactTop ? 40 : 48, left: isMobile ? 48 : 68 }}
+      margin={sparkline ? { top: 8, right: 20, bottom: 24, left: 44 } : { top: marginTop, right: isMobile ? 22 : 24, bottom: compactTop ? 40 : 48, left: isMobile ? 48 : 68 }}
       xScale={{ type: "point" }}
-      yScale={{ type: "linear", min: yMin, max: effectiveMax, stacked: false }}
+      yScale={{ type: "linear", min: yMin, max: effectiveMax, stacked }}
       curve={curve}
       animate
       motionConfig={{ mass: 1, tension: 120, friction: 14, clamp: false, precision: 0.01, velocity: 0 }}
       enableArea={enableArea}
       // Non-muted charts swap nivo's flat areas for GradientAreas (layers below).
-      areaOpacity={0.12}
-      enablePoints
+      areaOpacity={stacked ? 0.55 : 0.12}
+      enablePoints={!stacked && !sparkline}
       pointSize={6}
       pointColor={
         muted
@@ -1392,14 +1480,24 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       }
       enableSlices="x"
       tooltip={() => null}
-      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} overlayIds={dashedSeriesIds} planTooltip={planTooltip} />}
-      axisLeft={{
+      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} overlayIds={dashedSeriesIds} planTooltip={planTooltip} share={sliceShare} shareTotals={sliceShareTotals} shareLabel={sliceShareLabel} />}
+      axisLeft={sparkline ? {
+        tickSize: 0,
+        tickPadding: 6,
+        tickValues: yTicks,
+        format: (v) => ((v as number) < 0 ? `-${formatMoney(-(v as number))}` : formatMoney(v as number)),
+      } : {
         tickSize: 0,
         tickPadding: 10,
         tickValues: yTicks,
         format: yFormat ?? ((v) => formatMoney(v as number)),
       }}
-      axisBottom={{
+      axisBottom={sparkline ? {
+        tickSize: 0,
+        tickPadding: 8,
+        tickValues: axisBottomTickValues,
+        format: axisBottomFormat,
+      } : {
         tickSize: 0,
         // compactTop pairs this line chart with a bar chart in the same grid
         // row (the jobcost detail page); match the bar's 12px tick padding so
@@ -1409,6 +1507,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
         format: axisBottomFormat,
       }}
       gridYValues={yTicks ?? 5}
+      enableGridY
       enableGridX={false}
       enableCrosshair
       markers={nivoMarkers}
@@ -1418,7 +1517,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
         "grid",
         "markers",
         "axes",
-        dashedLayers && enableArea ? dashedLayers.AreasLayer : enableArea && !muted ? DefaultGradientAreas : ("areas" as const),
+        dashedLayers && enableArea ? dashedLayers.AreasLayer : enableArea && !muted && !stacked ? DefaultGradientAreas : ("areas" as const),
         "crosshair",
         // Gap bridges go under the solid line/points so dash ends tuck
         // beneath the flanking dots.
@@ -1437,7 +1536,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
         ...(pulsePoint ? [buildPulseLayer(pulsePoint)!] : []),
       ]}
       crosshairType="x"
-      lineWidth={2.5}
+      lineWidth={sparkline ? 2 : 2.5}
       legends={
         legend
           ? [

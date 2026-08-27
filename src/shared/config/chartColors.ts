@@ -106,3 +106,23 @@ export const RAMP_SCHEMES = {
   red:    { hue: 2,  drift: -14 },
   purple: { hue: 278, drift: 18 },
 } as const
+
+/** Ordered categorical palette for multi-line "composition over time" charts
+ *  (one line per category, ranked). Copper leads for the top category, then
+ *  the muted Treemap family spread around the wheel so neighbours in rank
+ *  are far apart in hue. Use `SERIES_OTHER_COLOR` for a folded "Other" tail. */
+export const SERIES_PALETTE = [
+  "hsl(28, 85%, 54%)",  // the donut ramp's lead orange (rank 1)
+  "hsl(186, 50%, 42%)", // teal
+  "hsl(232, 48%, 58%)", // indigo
+  "hsl(146, 40%, 46%)", // green
+  "hsl(4, 56%, 56%)",   // coral red
+  "hsl(44, 70%, 52%)",  // gold
+  "hsl(292, 36%, 56%)", // violet
+  "hsl(208, 56%, 54%)", // sky blue
+  "hsl(78, 44%, 44%)",  // olive
+  "hsl(336, 50%, 58%)", // rose
+  "hsl(20, 44%, 48%)",  // sienna
+  "hsl(168, 46%, 40%)", // emerald
+]
+export const SERIES_OTHER_COLOR = "#a3acb8"

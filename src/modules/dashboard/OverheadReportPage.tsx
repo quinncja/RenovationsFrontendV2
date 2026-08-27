@@ -18,7 +18,7 @@ import {
 import { SortableHeader } from "../../shared/components/SortableHeader"
 import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
 import { useModalLayer } from "../../shared/hooks/useModalLayer"
-import { colorRamp, RAMP_SCHEMES } from "../../shared/config/chartColors"
+import { SERIES_PALETTE, SERIES_OTHER_COLOR } from "../../shared/config/chartColors"
 import { shortMonth, fullMonth, formatMoneyFull, formatDate } from "../../shared/utils/format"
 import { downloadXlsx } from "../../shared/utils/exportXlsx"
 import { buildMonthlyBreakdownXlsx } from "./exportMonthlyBreakdownXlsx"
@@ -68,6 +68,14 @@ interface AnnualRow {
   overhead: number
 }
 
+interface CategoryHistoryRow {
+  account_number: number | string
+  account_name: string
+  year: number
+  month: number
+  net: number
+}
+
 interface OpenMonthPayload {
   openMonthPeriod?: number
   openMonthYear?: number
@@ -80,6 +88,7 @@ interface PageData extends Record<string, unknown> {
   monthlyRevenueComparison: MonthRow[] | null
   overheadCategoryComparison: CategoryRow[] | null
   annualOverheadTrend: AnnualRow[] | null
+  overheadCategoryHistory: CategoryHistoryRow[] | null
   overheadLineItems: LineItem[] | null
   openMonthFinances: OpenMonthPayload | null
 }
@@ -430,6 +439,8 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
   const [trendView, setTrendView] = useState<"monthly" | "cumulative">("monthly")
   // Top Movers ranks by dollar swing or percent swing — one leads at a time.
   const [moversBy, setMoversBy] = useState<"dollars" | "percent">("dollars")
+  // Category Trend: one line per category, by month (selected year) or by year.
+  const [categoryTrendView, setCategoryTrendView] = useState<"monthly" | "yearly">("monthly")
   const [modalCategory, setModalCategory] = useState<ModalCategory | null>(null)
   // The category donut rolls everything past the top 7 into one "Other" slice;
   // clicking it opens a modal listing the remainder, each of which drills into
@@ -441,6 +452,7 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
     "monthlyRevenueComparison",
     "overheadCategoryComparison",
     "annualOverheadTrend",
+    "overheadCategoryHistory",
     "overheadLineItems",
     "openMonthFinances",
   ])
@@ -557,8 +569,72 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
         ]
       : top
   }, [topCats, restCats, restTotal])
-  const { hue, drift } = RAMP_SCHEMES.orange
-  const pieColors = colorRamp(hue, drift, Math.max(pieItems.length, 1))
+  // Same rank → color mapping as the Category Trend panels below, so a slice
+  // and its sparkline read as the same thing; "Other" is the neutral slate.
+  const pieColors = pieItems.map((it, i) =>
+    it.id === OTHER_ID ? SERIES_OTHER_COLOR : SERIES_PALETTE[i % SERIES_PALETTE.length],
+  )
+
+  // ── Category trend: one small-multiple panel per donut category ──
+  // Same top-10 + "Other" split as the donut so the two widgets describe the
+  // same categories, with a fixed ordered palette (rank → hue). Each category
+  // gets its own sparkline on its own scale: overlaid on one axis, payroll
+  // flattened everything else to zero. Monthly = all 12 months of the year,
+  // points past the open month left null so the axis stays a full year but
+  // the lines stop at the last posted month; Yearly = one point per posted
+  // year, month-13 adjustments included so totals reconcile with Annual
+  // Overhead. Each entry also carries its total over the shown range.
+  const categoryTrend = useMemo(() => {
+    const raw = data?.overheadCategoryHistory
+    if (!Array.isArray(raw) || raw.length === 0 || topCats.length === 0) return null
+    const topIds = new Set(topCats.map((c) => String(c.account_number)))
+    const groups = [
+      ...topCats.map((c, i) => ({
+        id: c.account_name,
+        accountId: String(c.account_number),
+        color: SERIES_PALETTE[i % SERIES_PALETTE.length],
+        match: (r: CategoryHistoryRow) => String(r.account_number) === String(c.account_number),
+      })),
+      ...(restCats.length
+        ? [
+            {
+              id: `Other (${restCats.length})`,
+              accountId: OTHER_ID,
+              color: SERIES_OTHER_COLOR,
+              match: (r: CategoryHistoryRow) => !topIds.has(String(r.account_number)),
+            },
+          ]
+        : []),
+    ]
+    const monthly = categoryTrendView === "monthly"
+    const postedMonths = raw
+      .filter((r) => r.year === pageYear && r.month >= 1 && r.month <= 12)
+      .map((r) => r.month)
+    const lastPosted = postedMonths.length ? Math.max(...postedMonths) : 0
+    const xs = monthly
+      ? Array.from({ length: 12 }, (_, i) => ({ key: i + 1, label: shortMonth(i + 1), posted: i + 1 <= lastPosted }))
+      : Array.from(new Set(raw.map((r) => r.year)))
+          .sort((a, b) => a - b)
+          .map((y) => ({ key: y, label: String(y), posted: true }))
+    if (!xs.some((x) => x.posted)) return null
+    const inScope = (r: CategoryHistoryRow, key: number) =>
+      monthly ? r.year === pageYear && r.month === key : r.year === key
+    const series = groups.map((g) => {
+      const points = xs.map((x) => ({
+        x: x.label,
+        y: x.posted ? raw.filter((r) => g.match(r) && inScope(r, x.key)).reduce((s, r) => s + (r.net || 0), 0) : null,
+      }))
+      return { id: g.id, accountId: g.accountId, color: g.color, data: points, total: points.reduce((s, p) => s + (p.y ?? 0), 0) }
+    })
+    const grandTotal = series.reduce((s, x) => s + Math.max(x.total, 0), 0)
+    // Whole-period overhead per x (every category, not just the drawn lines)
+    // so the tooltip's share stays "of the month" even when one is isolated.
+    const sliceTotals: Record<string, number> = {}
+    xs.forEach((x, i) => {
+      if (x.posted) sliceTotals[x.label] = series.reduce((s, ser) => s + (ser.data[i].y ?? 0), 0)
+    })
+    return { series, grandTotal, lastPosted, sliceTotals }
+  }, [data, topCats, restCats, pageYear, categoryTrendView])
 
   // ── Top movers vs last year ──
   // Ranked by whichever metric the widget's toggle has in the lead. Percent
@@ -904,6 +980,73 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
           </Widget>
         </MotionItem>
 
+        {/* ── Each category over time, one panel each ─────────────────── */}
+        <MotionItem className="col-span-full">
+          <Widget
+            title="Category Trend"
+            description={
+              categoryTrendView === "monthly"
+                ? `Each category on its own scale, ${pageYear}. Hover for the share of that month; click a category for its costs.`
+                : "Each category on its own scale, every year. Hover for the share of that year; click a category for its costs."
+            }
+            loading={isLoading}
+            noData={!isLoading && !categoryTrend}
+            actions={
+              <SegmentedControl
+                variant="ohr"
+                ariaLabel="Category trend view"
+                layoutId="ohrCategoryTrendThumb"
+                value={categoryTrendView}
+                options={[
+                  { key: "monthly", label: "Monthly" },
+                  { key: "yearly", label: "Yearly" },
+                ]}
+                onChange={setCategoryTrendView}
+              />
+            }
+          >
+            {categoryTrend && (
+              <div className="ohr-multi">
+                {categoryTrend.series.map((s) => {
+                  const pct =
+                    categoryTrend.grandTotal > 0 ? (Math.max(s.total, 0) / categoryTrend.grandTotal) * 100 : null
+                  return (
+                    <div
+                      key={s.id}
+                      className="ohr-multi-panel"
+                      onClick={() => handleCatClick(s.accountId)}
+                      title={`View ${s.id} costs`}
+                    >
+                      <div className="ohr-multi-head">
+                        <span className="ohr-trend-swatch" style={{ background: s.color }} />
+                        <span className="ohr-multi-name">{s.id}</span>
+                        <span className="ohr-multi-pct">{pct != null ? `${pct.toFixed(pct >= 10 ? 0 : 1)}%` : "—"}</span>
+                      </div>
+                      <div className="ohr-multi-value">{formatMoneyFull(s.total)}</div>
+                      <div className="ohr-multi-chart" onClick={(e) => e.stopPropagation()}>
+                        <Chart
+                          config={{
+                            type: "line",
+                            sparkline: true,
+                            // Sparklines have no axis, so plotting unposted
+                            // months as gaps just looks cut off — trim them.
+                            series: [{ id: s.id, color: s.color, data: s.data.filter((p) => p.y != null) }],
+                            curve: "monotoneX",
+                            yFormat: formatMoneyFull,
+                            disableGrowthTooltip: true,
+                            sliceShareTotals: categoryTrend.sliceTotals,
+                            sliceShareLabel: categoryTrendView === "monthly" ? "month" : "year",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </Widget>
+        </MotionItem>
+
         {/* Every dollar, month by month. Clicking a month on "Overhead by
             Month" filters this table to that month. */}
         <MotionItem className="col-span-full">
@@ -932,6 +1075,7 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
               isLoading={isLoading}
               totalLabel="Overhead"
               filterMonth={selectedMonth}
+              hideColumns={["lgract"]}
             />
           </Widget>
         </MotionItem>
