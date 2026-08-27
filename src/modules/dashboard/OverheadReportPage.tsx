@@ -15,17 +15,17 @@ import {
   MonthlyDetailTable,
   collapseValue,
 } from "../../shared/components/MonthlyDetailTable/MonthlyDetailTable"
-import { SortableHeader } from "../../shared/components/SortableHeader"
-import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
 import { useModalLayer } from "../../shared/hooks/useModalLayer"
 import { SERIES_PALETTE, SERIES_OTHER_COLOR } from "../../shared/config/chartColors"
-import { shortMonth, fullMonth, formatMoneyFull, formatDate } from "../../shared/utils/format"
+import { shortMonth, fullMonth, formatMoneyFull } from "../../shared/utils/format"
 import { downloadXlsx } from "../../shared/utils/exportXlsx"
 import { buildMonthlyBreakdownXlsx } from "./exportMonthlyBreakdownXlsx"
 import type { LineMarker, SpendItem } from "../../shared/components/Chart/chart.types"
 import { useOnboarding } from "../../core/onboarding/OnboardingProvider"
 import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
 import { SegmentedControl } from "../../shared/components/SegmentedControl"
+import { OverheadCategoryDetail, type DetailCategory } from "./OverheadCategoryDetail"
+import { buildCategoryTrend, type CategoryHistoryRow, type TrendGroup } from "./overheadTrend"
 import { useAuth } from "../../core/auth/AuthProvider"
 import { isTechRole } from "../../core/auth/roles"
 
@@ -74,15 +74,6 @@ interface CategoryRow {
 interface AnnualRow {
   year: number
   overhead: number
-}
-
-interface CategoryHistoryRow {
-  account_number: number | string
-  account_name: string
-  parent_account?: number | string
-  year: number
-  month: number
-  net: number
 }
 
 interface OpenMonthPayload {
@@ -204,179 +195,6 @@ function DeltaPill({
   )
 }
 
-type ModalSortKey = "date" | "trnnum" | "description" | "month" | "amount"
-
-interface ModalCategory {
-  id: string
-  name: string
-}
-
-/**
- * Every individual GL cost line behind one pie category. Rows come from the
- * already-fetched overheadLineItems payload (no extra fetch) filtered by the
- * account FK; when the selected year holds the open period the rows are also
- * capped at the open month so the modal total reconciles with the pie slice.
- */
-function OverheadCategoryModal({
-  category,
-  onClose,
-  lineItems,
-  monthCap,
-}: {
-  category: ModalCategory | null
-  onClose: () => void
-  lineItems: LineItem[] | null
-  monthCap: number | null
-}) {
-  const open = category !== null
-  const sort = useTableSort<ModalSortKey>("date", "desc")
-  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
-
-  const rows = useMemo(() => {
-    if (!category || !Array.isArray(lineItems)) return []
-    return lineItems.filter((li) => {
-      if (String(collapseValue(li.lgract)) !== category.id) return false
-      const month = Number(collapseValue(li.month))
-      return monthCap == null || (month >= 1 && month <= monthCap)
-    })
-  }, [category, lineItems, monthCap])
-
-  const sorted = useMemo(
-    () =>
-      applySort(rows, sort, (li, key) =>
-        key === "date"
-          ? new Date(String(collapseValue(li.trndte) ?? "")).getTime() || 0
-          : key === "amount"
-            ? Number(collapseValue(li.net) ?? 0)
-            : key === "month"
-              ? Number(collapseValue(li.month) ?? 0)
-              : key === "trnnum"
-                ? String(collapseValue(li.trnnum) ?? "")
-                : String(collapseValue(li.dscrpt) ?? ""),
-      ),
-    [rows, sort],
-  )
-
-  const total = rows.reduce((sum, li) => sum + Number(collapseValue(li.net) ?? 0), 0)
-
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
-            style={{ zIndex: overlayZ }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-          />
-          <div className="modal-positioner" style={{ zIndex: contentZ }}>
-            <motion.div
-              className="modal reports-modal"
-              initial={{ opacity: 0, scale: 0.96, y: 16 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 16 }}
-              transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-            >
-              <div className="modal-header">
-                <div className="reports-modal-title">
-                  <div>
-                    <h2 className="title2 emphasized">{category?.name}</h2>
-                    <span className="reports-modal-subtitle">
-                      Account {category?.id} · {rows.length} cost
-                      {rows.length === 1 ? "" : "s"} · {formatMoneyFull(total)}
-                    </span>
-                  </div>
-                </div>
-                <button className="button modal-close" onClick={onClose}>
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="reports-modal-body">
-                {rows.length === 0 ? (
-                  <p className="reports-modal-empty body-text text-secondary">
-                    No costs recorded for this category.
-                  </p>
-                ) : (
-                  <table className="data-table billings-invoice-table">
-                    <thead>
-                      <tr>
-                        <SortableHeader
-                          label="Date"
-                          columnKey="date"
-                          activeKey={sort.key}
-                          dir={sort.dir}
-                          onSort={sort.toggle}
-                        />
-                        <SortableHeader
-                          label="Trans #"
-                          columnKey="trnnum"
-                          activeKey={sort.key}
-                          dir={sort.dir}
-                          onSort={sort.toggle}
-                        />
-                        <SortableHeader
-                          label="Description"
-                          columnKey="description"
-                          activeKey={sort.key}
-                          dir={sort.dir}
-                          onSort={sort.toggle}
-                        />
-                        <SortableHeader
-                          label="Month"
-                          columnKey="month"
-                          activeKey={sort.key}
-                          dir={sort.dir}
-                          onSort={sort.toggle}
-                        />
-                        <SortableHeader
-                          label="Amount"
-                          columnKey="amount"
-                          activeKey={sort.key}
-                          dir={sort.dir}
-                          onSort={sort.toggle}
-                          align="right"
-                        />
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sorted.map((li, i) => {
-                        const month = Number(collapseValue(li.month))
-                        return (
-                          <tr key={i}>
-                            <td className="text-secondary">
-                              {formatDate(collapseValue(li.trndte))}
-                            </td>
-                            <td>{String(collapseValue(li.trnnum) ?? "—")}</td>
-                            <td>{String(collapseValue(li.dscrpt) ?? "") || "—"}</td>
-                            <td>{month >= 1 && month <= 12 ? fullMonth(month) : "Adjustment"}</td>
-                            <td className="num">
-                              {formatMoneyFull(Number(collapseValue(li.net) ?? 0))}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <td colSpan={4}>Total</td>
-                        <td className="num">{formatMoneyFull(total)}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        </>
-      )}
-    </AnimatePresence>,
-    document.body,
-  )
-}
-
 /**
  * The "Other" tail of the category donut: every account past the top 7, as a
  * ranked list. Clicking a row drills into that category's cost modal, which
@@ -481,7 +299,7 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
   const [moversBy, setMoversBy] = useState<"dollars" | "percent">("dollars")
   // Category Trend: one line per category, by month (selected year) or by year.
   const [categoryTrendView, setCategoryTrendView] = useState<"monthly" | "yearly">("monthly")
-  const [modalCategory, setModalCategory] = useState<ModalCategory | null>(null)
+  const [modalCategory, setModalCategory] = useState<DetailCategory | null>(null)
   // The category donut rolls everything past the top 7 into one "Other" slice;
   // clicking it opens a modal listing the remainder, each of which drills into
   // its own cost modal on top.
@@ -660,11 +478,9 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
   // the lines stop at the last posted month; Yearly = one point per posted
   // year, month-13 adjustments included so totals reconcile with Annual
   // Overhead. Each entry also carries its total over the shown range.
-  const categoryTrend = useMemo(() => {
-    const raw = categoryHistory
-    if (!Array.isArray(raw) || raw.length === 0 || topCats.length === 0) return null
+  const trendGroups = useMemo<TrendGroup[]>(() => {
     const topIds = new Set(topCats.map((c) => String(c.account_number)))
-    const groups = [
+    return [
       ...topCats.map((c, i) => ({
         id: c.account_name,
         accountId: String(c.account_number),
@@ -682,54 +498,24 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
           ]
         : []),
     ]
-    const monthly = categoryTrendView === "monthly"
-    const postedMonths = raw
-      .filter((r) => r.year === pageYear && r.month >= 1 && r.month <= 12)
-      .map((r) => r.month)
-    const lastPosted = postedMonths.length ? Math.max(...postedMonths) : 0
-    const xs = monthly
-      ? Array.from({ length: 12 }, (_, i) => ({ key: i + 1, label: shortMonth(i + 1), posted: i + 1 <= lastPosted }))
-      : Array.from(new Set(raw.map((r) => r.year)))
-          .sort((a, b) => a - b)
-          .map((y) => ({ key: y, label: String(y), posted: true }))
-    if (!xs.some((x) => x.posted)) return null
-    const inScope = (r: CategoryHistoryRow, key: number) =>
-      monthly ? r.year === pageYear && r.month === key : r.year === key
-    const series = groups.map((g) => {
-      const points = xs.map((x) => ({
-        x: x.label,
-        y: x.posted ? raw.filter((r) => g.match(r) && inScope(r, x.key)).reduce((s, r) => s + (r.net || 0), 0) : null,
-      }))
-      // Monthly view: the whole prior year, so the axis always spans Jan–Dec
-      // and the dotted line shows where the rest of this year is headed.
-      const prevData = monthly
-        ? xs
-            .map((x) => ({
-              x: x.label,
-              y: raw
-                .filter((r) => g.match(r) && r.year === pageYear - 1 && r.month === x.key)
-                .reduce((s, r) => s + (r.net || 0), 0),
-            }))
-        : null
-      const hasPrev = prevData != null && raw.some((r) => g.match(r) && r.year === pageYear - 1)
-      return {
-        id: g.id,
-        accountId: g.accountId,
-        color: g.color,
-        data: points,
-        total: points.reduce((s, p) => s + (p.y ?? 0), 0),
-        prevData: hasPrev ? prevData : null,
-      }
-    })
-    const grandTotal = series.reduce((s, x) => s + Math.max(x.total, 0), 0)
-    // Whole-period overhead per x (every category, not just the drawn lines)
-    // so the tooltip's share stays "of the month" even when one is isolated.
-    const sliceTotals: Record<string, number> = {}
-    xs.forEach((x, i) => {
-      if (x.posted) sliceTotals[x.label] = series.reduce((s, ser) => s + (ser.data[i].y ?? 0), 0)
-    })
-    return { series, grandTotal, lastPosted, sliceTotals }
-  }, [categoryHistory, topCats, restCats, pageYear, categoryTrendView])
+  }, [topCats, restCats])
+  const historyRows = useMemo(() => (Array.isArray(categoryHistory) ? categoryHistory : []), [categoryHistory])
+  const categoryTrendAll = useMemo(
+    () => ({
+      monthly: buildCategoryTrend(historyRows, trendGroups, "monthly", pageYear),
+      yearly: buildCategoryTrend(historyRows, trendGroups, "yearly", pageYear),
+    }),
+    [historyRows, trendGroups, pageYear],
+  )
+  const categoryTrend = categoryTrendAll[categoryTrendView]
+  const trendGrandTotals = useMemo(
+    () => ({ monthly: categoryTrendAll.monthly?.grandTotal ?? 0, yearly: categoryTrendAll.yearly?.grandTotal ?? 0 }),
+    [categoryTrendAll],
+  )
+  const trendSliceTotals = useMemo(
+    () => ({ monthly: categoryTrendAll.monthly?.sliceTotals ?? {}, yearly: categoryTrendAll.yearly?.sliceTotals ?? {} }),
+    [categoryTrendAll],
+  )
 
   // ── Top movers vs last year ──
   // Ranked by whichever metric the widget's toggle has in the lead. Percent
@@ -822,14 +608,43 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
     })
   }
 
-  const openModal = (id: string) => {
+  // Opens the category detail for an account. From a Category Trend panel the
+  // detail morphs out of that panel (layoutId); from the donut, list or Other
+  // modal it simply fades in. The panel is only an origin for the top-N
+  // categories that have one.
+  const openModal = (id: string, fromPanel = false) => {
     const cat = categories.find((c) => String(c.account_number) === id)
-    if (cat) setModalCategory({ id, name: cat.account_name })
+    if (!cat) return
+    const topIdx = topCats.findIndex((c) => String(c.account_number) === id)
+    setModalCategory({
+      id,
+      name: cat.account_name,
+      color: topIdx >= 0 ? SERIES_PALETTE[topIdx % SERIES_PALETTE.length] : SERIES_OTHER_COLOR,
+      match: (r) => String(r.account_number) === id,
+      matchItem: (li) => String(collapseValue(li.lgract)) === id,
+      layoutId: fromPanel && topIdx >= 0 ? `ohr-cat-${id}` : undefined,
+    })
+  }
+
+  // The "Other" tail as a category of its own (the panel's click target).
+  const openOtherDetail = () => {
+    const topIds = new Set(topCats.map((c) => String(c.account_number)))
+    setModalCategory({
+      id: OTHER_ID,
+      name: `Other (${restCats.length})`,
+      color: SERIES_OTHER_COLOR,
+      match: (r) => !topIds.has(String(r.account_number)),
+      matchItem: (li) => !topIds.has(String(collapseValue(li.lgract))),
+      layoutId: `ohr-cat-${OTHER_ID}`,
+    })
   }
 
   // Donut/list click: the synthetic "Other" slice opens the tail modal; a real
-  // category opens its cost modal.
+  // category opens its cost detail.
   const handleCatClick = (id: string) => (id === OTHER_ID ? setOtherModalOpen(true) : openModal(id))
+  // Panel click: same, except Other opens as its own category and real
+  // categories grow out of their panel.
+  const handlePanelClick = (id: string) => (id === OTHER_ID ? openOtherDetail() : openModal(id, true))
 
   // Line items span the full posted year while the pie is capped at the open
   // month — cap the modal the same way so its total matches the slice.
@@ -1106,10 +921,12 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                   const pct =
                     categoryTrend.grandTotal > 0 ? (Math.max(s.total, 0) / categoryTrend.grandTotal) * 100 : null
                   return (
-                    <div
+                    <motion.div
                       key={s.id}
-                      className="ohr-multi-panel"
-                      onClick={() => handleCatClick(s.accountId)}
+                      className={`ohr-multi-panel${modalCategory?.layoutId === `ohr-cat-${s.accountId}` ? " ohr-multi-panel-lifted" : ""}`}
+                      layoutId={`ohr-cat-${s.accountId}`}
+                      style={{ borderRadius: 10 }}
+                      onClick={() => handlePanelClick(s.accountId)}
                       title={`View ${s.id} costs`}
                     >
                       <div className="ohr-multi-head">
@@ -1143,7 +960,7 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
                           }}
                         />
                       </div>
-                    </div>
+                    </motion.div>
                   )
                 })}
               </div>
@@ -1247,11 +1064,16 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
         onClose={() => setOtherModalOpen(false)}
       />
 
-      <OverheadCategoryModal
+      <OverheadCategoryDetail
         category={modalCategory}
         onClose={() => setModalCategory(null)}
+        history={historyRows}
         lineItems={lineItems}
+        pageYear={pageYear}
         monthCap={modalMonthCap}
+        initialView={categoryTrendView}
+        sliceTotals={trendSliceTotals}
+        grandTotals={trendGrandTotals}
       />
     </Page>
   )
