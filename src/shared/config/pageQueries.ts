@@ -51,7 +51,7 @@ export const PAGE_QUERIES = {
   ],
 
   // Upcoming Billings breakdown — the per-invoice open AR/AP rows behind the chart.
-  dashboardUpcomingBillings: ["agingSummaryOpen"],
+  dashboardUpcomingBillings: ["agingSummaryOpen", "weeklyBillingAccuracy"],
 
   // Progress Billings full list — every ranked project, over- and under-billed.
   dashboardProgressBillings: ["progressBillings"],

@@ -196,7 +196,7 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
   billings: {
     id: "billings",
     component: UpcomingBillingsWidget,
-    label: "Upcoming Billings",
+    label: "Forecast Billings",
     visualType: "forecast",
     // Half width — shares the first row with Banking & Overdue.
     defaultColSpan: 1,

@@ -36,13 +36,13 @@ export function UpcomingBillingsWidget() {
   )
 
   const viewLink = (
-    <Link to="/dashboard/upcoming-billings" className="widget-link-btn" title="View upcoming billings invoices">
+    <Link to="/dashboard/forecast-billings" className="widget-link-btn" title="View forecast billings invoices">
       View <ChevronRight size={12} />
     </Link>
   )
 
   return (
-    <Widget title="Upcoming Billings" loading={isLoading} noData={!forecast} actions={viewLink} className="billings-chart-card">
+    <Widget title="Forecast Billings" loading={isLoading} noData={!forecast} actions={viewLink} className="billings-chart-card">
       {forecast && (
         <Chart
           config={{
@@ -63,7 +63,7 @@ export function UpcomingBillingsWidget() {
               const params = new URLSearchParams()
               if (i >= 0) params.set("week", String(i))
               const qs = params.toString()
-              navigate(`/dashboard/upcoming-billings${qs ? `?${qs}` : ""}`)
+              navigate(`/dashboard/forecast-billings${qs ? `?${qs}` : ""}`)
             },
           }}
         />

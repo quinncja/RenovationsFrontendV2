@@ -217,10 +217,16 @@ export type ChartConfig =
        *  and all slices without `delta` — read "Projected: $X" in neutral ink.
        *  `label` swaps "Projected" for e.g. a prior year; `invertColor` reads
        *  a positive delta as bad (spending above last year = red). */
-      planTooltip?: { delta?: boolean; label?: string; invertColor?: boolean }
+      planTooltip?: { delta?: boolean; label?: string; invertColor?: boolean; /** Append the delta as a % of the plan, e.g. "+$12K (+8%)". */ percent?: boolean; /** Caption under the headline actual on slices that have one (e.g. "Received"). */ actualLabel?: string }
       /** Keep dashed series in the tooltip as ordinary rows (prior-year
        *  comparison look) instead of hiding them behind `planTooltip`. */
       dashedSeriesAsRows?: boolean
+      /** Suppress the per-sample point markers (dense multi-series timelines
+       *  read cleaner as bare lines; the slice tooltip still works). */
+      hidePoints?: boolean
+      /** Paint a faint wash from this x value to the right edge of the plot —
+       *  marks the forward (forecast) half of a past-and-future timeline. */
+      shadeFromX?: string
       /** Multi-series slice tooltip variant for "composition over time" charts:
        *  rows ranked by value at that slice, each carrying its share of the
        *  slice total, with a Total footer. Implies no growth row. */

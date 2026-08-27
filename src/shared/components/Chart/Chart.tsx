@@ -122,7 +122,9 @@ function sparklineTicks(series: LineSeries[]): number[] | undefined {
   return ticks.length > 1 ? ticks : undefined
 }
 
-function everyOtherYTicks(series: LineSeries[], ceiling?: number, divisions = 8): number[] | undefined {
+function everyOtherYTicks(series: LineSeries[], ceiling?: number, divisions?: number): number[] | undefined {
+  const explicit = divisions != null
+  divisions ??= 8
   const allY = series
     .flatMap((s) => s.data.map((p) => p.y))
     .filter((v): v is number => typeof v === "number")
@@ -135,10 +137,19 @@ function everyOtherYTicks(series: LineSeries[], ceiling?: number, divisions = 8)
   const rawStep = range / divisions
   if (rawStep === 0) return undefined
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)))
-  const niceStep = Math.ceil(rawStep / magnitude) * magnitude
-  // When data spans negative values use niceStep so zero stays centered;
-  // for all-positive data skip every other tick to reduce clutter.
-  const step = min < 0 ? niceStep : niceStep * 2
+  // Explicit `divisions` (a caller asked for N lines): snap to the nearest
+  // 1 / 2 / 5 step so paired panels land on the same density regardless of
+  // their ranges. Default: round the step up to a whole magnitude and, for
+  // all-positive data, skip every other tick to reduce clutter.
+  let step: number
+  if (explicit) {
+    step = [1, 2, 2.5, 5, 10]
+      .map((m) => m * magnitude)
+      .reduce((best, c) => (Math.abs(range / c - divisions) < Math.abs(range / best - divisions) ? c : best))
+  } else {
+    const niceStep = Math.ceil(rawStep / magnitude) * magnitude
+    step = min < 0 ? niceStep : niceStep * 2
+  }
   // With an explicit ceiling, round the top tick UP to the next step multiple
   // so a gridline lands at/above the ceiling (the caller snaps the axis max to
   // this tick — see LineChart — so the top gridline sits flush at the axis edge
@@ -167,7 +178,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
   disableGrowth?: boolean
   wipMonthLabel?: string | null
   overlayIds?: string[]
-  planTooltip?: { delta?: boolean; label?: string; invertColor?: boolean }
+  planTooltip?: { delta?: boolean; label?: string; invertColor?: boolean; percent?: boolean; actualLabel?: string }
   share?: boolean
   shareTotals?: Record<string, number>
   shareLabel?: string
@@ -210,7 +221,11 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
             className="chart-line-tooltip-growth-value"
             style={delta != null ? { color: good ? "#22c55e" : "#ef4444" } : undefined}
           >
-            {delta != null ? `${delta >= 0 ? "+" : "−"}${fmt(Math.abs(delta))}` : fmt(planValue)}
+            {delta != null
+              ? `${delta >= 0 ? "+" : "−"}${fmt(Math.abs(delta))}${
+                  planTooltip?.percent && planValue > 0 ? ` (${delta >= 0 ? "+" : "−"}${Math.round((Math.abs(delta) / planValue) * 100)}%)` : ""
+                }`
+              : fmt(planValue)}
           </span>
         </div>
       </>
@@ -219,8 +234,11 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
 
   // Single-series: large value + optional growth vs previous data point
   if (coreSeries.length === 1) {
-    const point = points.find((p) => String(p.seriesId) === String(coreSeries[0].id)) ?? points[0]
-    const currVal = point.data.y as number
+    // Strictly the core series' point: nivo drops null-y points from the
+    // slice, so falling back to points[0] here would pick up the dashed plan
+    // point and read it as an actual of $0 with a zero delta.
+    const point = points.find((p) => String(p.seriesId) === String(coreSeries[0].id)) ?? (overlayIds?.length ? undefined : points[0])
+    const currVal = (point?.data.y ?? null) as number | null
     const seriesData = coreSeries[0]?.data ?? []
     const idx = seriesData.findIndex((p) => String(p.x) === xLabel)
     let growth: number | null = null
@@ -234,11 +252,28 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
       ? growth >= 0 ? "#22c55e" : "#ef4444"
       : undefined
 
+    // No actual at this slice but a plan value (the forward half of a
+    // past-and-future timeline): the plan IS the number here, so show it as
+    // the headline value with its label — not as a "vs" footer under nothing.
+    if (currVal == null && planValue != null) {
+      return (
+        <div className="chart-line-tooltip">
+          <TooltipPing />
+          <div className="chart-line-tooltip-header">{headerLabel}</div>
+          <div className="chart-line-tooltip-single-value">{fmt(planValue)}</div>
+          <div className="chart-line-tooltip-growth">{planTooltip?.label ?? "Projected"}</div>
+        </div>
+      )
+    }
+
     return (
       <div className="chart-line-tooltip">
         <TooltipPing />
         <div className="chart-line-tooltip-header">{headerLabel}</div>
         <div className="chart-line-tooltip-single-value">{fmt(currVal)}</div>
+        {planTooltip?.actualLabel && planValue != null && !planIsAnchor && (
+          <div className="chart-line-tooltip-growth">{planTooltip.actualLabel}</div>
+        )}
         {growth != null && (
           <div className="chart-line-tooltip-growth" style={{ color: growthColor }}>
             {growth >= 0 ? "↗" : "↘"} {growth > 0 ? "+" : ""}{growth.toFixed(1)}% YoY
@@ -1199,6 +1234,20 @@ function buildValueColorLayer(valueColor: (v: number) => string) {
 // flanking each run of nulls. The solid line still breaks at the gap (nivo's
 // defined() behavior), so the dash reads as "no data here, but the trend
 // continues" rather than faking a measurement across the gap.
+// Faint wash over the plot from `fromX` (a point-scale category) rightward.
+function buildShadeLayer(fromX: string, fill: string) {
+  return function ShadeLayer(props: unknown) {
+    const { xScale, innerWidth, innerHeight } = props as {
+      xScale: (v: string) => number
+      innerWidth: number
+      innerHeight: number
+    }
+    const x = xScale(fromX)
+    if (!Number.isFinite(x)) return null
+    return <rect x={x} y={0} width={Math.max(0, innerWidth - x)} height={innerHeight} fill={fill} rx={4} pointerEvents="none" />
+  }
+}
+
 function buildGapBridgeLayer() {
   return function GapBridgeLayer(props: unknown) {
     const { series } = props as {
@@ -1367,7 +1416,7 @@ function buildDashedSeriesLayers(dashedIds: string[], dotted = false, overlayOnl
 }
 
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
-  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip, topBand, sliceShare, sliceShareTotals, yTickCount, stacked = false, sparkline = false, sliceShareLabel, dashedSeriesAsRows } = config
+  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip, topBand, sliceShare, sliceShareTotals, yTickCount, stacked = false, sparkline = false, sliceShareLabel, dashedSeriesAsRows, hidePoints = false, shadeFromX } = config
 
   // Dashed-overlay mode swaps the stock areas/lines layers for versions that
   // stroke the listed series dashed and skip their area fill. Muted highlight
@@ -1463,7 +1512,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       enableArea={enableArea}
       // Non-muted charts swap nivo's flat areas for GradientAreas (layers below).
       areaOpacity={stacked ? 0.55 : 0.12}
-      enablePoints={!stacked && !sparkline}
+      enablePoints={!stacked && !sparkline && !hidePoints}
       pointSize={6}
       pointColor={
         muted
@@ -1535,6 +1584,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       // (drawn over the line + data), then the pulse dot on top of everything.
       layers={[
         "grid",
+        ...(shadeFromX ? [buildShadeLayer(shadeFromX, dark ? "rgba(255,255,255,0.045)" : "rgba(25,55,90,0.045)")] : []),
         "markers",
         "axes",
         dashedLayers && enableArea ? dashedLayers.AreasLayer : enableArea && !muted && !stacked ? DefaultGradientAreas : ("areas" as const),

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { ArrowLeft, ChevronDown, ChevronRight, Download } from "lucide-react"
+import { ArrowLeft, ChevronRight, Download, X } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
@@ -10,6 +11,9 @@ import { Chart } from "../../shared/components/Chart/Chart"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { SortableHeader } from "../../shared/components/SortableHeader"
+import { useModalLayer } from "../../shared/hooks/useModalLayer"
+import { fetchPageData } from "../../shared/api/pageApi"
+import { SkelText } from "../../shared/components/SkelText"
 import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
 import useIsMobile from "../../shared/hooks/useIsMobile"
 import { downloadXlsx, type SheetRow, type StyledCell } from "../../shared/utils/exportXlsx"
@@ -22,6 +26,7 @@ import {
   type BillingsInvoice,
 } from "./utils/agingForecast"
 import { AR_COLOR, AP_COLOR } from "./widgets/billings/billingsShared"
+import { Fact } from "../jobcost/detailPrimitives"
 
 // Drill-down for the home Upcoming Billings widget: the forecast chart plus one
 // expandable card per week (accordion — a single card open at a time, so the
@@ -38,6 +43,71 @@ interface WeekGroup {
 }
 
 type Side = "AR" | "AP"
+
+// Past-half data from `weeklyBillingAccuracy` (reconstructed forecast + paid).
+interface PastSide {
+  projected: number
+  actual: number
+}
+interface PastWeek {
+  weekStart: string
+  ar: PastSide
+  ap: PastSide
+}
+interface BillingAccuracyData {
+  arAvailable: boolean
+  apAvailable: boolean
+  weeks: PastWeek[]
+  /** Week-to-date payments for the current partial week (Monday → today). */
+  current?: { weekStart: string; through: string; ar: { actual: number }; ap: { actual: number } }
+}
+
+const TODAY_LABEL = "This Week"
+
+/** What the week modal shows: a forward week's open invoices for one side,
+ *  or a past / current week's paid-vs-projected breakdown for one side. */
+type WeekModalTarget =
+  | { kind: "future"; side: Side; week: WeekGroup }
+  | { kind: "past"; side: Side; label: string; weekStart: string; isCurrent: boolean }
+
+interface DetailProjected {
+  recnum: string
+  invnum: string | null
+  counterparty: string | null
+  job: string | null
+  duedte: string | null
+  mark: string | null
+  invttl: number
+  openAtStart: number
+  paidDuring: number
+}
+interface DetailPaid {
+  recnum: string
+  invnum: string | null
+  counterparty: string | null
+  job: string | null
+  chkdte: string | null
+  mark: string | null
+  amount: number
+  wasProjected: boolean
+}
+interface WeekDetail {
+  available: boolean
+  projected: DetailProjected[]
+  paid: DetailPaid[]
+}
+
+const SIDE_META = {
+  ar: { code: "AR", title: "Receivables", verb: "received" },
+  ap: { code: "AP", title: "Payables", verb: "paid" },
+} as const
+
+/** Past-window totals for one side, for the accuracy strip. */
+function sideTotals(weeks: PastWeek[], side: "ar" | "ap") {
+  const projected = weeks.reduce((s, w) => s + w[side].projected, 0)
+  const actual = weeks.reduce((s, w) => s + w[side].actual, 0)
+  return { projected, actual, ratio: projected > 0 ? actual / projected : null }
+}
 
 type LeafSortKey = "counterparty" | "invnum" | "job" | "due" | "mark" | "total" | "amount"
 
@@ -107,12 +177,425 @@ function InvoiceTable({
   )
 }
 
+/** AR then AP tables for one week, shared by the row body and the modal. */
+function WeekSides({ week, only, onOpenInvoice }: { week: WeekGroup; only?: Side; onOpenInvoice: (recnum: string, side: Side) => void }) {
+  const sides = (["AR", "AP"] as const).filter((side) => (!only || side === only) && (side === "AR" ? week.ar : week.ap).length > 0)
+  if (sides.length === 0) return <p className="reports-modal-empty body-text text-secondary">No invoices this week.</p>
+  return (
+    <>
+      {sides.map((side) => {
+        const list = side === "AR" ? week.ar : week.ap
+        return (
+          <div key={side} className="billings-side-section">
+            <div className="billings-side-section-header">
+              <span className={`inv-type-badge inv-type-badge--${side.toLowerCase()}`}>{side}</span>
+              <span className="billings-count">
+                {list.length} invoice{list.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="ohr-cost-items">
+              <InvoiceTable list={list} side={side} onOpen={onOpenInvoice} />
+            </div>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+/**
+ * Weeks as expanding period cards — the Overhead Report's Monthly Spending
+ * rows (OverheadCostRows) with the week's AR / AP / Net in the head slots
+ * and the AR + AP invoice tables in the body.
+ */
+function WeekRows({
+  weeks,
+  openKey,
+  onToggle,
+  onOpenInvoice,
+}: {
+  weeks: WeekGroup[]
+  openKey: number | null
+  onToggle: (i: number) => void
+  onOpenInvoice: (recnum: string, side: Side) => void
+}) {
+  if (weeks.every((w) => w.ar.length + w.ap.length === 0)) {
+    return <p className="reports-modal-empty body-text text-secondary">No upcoming invoices.</p>
+  }
+  return (
+    <div className="ohr-detail-list scrollbar-secondary">
+      {weeks.map((week) => {
+        const count = week.ar.length + week.ap.length
+        const isOpen = openKey === week.index
+        const net = week.arTotal - week.apTotal
+        const money = (v: number, color: string) => (
+          <span className="jc-head-stat-value num" style={{ color: v ? color : "var(--secondary-text)" }}>
+            {formatMoneyFull(v)}
+          </span>
+        )
+        return (
+          <div key={week.index} className={`ohr-cost-card${isOpen ? " ohr-cost-card-open" : ""}${count === 0 ? " ubw-empty" : ""}`}>
+            <div
+              className="ohr-cost-head"
+              role="button"
+              tabIndex={count ? 0 : -1}
+              aria-expanded={isOpen}
+              aria-disabled={count === 0}
+              onClick={() => count && onToggle(week.index)}
+              onKeyDown={(e) => {
+                if (count && (e.key === "Enter" || e.key === " ")) {
+                  e.preventDefault()
+                  onToggle(week.index)
+                }
+              }}
+            >
+              <span className="jc-head-toggle">
+                <ChevronRight size={15} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
+              </span>
+              <span className="ohr-cost-label">{week.label}</span>
+              <span className="ohr-cost-stats">
+                <span className="jc-head-stat">
+                  <span className="jc-head-stat-label">Invoices</span>
+                  <span className="jc-head-stat-value">{count}</span>
+                </span>
+                <span className="jc-head-stat">
+                  <span className="jc-head-stat-label">AR in</span>
+                  {money(week.arTotal, AR_COLOR)}
+                </span>
+                <span className="jc-head-stat">
+                  <span className="jc-head-stat-label">AP out</span>
+                  {money(week.apTotal, AP_COLOR)}
+                </span>
+                <span className="jc-head-stat">
+                  <span className="jc-head-stat-label">Net</span>
+                  {money(net, net > 0 ? AR_COLOR : AP_COLOR)}
+                </span>
+              </span>
+            </div>
+            <AnimatePresence initial={false}>
+              {isOpen && (
+                <motion.div
+                  key="body"
+                  className="ohr-cost-body"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.14 } }}
+                >
+                  <WeekSides week={week} onOpenInvoice={onOpenInvoice} />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * How a payment related to the forecast: it was projected for the week it
+ * landed in, or for some week ahead (paid early) or behind (paid late), or
+ * its invoice never had a due date to project from.
+ */
+function ProjectionBadge({ mark, weekStart, wasProjected }: { mark: string | null; weekStart: string; wasProjected: boolean }) {
+  if (wasProjected) return <span className="ubw-badge ubw-badge--ok">Correctly projected</span>
+  if (!mark) return <span className="ubw-badge">Not projected</span>
+  const diff = Math.round((new Date(`${mark}T00:00:00Z`).getTime() - new Date(`${weekStart}T00:00:00Z`).getTime()) / (7 * 86_400_000))
+  if (diff > 0) return <span className="ubw-badge ubw-badge--early">Projected {diff} week{diff === 1 ? "" : "s"} out</span>
+  if (diff < 0) return <span className="ubw-badge ubw-badge--late">Projected {-diff} week{diff === -1 ? "" : "s"} earlier</span>
+  return <span className="ubw-badge ubw-badge--ok">Correctly projected</span>
+}
+
+/** Section header inside the week modal: title, count, total. */
+function DetailSectionHead({ title, count, noun, total, color }: { title: string; count: number; noun: string; total: number; color?: string }) {
+  return (
+    <div className="ubw-section-head">
+      <span className="ubw-section-title headline">{title}</span>
+      <span className="ubw-section-count footnote">
+        {count} {noun}{count === 1 ? "" : "s"}
+      </span>
+      <span className="ubw-section-total title3 emphasized num" style={color ? { color } : undefined}>{formatMoneyFull(total)}</span>
+    </div>
+  )
+}
+
+/** Paid vs. projected tables for a past / current week (fetched on demand). */
+function WeekDetailBody({
+  target,
+  detail,
+  onOpenInvoice,
+}: {
+  target: Extract<WeekModalTarget, { kind: "past" }>
+  detail: WeekDetail | "loading" | "error"
+  onOpenInvoice: (recnum: string, side: Side) => void
+}) {
+  const color = target.side === "AR" ? AR_COLOR : AP_COLOR
+  const verb = target.side === "AR" ? "Received" : "Paid"
+  if (detail === "loading") {
+    return (
+      <div className="ohr-cost-items ohr-cost-items-loading" aria-busy="true">
+        {Array.from({ length: 5 }, (_, i) => (
+          <div key={i} className="ohr-cost-skel-row">
+            <SkelText ch={9} />
+            <SkelText ch={26} />
+            <SkelText ch={8} />
+          </div>
+        ))}
+      </div>
+    )
+  }
+  if (detail === "error") {
+    return <p className="reports-modal-empty body-text text-secondary">Couldn't load this week. Try again in a moment.</p>
+  }
+  if (!detail.available) {
+    return <p className="reports-modal-empty body-text text-secondary">{target.side} payment history is not exposed by Sage.</p>
+  }
+  const rowProps = (recnum: string) => ({
+    className: "clickable-row",
+    onClick: () => onOpenInvoice(recnum, target.side),
+    tabIndex: 0,
+    role: "button" as const,
+    onKeyDown: (e: React.KeyboardEvent) => e.key === "Enter" && onOpenInvoice(recnum, target.side),
+    title: "View invoice details",
+  })
+  const paidTotal = detail.paid.reduce((s, p) => s + p.amount, 0)
+  const projTotal = detail.projected.reduce((s, p) => s + p.openAtStart, 0)
+  return (
+    <>
+      <div className="billings-side-section ubw-section">
+        <DetailSectionHead
+          title={`${verb} ${target.isCurrent ? "so far this week" : "this week"}`}
+          count={detail.paid.length}
+          noun="payment"
+          total={paidTotal}
+          color={color}
+        />
+        <div className="ohr-cost-items">
+          {detail.paid.length === 0 ? (
+            <p className="reports-modal-empty body-text text-secondary">Nothing {verb.toLowerCase()} {target.isCurrent ? "yet" : "this week"}.</p>
+          ) : (
+            <table className="data-table billings-leaf-table">
+              <thead>
+                <tr>
+                  <th>Client / Vendor</th>
+                  <th>Invoice</th>
+                  <th>Job</th>
+                  <th>{verb} on</th>
+                  <th>Forecast</th>
+                  <th className="num">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.paid.map((p, i) => (
+                  <tr key={`${p.recnum}-${i}`} {...rowProps(p.recnum)}>
+                    <td>{p.counterparty || "—"}</td>
+                    <td className="text-secondary">{p.invnum || "—"}</td>
+                    <td className="text-secondary">{p.job || "—"}</td>
+                    <td className="text-secondary">{formatDate(p.chkdte)}</td>
+                    <td><ProjectionBadge mark={p.mark} weekStart={target.weekStart} wasProjected={p.wasProjected} /></td>
+                    <td className="num" style={{ color }}>{formatMoneyFull(p.amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+      <div className="billings-side-section ubw-section">
+        <DetailSectionHead title="Projected for this week" count={detail.projected.length} noun="invoice" total={projTotal} />
+        <div className="ohr-cost-items">
+          {detail.projected.length === 0 ? (
+            <p className="reports-modal-empty body-text text-secondary">Nothing was projected for this week.</p>
+          ) : (
+            <table className="data-table billings-leaf-table">
+              <thead>
+                <tr>
+                  <th>Client / Vendor</th>
+                  <th>Invoice</th>
+                  <th>Job</th>
+                  <th>Due</th>
+                  <th>Overdue on</th>
+                  <th className="num">Projected</th>
+                  <th className="num">{verb}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {detail.projected.map((p, i) => (
+                  <tr key={`${p.recnum}-${i}`} {...rowProps(p.recnum)}>
+                    <td>{p.counterparty || "—"}</td>
+                    <td className="text-secondary">{p.invnum || "—"}</td>
+                    <td className="text-secondary">{p.job || "—"}</td>
+                    <td className="text-secondary">{formatDate(p.duedte)}</td>
+                    <td className="text-secondary">{formatDate(p.mark)}</td>
+                    <td className="num">{formatMoneyFull(p.openAtStart)}</td>
+                    <td className="num" style={{ color: p.paidDuring > 0 ? color : "var(--secondary-text)" }}>
+                      {formatMoneyFull(p.paidDuring)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+/**
+ * One week for one side in a modal — opened from a chart point, the way the
+ * Overhead Report's Category Trend opens a category. Forward weeks list the
+ * open invoices reaching their mark; past weeks and This Week show what was
+ * actually paid against what was projected. Same overlay/card shell as the
+ * category detail; the invoice modal stacks above via useModalLayer.
+ */
+function WeekInvoicesModal({
+  target,
+  onClose,
+  onOpenInvoice,
+}: {
+  target: WeekModalTarget | null
+  onClose: () => void
+  onOpenInvoice: (recnum: string, side: Side) => void
+}) {
+  const open = target != null
+  const { overlayZ, contentZ } = useModalLayer(open)
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [open, onClose])
+
+  // Past / current weeks fetch their breakdown when opened (cached per
+  // week+side for the life of the page).
+  const [details, setDetails] = useState<Record<string, WeekDetail | "loading" | "error">>({})
+  const detailKey = target?.kind === "past" ? `${target.side}|${target.weekStart}` : null
+  useEffect(() => {
+    if (!target || target.kind !== "past" || !detailKey || details[detailKey]) return
+    setDetails((m) => ({ ...m, [detailKey]: "loading" }))
+    fetchPageData({
+      module: "dashboard",
+      queries: ["billingWeekDetail"],
+      params: { from: target.weekStart, kind: target.side.toLowerCase() },
+    })
+      .then((res) => {
+        const d = res.billingWeekDetail as WeekDetail | null
+        setDetails((m) => ({ ...m, [detailKey]: d && Array.isArray(d.projected) ? d : "error" }))
+      })
+      .catch(() => setDetails((m) => ({ ...m, [detailKey]: "error" })))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailKey])
+
+  const meta = target ? (target.side === "AR" ? SIDE_META.ar : SIDE_META.ap) : null
+  const color = target?.side === "AR" ? AR_COLOR : AP_COLOR
+  let title = ""
+  let subtitle = ""
+  let headline: number | null = null
+  // Past weeks: projected total + signed miss ($ and % of projected).
+  let projectedTotal: number | null = null
+  if (target?.kind === "future") {
+    const list = target.side === "AR" ? target.week.ar : target.week.ap
+    title = target.week.label
+    subtitle = `${meta!.title} · ${list.length} invoice${list.length === 1 ? "" : "s"} reaching 30 days past due`
+    headline = list.reduce((s, x) => s + x.amount, 0)
+  } else if (target?.kind === "past") {
+    const d = detailKey ? details[detailKey] : undefined
+    const ws = new Date(`${target.weekStart}T12:00:00`)
+    const wsLabel = isNaN(ws.getTime()) ? target.label : ws.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    title = target.isCurrent ? "This Week" : `Week of ${wsLabel}`
+    subtitle = target.isCurrent ? meta!.title : `${meta!.title} · ${target.label.replace("w ago", " weeks ago")}`
+    if (d && typeof d === "object") {
+      headline = d.paid.reduce((s, p) => s + p.amount, 0)
+      projectedTotal = d.projected.reduce((s, p) => s + p.openAtStart, 0)
+    }
+  }
+  const miss = headline != null && projectedTotal != null ? headline - projectedTotal : null
+
+  return createPortal(
+    <AnimatePresence>
+      {open && target && (
+        <>
+          <motion.div
+            key="overlay"
+            className="modal-overlay"
+            style={{ zIndex: overlayZ }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: 0.2 } }}
+            exit={{ opacity: 0, transition: { duration: 0.18 } }}
+            onClick={onClose}
+          />
+          <div className="modal-positioner ohr-detail-positioner" style={{ zIndex: contentZ }}>
+            <motion.div
+              key="card"
+              className="ohr-detail ubw-modal"
+              style={{ borderRadius: 16 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12, transition: { duration: 0.16 } }}
+              transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <div className="ohr-detail-right ubw-modal-pane">
+                <div className="ohr-detail-right-head ubw-modal-head">
+                  <div className="ubw-modal-title">
+                    <h2 className="title2 emphasized">{title}</h2>
+                    <span className="reports-modal-subtitle">
+                      <span className="ubw-modal-side" style={{ color }}>{target.side}</span>
+                      {" · "}
+                      {subtitle}
+                      {miss != null && miss !== 0 && (
+                        <>
+                          {" · "}
+                          <span className="num" style={{ color: miss >= 0 ? AR_COLOR : AP_COLOR }}>
+                            {miss >= 0 ? "+" : "−"}{formatMoneyFull(Math.abs(miss))}
+                          </span>
+                          {" vs. projected"}
+                        </>
+                      )}
+                    </span>
+                  </div>
+                  <div className="ohr-detail-head-actions">
+                    <button type="button" className="button modal-close" onClick={onClose} aria-label="Close">
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="ohr-detail-list scrollbar-secondary">
+                  {target.kind === "future" ? (
+                    <WeekSides week={target.week} only={target.side} onOpenInvoice={onOpenInvoice} />
+                  ) : (
+                    <WeekDetailBody target={target} detail={details[detailKey!] ?? "loading"} onOpenInvoice={onOpenInvoice} />
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body,
+  )
+}
+
 function UpcomingBillingsContent() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { data, isLoading } = useWidgetData<{ agingSummaryOpen: AgingOpenRow[] | null }>([
-    "agingSummaryOpen",
-  ])
+  const { data, isLoading } = useWidgetData<{
+    agingSummaryOpen: AgingOpenRow[] | null
+    weeklyBillingAccuracy: BillingAccuracyData | null
+  }>(["agingSummaryOpen", "weeklyBillingAccuracy"])
+  const past = data?.weeklyBillingAccuracy
+  // Past weeks arrive oldest → newest; label each by its distance from today.
+  const pastWeeks = useMemo(
+    () => (past?.weeks ?? []).map((w, i, arr) => ({ ...w, label: `${arr.length - i}w ago` })),
+    [past]
+  )
+  const pastLen = pastWeeks.length
+  const arTotals = useMemo(() => sideTotals(pastWeeks, "ar"), [pastWeeks])
+  const apTotals = useMemo(() => sideTotals(pastWeeks, "ap"), [pastWeeks])
 
   const forecast = useMemo(
     () => buildAgingForecast(data?.agingSummaryOpen, new Date()),
@@ -140,62 +623,69 @@ function UpcomingBillingsContent() {
   }, [forecast, invoices])
 
   // Diverging lines: AR above zero, AP (negated) below — money-in vs money-out.
-  const series = useMemo(
-    () => [
-      { id: "AR", color: AR_COLOR, data: forecast?.weeks.map((w) => ({ x: w.label, y: w.ar })) ?? [] },
-      { id: "AP", color: AP_COLOR, data: forecast?.weeks.map((w) => ({ x: w.label, y: -w.ap })) ?? [] },
-    ],
-    [forecast]
-  )
+  // Each side gets its own panel: one timeline with "This Week" in the middle.
+  // Right of center is the live forecast; left of center is the same forecast
+  // reconstructed for each past week (what this chart would have shown that
+  // Monday) beside what Sage actually recorded as paid. Dashed = projected
+  // (the app-wide plan-overlay convention), solid = actual; the actual series
+  // is null on the forward half so its line ends at today.
+  const panels = useMemo(() => {
+    if (!forecast) return []
+    const fut = forecast.weeks
+    const xs = [...pastWeeks.map((w) => w.label), ...fut.map((w) => w.label)]
+    const pts = (ys: (number | null)[]) => xs.map((x, i) => ({ x, y: ys[i] }))
+    const build = (side: "ar" | "ap", color: string, available: boolean | undefined) => {
+      const projected = [...pastWeeks.map((w) => w[side].projected), ...fut.map((w) => w[side])]
+      // Actual runs through "This Week" as week-to-date, so the solid line
+      // reaches today; it is null for every later week.
+      const actual = [
+        ...pastWeeks.map((w) => w[side].actual),
+        ...fut.map((_, i) => (i === 0 && past?.current ? past.current[side].actual : null)),
+      ]
+      const series = [{ id: "Projected", color, data: pts(projected) }]
+      if (pastLen && available) series.unshift({ id: "Actual", color, data: pts(actual) })
+      const nextTotal = fut.reduce((sum, w) => sum + w[side], 0)
+      return { side, color, series, nextTotal, available: Boolean(available) }
+    }
+    return [build("ar", AR_COLOR, past?.arAvailable), build("ap", AP_COLOR, past?.apAvailable)]
+  }, [forecast, pastWeeks, pastLen, past?.arAvailable, past?.apAvailable, past?.current])
 
-  // Mobile: nine bucket labels crowd the x axis — show every other one.
+  // Seventeen labels crowd a half-width panel: show every other one on either
+  // side of "This Week" (every fourth on a phone), always keeping the anchor.
   const isMobile = useIsMobile()
-  const axisBottomTickValues = useMemo(
-    () => (isMobile ? forecast?.weeks.filter((_, i) => i % 2 === 0).map((w) => w.label) : undefined),
-    [isMobile, forecast]
-  )
+  const axisBottomTickValues = useMemo(() => {
+    if (!forecast) return undefined
+    const all = [...pastWeeks.map((w) => w.label), ...forecast.weeks.map((w) => w.label)]
+    const step = isMobile ? 4 : 2
+    return all.filter((x, i) => (i - pastLen) % step === 0 || x === TODAY_LABEL)
+  }, [isMobile, forecast, pastWeeks, pastLen])
 
-  // Accordion: a single open card keeps the reader anchored to one week.
+  // Invoices by week: one open row at a time (the Monthly Spending pattern).
   const [openWeek, setOpenWeek] = useState<number | null>(null)
-  // The AR/AP section headers only become sticky once the expand animation has
-  // finished — while the body still has overflow:hidden, sticky would resolve
-  // against the body instead of the page and the headers render ~2rem low,
-  // snapping up when the overflow is released.
-  const [bodySettled, setBodySettled] = useState(false)
+  // Clicking a forward week on either chart opens that week's invoices in a
+  // modal (the Category Trend pattern) instead of scrolling the page.
+  const [modalTarget, setModalTarget] = useState<WeekModalTarget | null>(null)
   const [selectedInvoice, setSelectedInvoice] = useState<
     { recnum: string; module: "clients" | "suppliers" } | null
   >(null)
-  const weekRefs = useRef<(HTMLDivElement | null)[]>([])
-  // Week index waiting to be scrolled to the top once its expand animation
-  // finishes (scrolling while the body is still collapsed can't reach the
-  // top — the page doesn't have its full height yet).
-  const pendingScroll = useRef<number | null>(null)
 
-  function toggleWeek(weekIndex: number) {
-    setBodySettled(false)
-    setOpenWeek((prev) => (prev === weekIndex ? null : weekIndex))
-  }
-
-  // "start" pins the card to the top of the page, where its sticky header
-  // lands anyway — "center" left it floating mid-viewport.
-  function scrollWeekToTop(weekIndex: number) {
-    weekRefs.current[weekIndex]?.scrollIntoView({ behavior: "smooth", block: "start" })
-  }
-
-  function openWeekCard(weekIndex: number) {
-    if (openWeek === weekIndex) {
-      // Already open — no expand animation will fire, scroll straight away.
-      scrollWeekToTop(weekIndex)
+  // A chart point opens the week for THAT panel's side only. Past weeks and
+  // This Week show paid vs. projected (fetched on demand); later weeks show
+  // the open invoices reaching their mark that week.
+  function openWeekFor(side: Side, label: string) {
+    const fi = weeks.findIndex((w) => w.label === label)
+    if (fi > 0) {
+      setModalTarget({ kind: "future", side, week: weeks[fi] })
       return
     }
-    setBodySettled(false)
-    setOpenWeek(weekIndex)
-    pendingScroll.current = weekIndex
-  }
-
-  function handleBarClick(label: string) {
-    const i = weeks.findIndex((w) => w.label === label)
-    if (i >= 0) openWeekCard(i)
+    if (fi === 0) {
+      const weekStart = past?.current?.weekStart
+      if (weekStart) setModalTarget({ kind: "past", side, label, weekStart, isCurrent: true })
+      else setModalTarget({ kind: "future", side, week: weeks[0] })
+      return
+    }
+    const pw = pastWeeks.find((w) => w.label === label)
+    if (pw) setModalTarget({ kind: "past", side, label, weekStart: pw.weekStart, isCurrent: false })
   }
 
   function openInvoice(recnum: string, side: Side) {
@@ -238,7 +728,7 @@ function UpcomingBillingsContent() {
       rows.push(cells.map((v, i) => ({ v, s: bodyStyle(i, stripe) })))
     })
     const date = new Date().toISOString().slice(0, 10)
-    downloadXlsx(rows, `Upcoming_Billings_${date}.xlsx`, "Upcoming Billings", {
+    downloadXlsx(rows, `Forecast_Billings_${date}.xlsx`, "Forecast Billings", {
       autoFilterRow: 0,
       autoFilterCols: header.length,
     })
@@ -254,13 +744,14 @@ function UpcomingBillingsContent() {
     if (wParam == null) return
     const i = Number(wParam)
     if (!Number.isInteger(i) || i < 0 || i >= weeks.length) return
-    openWeekCard(i)
+    // Deep links predate the side split: default to the side with invoices.
+    setModalTarget({ kind: "future", side: weeks[i].ar.length || !weeks[i].ap.length ? "AR" : "AP", week: weeks[i] })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weeks.length])
 
   return (
     <Page
-      title="Upcoming Billings"
+      title="Forecast Billings"
       actions={
         <>
           <button className="jc-export-btn" onClick={() => navigate("/dashboard")} title="Back to dashboard">
@@ -279,147 +770,138 @@ function UpcomingBillingsContent() {
     >
       <MotionList className="mbp-stack">
         <MotionItem>
-        <Widget
-          title="Forecast — weeks until invoices reach 30 days past due"
-          loading={isLoading}
-          noData={!forecast}
-          className="mbp-chart-widget"
-        >
-          {forecast && (
-            <Chart
-              config={{
-                type: "line",
-                series,
-                yFormat: (v) => formatMoney(Math.abs(v)),
-                enableArea: true,
-                curve: "monotoneX",
-                legend: true,
-                axisBottomTickValues,
-                disableGrowthTooltip: true,
-                onPointClick: handleBarClick,
-              }}
-            />
-          )}
-        </Widget>
-        </MotionItem>
-
-        {/* Week cards render straight onto the page (no parent card) — each
-            week is its own standalone card. */}
-        <MotionItem>
         <section className="billings-week-section">
-          {/* Same text treatment as a widget header, just floating on the page. */}
-          <h2 className="widget-title headline billings-week-section-title">Invoices by week</h2>
-          {!isLoading && invoices.length === 0 && (
-            <p className="body-text text-secondary">No upcoming invoices.</p>
-          )}
-          <div className="billings-week-cards">
-            {weeks.map((week) => {
-              const count = week.ar.length + week.ap.length
-              const isOpen = openWeek === week.index
-              const net = week.arTotal - week.apTotal
+          <h2 className="widget-title headline billings-week-section-title">Projected vs. Actual</h2>
+          <p className="body-text text-secondary ubf-intro">
+            By the week invoices reach 30 days past due.
+          </p>
+          <div className="ubf-grid">
+            {(isLoading || !forecast
+              ? [
+                  { side: "ar" as const, color: AR_COLOR },
+                  { side: "ap" as const, color: AP_COLOR },
+                ]
+              : panels
+            ).map((p) => {
+              const meta = p.side === "ar" ? SIDE_META.ar : SIDE_META.ap
+              const t = p.side === "ar" ? arTotals : apTotals
+              const full = "series" in p ? p : null
+              const miss = t.actual - t.projected
+              const missPct = t.projected > 0 ? Math.round((Math.abs(miss) / t.projected) * 100) : null
               return (
-                <div
-                  key={week.index}
-                  ref={(el) => {
-                    weekRefs.current[week.index] = el
-                  }}
-                  className={`billings-week-card${isOpen ? " expanded" : ""}${count === 0 ? " is-empty" : ""}`}
+                <Widget
+                  key={p.side}
+                  loading={isLoading}
+                  noData={!forecast}
+                  className="ubf-panel mbp-chart-widget"
+                  title={`${meta.code} · ${meta.title}`}
+                  actions={
+                    full && (
+                      <span className="ubf-key">
+                        {full.available && (
+                          <>
+                            <span className="ubf-key-line" style={{ borderTopColor: p.color }} />
+                            {meta.verb}
+                          </>
+                        )}
+                        <span className="ubf-key-line ubf-key-line--dashed" style={{ borderTopColor: p.color }} />
+                        projected
+                      </span>
+                    )
+                  }
                 >
-                  <button
-                    type="button"
-                    className="billings-week-card-header"
-                    onClick={() => toggleWeek(week.index)}
-                    disabled={count === 0}
-                    aria-expanded={isOpen}
-                    title={count > 0 ? `${isOpen ? "Collapse" : "Expand"} ${week.label}` : undefined}
-                  >
-                    <span className="billings-week-card-title">
-                      {/* Empty weeks render an invisible chevron so labels stay aligned. */}
-                      <span className={`jc-group-chevron${count === 0 ? " jc-group-chevron-spacer" : ""}`}>
-                        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                      </span>
-                      {week.label}
-                      <span className="billings-count">
-                        {count} invoice{count === 1 ? "" : "s"}
-                      </span>
-                    </span>
-                    <span className="billings-week-card-stats">
-                      {/* Zero amounts read as inert gray — color is reserved for real money. */}
-                      <span className="billings-week-stat">
-                        <span className="billings-week-stat-label">AR in</span>
-                        <span className="num" style={{ color: week.arTotal ? AR_COLOR : "var(--secondary-text)" }}>
-                          {formatMoneyFull(week.arTotal)}
-                        </span>
-                      </span>
-                      <span className="billings-week-stat">
-                        <span className="billings-week-stat-label">AP out</span>
-                        <span className="num" style={{ color: week.apTotal ? AP_COLOR : "var(--secondary-text)" }}>
-                          {formatMoneyFull(week.apTotal)}
-                        </span>
-                      </span>
-                      <span className="billings-week-stat">
-                        <span className="billings-week-stat-label">Net</span>
-                        <span className="num" style={{ color: net === 0 ? "var(--secondary-text)" : net > 0 ? AR_COLOR : AP_COLOR }}>
-                          {formatMoneyFull(net)}
-                        </span>
-                      </span>
-                    </span>
-                  </button>
-
-                  <AnimatePresence initial={false}>
-                    {isOpen && (
-                      <motion.div
-                        className={`billings-week-card-body${bodySettled ? " is-settled" : ""}`}
-                        // overflow stays hidden only while the height animates —
-                        // a persistent overflow ancestor would break the sticky
-                        // AR/AP section headers inside the body.
-                        initial={{ height: 0, opacity: 0, overflow: "hidden" }}
-                        animate={{ height: "auto", opacity: 1, overflow: "hidden", transitionEnd: { overflow: "visible" } }}
-                        exit={{ height: 0, opacity: 0, overflow: "hidden" }}
-                        transition={{ duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] }}
-                        onAnimationComplete={(def) => {
-                          // Only the expand animation ends at height:auto.
-                          if (typeof def === "object" && def !== null && (def as { height?: unknown }).height === "auto") {
-                            setBodySettled(true)
-                            // Now that the page has its full height, the
-                            // deferred chart-click scroll can reach the top.
-                            if (pendingScroll.current != null) {
-                              const target = pendingScroll.current
-                              pendingScroll.current = null
-                              requestAnimationFrame(() => scrollWeekToTop(target))
-                            }
-                          }
-                        }}
-                      >
-                        <div className="billings-week-card-body-inner">
-                          {(["AR", "AP"] as const).map((side) => {
-                            const list = side === "AR" ? week.ar : week.ap
-                            if (list.length === 0) return null
-                            return (
-                              <div key={side} className="billings-side-section">
-                                <div className="billings-side-section-header">
-                                  <span className={`inv-type-badge inv-type-badge--${side.toLowerCase()}`}>{side}</span>
-                                  <span className="billings-count">
-                                    {list.length} invoice{list.length === 1 ? "" : "s"}
-                                  </span>
-                                </div>
-                                <div className="billings-leaf-wrap">
-                                  <InvoiceTable list={list} side={side} onOpen={openInvoice} />
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                  {full && (
+                    <div className="ubf-panel-body">
+                      <div className="ubf-chart">
+                        <Chart
+                          config={{
+                            type: "line",
+                            series: full.series,
+                            yFormat: (v) => formatMoney(v),
+                            enableArea: true,
+                            curve: "monotoneX",
+                            legend: false,
+                            hidePoints: true,
+                            // Same gridline density on AR and AP (1/2/5 nice steps).
+                            yTickCount: 5,
+                            axisBottomTickValues,
+                            dashedSeriesIds: ["Projected"],
+                            planTooltip: { delta: true, percent: true, actualLabel: p.side === "ar" ? "Received" : "Paid" },
+                            shadeFromX: TODAY_LABEL,
+                            markers: [
+                              {
+                                axis: "x",
+                                value: TODAY_LABEL,
+                                legend: "Today",
+                                legendPosition: "top",
+                                lineStyle: { stroke: "currentColor", strokeWidth: 1, strokeOpacity: 0.35, strokeDasharray: "3 4" },
+                                textStyle: { fill: "currentColor", fontSize: 10, fontWeight: 600 },
+                              },
+                            ],
+                            disableGrowthTooltip: true,
+                            // Forward weeks open their card below; past weeks
+                            // have no open-invoice list, handleBarClick ignores them.
+                            onPointClick: (label) => openWeekFor(meta.code, label),
+                          }}
+                        />
+                      </div>
+                      <div className="ubf-facts jcd-facts">
+                        {full.available ? (
+                          <>
+                            <Fact
+                              label={`Past ${pastLen} weeks`}
+                              value={formatMoney(t.actual)}
+                              sub={`${formatMoney(t.projected)} projected`}
+                            />
+                            <Fact
+                              label="Forecast miss"
+                              value={`${miss >= 0 ? "+" : "−"}${formatMoney(Math.abs(miss))}`}
+                              sub={missPct == null ? "actual minus projected" : `${miss >= 0 ? "+" : "−"}${missPct}% vs projected`}
+                            />
+                          </>
+                        ) : (
+                          <Fact label={`Past ${pastLen} weeks`} value="n/a" sub={`${meta.code} payment history is not exposed by Sage`} />
+                        )}
+                        <Fact
+                          label={`Next ${forecast.weeks.length - 1} weeks`}
+                          value={formatMoney(full.nextTotal)}
+                          sub="reaching 30 days past due"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </Widget>
               )
             })}
           </div>
         </section>
         </MotionItem>
+
+        <MotionItem>
+          <Widget
+            title="Invoices by week"
+            loading={isLoading}
+            noData={!forecast}
+            className="ohr-spending-widget"
+            actions={
+              openWeek != null ? (
+                <button className="widget-link-btn" onClick={() => setOpenWeek(null)} title="Collapse">
+                  <X size={12} /> Collapse {weeks[openWeek]?.label}
+                </button>
+              ) : undefined
+            }
+          >
+            <WeekRows
+              weeks={weeks}
+              openKey={openWeek}
+              onToggle={(i) => setOpenWeek((curr) => (curr === i ? null : i))}
+              onOpenInvoice={openInvoice}
+            />
+          </Widget>
+        </MotionItem>
       </MotionList>
+
+      <WeekInvoicesModal target={modalTarget} onClose={() => setModalTarget(null)} onOpenInvoice={openInvoice} />
 
       <InvoiceDetailModal
         invoiceId={selectedInvoice?.recnum ?? null}
