@@ -21,6 +21,7 @@ const ReportsPage = lazy(() => import("../../modules/dashboard/report/ReportsPag
 const CashFlow = lazy(() => import("../../modules/cash-flow/CashFlowPage.tsx"))
 const RevenueMap = lazy(() => import("../../modules/revenue-map/RevenueMapPage.tsx"))
 const OrgChart = lazy(() => import("../../modules/org-chart/OrgChartPage.tsx"))
+const ProjectProcessPage = lazy(() => import("../../modules/project-process/ProjectProcessPage.tsx"))
 const ClientsPage = lazy(() => import("../../modules/directory/clients/ClientsPage.tsx"))
 const ClientDetailPage = lazy(() => import("../../modules/directory/clients/ClientDetailPage.tsx"))
 const VendorsPage = lazy(() => import("../../modules/directory/vendors/VendorsPage.tsx"))
@@ -53,7 +54,7 @@ export default function Router() {
             {/* Dashboard — admin/executive see full, PM sees limited */}
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/breakdown/:category" element={<RequireRole allowed={["executive", "admin"]}><MonthlyBreakdownPage /></RequireRole>} />
-            <Route path="/dashboard/upcoming-billings" element={<RequireRole allowed={["executive", "admin"]}><UpcomingBillingsPage /></RequireRole>} />
+            <Route path="/dashboard/forecast-billings" element={<RequireRole allowed={["executive", "admin"]}><UpcomingBillingsPage /></RequireRole>} />
             <Route path="/employees" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><EmployeesPage /></RequireRole>} />
             <Route path="/employees/:employeeNum" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><EmployeeDetailPage /></RequireRole>} />
 
@@ -103,11 +104,14 @@ export default function Router() {
                 <Invoices />
               </RequireRole>
             } />
-            <Route path="/upcoming-billings" element={
+            <Route path="/forecast-billings" element={
               <RequireRole allowed={["executive", "admin"]}>
                 <UpcomingBillingsPage />
               </RequireRole>
             } />
+            {/* Old URL, kept for bookmarks and the widget's pre-rename links. */}
+            <Route path="/upcoming-billings" element={<Navigate to="/forecast-billings" replace />} />
+            <Route path="/dashboard/upcoming-billings" element={<Navigate to="/dashboard/forecast-billings" replace />} />
             <Route path="/progress-billings" element={
               <RequireRole allowed={["executive", "admin"]}>
                 <ProgressBillingsPage />
@@ -131,6 +135,7 @@ export default function Router() {
             <Route path="/cash-flow" element={<RequireRole allowed={["executive", "admin"]}><CashFlow /></RequireRole>} />
             <Route path="/revenue-map" element={<RequireRole allowed={["executive", "admin"]}><RevenueMap /></RequireRole>} />
             <Route path="/org-chart" element={<RequireRole allowed={["executive", "admin"]}><OrgChart /></RequireRole>} />
+            <Route path="/project-process" element={<RequireRole allowed={["executive", "admin"]}><ProjectProcessPage /></RequireRole>} />
 
             {/* Users — admin/executive */}
             <Route path="/users" element={<RequireRole allowed={["executive", "admin"]}><Users /></RequireRole>} />

@@ -14,6 +14,7 @@ import {
   DollarSign,
   Map,
   Network,
+  Workflow,
   BarChart3,
   MessageSquare,
   Landmark,
@@ -64,7 +65,7 @@ const navItems = {
   dailyReports: { label: "Activity", path: "/reports", icon: Clock },
   changeOrders: { label: "Change Orders", path: "/change-orders", icon: ChangeOrderIcon as unknown as LucideIcon },
   invoices: { label: "Invoices", path: "/invoices", icon: FileText },
-  upcomingBillings: { label: "Upcoming Billings", path: "/upcoming-billings", icon: CalendarClock },
+  upcomingBillings: { label: "Forecast Billings", path: "/forecast-billings", icon: CalendarClock },
   progressBillings: { label: "Progress Billings", path: "/progress-billings", icon: Receipt },
   overheadReport: { label: "Overhead Report", path: "/overhead-report", icon: ChartPie },
   users: { label: "Users", path: "/users", icon: Users },
@@ -75,6 +76,7 @@ const navItems = {
   cashFlow: { label: "Cash Flow", path: "/cash-flow", icon: DollarSign },
   revenueMap: { label: "Revenue Map", path: "/revenue-map", icon: Map },
   orgChart: { label: "Org Chart", path: "/org-chart", icon: Network },
+  projectProcess: { label: "Project Process", path: "/project-process", icon: Workflow },
   feedback: { label: "Feedback", path: "/feedback", icon: MessageSquare },
 } as const satisfies Record<string, NavItem>
 
@@ -93,7 +95,8 @@ const directoryGroup: NavGroup = {
 const chartsGroup: NavGroup = {
   label: "Charts",
   icon: BarChart3,
-  items: [navItems.orgChart, navItems.cashFlow, navItems.revenueMap],
+  // revenueMap intentionally hidden from the nav (page still routed at /revenue-map).
+  items: [navItems.orgChart, navItems.projectProcess, navItems.cashFlow],
 }
 
 // Shared by executive, the two top-tier roles (owner, tech), and admin — identical nav.

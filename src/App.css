@@ -2031,149 +2031,18 @@ span.skel-text {
   padding-top: 0.75rem;
 }
 
-/* Invoices-by-week cards — one expandable card per week, spaced apart, with an
-   accordion (single card open at a time) so the reader keeps context. border-box
-   keeps leaf-table cell padding inside its fixed column widths. */
+/* Invoices-by-week leaf tables (inside the Overhead-style week rows and the
+   week modal). border-box keeps cell padding inside the fixed column widths. */
 .billings-leaf-table th,
 .billings-leaf-table td {
   box-sizing: border-box;
 }
-.billings-week-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-.billings-week-section-title {
-  margin: 0;
-}
-.billings-week-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-/* Standalone cards on the page background — match the app's card surface.
-   No overflow:hidden here — an overflow ancestor would break the sticky
-   header; the header and body clip their own corners instead. */
-.billings-week-card {
-  /* Fixed header height so the AR/AP section headers can pin exactly
-     beneath the pinned week header. */
-  --billings-week-header-h: 4rem;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  background: var(--card-color);
-}
-.billings-week-card.is-empty {
-  opacity: 0.5;
-}
-.billings-week-card.expanded {
-  border-color: color-mix(in srgb, var(--primary-text) 22%, transparent);
-}
-/* The whole header is the expand/collapse button. */
-.billings-week-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  width: 100%;
-  min-height: var(--billings-week-header-h);
-  box-sizing: border-box;
-  padding: 0.8rem 1rem;
-  background: none;
-  border: none;
-  border-radius: 11px; /* nest just inside the card's 12px corner */
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-/* While its card is open, the header pins to the top of the page scrollport so
-   the week context (label, counts, AR/AP/Net) stays visible over long lists.
-   top: -2rem cancels .page's 2rem top padding — Chrome insets the sticky
-   constraint rect by the scroll container's padding, so top: 0 would pin 2rem
-   low with rows visible above (same correction as .page-header-sticky). */
-.billings-week-card.expanded .billings-week-card-header {
-  position: sticky;
-  top: -2rem;
-  z-index: 5;
-  background: var(--card-color); /* opaque — rows scroll under it */
-  border-radius: 11px 11px 0 0;
-  border-bottom: 1px solid var(--border-color);
-}
-.billings-week-card-header:disabled {
-  cursor: default;
-}
-.billings-week-card:not(.is-empty) .billings-week-card-header:hover {
-  background: var(--hover-bg);
-}
-/* The sticky (expanded) header must stay opaque on hover — the translucent
-   --hover-bg would let rows scrolling underneath show through. */
-.billings-week-card.expanded .billings-week-card-header:hover {
-  background: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
-}
-.billings-week-card-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-}
-.billings-count {
-  font-weight: 400;
-  font-size: 0.8125rem;
-  color: var(--secondary-text);
-}
-/* AR in / AP out / Net summary on the right of the header. */
-.billings-week-card-stats {
-  display: inline-flex;
-  align-items: center;
-  gap: 1.75rem;
-}
-.billings-week-stat {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.1rem;
-  min-width: 6.5rem;
-}
-.billings-week-stat-label {
-  font-size: 0.75rem;
-  color: var(--secondary-text);
-}
-/* The body's overflow is managed inline by framer-motion: hidden while the
-   height animates, visible once settled — so the sticky section headers
-   inside it keep working. */
-.billings-week-card-body {
-  border-radius: 0 0 11px 11px;
-}
-.billings-week-card-body-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-  padding: 0.25rem 1rem 1rem;
-}
-/* AR/AP section header — pins just beneath the pinned week header while its
-   section is in view (the -2rem cancels .page's top padding, same as the week
-   header). Padding instead of margin so the opaque background fully covers
-   rows scrolling beneath it. */
+/* AR / AP section header above each leaf table. */
 .billings-side-section-header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 5px 0 0.45rem;
-}
-/* Sticky only once the expand animation settles (.is-settled) — while the
-   body still has overflow:hidden, sticky would resolve against the body and
-   the headers would render low, snapping up when the overflow releases. */
-.billings-week-card.expanded .billings-week-card-body.is-settled .billings-side-section-header {
-  position: sticky;
-  top: calc(var(--billings-week-header-h) - 2rem);
-  z-index: 4; /* beneath the week header (5), above the rows */
-  background: var(--card-color);
-}
-.billings-leaf-wrap {
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  overflow: hidden; /* clip the collapsed-border table to the rounded corners */
-  background: var(--card-color);
 }
 .billings-leaf-table {
   table-layout: fixed;
@@ -2212,41 +2081,12 @@ span.skel-text {
 .billings-leaf-table th:nth-child(7),
 .billings-leaf-table td:nth-child(7) { width: 14%; }
 
-/* Mobile: the header's three stats (AR in / AP out / Net) can't sit beside the
-   week title without spilling past the card. Stack the header — title row above
-   a full-width stats row — and let the stats share the width evenly. The taller
-   stacked header needs a matching --billings-week-header-h bump so the sticky
-   week header reserves the right height and the pinned AR/AP sub-headers (offset
-   by that variable) don't overlap the rows. */
 @media (max-width: 768px) {
-  .billings-week-card {
-    --billings-week-header-h: 6rem;
-  }
-  .billings-week-card-header {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.6rem;
-  }
-  .billings-week-card-stats {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-  .billings-week-stat {
-    flex: 1 1 0;
-    min-width: 0;
-    align-items: flex-start;
-  }
-  /* First stat reads left-aligned with the title; last holds the right edge. */
-  .billings-week-stat:last-child {
-    align-items: flex-end;
-  }
   /* The 7-column leaf table can't fit a phone width under fixed layout — the
      columns crush to nothing. Let it size to its content and scroll horizontally
      inside the rounded wrapper instead. overscroll-behavior-x keeps the swipe
      from bubbling up to browser back/forward. */
-  .billings-leaf-wrap {
-    overflow-x: auto;
+  .ohr-cost-items {
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-x: contain;
   }
@@ -2257,8 +2097,8 @@ span.skel-text {
   }
   /* Override the fixed %-width per-column rules (equal specificity, later in the
      sheet) so each column sizes to its own content and nothing is truncated. */
-  .billings-week-card .billings-leaf-table th,
-  .billings-week-card .billings-leaf-table td {
+  .billings-leaf-table th,
+  .billings-leaf-table td {
     width: auto;
     white-space: nowrap;
     overflow: visible;
@@ -21552,4 +21392,303 @@ body.pj-painting td.pj-computed {
   .ohr-detail { grid-template-columns: 1fr; height: 95vh; overflow-y: auto; }
   .ohr-detail-right { border-left: none; border-top: 1px solid var(--border-color); }
   .ohr-detail-list { overflow: visible; }
+}
+
+/* ==================================================================
+   Project Process page (/project-process): Figma-style canvas. The
+   world is laid out in PDF pixel units and scaled by the viewport
+   transform; nodes carry a solid colored header like the source doc.
+   ================================================================== */
+.pp-viewport {
+  position: relative;
+  height: calc(100vh - 11rem);
+  min-height: 480px;
+  overflow: hidden;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--primary-text) 16%, transparent) 1px, transparent 1.2px) 0 0 / 22px 22px,
+    light-dark(#eef0f6, #141210);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  overscroll-behavior: contain;
+}
+.pp-viewport--dragging { cursor: grabbing; }
+/* Full-screen: same fixed floating inset as the Projections grid. */
+.pp-viewport--expanded {
+  position: fixed;
+  inset: 0.75rem;
+  z-index: 181;
+  height: auto;
+  box-shadow: light-dark(0 24px 64px rgba(0, 0, 0, 0.25), 0 24px 64px rgba(0, 0, 0, 0.7));
+}
+.pp-expanded-actions {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 2;
+  cursor: default;
+}
+
+.pp-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.pp-world--smooth { transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.pp-title {
+  position: absolute;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-text);
+  white-space: nowrap;
+}
+/* Zoom pill: the Projections outline pill holding two icon buttons + level */
+.pp-zoom { gap: 0.15rem; padding: 0.2rem 0.35rem; cursor: default; }
+/* Zoom + Fit pills carry the same card-white ground as the full-screen circle. */
+.pp-zoom,
+.pp-fit-btn { background-color: var(--card-color); border-width: 1px; }
+.pp-zoom:hover { background-color: var(--card-color); color: var(--secondary-text); }
+.pp-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.pp-zoom-btn:hover { background-color: var(--hover-bg); color: var(--primary-text); }
+.pp-zoom-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 20%, transparent); }
+.pp-zoom-level {
+  min-width: 2.75rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Node chrome, shared by ownership cards and lifecycle nodes */
+.pp-own,
+.pp-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--card-color);
+  box-shadow:
+    light-dark(0 1px 2px rgba(25, 55, 90, 0.14), 0 1px 2px rgba(0, 0, 0, 0.6)),
+    light-dark(0 4px 10px rgba(25, 55, 90, 0.18), 0 6px 14px rgba(0, 0, 0, 0.55)),
+    light-dark(0 14px 32px rgba(25, 55, 90, 0.16), 0 18px 40px rgba(0, 0, 0, 0.5));
+}
+.pp-node-head {
+  height: 15px;
+  padding: 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: #fff;
+  font-size: 6px;
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+.pp-node-or { font-weight: var(--font-weight-regular); opacity: 0.85; }
+.pp-node--stage .pp-node-head { height: auto; min-height: 15px; padding: 3px 6px; text-align: center; line-height: 1.2; white-space: normal; }
+.pp-node-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 6px;
+  text-align: center;
+  font-size: 6px;
+  line-height: 1.3;
+  color: var(--primary-text);
+}
+.pp-node--stage .pp-node-body { font-weight: var(--font-weight-semibold); }
+.pp-node-bd { color: var(--primary-color); }
+
+/* Ownership cards: same scale as lifecycle nodes, taller header */
+.pp-own .pp-node-head { height: 22px; justify-content: flex-start; font-size: 8px; }
+.pp-own-group { display: flex; flex-direction: column; gap: 6px; padding: 7px 7px 9px; }
+.pp-own-group--rule { border-top: 1px solid var(--primary-text); }
+.pp-own-group-title { font-size: 5.5px; font-weight: var(--font-weight-medium); }
+.pp-own-cluster { display: flex; flex-direction: column; gap: 2px; font-size: 6px; line-height: 1.3; color: var(--primary-text); }
+
+/* Lifecycle */
+.pp-lc,
+.pp-lc-body { position: absolute; left: 0; width: 100%; }
+.pp-edges {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  /* Solid (no alpha) but lighter than body text: ink mixed toward the card ground. */
+  color: color-mix(in srgb, var(--primary-text) 72%, var(--card-color));
+  pointer-events: none;
+}
+.pp-edges .pp-arrowhead { fill: currentColor; stroke: none; }
+.pp-edges > path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pp-conditional {
+  position: absolute;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--primary-color) 12%, var(--card-color));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary-color) 18%, transparent);
+}
+.pp-conditional > span {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 7px;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-text);
+}
+
+/* ── Upcoming Billings forecast: AR ‖ AP small-multiple panels ───────────
+   Two half-width cards under a floating section headline (same treatment as
+   "Invoices by week" below them). Each card: chart, then a hairline, then a
+   jcd-style fact row. Dashed = projected, solid = actual (app convention). */
+.ubf-intro { margin: -0.25rem 0 0; max-width: 70ch; }
+.ubf-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+.ubf-panel { min-width: 0; }
+.ubf-panel .widget-body { min-height: 0; }
+.ubf-panel-body { flex: 1; display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
+.ubf-chart { flex: 1; display: flex; flex-direction: column; min-height: 16rem; min-width: 0; }
+.ubf-chart > .chart-container { flex: 1; height: auto; }
+/* Three equal columns, each fact centered, so the row reads as a balanced
+   KPI strip under the chart rather than a left-packed list. */
+.ubf-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+.ubf-facts .jcd-fact { align-items: center; text-align: center; min-width: 0; }
+.ubf-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--caption1-size);
+  color: var(--secondary-text);
+  white-space: nowrap;
+}
+.ubf-key-line { display: inline-block; width: 16px; height: 0; border-top: 2px solid currentColor; }
+.ubf-key-line--dashed { border-top-style: dashed; opacity: 0.85; }
+.ubf-key-line + .ubf-key-line, .ubf-key > span + .ubf-key-line { margin-left: 0.5rem; }
+@media (max-width: 900px) {
+  .ubf-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Upcoming Billings: week rows + week modal (Overhead Report patterns) ──
+   Week rows reuse .ohr-cost-card / .ohr-cost-head from Monthly Spending; the
+   modal reuses the category-detail shell but as a single pane. */
+.ubw-empty .ohr-cost-head { cursor: default; opacity: 0.55; }
+.ubw-empty .ohr-cost-head:hover { background: transparent; }
+.ubw-modal { grid-template-columns: 1fr; width: min(1100px, 100%); }
+.ubw-modal-pane { border-left: 0; }
+/* Modal header: title + one subtitle line (side, context, delta) and the
+   close button. Totals live in the section heads below, never repeated here. */
+.ubw-modal-head { padding: 1.5rem 1.375rem 1.25rem; border-bottom: 1px solid var(--border-color); }
+.ubw-modal-title { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.ubw-modal-side { font-weight: var(--font-weight-bold); }
+.ubw-modal .ohr-detail-list { padding-top: 0; }
+/* Week modal sections: the list pane drops its side padding so the tables
+   run the full card width; each section head carries the inset instead. */
+.ubw-modal .ohr-detail-list { padding-left: 0; padding-right: 0; scrollbar-gutter: auto; gap: 0; }
+/* Every section carries the same top inset, so the first head sits the same
+   distance below the header as later heads sit below the table above. */
+.ubw-section { width: 100%; padding-top: 1.25rem; }
+.ubw-section .ohr-cost-items { border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); }
+.ubw-section .billings-leaf-table { width: 100%; table-layout: auto; }
+.ubw-section .billings-leaf-table th:first-child, .ubw-section .billings-leaf-table td:first-child { padding-left: 1.375rem; }
+.ubw-section .billings-leaf-table th:last-child, .ubw-section .billings-leaf-table td:last-child { padding-right: 1.375rem; }
+.ubw-section .reports-modal-empty { padding: 0.75rem 1.375rem; margin: 0; }
+.ubw-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0 1.375rem 0.5rem;
+}
+.ubw-section-title { color: var(--primary-text); text-transform: uppercase; letter-spacing: 0.04em; }
+.ubw-section-count { color: var(--secondary-text); }
+.ubw-section-total { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--primary-text); }
+/* Forecast-timing badge on each payment row: green = landed in its
+   projected week; neutral = early; amber = late; muted = never projected. */
+.ubw-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  background: var(--hover-bg);
+  color: var(--secondary-text);
+}
+.ubw-badge--ok { background: rgba(34, 197, 94, 0.15); color: #16a34a; }
+.ubw-badge--early { background: rgba(25, 55, 90, 0.08); color: var(--primary-text); }
+.ubw-badge--late { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+/* Tables run edge to edge like Monthly Spending; only the AR/AP badge row
+   carries the head's horizontal inset. */
+.ohr-cost-body .billings-side-section { padding: 0; }
+.ohr-cost-body .billings-side-section-header { padding: 0.5rem 1.125rem; }
+.ohr-cost-body .billings-side-section + .billings-side-section .billings-side-section-header { border-top: 1px solid var(--border-color); }
+.ohr-cost-body .ohr-cost-items .billings-leaf-table { table-layout: auto; width: 100%; }
+.ohr-cost-body .billings-leaf-table th:first-child, .ohr-cost-body .billings-leaf-table td:first-child { padding-left: 1.125rem; }
+.ohr-cost-body .billings-leaf-table th:last-child, .ohr-cost-body .billings-leaf-table td:last-child { padding-right: 1.125rem; }
+.ubw-modal .billings-side-section + .billings-side-section { margin-top: 0.75rem; }
+/* Floating section header (Forecast) above the AR ‖ AP panels. */
+.billings-week-section { display: flex; flex-direction: column; gap: 0.75rem; }
+.billings-week-section-title { margin: 0; }
+.billings-count { font-weight: 400; font-size: 0.8125rem; color: var(--secondary-text); }
+
+/* ── Cash Flow on the Project Process canvas ──────────────────────────
+   The nivo Sankey draws directly on the dotted canvas (no card). Pointer
+   events stay on so hover tooltips work; drag-to-pan starts from the
+   viewport handler either way. */
+.cf-chart { position: absolute; }
+.cf-chart-title { left: 24px; top: 20px; font-size: 16px; }
+.cf-tooltip {
+  background: var(--card-color);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  color: var(--primary-text);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.pp-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  color: var(--secondary-text);
+  pointer-events: none;
 }
