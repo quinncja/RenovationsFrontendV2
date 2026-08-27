@@ -21426,6 +21426,30 @@ body.pj-painting td.pj-computed {
 .ohr-detail-pie .pie-with-list { justify-content: center; }
 .ohr-detail-pie .pie-with-list-chart--md { width: 220px; }
 .ohr-detail-pie .ohr-detail-hint { text-align: center; }
+/* Monthly Spending on the report: the same period cards, inline in the
+   widget (no fixed height, page scrolls). */
+.ohr-spending-widget .ohr-detail-list {
+  overflow: visible;
+  padding: 0;
+  scrollbar-gutter: auto;
+  width: 100%;
+  align-self: stretch;
+}
+/* Cards always span their column; an open table never widens its card
+   (long descriptions wrap, the table scrolls sideways only as a last resort). */
+/* The generic "table inside a widget bleeds edge-to-edge" rule must not
+   fire here: the tables live inside cards, so the widget keeps its padding. */
+.widget.ohr-spending-widget:has(.data-table) { padding: 1.25rem; overflow: visible; }
+.widget.ohr-spending-widget:has(.data-table) > .widget-header { padding: 0; }
+.widget.ohr-spending-widget:has(.data-table) .ohr-cost-table th:first-child,
+.widget.ohr-spending-widget:has(.data-table) .ohr-cost-table td:first-child { padding-left: 1.125rem; }
+.widget.ohr-spending-widget:has(.data-table) .ohr-cost-table th:last-child,
+.widget.ohr-spending-widget:has(.data-table) .ohr-cost-table td:last-child { padding-right: 1.125rem; }
+.ohr-cost-card { width: 100%; min-width: 0; box-sizing: border-box; }
+.ohr-cost-items { overflow-x: auto; }
+.ohr-cost-table { table-layout: auto; }
+.ohr-cost-table td { white-space: normal; overflow-wrap: anywhere; }
+.ohr-cost-table td.num, .ohr-cost-table td:first-child, .ohr-cost-table td:nth-child(2) { white-space: nowrap; }
 .ohr-detail-right {
   display: flex;
   flex-direction: column;
@@ -21446,10 +21470,11 @@ body.pj-painting td.pj-computed {
   flex: 1;
   min-height: 0;
   /* Always reserve the gutter so an expanding row doesn't shift the list
-     sideways the moment it overflows. */
+     sideways the moment it overflows; the thin secondary scrollbar (same as
+     the Projection Board) keeps it quiet. */
   overflow-y: scroll;
   scrollbar-gutter: stable;
-  padding: 0 1.375rem 1.375rem;
+  padding: 0 0.75rem 1.375rem 1.375rem;
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
@@ -21501,6 +21526,23 @@ body.pj-painting td.pj-computed {
   background: rgb(from var(--primary-text) r g b / 0.02);
 }
 .ohr-cost-items { border-top: 1px solid var(--border-color); }
+.ohr-cost-line { cursor: pointer; transition: background-color 120ms ease; }
+.ohr-cost-line:hover td { background: var(--hover-bg); }
+.ledger-modal-actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+.ledger-modal-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--primary-text);
+  font-size: var(--callout-size);
+  font-weight: var(--font-weight-semibold);
+  transition: background 0.15s;
+}
+.ledger-modal-link:hover { background: var(--hover-bg); }
 .ohr-cost-table th:first-child, .ohr-cost-table td:first-child { padding-left: 1.125rem; }
 .ohr-cost-table th:last-child, .ohr-cost-table td:last-child { padding-right: 1.125rem; }
 .ohr-cost-items-loading { padding: 0.75rem 1.125rem; display: flex; flex-direction: column; gap: 0.5rem; }

@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
-import { ChevronRight, X } from "lucide-react"
+import { X } from "lucide-react"
 import { Chart } from "../../shared/components/Chart/Chart"
 import { SegmentedControl } from "../../shared/components/SegmentedControl"
-import { SkelText } from "../../shared/components/SkelText"
 import { collapseValue } from "../../shared/components/MonthlyDetailTable/MonthlyDetailTable"
 import { useModalLayer } from "../../shared/hooks/useModalLayer"
 import { fetchPageData } from "../../shared/api/pageApi"
-import { shortMonth, fullMonth, formatMoneyFull, formatDate } from "../../shared/utils/format"
+import { fullMonth, formatMoneyFull } from "../../shared/utils/format"
 import type { LineMarker, SpendItem } from "../../shared/components/Chart/chart.types"
+import { LedgerTransactionModal, type LedgerRef } from "./LedgerTransactionModal"
+import { OverheadCostRows, type CostRow, type PeriodItems, type LineItem } from "./OverheadCostRows"
 import { buildCategoryTrend, type CategoryHistoryRow, type TrendGroup, type TrendView, type TrendSeries } from "./overheadTrend"
 
-type LineItem = Record<string, unknown>
 
 export interface DetailCategory {
   /** Value matched against a line item's lgract (account number, the
@@ -29,7 +29,7 @@ export interface DetailCategory {
 
 /** Line items for one posting year. The page already holds the selected
  *  year's; other years (Yearly view rows) are fetched on first expand. */
-type YearItems = LineItem[] | "loading" | "error"
+type YearItems = PeriodItems
 
 const PRIOR_YEAR_DOT_COLOR = "#a9b2be"
 
@@ -86,6 +86,8 @@ export function OverheadCategoryDetail({
   // Switching category keeps the view but closes any open row.
   useEffect(() => setOpenKey(null), [category?.id])
   const [yearItems, setYearItems] = useState<Record<number, YearItems>>({})
+  // A clicked cost line opens its ledger transaction on top of this modal.
+  const [ledger, setLedger] = useState<LedgerRef | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   // The nivo chart mounts only once the morph has landed: measuring and
   // painting an SVG mid-spring is what made the open stutter.
@@ -125,7 +127,7 @@ export function OverheadCategoryDetail({
   const monthOf = (li: LineItem) => Number(collapseValue(li.month))
   const netOf = (li: LineItem) => Number(collapseValue(li.net) ?? 0)
 
-  const rows = useMemo(() => {
+  const rows = useMemo<CostRow[]>(() => {
     if (!category || !series) return []
     if (view === "monthly") {
       const items = Array.isArray(lineItems) ? lineItems.filter(category.matchItem) : []
@@ -322,140 +324,23 @@ export function OverheadCategoryDetail({
                     </button>
                   </div>
                 </div>
-                <div ref={listRef} className="ohr-detail-list">
-                  {rows.length === 0 && (
-                    <p className="reports-modal-empty body-text text-secondary">No costs recorded for this category.</p>
-                  )}
-                  {rows.map((row) => {
-                    const isOpen = openKey === row.key
-                    const items = isOpen ? (row.items ?? (view === "yearly" ? yearItems[row.key] ?? "loading" : [])) : null
-                    return (
-                      <div
-                        key={`${view}-${row.key}`}
-                        data-row-key={row.key}
-                        className={`ohr-cost-card${isOpen ? " ohr-cost-card-open" : ""}`}
-                      >
-                        <div
-                          className="ohr-cost-head"
-                          role="button"
-                          tabIndex={0}
-                          aria-expanded={isOpen}
-                          onClick={() => toggleRow(row.key)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault()
-                              toggleRow(row.key)
-                            }
-                          }}
-                        >
-                          <span className="jc-head-toggle">
-                            <ChevronRight size={15} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
-                          </span>
-                          <span className="ohr-cost-label">{row.label}</span>
-                          <span className="ohr-cost-stats">
-                            <span className="jc-head-stat">
-                              <span className="jc-head-stat-label">Items</span>
-                              <span className="jc-head-stat-value">{row.count ?? "—"}</span>
-                            </span>
-                            <span className="jc-head-stat">
-                              <span className="jc-head-stat-label">Total</span>
-                              <span className="jc-head-stat-value">{formatMoneyFull(row.total)}</span>
-                            </span>
-                          </span>
-                        </div>
-                        <AnimatePresence initial={false}>
-                          {isOpen && (
-                            <motion.div
-                              key="body"
-                              className="ohr-cost-body"
-                              initial={{ height: 0, opacity: 0 }}
-                              animate={{ height: "auto", opacity: 1 }}
-                              exit={{ height: 0, opacity: 0 }}
-                              transition={{ height: { duration: 0.3, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.2 } }}
-                            >
-                              <CostItems items={items} showMonth={view === "yearly"} />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    )
-                  })}
-                </div>
+                <OverheadCostRows
+                  rows={rows}
+                  openKey={openKey}
+                  onToggle={toggleRow}
+                  onOpen={setLedger}
+                  showCount={view === "monthly"}
+                  showMonth={view === "yearly"}
+                  emptyText="No costs recorded for this category."
+                  listRef={listRef}
+                />
               </div>
             </motion.div>
           </div>
+          <LedgerTransactionModal ledger={ledger} onClose={() => setLedger(null)} />
         </>
       )}
     </AnimatePresence>,
     document.body,
-  )
-}
-
-/** The itemized ledger lines inside an open month/year row. Sorted by date,
- *  newest first; rows fade in with a short stagger once the tray opens. */
-function CostItems({ items, showMonth }: { items: YearItems | null; showMonth: boolean }) {
-  if (items === "loading" || items == null) {
-    return (
-      <div className="ohr-cost-items ohr-cost-items-loading" aria-busy="true">
-        {Array.from({ length: 4 }, (_, i) => (
-          <div key={i} className="ohr-cost-skel-row">
-            <SkelText ch={9} />
-            <SkelText ch={26} />
-            <SkelText ch={8} />
-          </div>
-        ))}
-      </div>
-    )
-  }
-  if (items === "error") {
-    return <p className="reports-modal-empty body-text text-secondary">Couldn't load these costs. Try again in a moment.</p>
-  }
-  if (items.length === 0) {
-    return <p className="reports-modal-empty body-text text-secondary">No costs this period.</p>
-  }
-  const sorted = [...items].sort(
-    (a, b) =>
-      (new Date(String(collapseValue(b.trndte) ?? "")).getTime() || 0) -
-      (new Date(String(collapseValue(a.trndte) ?? "")).getTime() || 0),
-  )
-  const total = items.reduce((s, li) => s + Number(collapseValue(li.net) ?? 0), 0)
-  return (
-    <div className="ohr-cost-items">
-      <table className="data-table ohr-cost-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Trans #</th>
-            <th>Description</th>
-            {showMonth && <th>Month</th>}
-            <th className="num">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.map((li, i) => {
-            const month = Number(collapseValue(li.month))
-            return (
-              <motion.tr
-                key={i}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, transition: { delay: Math.min(i, 12) * 0.02 + 0.08, duration: 0.2 } }}
-              >
-                <td className="text-secondary">{formatDate(collapseValue(li.trndte))}</td>
-                <td>{String(collapseValue(li.trnnum) ?? "—")}</td>
-                <td>{String(collapseValue(li.dscrpt) ?? "") || "—"}</td>
-                {showMonth && <td>{month >= 1 && month <= 12 ? shortMonth(month) : "Adj."}</td>}
-                <td className="num">{formatMoneyFull(Number(collapseValue(li.net) ?? 0))}</td>
-              </motion.tr>
-            )
-          })}
-        </tbody>
-        <tfoot>
-          <tr>
-            <td colSpan={showMonth ? 4 : 3}>Total</td>
-            <td className="num">{formatMoneyFull(total)}</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
   )
 }

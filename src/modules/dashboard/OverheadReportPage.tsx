@@ -12,7 +12,6 @@ import { Chart } from "../../shared/components/Chart/Chart"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import {
-  MonthlyDetailTable,
   collapseValue,
 } from "../../shared/components/MonthlyDetailTable/MonthlyDetailTable"
 import { useModalLayer } from "../../shared/hooks/useModalLayer"
@@ -25,6 +24,8 @@ import { useOnboarding } from "../../core/onboarding/OnboardingProvider"
 import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
 import { SegmentedControl } from "../../shared/components/SegmentedControl"
 import { OverheadCategoryDetail, ALL_ID, type DetailCategory } from "./OverheadCategoryDetail"
+import { OverheadCostRows, type CostRow } from "./OverheadCostRows"
+import { LedgerTransactionModal, type LedgerRef } from "./LedgerTransactionModal"
 import { buildCategoryTrend, type CategoryHistoryRow, type TrendGroup } from "./overheadTrend"
 import { useAuth } from "../../core/auth/AuthProvider"
 import { isTechRole } from "../../core/auth/roles"
@@ -293,6 +294,8 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
   const pageYear = usePageYear()
   const lastYear = pageYear - 1
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
+  // A clicked cost line in Monthly Spending opens its ledger transaction.
+  const [ledger, setLedger] = useState<LedgerRef | null>(null)
   // One trend widget, two reads: month-by-month spending or the running total.
   const [trendView, setTrendView] = useState<"monthly" | "cumulative">("monthly")
   // Top Movers ranks by dollar swing or percent swing — one leads at a time.
@@ -556,6 +559,23 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
     () => currentMonthRows.map((r) => ({ month: r.month, value: r.overhead ?? 0 })),
     [currentMonthRows],
   )
+
+  // Monthly Spending rows: every posted month of the selected year, newest
+  // first, month 13 (year-end adjustments) last when it has entries.
+  const spendingRows = useMemo<CostRow[]>(() => {
+    const items = Array.isArray(lineItems) ? lineItems : []
+    const monthOf = (li: Record<string, unknown>) => Number(collapseValue(li.month))
+    const netOf = (li: Record<string, unknown>) => Number(collapseValue(li.net) ?? 0)
+    const rows: CostRow[] = monthlyTotals
+      .map((m) => {
+        const mine = items.filter((li) => monthOf(li) === m.month)
+        return { key: m.month, label: fullMonth(m.month), total: m.value, count: mine.length, items: mine }
+      })
+      .reverse()
+    const adj = items.filter((li) => monthOf(li) === 13)
+    if (adj.length) rows.push({ key: 13, label: "Year-end adjustments", total: adj.reduce((s, li) => s + netOf(li), 0), count: adj.length, items: adj })
+    return rows
+  }, [lineItems, monthlyTotals])
 
   function handlePointClick(x: string) {
     const monthNum = currentMonthRows.find((r) => shortMonth(r.month) === x)?.month
@@ -976,35 +996,31 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
           </Widget>
         </MotionItem>
 
-        {/* Every dollar, month by month. Clicking a month on "Overhead by
-            Month" filters this table to that month. */}
+        {/* Every dollar, month by month, as expanding period cards. Clicking a
+            month on "Overhead by Month" opens that month here; a cost line
+            opens its ledger transaction. */}
         <MotionItem className="col-span-full">
           <Widget
             title="Monthly Spending"
-            description={
-              selectedMonth != null ? `Showing ${fullMonth(selectedMonth)} only` : undefined
-            }
+            description={`${pageYear}, by month. Click a month for its costs; click a cost for the full transaction.`}
             loading={isLoading && lineItems === null}
-            className="mbp-table-widget"
+            noData={!isLoading && spendingRows.length === 0}
+            className="ohr-spending-widget"
             actions={
               selectedMonth != null ? (
-                <button
-                  className="widget-link-btn"
-                  onClick={() => setSelectedMonth(null)}
-                  title="Clear month selection"
-                >
-                  <X size={12} /> Clear {fullMonth(selectedMonth)}
+                <button className="widget-link-btn" onClick={() => setSelectedMonth(null)} title="Collapse">
+                  <X size={12} /> Collapse {fullMonth(selectedMonth)}
                 </button>
               ) : undefined
             }
           >
-            <MonthlyDetailTable
-              monthlyTotals={monthlyTotals}
-              lineItems={lineItems}
-              isLoading={isLoading}
-              totalLabel="Overhead"
-              filterMonth={selectedMonth}
-              hideColumns={["lgract"]}
+            <OverheadCostRows
+              rows={spendingRows}
+              openKey={selectedMonth}
+              onToggle={(key) => setSelectedMonth((curr) => (curr === key ? null : key))}
+              onOpen={setLedger}
+              showCategory
+              emptyText="No overhead costs recorded."
             />
           </Widget>
         </MotionItem>
@@ -1071,6 +1087,8 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
         onSelect={openModal}
         onClose={() => setOtherModalOpen(false)}
       />
+
+      <LedgerTransactionModal ledger={ledger} onClose={() => setLedger(null)} />
 
       <OverheadCategoryDetail
         category={modalCategory}
