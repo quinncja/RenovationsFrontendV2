@@ -43,6 +43,8 @@ type Hover =
   | { kind: "link"; source: string; target: string; color: string; value: number; sourceTotal: number }
 
 let setHoverRef: ((h: Hover | null) => void) | null = null
+/** Last known cursor, tracked while the page is mounted so a tooltip has a position on its first paint. */
+const cursor = { x: 0, y: 0 }
 
 function NodeSensor({ node }: { node: { id: string; label: string; color: string; value: number } }) {
   useEffect(() => {
@@ -60,13 +62,12 @@ function LinkSensor({ link }: { link: { value: number; source: { label: string; 
 }
 
 function CashFlowTooltip({ hover, income }: { hover: Hover; income: number }) {
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
+  const [pos, setPos] = useState({ ...cursor })
   useEffect(() => {
     const onMove = (e: MouseEvent) => setPos({ x: e.clientX, y: e.clientY })
     window.addEventListener("mousemove", onMove)
     return () => window.removeEventListener("mousemove", onMove)
   }, [])
-  if (!pos) return null
   const pct = (v: number, of: number) => (of > 0 ? `${((v / of) * 100).toFixed(1)}%` : "")
   // Flip to the left of the cursor near the right edge.
   const flip = pos.x > window.innerWidth - 260
@@ -100,10 +101,12 @@ function CashFlowTooltip({ hover, income }: { hover: Hover; income: number }) {
               <span className="chart-line-tooltip-label">Amount</span>
               <span className="chart-line-tooltip-value">{formatMoneyFull(hover.value)}</span>
             </div>
-            <div className="chart-line-tooltip-row">
-              <span className="chart-line-tooltip-label">Of {hover.source}</span>
-              <span className="chart-line-tooltip-value">{pct(hover.value, hover.sourceTotal)}</span>
-            </div>
+            {hover.sourceTotal !== income && (
+              <div className="chart-line-tooltip-row">
+                <span className="chart-line-tooltip-label">Of {hover.source}</span>
+                <span className="chart-line-tooltip-value">{pct(hover.value, hover.sourceTotal)}</span>
+              </div>
+            )}
             <div className="chart-line-tooltip-row">
               <span className="chart-line-tooltip-label">Share of income</span>
               <span className="chart-line-tooltip-value">{pct(hover.value, income)}</span>
@@ -146,7 +149,12 @@ function CashFlowContent({ year, onYearChange }: { year: number; onYearChange: (
   }, [data?.cashflow, dark])
 
   const [hover, setHover] = useState<Hover | null>(null)
-  useEffect(() => { setHoverRef = setHover; return () => { setHoverRef = null } }, [])
+  useEffect(() => {
+    setHoverRef = setHover
+    const track = (e: MouseEvent) => { cursor.x = e.clientX; cursor.y = e.clientY }
+    window.addEventListener("mousemove", track)
+    return () => { setHoverRef = null; window.removeEventListener("mousemove", track) }
+  }, [])
   const income = useMemo(
     () => sankeyData?.links.filter(l => l.source === "construction-income").reduce((s, l) => s + l.value, 0) ?? 0,
     [sankeyData],
