@@ -13323,9 +13323,9 @@ svg.placeholder-illustration {
 .chart-line-tooltip--airy {
   border: none;
   border-radius: 12px;
-  padding: 14px 18px 12px;
-  gap: 6px;
-  min-width: 190px;
+  padding: 10px 14px 8px;
+  gap: 4px;
+  min-width: 180px;
   box-shadow: 0 6px 24px rgba(15, 23, 42, 0.1), 0 1px 3px rgba(15, 23, 42, 0.06);
 }
 .chart-line-tooltip--airy .chart-line-tooltip-header {
