@@ -81,19 +81,19 @@ const navItems = {
 } as const satisfies Record<string, NavItem>
 
 const financesGroup: NavGroup = {
-  label: "Finances",
+  label: "Reports",
   icon: Landmark,
   items: [navItems.invoices, navItems.upcomingBillings, navItems.progressBillings, navItems.overheadReport],
 }
 
 const directoryGroup: NavGroup = {
-  label: "Directory",
+  label: "Partners",
   icon: Briefcase,
   items: [navItems.clients, navItems.vendors, navItems.subcontractors],
 }
 
 const chartsGroup: NavGroup = {
-  label: "Charts",
+  label: "Organization",
   icon: BarChart3,
   // revenueMap intentionally hidden from the nav (page still routed at /revenue-map).
   items: [navItems.orgChart, navItems.projectProcess, navItems.cashFlow],
@@ -109,9 +109,9 @@ const executiveNav: NavEntry[] = [
   navItems.changeOrders,
   financesGroup,
   NAV_DIVIDER,
-  navItems.dailyReports,
-  chartsGroup,
   directoryGroup,
+  chartsGroup,
+  navItems.dailyReports,
   navItems.users,
 ]
 

@@ -33,7 +33,7 @@ export interface SectionAnnouncement {
 export const SECTION_ANNOUNCEMENTS: SectionAnnouncement[] = [
   {
     milestone: SECTION_OVERHEAD_REPORT,
-    navGroup: "Finances",
+    navGroup: "Reports",
     targetId: "nav-finances",
     title: "New in Finances",
     body: "Overhead Expense Report now available.",
