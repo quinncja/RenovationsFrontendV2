@@ -21765,9 +21765,6 @@ body.pj-painting td.pj-computed {
 }
 
 /* Expanded card body: breathing room around the member-phase table. */
-.ptr-deck-sub {
-  padding: 0.25rem 1rem 1rem;
-}
 
 /* Share pill — the "% of that property's spend" figure */
 .ptr-share-pill {

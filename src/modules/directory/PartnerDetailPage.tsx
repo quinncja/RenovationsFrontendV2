@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence, type Transition } from "framer-motion"
 import { ChevronRight, ExternalLink, X } from "lucide-react"
@@ -898,7 +898,7 @@ interface DeckStat {
   color?: string
 }
 
-function DeckCard({ name, subtitle, stats, open, entrance, index, onToggle, reportTo, reportLabel, children }: {
+function DeckCard({ name, subtitle, stats, open, entrance, index, onToggle, onReport, reportLabel, children }: {
   name: string
   subtitle: string
   stats: DeckStat[]
@@ -906,12 +906,11 @@ function DeckCard({ name, subtitle, stats, open, entrance, index, onToggle, repo
   entrance: boolean
   index: number
   onToggle: () => void
-  /** Route for the card's View tile (e.g. the property report); omit to hide. */
-  reportTo?: string
+  /** Opens the card's report (e.g. the property page); omit to hide the tile. */
+  onReport?: () => void
   reportLabel?: string
   children: ReactNode
 }) {
-  const navigate = useNavigate()
   return (
     <motion.div
       className={`jc-project-card${open ? " jc-project-card-open" : ""}`}
@@ -951,7 +950,7 @@ function DeckCard({ name, subtitle, stats, open, entrance, index, onToggle, repo
             </span>
           ))}
         </span>
-        {reportTo && (
+        {onReport && (
           <button
             type="button"
             className="jc-view-tile jc-view-tile-wide"
@@ -959,11 +958,11 @@ function DeckCard({ name, subtitle, stats, open, entrance, index, onToggle, repo
             title={reportLabel ?? "Open report"}
             onClick={(e) => {
               e.stopPropagation()
-              navigate(reportTo)
+              onReport()
             }}
             onKeyDown={(e) => e.stopPropagation()}
           >
-            {reportLabel ?? "Report"} <ExternalLink size={13} />
+            {reportLabel ?? "View"} <ExternalLink size={13} />
           </button>
         )}
       </div>
@@ -1031,7 +1030,7 @@ function DeckGhosts() {
 type BoardView = "property" | "project"
 
 function ClientProjectsSection({ clientId, year }: { clientId: number; year: number | null }) {
-  const { goToJobcost } = useJobcostNav()
+  const { goToJobcost, goToProperty } = useJobcostNav()
   const marginColorsOn = useMarginColorsEnabled()
   const [view, setView] = useLocalStorage<BoardView>("ptrClientProjectView", "property")
   const [jobs, setJobs] = useState<Job[]>([])
@@ -1208,10 +1207,9 @@ function ClientProjectsSection({ clientId, year }: { clientId: number; year: num
                     entrance
                     index={i}
                     onToggle={() => setOpenGroup((k) => (k === g.key ? null : g.key))}
-                    reportTo={`/jobcost/property/${encodeURIComponent(g.key)}`}
-                    reportLabel="Report"
+                    onReport={() => goToProperty(g.key)}
                   >
-                    <div className="ptr-deck-sub">
+                    <div className="jc-member-table">
                       <table className="spend-rank-table">
                         <thead>
                           <tr>
@@ -1280,7 +1278,7 @@ function ContributionSection({ cfg, rows, year, loading }: {
   year: number | null
   loading: boolean
 }) {
-  const { goToJobcost } = useJobcostNav()
+  const { goToJobcost, goToProperty } = useJobcostNav()
   const [view, setView] = useLocalStorage<ContribView>("ptrContributionView", "properties")
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<ContribSortKey>("partnerCost")
@@ -1393,10 +1391,9 @@ function ContributionSection({ cfg, rows, year, loading }: {
                       entrance
                       index={i}
                       onToggle={() => setOpenGroup((k) => (k === g.key ? null : g.key))}
-                      reportTo={g.isProperty ? `/jobcost/property/${encodeURIComponent(g.key)}` : undefined}
-                      reportLabel="Report"
+                      onReport={g.isProperty ? () => goToProperty(g.key) : undefined}
                     >
-                      <div className="ptr-deck-sub">
+                      <div className="jc-member-table">
                         <table className="spend-rank-table">
                           <thead>
                             <tr>
