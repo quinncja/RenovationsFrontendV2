@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence, type Transition } from "framer-motion"
-import { ChevronRight, ExternalLink, FileText, X } from "lucide-react"
+import { ChevronRight, ExternalLink, X } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
@@ -16,7 +16,6 @@ import { SortTh } from "../../shared/components/SortTh"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
-import { Metric, MetricDivider } from "../../shared/components/CollapsibleSection/CollapsibleSection"
 import { invoiceStatusLabel, invoiceStatusTone } from "../../shared/utils/invoiceStatus"
 import { formatMoneyFull, formatDate, marginTextColor } from "../../shared/utils/format"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
@@ -65,6 +64,9 @@ interface KindConfig {
   /** The money the headline stats measure ("Revenue" / "Material Spend" / …). */
   moneyNoun: string
   shareTitle: string
+  /** Days past duedte before an open invoice counts as overdue: AR follows the
+   *  aging rule (duedte + 30), AP ages straight off the due date. */
+  overdueGraceDays: number
 }
 
 const CONFIG: Record<PartnerKind, KindConfig> = {
@@ -77,10 +79,11 @@ const CONFIG: Record<PartnerKind, KindConfig> = {
     byYearKey: "clientRevenueByYear",
     byMonthKey: "clientRevenueByMonth",
     shareKey: "clientRevenueShare",
-    invoicesKey: "clientRecentInvoices",
+    invoicesKey: "clientInvoices",
     invoiceModule: "clients",
     moneyNoun: "Revenue",
     shareTitle: "Share of Revenue",
+    overdueGraceDays: 30,
   },
   vendor: {
     noun: "Vendor",
@@ -91,10 +94,11 @@ const CONFIG: Record<PartnerKind, KindConfig> = {
     byYearKey: "vendorSpendByYear",
     byMonthKey: "vendorSpendByMonth",
     shareKey: "vendorCategoryShare",
-    invoicesKey: "vendorRecentInvoices",
+    invoicesKey: "vendorInvoices",
     invoiceModule: "suppliers",
     moneyNoun: "Material Spend",
     shareTitle: "Share of Material Costs",
+    overdueGraceDays: 0,
   },
   subcontractor: {
     noun: "Subcontractor",
@@ -105,10 +109,11 @@ const CONFIG: Record<PartnerKind, KindConfig> = {
     byYearKey: "subcontractorSpendByYear",
     byMonthKey: "subcontractorSpendByMonth",
     shareKey: "subcontractorCategoryShare",
-    invoicesKey: "subcontractorRecentInvoices",
+    invoicesKey: "subcontractorInvoices",
     invoiceModule: "subcontractors",
     moneyNoun: "Subcontract Spend",
     shareTitle: "Share of Subcontract Costs",
+    overdueGraceDays: 0,
   },
 }
 
@@ -160,6 +165,7 @@ interface RecentInvoice {
   description: string | null
   value: number
   invoiceDate: string
+  dueDate: string | null
   status: number
   amountRemaining: number
 }
@@ -274,12 +280,12 @@ function PartnerDetail({ kind, partnerId, year, onYearChange }: {
         <MotionItem>
           <HistoryChart
             cfg={cfg}
+            partnerId={partnerId}
             year={year}
             loading={isLoading}
             byYear={byYear}
             byMonth={byMonth}
             invoices={invoices}
-            overdue={payment?.overdue ?? null}
             onOpenInvoice={setSelectedInvoiceId}
           />
         </MotionItem>
@@ -465,24 +471,61 @@ function KpiCards({ kind, year, loading, summary, byYear, share, marginSummary, 
 // ─── History chart (Monthly ↔ Yearly) ─────────────────────────────────────────
 
 type HistoryView = "monthly" | "yearly"
+type InvoiceFilter = "all" | "outstanding" | "overdue"
 
-function HistoryChart({ cfg, year, loading, byYear, byMonth, invoices, overdue, onOpenInvoice }: {
+/** Overdue per the partner kind's aging rule: open balance whose due date
+ *  (plus the kind's grace window) has passed. */
+function isInvoiceOverdue(inv: RecentInvoice, graceDays: number): boolean {
+  if (inv.status === 5 || (inv.amountRemaining ?? 0) <= 0 || !inv.dueDate) return false
+  const mark = new Date(inv.dueDate)
+  mark.setDate(mark.getDate() + graceDays)
+  return mark.getTime() < Date.now()
+}
+
+function HistoryChart({ cfg, partnerId, year, loading, byYear, byMonth, invoices, onOpenInvoice }: {
   cfg: KindConfig
+  partnerId: number
   year: number | null
   loading: boolean
   byYear: YearPoint[]
   byMonth: MonthlySeries | null
   invoices: RecentInvoice[]
-  overdue: number | null
   onOpenInvoice: (id: string) => void
 }) {
-  const [invoicesOpen, setInvoicesOpen] = useState(false)
+  const [invoiceFilter, setInvoiceFilter] = useState<InvoiceFilter | null>(null)
   // All Time reads best year-over-year; a specific year defaults to its
   // month-over-month story.
   const [view, setView] = useState<HistoryView>(year == null ? "yearly" : "monthly")
   useEffect(() => {
     if (year == null) setView("yearly")
   }, [year])
+
+  // The invoice rollup under the chart follows the chart's scope: Monthly is
+  // the selected year's story, Yearly is the all-time one. Page data already
+  // carries the selected year's invoices; the all-time set (only needed when a
+  // specific year is selected) is fetched once per partner and cached.
+  const wantAllTime = view === "yearly" && year != null
+  const [allTimeInvoices, setAllTimeInvoices] = useState<RecentInvoice[] | null>(null)
+  useEffect(() => {
+    setAllTimeInvoices(null)
+  }, [partnerId, cfg.invoicesKey])
+  useEffect(() => {
+    if (!wantAllTime || allTimeInvoices != null) return
+    const controller = new AbortController()
+    fetchPageData({
+      module: "dashboard",
+      queries: [cfg.invoicesKey],
+      params: { id: partnerId, year: null },
+      signal: controller.signal,
+    })
+      .then((result) => {
+        if (controller.signal.aborted) return
+        const rows = result[cfg.invoicesKey]
+        setAllTimeInvoices(Array.isArray(rows) ? (rows as RecentInvoice[]) : [])
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [wantAllTime, allTimeInvoices, partnerId, cfg.invoicesKey])
 
   const chartYear = byMonth?.year ?? year ?? new Date().getFullYear()
 
@@ -509,6 +552,10 @@ function HistoryChart({ cfg, year, loading, byYear, byMonth, invoices, overdue, 
 
   const showMonthly = view === "monthly"
   const noData = showMonthly ? monthly == null : byYear.length === 0
+
+  const scopedInvoices = wantAllTime ? allTimeInvoices : invoices
+  const invoicesLoading = wantAllTime && allTimeInvoices == null
+  const scopeLabel = view === "yearly" ? "All-Time" : String(chartYear)
 
   return (
     <Widget
@@ -561,80 +608,146 @@ function HistoryChart({ cfg, year, loading, byYear, byMonth, invoices, overdue, 
       )}
 
       <InvoicesFooter
-        year={year}
-        invoices={invoices}
-        overdue={overdue}
-        onView={() => setInvoicesOpen(true)}
+        scopeLabel={scopeLabel}
+        invoices={scopedInvoices ?? []}
+        loading={invoicesLoading}
+        graceDays={cfg.overdueGraceDays}
+        onOpen={setInvoiceFilter}
       />
 
       <InvoiceListModal
         cfg={cfg}
-        year={year}
-        open={invoicesOpen}
-        invoices={invoices}
-        onClose={() => setInvoicesOpen(false)}
+        scopeLabel={view === "yearly" ? "All Time" : String(chartYear)}
+        filter={invoiceFilter}
+        invoices={scopedInvoices ?? []}
+        graceDays={cfg.overdueGraceDays}
+        onClose={() => setInvoiceFilter(null)}
         onOpenInvoice={onOpenInvoice}
       />
     </Widget>
   )
 }
 
-/** Invoice rollup strip under the history chart — the summary lives with the
- *  chart; the row-by-row list opens in a modal instead of unrolling the page. */
-function InvoicesFooter({ year, invoices, overdue, onView }: {
-  year: number | null
+/** Invoice rollup band under the history chart, scoped to the chart's view
+ *  (selected year ↔ all-time). Each metric is a tile that opens the invoice
+ *  modal filtered to what it counts. */
+function InvoicesFooter({ scopeLabel, invoices, loading, graceDays, onOpen }: {
+  scopeLabel: string
   invoices: RecentInvoice[]
-  overdue: number | null
-  onView: () => void
+  loading: boolean
+  graceDays: number
+  onOpen: (filter: InvoiceFilter) => void
 }) {
   // Void (status 5) stays out of the rollups, matching the backend's summary
-  // filters. The modal still lists voids.
+  // filters. The modal still lists voids under "all".
   const billable = invoices.filter((i) => i.status !== 5)
   const totalBilled = billable.reduce((s, i) => s + (i.value ?? 0), 0)
   const totalOutstanding = billable.reduce((s, i) => s + (i.amountRemaining ?? 0), 0)
+  const totalOverdue = billable
+    .filter((i) => isInvoiceOverdue(i, graceDays))
+    .reduce((s, i) => s + (i.amountRemaining ?? 0), 0)
+
+  const tiles: {
+    key: InvoiceFilter
+    label: string
+    value: string
+    valueClass?: string
+    enabled: boolean
+  }[] = [
+    {
+      key: "all",
+      label: `${scopeLabel} Invoices`,
+      value: String(billable.length),
+      enabled: invoices.length > 0,
+    },
+    {
+      key: "all",
+      label: "Total Billed",
+      value: formatMoneyFull(totalBilled),
+      enabled: invoices.length > 0,
+    },
+    {
+      key: "outstanding",
+      label: "Outstanding",
+      value: formatMoneyFull(totalOutstanding),
+      valueClass: totalOutstanding > 0 ? "invoice-amount-value--remaining" : undefined,
+      enabled: totalOutstanding > 0,
+    },
+  ]
+  if (totalOverdue > 0) {
+    tiles.push({
+      key: "overdue",
+      label: "Overdue",
+      value: formatMoneyFull(totalOverdue),
+      valueClass: "ptr-metric-overdue",
+      enabled: true,
+    })
+  }
 
   return (
-    <div className="ptr-fin-foot">
-      <div className="ptr-fin-metrics">
-        <Metric value={billable.length} label={`${year ?? "All-Time"} Invoices`} />
-        <MetricDivider />
-        <Metric value={formatMoneyFull(totalBilled)} label="Total Billed" />
-        <MetricDivider />
-        <Metric
-          value={formatMoneyFull(totalOutstanding)}
-          label="Outstanding"
-          valueClass="invoice-amount-value--remaining"
-        />
-        {overdue != null && overdue > 0 && (
-          <>
-            <MetricDivider />
-            <Metric value={formatMoneyFull(overdue)} label="Overdue" valueClass="ptr-metric-overdue" />
-          </>
-        )}
-      </div>
-      <button
-        type="button"
-        className="button primary-button ptr-fin-view"
-        onClick={onView}
-        disabled={invoices.length === 0}
-      >
-        <FileText size={15} /> View Invoices
-      </button>
+    <div className="ptr-fin-band" role="group" aria-label={`${scopeLabel} invoice summary`}>
+      {tiles.map((t, i) => (
+        <button
+          key={`${t.key}-${i}`}
+          type="button"
+          className="ptr-fin-cell"
+          onClick={() => onOpen(t.key)}
+          disabled={loading || !t.enabled}
+          title={t.enabled ? `View ${t.label.toLowerCase()}` : undefined}
+        >
+          <span className={`ptr-fin-cell-value${t.valueClass ? ` ${t.valueClass}` : ""}`}>
+            {loading ? <span className="skel-line ptr-fin-cell-skel" /> : t.value}
+          </span>
+          <span className="ptr-fin-cell-label">
+            {t.label}
+            <ChevronRight size={12} className="ptr-fin-cell-chev" aria-hidden="true" />
+          </span>
+        </button>
+      ))}
     </div>
   )
 }
 
-function InvoiceListModal({ cfg, year, open, invoices, onClose, onOpenInvoice }: {
+const MODAL_ROW_CAP = 300
+
+const FILTER_TITLES: Record<InvoiceFilter, string> = {
+  all: "Invoices",
+  outstanding: "Outstanding Invoices",
+  overdue: "Overdue Invoices",
+}
+
+function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClose, onOpenInvoice }: {
   cfg: KindConfig
-  year: number | null
-  open: boolean
+  scopeLabel: string
+  filter: InvoiceFilter | null
   invoices: RecentInvoice[]
+  graceDays: number
   onClose: () => void
   onOpenInvoice: (id: string) => void
 }) {
+  const open = filter != null
   const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
-  const billable = invoices.filter((i) => i.status !== 5)
-  const totalBilled = billable.reduce((s, i) => s + (i.value ?? 0), 0)
+  // Keep the last filter through the exit animation so the content doesn't
+  // flash back to "all" while the modal fades out.
+  const lastFilter = useRef<InvoiceFilter>("all")
+  if (filter != null) lastFilter.current = filter
+  const activeFilter = filter ?? lastFilter.current
+
+  const rows =
+    activeFilter === "all"
+      ? invoices
+      : invoices.filter(
+          (i) =>
+            i.status !== 5 &&
+            (i.amountRemaining ?? 0) > 0 &&
+            (activeFilter === "outstanding" || isInvoiceOverdue(i, graceDays))
+        )
+  // "All" totals bill; the open-balance filters total what's still owed.
+  const rollup =
+    activeFilter === "all"
+      ? rows.filter((i) => i.status !== 5).reduce((s, i) => s + (i.value ?? 0), 0)
+      : rows.reduce((s, i) => s + (i.amountRemaining ?? 0), 0)
+  const shown = rows.slice(0, MODAL_ROW_CAP)
 
   return createPortal(
     <AnimatePresence>
@@ -659,10 +772,12 @@ function InvoiceListModal({ cfg, year, open, invoices, onClose, onOpenInvoice }:
               <div className="modal-header">
                 <div className="reports-modal-title">
                   <div>
-                    <h2 className="title2 emphasized">Invoices — {year ?? "All Time"}</h2>
+                    <h2 className="title2 emphasized">
+                      {FILTER_TITLES[activeFilter]} — {scopeLabel}
+                    </h2>
                     <span className="reports-modal-subtitle">
-                      {billable.length} invoice{billable.length === 1 ? "" : "s"} · {formatMoneyFull(totalBilled)}
-                      {invoices.length === 25 ? " · 25 most recent" : ""}
+                      {rows.length} invoice{rows.length === 1 ? "" : "s"} · {formatMoneyFull(rollup)}
+                      {activeFilter === "all" ? "" : " open"}
                     </span>
                   </div>
                 </div>
@@ -673,7 +788,7 @@ function InvoiceListModal({ cfg, year, open, invoices, onClose, onOpenInvoice }:
 
               <div className="reports-modal-body">
                 <div className="ptr-inv-list">
-                  {invoices.map((inv) => (
+                  {shown.map((inv) => (
                     <button
                       key={inv.id}
                       type="button"
@@ -708,11 +823,19 @@ function InvoiceListModal({ cfg, year, open, invoices, onClose, onOpenInvoice }:
                     </button>
                   ))}
                 </div>
-                <p className="ptr-inv-footnote subheadline text-secondary">
-                  Click an invoice for its full detail. Showing{" "}
-                  {invoices.length === 25 ? "the 25 most recent invoices" : `${invoices.length} invoice${invoices.length === 1 ? "" : "s"}`}
-                  {year != null ? ` posted in ${year}` : ""} for this {cfg.noun.toLowerCase()}.
-                </p>
+                {rows.length === 0 ? (
+                  <p className="ptr-inv-footnote subheadline text-secondary">
+                    No {FILTER_TITLES[activeFilter].toLowerCase()} for this {cfg.noun.toLowerCase()}.
+                  </p>
+                ) : (
+                  <p className="ptr-inv-footnote subheadline text-secondary">
+                    Click an invoice for its full detail. Showing{" "}
+                    {rows.length > MODAL_ROW_CAP
+                      ? `the ${MODAL_ROW_CAP} most recent of ${rows.length} invoices`
+                      : `${rows.length} invoice${rows.length === 1 ? "" : "s"}`}{" "}
+                    for this {cfg.noun.toLowerCase()}.
+                  </p>
+                )}
               </div>
             </motion.div>
           </div>

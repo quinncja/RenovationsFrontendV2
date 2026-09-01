@@ -146,7 +146,7 @@ export const PAGE_QUERIES = {
     "clientRevenueShare",
     "clientMarginSummary",
     "clientPaymentBehavior",
-    "clientRecentInvoices",
+    "clientInvoices",
   ],
 
   // Directory — Vendors
@@ -157,7 +157,7 @@ export const PAGE_QUERIES = {
     "vendorSpendByMonth",
     "vendorCategoryShare",
     "vendorRelationship",
-    "vendorRecentInvoices",
+    "vendorInvoices",
     "partnerProjectContribution",
   ],
 
@@ -169,7 +169,7 @@ export const PAGE_QUERIES = {
     "subcontractorSpendByMonth",
     "subcontractorCategoryShare",
     "subcontractorRelationship",
-    "subcontractorRecentInvoices",
+    "subcontractorInvoices",
     "partnerProjectContribution",
   ],
 } as const
