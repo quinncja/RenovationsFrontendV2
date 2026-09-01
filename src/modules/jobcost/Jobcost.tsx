@@ -705,18 +705,12 @@ function GroupExpandedPanel({ group, yearLabel, showContract, marginColorsOn, op
   return (
     <div className="jc-expand-panel">
       {/* Overall property stats (the row itself only carries counts). */}
-      <div className="jc-group-overview">
-        {/* Scope mark: the selected year (or ALL/TIME) in the same recessed
-            copper display type as the /jobcost report heroes' backdrop art —
-            every figure on this strip and the kind cards reads as this
-            period. */}
-        {yearLabel === "All Time" ? (
-          <span className="jc-overview-scope jc-overview-scope-stack" aria-label="Showing all time">
-            <span>All</span><span>Time</span>
-          </span>
-        ) : (
-          <span className="jc-overview-scope" aria-label={`Showing ${yearLabel}`}>{yearLabel}</span>
-        )}
+      <div className="jc-group-overview jc-overview-scoped">
+        {/* Scope backdrop: the selected year (or All Time) huge and recessed
+            behind the strip, the same treatment as the /jobcost report
+            heroes' art — every figure here and on the kind cards reads as
+            this period. */}
+        <div className="jc-overview-scope-art" aria-hidden="true">{yearLabel}</div>
         {showContract && <OverviewStat label="Property Contract Volume" value={formatMoneyFull(group.contract)} />}
         <OverviewStat
           label="Property Gross Margin"

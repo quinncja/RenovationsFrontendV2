@@ -21900,35 +21900,41 @@ body.pj-painting td.pj-computed {
   }
 }
 
-/* Scope mark on the expanded property's overview strip: the selected year in
-   the report heroes' recessed copper display type (see .pd-hero-art-text),
-   scaled to the strip and sitting inline at its left edge. Opaque pre-blend
-   against the strip's deck tones — same reasoning as the hero art. */
-.jc-overview-scope {
-  align-self: center;
+/* Scope backdrop on the expanded property's overview strip: the selected
+   year (or All Time) in the report heroes' recessed copper display type,
+   oversized and cropped by the strip like the project hero's phase mark.
+   Content stacks above it (z-index 1); the left-fade mask keeps the leading
+   stats on quiet ground. */
+.jc-overview-scoped {
+  position: relative;
+  overflow: hidden;
+}
+.jc-overview-scoped > * {
+  position: relative;
+  z-index: 1;
+}
+.jc-overview-scoped > .jc-overview-scope-art {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 1.25rem;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
   font-weight: 900;
-  font-size: 2.875rem;
+  font-size: 6.5rem;
   line-height: 1;
   letter-spacing: -0.05em;
   font-variant-numeric: tabular-nums;
   color: light-dark(
-    color-mix(in srgb, var(--primary-color) 18%, #f8f6f1),
-    color-mix(in srgb, var(--primary-color) 24%, #251f1a)
+    rgb(from var(--primary-color) r g b / 0.11),
+    rgb(from var(--primary-color) r g b / 0.16)
   );
-  user-select: none;
-  white-space: nowrap;
+  mask-image: linear-gradient(to left, #000 55%, transparent 92%);
 }
-/* ALL/TIME stack — the ONE/OFF art's recipe at strip scale: monospace so both
-   lines land the same width, stroke-fattened to match the numeral weight. */
-.jc-overview-scope-stack {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-transform: uppercase;
-  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
-  font-size: 1.375rem;
-  line-height: 0.92;
-  letter-spacing: -0.03em;
-  -webkit-text-stroke: 0.025em currentColor;
+@media (max-width: 640px) {
+  .jc-overview-scoped > .jc-overview-scope-art { display: none; }
 }
-.jc-overview-scope-stack span { display: block; }
