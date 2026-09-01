@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useParams } from "react-router-dom"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence, type Transition } from "framer-motion"
-import { ChevronRight, ExternalLink, X } from "lucide-react"
+import { ChevronRight, ExternalLink, FileText, X } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
@@ -165,6 +165,7 @@ interface RecentInvoice {
   jobName?: string | null
   invoiceNum: string
   description: string | null
+  jobRecnum?: number | null
   value: number
   invoiceDate: string
   dueDate: string | null
@@ -244,6 +245,9 @@ function PartnerDetail({ kind, partnerId, year, onYearChange }: {
 }) {
   const cfg = CONFIG[kind]
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
+  // One job's invoices, opened from a contribution-board row. Uses the
+  // page-scope ledger, which matches the board's year scope.
+  const [jobInvoices, setJobInvoices] = useState<JobInvoiceFilter | null>(null)
 
   const { data, isLoading } = useWidgetData<Record<string, unknown>>([...cfg.queries])
 
@@ -296,10 +300,26 @@ function PartnerDetail({ kind, partnerId, year, onYearChange }: {
           {kind === "client" ? (
             <ClientProjectsSection clientId={partnerId} year={year} />
           ) : (
-            <ContributionSection cfg={cfg} rows={contribution} year={year} loading={isLoading} />
+            <ContributionSection
+              cfg={cfg}
+              rows={contribution}
+              year={year}
+              loading={isLoading}
+              onJobInvoices={(row) => setJobInvoices({ jobRecnum: row.recnum, jobName: row.jobName })}
+            />
           )}
         </MotionItem>
       </MotionList>
+
+      <InvoiceListModal
+        cfg={cfg}
+        scopeLabel={year != null ? String(year) : "All Time"}
+        filter={jobInvoices}
+        invoices={invoices}
+        graceDays={cfg.overdueGraceDays}
+        onClose={() => setJobInvoices(null)}
+        onOpenInvoice={setSelectedInvoiceId}
+      />
 
       <InvoiceDetailModal
         invoiceId={selectedInvoiceId}
@@ -388,7 +408,6 @@ function KpiCards({ kind, year, loading, summary, byYear, share, marginSummary, 
           marginSummary && marginSummary.closedJobs > 0 ? (
             <span className="ptr-kpi-caption subheadline text-secondary">
               {marginSummary.closedJobs} closed {marginSummary.closedJobs === 1 ? "job" : "jobs"}
-              {companyMargin != null ? ` · company avg ${formatShare(companyMargin)}` : ""}
             </span>
           ) : undefined
         }
@@ -408,26 +427,6 @@ function KpiCards({ kind, year, loading, summary, byYear, share, marginSummary, 
             ) : (
               <span className="ptr-kpi-caption subheadline text-secondary">Nothing overdue</span>
             )
-          ) : undefined
-        }
-      />,
-    )
-    const coRate =
-      marginSummary && marginSummary.originalContractTotal > 0
-        ? (marginSummary.changeOrderTotal / marginSummary.originalContractTotal) * 100
-        : null
-    cards.push(
-      <StatWidget
-        key="co"
-        title="Change-Order Rate"
-        value={coRate}
-        loading={loading}
-        format={(v) => formatShare(v)}
-        caption={
-          marginSummary && coRate != null ? (
-            <span className="ptr-kpi-caption subheadline text-secondary">
-              {formatMoneyFull(marginSummary.changeOrderTotal)} in approved COs
-            </span>
           ) : undefined
         }
       />,
@@ -474,6 +473,12 @@ function KpiCards({ kind, year, loading, summary, byYear, share, marginSummary, 
 
 type HistoryView = "monthly" | "yearly"
 type InvoiceFilter = "all" | "outstanding" | "overdue"
+/** Modal scope for one job's invoices (contribution-board row action). */
+interface JobInvoiceFilter {
+  jobRecnum: number
+  jobName: string
+}
+type ModalFilter = InvoiceFilter | JobInvoiceFilter
 
 /** Overdue per the partner kind's aging rule: open balance whose due date
  *  (plus the kind's grace window) has passed. */
@@ -725,7 +730,7 @@ type InvSortKey = "invnum" | "description" | "job" | "date" | "status" | "amount
 function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClose, onOpenInvoice }: {
   cfg: KindConfig
   scopeLabel: string
-  filter: InvoiceFilter | null
+  filter: ModalFilter | null
   invoices: RecentInvoice[]
   graceDays: number
   onClose: () => void
@@ -735,14 +740,17 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
   const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   // Keep the last filter through the exit animation so the content doesn't
   // flash back to "all" while the modal fades out.
-  const lastFilter = useRef<InvoiceFilter>("all")
+  const lastFilter = useRef<ModalFilter>("all")
   if (filter != null) lastFilter.current = filter
   const activeFilter = filter ?? lastFilter.current
+  const jobFilter = typeof activeFilter === "object" ? activeFilter : null
 
   // Outstanding lists every nonzero balance — credit memos included, so the
   // list sums to the (net) tile figure. Overdue is positive past-due balances.
-  const rows =
-    activeFilter === "all"
+  // A job filter is "all" scoped to that job (voids included).
+  const rows = jobFilter
+    ? invoices.filter((i) => i.jobRecnum === jobFilter.jobRecnum)
+    : activeFilter === "all"
       ? invoices
       : invoices.filter((i) =>
           i.status !== 5 &&
@@ -750,11 +758,17 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
             ? (i.amountRemaining ?? 0) !== 0
             : isInvoiceOverdue(i, graceDays))
         )
-  // "All" totals bill; the open-balance filters total what's still owed.
-  const rollup =
-    activeFilter === "all"
-      ? rows.filter((i) => i.status !== 5).reduce((s, i) => s + (i.value ?? 0), 0)
-      : rows.reduce((s, i) => s + (i.amountRemaining ?? 0), 0)
+  // "All"-shaped views total bill; the open-balance filters total what's owed.
+  const billedTotals = jobFilter != null || activeFilter === "all"
+  const rollup = billedTotals
+    ? rows.filter((i) => i.status !== 5).reduce((s, i) => s + (i.value ?? 0), 0)
+    : rows.reduce((s, i) => s + (i.amountRemaining ?? 0), 0)
+  // The Job column is noise when every row is the same job.
+  const showJobCol = jobFilter == null
+  const colCount = showJobCol ? 7 : 6
+  const title = jobFilter
+    ? `Invoices — ${jobFilter.jobName}`
+    : `${FILTER_TITLES[activeFilter as InvoiceFilter]} — ${scopeLabel}`
 
   const sort = useTableSort<InvSortKey>("date", "desc")
   const sorted = applySort(rows, sort, (inv, key) =>
@@ -797,12 +811,11 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
               <div className="modal-header">
                 <div className="reports-modal-title">
                   <div>
-                    <h2 className="title2 emphasized">
-                      {FILTER_TITLES[activeFilter]} — {scopeLabel}
-                    </h2>
+                    <h2 className="title2 emphasized">{title}</h2>
                     <span className="reports-modal-subtitle">
                       {rows.length} invoice{rows.length === 1 ? "" : "s"} · {formatMoneyFull(rollup)}
-                      {activeFilter === "all" ? "" : " open"}
+                      {billedTotals ? "" : " open"}
+                      {jobFilter ? ` · ${scopeLabel}` : ""}
                     </span>
                   </div>
                 </div>
@@ -814,7 +827,9 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
               <div className="reports-modal-body">
                 {rows.length === 0 ? (
                   <p className="reports-modal-empty body-text text-secondary">
-                    No {FILTER_TITLES[activeFilter].toLowerCase()} for this {cfg.noun.toLowerCase()}.
+                    {jobFilter
+                      ? "No invoices for this job."
+                      : `No ${FILTER_TITLES[activeFilter as InvoiceFilter].toLowerCase()} for this ${cfg.noun.toLowerCase()}.`}
                   </p>
                 ) : (
                   <table className="data-table billings-invoice-table">
@@ -822,7 +837,9 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
                       <tr>
                         <SortableHeader label="Invoice" columnKey="invnum" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
                         <SortableHeader label="Description" columnKey="description" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
-                        <SortableHeader label="Job" columnKey="job" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+                        {showJobCol && (
+                          <SortableHeader label="Job" columnKey="job" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+                        )}
                         <SortableHeader label="Date" columnKey="date" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
                         <SortableHeader label="Status" columnKey="status" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
                         <SortableHeader label="Amount" columnKey="amount" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} align="right" />
@@ -842,7 +859,9 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
                         >
                           <td>#{inv.invoiceNum}</td>
                           <td className="text-secondary ptr-inv-td-desc">{inv.description || "—"}</td>
-                          <td className="text-secondary ptr-inv-td-desc">{inv.jobName || "—"}</td>
+                          {showJobCol && (
+                            <td className="text-secondary ptr-inv-td-desc">{inv.jobName || "—"}</td>
+                          )}
                           <td className="text-secondary">{formatDate(inv.invoiceDate)}</td>
                           <td>
                             <Badge tone={invoiceStatusTone(inv.status)}>{invoiceStatusLabel(inv.status)}</Badge>
@@ -856,9 +875,9 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
                     </tbody>
                     <tfoot>
                       <tr>
-                        <td colSpan={activeFilter === "all" ? 5 : 6}>Total</td>
-                        {activeFilter === "all" && <td className="num">{formatMoneyFull(rollup)}</td>}
-                        {activeFilter === "all" ? (
+                        <td colSpan={billedTotals ? colCount - 2 : colCount - 1}>Total</td>
+                        {billedTotals && <td className="num">{formatMoneyFull(rollup)}</td>}
+                        {billedTotals ? (
                           <td className="num">
                             {formatMoneyFull(rows.filter((i) => i.status !== 5).reduce((s, i) => s + (i.amountRemaining ?? 0), 0))}
                           </td>
@@ -1127,8 +1146,6 @@ function ClientProjectsSection({ clientId, year }: { clientId: number; year: num
   )
 
   const totalContract = jobs.reduce((s, j) => s + j.contract, 0)
-  const totalCost = jobs.reduce((s, j) => s + j.totalCost, 0)
-  const aggMargin = totalContract > 0 ? ((totalContract - totalCost) / totalContract) * 100 : null
 
   return (
     <section className="ptr-deck-section">
@@ -1146,8 +1163,8 @@ function ClientProjectsSection({ clientId, year }: { clientId: number; year: num
         />
         <span className="jc-cb-divider" aria-hidden="true" />
         {!loading && jobs.length > 0 && (
-          <span className="jc-cb-legend">
-            {formatMoneyFull(totalContract)} contract · {formatMargin(aggMargin)} margin
+          <span className="jc-cb-count">
+            <span className="jc-cb-count-num">{formatMoneyFull(totalContract)}</span> Contract
           </span>
         )}
         <span className="jc-cb-count">
@@ -1189,7 +1206,9 @@ function ClientProjectsSection({ clientId, year }: { clientId: number; year: num
                     key={g.key}
                     name={g.key}
                     subtitle={[
-                      `${g.phases.length} ${g.phases.length === 1 ? "phase" : "phases"}`,
+                      g.phases.length > 0
+                        ? `${g.phases.length} ${g.phases.length === 1 ? "phase" : "phases"}`
+                        : null,
                       g.oneoffs.length > 0
                         ? `${g.oneoffs.length} one-off${g.oneoffs.length === 1 ? "" : "s"}`
                         : null,
@@ -1272,11 +1291,12 @@ interface ContribGroup {
   totalCost: number
 }
 
-function ContributionSection({ cfg, rows, year, loading }: {
+function ContributionSection({ cfg, rows, year, loading, onJobInvoices }: {
   cfg: KindConfig
   rows: ContributionRow[]
   year: number | null
   loading: boolean
+  onJobInvoices: (row: ContributionRow) => void
 }) {
   const { goToJobcost, goToProperty } = useJobcostNav()
   const [view, setView] = useLocalStorage<ContribView>("ptrContributionView", "properties")
@@ -1393,11 +1413,17 @@ function ContributionSection({ cfg, rows, year, loading }: {
                               <th className="spend-rank-table-value">Their Work</th>
                               <th className="spend-rank-table-value">Total Cost</th>
                               <th className="spend-rank-table-value">% of Spend</th>
+                              <th className="spend-rank-table-name jc-view-th" aria-label="Invoices" />
                             </tr>
                           </thead>
                           <tbody>
                             {g.rows.map((r) => (
-                              <ContributionRowTr key={r.recnum} row={r} onOpen={() => goToJobcost(r.recnum)} />
+                              <ContributionRowTr
+                                key={r.recnum}
+                                row={r}
+                                onOpen={() => goToJobcost(r.recnum)}
+                                onInvoices={() => onJobInvoices(r)}
+                              />
                             ))}
                           </tbody>
                         </table>
@@ -1417,11 +1443,17 @@ function ContributionSection({ cfg, rows, year, loading }: {
                       <SortTh spendRank col="partnerCost" label="Their Work" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                       <SortTh spendRank col="totalCost" label="Total Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                       <SortTh spendRank col="share" label="% of Spend" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <th className="spend-rank-table-name jc-view-th" aria-label="Invoices" />
                     </tr>
                   </thead>
                   <tbody>
                     {sortedRows.map((r) => (
-                      <ContributionRowTr key={r.recnum} row={r} onOpen={() => goToJobcost(r.recnum)} />
+                      <ContributionRowTr
+                        key={r.recnum}
+                        row={r}
+                        onOpen={() => goToJobcost(r.recnum)}
+                        onInvoices={() => onJobInvoices(r)}
+                      />
                     ))}
                   </tbody>
                 </table>
@@ -1434,7 +1466,11 @@ function ContributionSection({ cfg, rows, year, loading }: {
   )
 }
 
-function ContributionRowTr({ row, onOpen }: { row: ContributionRow; onOpen: () => void }) {
+function ContributionRowTr({ row, onOpen, onInvoices }: {
+  row: ContributionRow
+  onOpen: () => void
+  onInvoices: () => void
+}) {
   const share = row.totalCost > 0 ? (row.partnerCost / row.totalCost) * 100 : null
   return (
     <tr
@@ -1455,6 +1491,21 @@ function ContributionRowTr({ row, onOpen }: { row: ContributionRow; onOpen: () =
       <td className="spend-rank-table-value body-text text-secondary">{formatMoneyFull(row.totalCost)}</td>
       <td className="spend-rank-table-value">
         <span className="ptr-share-pill">{share != null ? formatShare(share) : "—"}</span>
+      </td>
+      <td className="spend-rank-table-value ptr-inv-tile-cell">
+        <button
+          type="button"
+          className="jc-view-tile"
+          aria-label={`View invoices for ${row.jobName}`}
+          title="View invoices"
+          onClick={(e) => {
+            e.stopPropagation()
+            onInvoices()
+          }}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <FileText size={14} />
+        </button>
       </td>
     </tr>
   )
