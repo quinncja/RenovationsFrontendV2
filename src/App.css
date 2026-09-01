@@ -21782,62 +21782,17 @@ body.pj-painting td.pj-computed {
   white-space: nowrap;
 }
 
-/* Invoice rows — flat modal list in the modal-spend-item grammar: no per-row
-   card chrome, just tight rows with a rounded hover fill. */
-.ptr-inv-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
+/* Invoice modal — same sortable data-table form as the AP/AR billing modals.
+   One extra column pair (Amount + Open) over the billings table, so the shell
+   runs a bit wider and the long text columns get an ellipsis cap. */
+.ptr-inv-modal {
+  max-width: min(960px, 95vw);
 }
 
-.ptr-inv-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
-  align-items: center;
-  gap: 1rem;
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: none;
-  border-radius: 8px;
-  background: none;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.ptr-inv-row:hover {
-  background: var(--hover-bg);
-}
-
-.ptr-inv-main {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  min-width: 0;
-}
-
-.ptr-inv-desc {
+.ptr-inv-td-desc {
+  max-width: 14rem;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ptr-inv-date {
-  white-space: nowrap;
-}
-
-.ptr-inv-amounts {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.125rem;
-  min-width: 6.5rem;
-}
-
-.ptr-inv-total,
-.ptr-inv-remaining {
   white-space: nowrap;
 }
 
@@ -21854,19 +21809,6 @@ body.pj-painting td.pj-computed {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
   }
-
-
-
-
-  .ptr-inv-row {
-    grid-template-columns: minmax(0, 1fr) auto;
-    row-gap: 0.375rem;
-  }
-
-  .ptr-inv-date {
-    order: 3;
-  }
-
 }
 
 /* Financials card: invoice metric band under the history chart, scoped to the

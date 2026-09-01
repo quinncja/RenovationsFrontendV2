@@ -13,6 +13,8 @@ import { Chart } from "../../shared/components/Chart/Chart"
 import { Badge } from "../../shared/components/Badge"
 import { SegmentedControl } from "../../shared/components/SegmentedControl"
 import { SortTh } from "../../shared/components/SortTh"
+import { SortableHeader } from "../../shared/components/SortableHeader"
+import { useTableSort, applySort } from "../../shared/hooks/useTableSort"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
@@ -718,6 +720,8 @@ const FILTER_TITLES: Record<InvoiceFilter, string> = {
   overdue: "Overdue Invoices",
 }
 
+type InvSortKey = "invnum" | "description" | "job" | "date" | "status" | "amount" | "open"
+
 function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClose, onOpenInvoice }: {
   cfg: KindConfig
   scopeLabel: string
@@ -751,7 +755,24 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
     activeFilter === "all"
       ? rows.filter((i) => i.status !== 5).reduce((s, i) => s + (i.value ?? 0), 0)
       : rows.reduce((s, i) => s + (i.amountRemaining ?? 0), 0)
-  const shown = rows.slice(0, MODAL_ROW_CAP)
+
+  const sort = useTableSort<InvSortKey>("date", "desc")
+  const sorted = applySort(rows, sort, (inv, key) =>
+    key === "date"
+      ? new Date(inv.invoiceDate).getTime()
+      : key === "amount"
+        ? inv.value ?? 0
+        : key === "open"
+          ? inv.amountRemaining ?? 0
+          : key === "status"
+            ? inv.status
+            : key === "invnum"
+              ? inv.invoiceNum
+              : key === "job"
+                ? inv.jobName ?? ""
+                : inv.description ?? ""
+  )
+  const shown = sorted.slice(0, MODAL_ROW_CAP)
 
   return createPortal(
     <AnimatePresence>
@@ -767,7 +788,7 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
           />
           <div className="modal-positioner" style={{ zIndex: contentZ }}>
             <motion.div
-              className="modal reports-modal"
+              className="modal reports-modal ptr-inv-modal"
               initial={{ opacity: 0, scale: 0.96, y: 16 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 16 }}
@@ -791,53 +812,66 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
               </div>
 
               <div className="reports-modal-body">
-                <div className="ptr-inv-list">
-                  {shown.map((inv) => (
-                    <button
-                      key={inv.id}
-                      type="button"
-                      className="ptr-inv-row"
-                      onClick={() => onOpenInvoice(inv.id)}
-                    >
-                      <span className="ptr-inv-main">
-                        <span className="ptr-inv-num body-text emphasized">#{inv.invoiceNum}</span>
-                        {(inv.description || inv.jobName) && (
-                          <span className="ptr-inv-desc subheadline text-secondary">
-                            {inv.description || inv.jobName}
-                            {inv.description && inv.jobName ? ` · ${inv.jobName}` : ""}
-                          </span>
-                        )}
-                      </span>
-                      <span className="ptr-inv-date subheadline text-secondary">{formatDate(inv.invoiceDate)}</span>
-                      <span className="ptr-inv-status">
-                        <Badge tone={invoiceStatusTone(inv.status)}>{invoiceStatusLabel(inv.status)}</Badge>
-                      </span>
-                      <span className="ptr-inv-amounts">
-                        <span className="ptr-inv-total body-text emphasized">{formatMoneyFull(inv.value ?? 0)}</span>
-                        <span
-                          className={`ptr-inv-remaining subheadline ${
-                            (inv.amountRemaining ?? 0) !== 0 ? "invoice-amount-value--remaining" : "text-secondary"
-                          }`}
-                        >
-                          {(inv.amountRemaining ?? 0) !== 0
-                            ? `${formatMoneyFull(inv.amountRemaining)} open`
-                            : "Paid"}
-                        </span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
                 {rows.length === 0 ? (
-                  <p className="ptr-inv-footnote subheadline text-secondary">
+                  <p className="reports-modal-empty body-text text-secondary">
                     No {FILTER_TITLES[activeFilter].toLowerCase()} for this {cfg.noun.toLowerCase()}.
                   </p>
                 ) : (
+                  <table className="data-table billings-invoice-table">
+                    <thead>
+                      <tr>
+                        <SortableHeader label="Invoice" columnKey="invnum" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+                        <SortableHeader label="Description" columnKey="description" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+                        <SortableHeader label="Job" columnKey="job" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+                        <SortableHeader label="Date" columnKey="date" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+                        <SortableHeader label="Status" columnKey="status" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} />
+                        <SortableHeader label="Amount" columnKey="amount" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} align="right" />
+                        <SortableHeader label="Open" columnKey="open" activeKey={sort.key} dir={sort.dir} onSort={sort.toggle} align="right" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {shown.map((inv) => (
+                        <tr
+                          key={inv.id}
+                          className="clickable-row"
+                          onClick={() => onOpenInvoice(inv.id)}
+                          title="View invoice details"
+                          tabIndex={0}
+                          role="button"
+                          onKeyDown={(e) => e.key === "Enter" && onOpenInvoice(inv.id)}
+                        >
+                          <td>#{inv.invoiceNum}</td>
+                          <td className="text-secondary ptr-inv-td-desc">{inv.description || "—"}</td>
+                          <td className="text-secondary ptr-inv-td-desc">{inv.jobName || "—"}</td>
+                          <td className="text-secondary">{formatDate(inv.invoiceDate)}</td>
+                          <td>
+                            <Badge tone={invoiceStatusTone(inv.status)}>{invoiceStatusLabel(inv.status)}</Badge>
+                          </td>
+                          <td className="num">{formatMoneyFull(inv.value ?? 0)}</td>
+                          <td className={`num ${(inv.amountRemaining ?? 0) !== 0 ? "" : "text-secondary"}`}>
+                            {(inv.amountRemaining ?? 0) !== 0 ? formatMoneyFull(inv.amountRemaining) : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan={activeFilter === "all" ? 5 : 6}>Total</td>
+                        {activeFilter === "all" && <td className="num">{formatMoneyFull(rollup)}</td>}
+                        {activeFilter === "all" ? (
+                          <td className="num">
+                            {formatMoneyFull(rows.filter((i) => i.status !== 5).reduce((s, i) => s + (i.amountRemaining ?? 0), 0))}
+                          </td>
+                        ) : (
+                          <td className="num">{formatMoneyFull(rollup)}</td>
+                        )}
+                      </tr>
+                    </tfoot>
+                  </table>
+                )}
+                {rows.length > MODAL_ROW_CAP && (
                   <p className="ptr-inv-footnote subheadline text-secondary">
-                    Click an invoice for its full detail. Showing{" "}
-                    {rows.length > MODAL_ROW_CAP
-                      ? `the ${MODAL_ROW_CAP} most recent of ${rows.length} invoices`
-                      : `${rows.length} invoice${rows.length === 1 ? "" : "s"}`}{" "}
-                    for this {cfg.noun.toLowerCase()}.
+                    Showing the first {MODAL_ROW_CAP} of {rows.length} invoices.
                   </p>
                 )}
               </div>
