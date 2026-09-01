@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { useJobcostNav } from "../../../modules/jobcost/useJobcostNav"
+import { usePartnerNav, type PartnerKind } from "../../../modules/directory/usePartnerNav"
 import { fetchPageData } from "../../api/pageApi"
 import { formatMoneyFull, formatDate } from "../../utils/format"
 import {
@@ -32,6 +33,11 @@ interface InvoiceHeader {
   description: string | null
   clientName?: string | null
   vendorName?: string | null
+  /** Directory recnums behind the party names (reccln/actpay), for the
+   *  click-through to the partner page. Optional: an older backend deploy
+   *  won't send them and the party stays plain text. */
+  clientId?: number | null
+  vendorId?: number | null
 }
 
 // AP lines carry an account; AR lines carry qty/unit/price.
@@ -78,6 +84,14 @@ const MODULE_KIND: Record<InvoiceDetailModalProps["module"], string> = {
   clients: "AR invoice",
   suppliers: "AP invoice",
   subcontractors: "AP invoice",
+}
+
+// Which directory page the invoice's party lives on, per module. "suppliers"
+// maps to the /vendors route — there is no /suppliers route.
+const MODULE_PARTNER_KIND: Record<InvoiceDetailModalProps["module"], PartnerKind> = {
+  clients: "client",
+  suppliers: "vendor",
+  subcontractors: "subcontractor",
 }
 
 // ─── Line normalization ───────────────────────────────────────────────────────
@@ -195,8 +209,10 @@ function InvoiceContent({
   projectBlockedReason?: string | null
 }) {
   const { goToJobcost } = useJobcostNav()
+  const { canViewPartners, goToPartner } = usePartnerNav()
   const h = detail.header
   const party = module === "clients" ? h.clientName : h.vendorName
+  const partyId = module === "clients" ? h.clientId : h.vendorId
   const hasDesc = Boolean(h.description)
   // The description is what the invoice is FOR, so it leads as the name; the
   // invoice number rides small beside the eyebrow. When there's no description
@@ -227,6 +243,14 @@ function InvoiceContent({
       title={title}
       caption={caption}
       party={party || null}
+      // Party click-through to the partner's directory page. Suppressed while
+      // the daily-recap intro blocks navigation, and for roles that can't
+      // reach the directory routes.
+      onPartyOpen={
+        canViewPartners && !projectBlockedReason && partyId != null
+          ? () => goToPartner(MODULE_PARTNER_KIND[module], partyId)
+          : null
+      }
       project={
         h.jobNum
           ? {

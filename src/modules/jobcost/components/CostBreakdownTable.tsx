@@ -5,6 +5,7 @@ import { formatMoneyFull } from "../../../shared/utils/format"
 import { useItemDrilldown } from "../../dashboard/report/ActivityFeed"
 import type { RecentChangeItem } from "../../dashboard/widgets/recent/recentTypes"
 import { computeCostGroups, COST_TYPES, type BudgetBreakdown, type CostItem } from "../types"
+import { usePartnerNav } from "../../directory/usePartnerNav"
 
 // Full-height loading stand-in for CostBreakdownTable. The table's shape is
 // fully known before the fetch returns — always the four COST_TYPES rows
@@ -84,6 +85,7 @@ function toDrilldownItem(t: CostItem, job: { id: string; name: string } | null |
     jobName: job?.name ?? null,
     title: t.dscrpt?.trim() || t.id,
     party: t.id,
+    partyId: t.vendorId ?? null,
     amount: (t.committedAmount || 0) + (t.postedAmount || 0),
     status: null,
     pmName: null,
@@ -115,6 +117,7 @@ export function CostBreakdownTable({
   // Same drill-down wiring as the Daily Recap feed: invoice-shaped items open
   // the invoice modal, POs/subcontracts the generic detail modal.
   const { openItem, modals } = useItemDrilldown({ backLabel: "Job Costing" })
+  const { canViewPartners, goToPartner } = usePartnerNav()
 
   const { groups, totalBudget, totalActual, totalVariance } = computeCostGroups(budget, costItems)
 
@@ -245,6 +248,11 @@ export function CostBreakdownTable({
                             <tr><td colSpan={4} className="jc-txn-empty">No line items</td></tr>
                           ) : group.items.map((t, i) => {
                             const drillItem = toDrilldownItem(t, job)
+                            // The row opens the item's detail modal; the vendor
+                            // cell alone jumps to the partner's directory page
+                            // (exec/admin only — other roles can't reach it).
+                            const partnerKind = t.costType === "Subcontractor" ? "subcontractor" as const : "vendor" as const
+                            const vendorLinked = canViewPartners && t.vendorId != null
                             return (
                               <tr
                                 key={`${t.recnum}-${i}`}
@@ -254,7 +262,18 @@ export function CostBreakdownTable({
                                 tabIndex={0}
                                 onKeyDown={(e) => e.key === "Enter" && openItem(drillItem)}
                               >
-                                <td className="jc-txn-vendor">{t.id}</td>
+                                <td className="jc-txn-vendor">
+                                  {vendorLinked ? (
+                                    <button
+                                      type="button"
+                                      className="jc-vendor-link"
+                                      onClick={(e) => { e.stopPropagation(); goToPartner(partnerKind, t.vendorId!) }}
+                                      onKeyDown={(e) => e.stopPropagation()}
+                                    >
+                                      {t.id}
+                                    </button>
+                                  ) : t.id}
+                                </td>
                                 <td className="text-secondary">{t.dscrpt || "—"}</td>
                                 <td className="jc-txn-amount-col">{t.committedAmount ? formatMoneyFull(t.committedAmount) : "—"}</td>
                                 <td className="jc-txn-amount-col emphasized">{t.postedAmount ? formatMoneyFull(t.postedAmount) : "—"}</td>

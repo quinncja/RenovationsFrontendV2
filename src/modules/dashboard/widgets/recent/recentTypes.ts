@@ -22,6 +22,9 @@ export interface RecentChangeItem {
   title: string
   /** Vendor or client name, per kind. */
   party: string | null
+  /** Directory recnum behind `party` (actpay/reccln), for the click-through to
+   *  the partner page. Null/absent = plain text (no id, or an older backend). */
+  partyId?: number | null
   amount: number | null
   /** changeOrder: 'entered' | 'approved'; cost: 'posted'; invoices: numeric status. */
   status: string | null

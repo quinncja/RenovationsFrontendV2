@@ -5,6 +5,7 @@ import { DetailModal, DetailModalContent, type DetailStat, type DetailLine } fro
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { collapseValue } from "../../shared/components/MonthlyDetailTable/MonthlyDetailTable"
 import { formatMoneyFull, formatDate, fullMonth } from "../../shared/utils/format"
+import { usePartnerNav } from "../directory/usePartnerNav"
 
 export interface LedgerRef {
   /** lgrtrn.recnum */
@@ -36,6 +37,7 @@ export function LedgerTransactionModal({ ledger, onClose }: { ledger: LedgerRef 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [invoiceId, setInvoiceId] = useState<string | null>(null)
+  const { canViewPartners, goToPartner } = usePartnerNav()
 
   useEffect(() => {
     if (!ledger) {
@@ -69,6 +71,9 @@ export function LedgerTransactionModal({ ledger, onClose }: { ledger: LedgerRef 
   const trnnum = h ? str(h.trnnum) : ""
   const desc = h ? str(h.dscrpt) : ""
   const vendor = h ? str(h.vendorName) : ""
+  // lgrtrn.vndnum rides through the header's wildcard select — the AP vendor's
+  // directory recnum (0/absent on non-vendor entries).
+  const vendorId = h ? num(h.vndnum) : 0
   const period = h ? num(h.actprd) % 100 : 0
   const postyr = h ? num(h.postyr) : 0
   const apRecnum = h ? str(h.apInvoiceRecnum) : ""
@@ -108,6 +113,11 @@ export function LedgerTransactionModal({ ledger, onClose }: { ledger: LedgerRef 
               title={desc || (trnnum ? `Transaction ${trnnum}` : "Ledger transaction")}
               caption={desc && trnnum ? `#${trnnum}` : null}
               party={vendor || null}
+              onPartyOpen={
+                canViewPartners && vendor && vendorId > 0
+                  ? () => goToPartner("vendor", vendorId)
+                  : null
+              }
               figure={formatMoneyFull(ledger.amount)}
               stats={stats}
               ledger={

@@ -8,8 +8,22 @@ import {
 import { fetchPageData } from "../../../../shared/api/pageApi"
 import { formatDate, formatMoneyFull, formatRelativeTime } from "../../../../shared/utils/format"
 import { transformUsername } from "../../../../shared/components/MonthlyDetailTable/MonthlyDetailTable"
-import type { RecentChangeItem } from "./recentTypes"
+import type { RecentChangeItem, RecentKind } from "./recentTypes"
 import { KIND_LABEL, rowParts } from "./recentPresentation"
+import { usePartnerNav, type PartnerKind } from "../../../directory/usePartnerNav"
+
+// Which directory page the item's party lives on, per item kind. Vendors on
+// committed/posted items, clients on projects and billing items; change orders
+// carry no party at all.
+const PARTY_PARTNER_KIND: Partial<Record<RecentKind, PartnerKind>> = {
+  project: "client",
+  purchaseOrder: "vendor",
+  subcontract: "subcontractor",
+  cost: "vendor",
+  apInvoice: "vendor",
+  arInvoice: "client",
+  payment: "client",
+}
 
 // ─── Line-item drill-down ────────────────────────────────────────────────────
 // Three kinds carry a line-item breakdown behind their total, fetched on open:
@@ -167,6 +181,7 @@ export function ItemDetailModal({
   projectBlockedReason?: string | null
 }) {
   const open = item !== null
+  const { canViewPartners, goToPartner } = usePartnerNav()
   // Keep the last item through the exit animation.
   const [shown, setShown] = useState(item)
   if (item !== null && item !== shown) setShown(item)
@@ -204,6 +219,17 @@ export function ItemDetailModal({
           party={
             shown.kind !== "cost" && shown.party && shown.party !== shown.jobName
               ? shown.party
+              : null
+          }
+          // Party click-through to the partner's directory page. Suppressed
+          // while the daily-recap intro blocks navigation, and for roles that
+          // can't reach the directory routes.
+          onPartyOpen={
+            canViewPartners &&
+            !projectBlockedReason &&
+            shown.partyId != null &&
+            PARTY_PARTNER_KIND[shown.kind]
+              ? () => goToPartner(PARTY_PARTNER_KIND[shown.kind]!, shown.partyId!)
               : null
           }
           // Provenance reads last and quiet — who on the left, when on the right.

@@ -263,7 +263,7 @@ export function JobDetailPanel({ detail, expandedGroups, onToggleGroup }: JobDet
                             <tr><td colSpan={6} className="jc-txn-empty">No transactions found</td></tr>
                           ) : groupTxns.map((t) => {
                             const txnPath = t.vendorId
-                              ? (t.costType === "Subcontractor" ? `/subcontractors/${t.vendorId}` : `/suppliers/${t.vendorId}`)
+                              ? (t.costType === "Subcontractor" ? `/subcontractors/${t.vendorId}` : `/vendors/${t.vendorId}`)
                               : null
                             return (
                               <tr

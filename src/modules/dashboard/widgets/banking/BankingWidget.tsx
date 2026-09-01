@@ -10,6 +10,7 @@ import { useModalLayer } from "../../../../shared/hooks/useModalLayer"
 import { fetchPageData } from "../../../../shared/api/pageApi"
 import { formatMoneyFull, formatDate } from "../../../../shared/utils/format"
 import { AR_COLOR, AP_COLOR } from "../billings/billingsShared"
+import { usePartnerNav } from "../../../directory/usePartnerNav"
 
 // Cash in bank + line of credit, rendered as two stacked stat boxes inside one
 // container — structurally identical to the Overdue card beside it, so the two
@@ -56,6 +57,7 @@ type TxnSortKey = "date" | "type" | "description" | "amount"
  */
 function BankTransactionsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const sort = useTableSort<TxnSortKey>("date", "desc")
+  const { canViewPartners, goToPartner } = usePartnerNav()
   const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
   const [rows, setRows] = useState<BankTransactionRow[] | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -161,7 +163,20 @@ function BankTransactionsModal({ open, onClose }: { open: boolean; onClose: () =
                           </td>
                           <td>
                             {txn.description || "—"}
-                            {txn.vendorName && <span className="text-secondary"> · {txn.vendorName}</span>}
+                            {txn.vendorName && (
+                              <span className="text-secondary">
+                                {" · "}
+                                {canViewPartners && txn.vendorNum ? (
+                                  <button
+                                    type="button"
+                                    className="jc-vendor-link"
+                                    onClick={() => goToPartner("vendor", txn.vendorNum!)}
+                                  >
+                                    {txn.vendorName}
+                                  </button>
+                                ) : txn.vendorName}
+                              </span>
+                            )}
                           </td>
                           <td className="num" style={{ color: txn.type === "AR" ? AR_COLOR : AP_COLOR }}>
                             {formatMoneyFull(txn.amount)}

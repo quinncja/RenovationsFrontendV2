@@ -13,6 +13,11 @@ export interface CostItem {
   costType: string
   category: number
   id: string
+  /** Partner recnum behind the vendor/source label (actpay.recnum) — the
+   *  click-through key to /vendors/:id or /subcontractors/:id. Null for
+   *  journal/payroll rows; optional because a backend still on the previous
+   *  deploy won't send it — the name just renders as plain text. */
+  vendorId?: number | null
   recnum: string
   committedAmount: number
   postedAmount: number

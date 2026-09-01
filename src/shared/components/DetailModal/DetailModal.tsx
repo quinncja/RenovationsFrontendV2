@@ -134,6 +134,11 @@ export interface DetailModalContentProps {
   /** The party the item is with (client / vendor / subcontractor) — emphasized
    *  directly under the name, since who it's with is as telling as what it is. */
   party?: string | null
+  /** When set, the party name renders as a link and clicking it runs this
+   *  (navigate to the partner's directory page; the route change closes the
+   *  modal via useCloseOnRouteChange). Omit to keep the party as plain text —
+   *  e.g. when the viewer's role can't reach the directory pages. */
+  onPartyOpen?: (() => void) | null
   /** Pre-formatted figure string (money). Pass null when no amount was entered —
    *  it renders a muted "No amount entered" caption instead of the figure. */
   figure: string | null
@@ -152,6 +157,7 @@ export function DetailModalContent({
   caption,
   title,
   party,
+  onPartyOpen,
   figure,
   badge,
   stats,
@@ -178,7 +184,19 @@ export function DetailModalContent({
         <div className="cost-detail-headline">
           <div className="cost-detail-headline-text">
             <p className="cost-detail-title">{title}</p>
-            {party && <p className="cost-detail-party">{party}</p>}
+            {party && (
+              onPartyOpen ? (
+                <button
+                  type="button"
+                  className="cost-detail-party cost-detail-party--link"
+                  onClick={onPartyOpen}
+                >
+                  {party}
+                </button>
+              ) : (
+                <p className="cost-detail-party">{party}</p>
+              )
+            )}
           </div>
           <div className="cost-detail-figure-block">
             <span className={`cost-detail-figure${figure == null ? " cost-detail-figure--empty" : ""}`}>
