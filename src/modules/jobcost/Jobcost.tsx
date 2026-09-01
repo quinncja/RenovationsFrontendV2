@@ -2081,25 +2081,26 @@ export default function Jobcost() {
     setStatusFilter("all")
   }
 
-  // Grouped view: a parent qualifies if ANY member was active in the selected
-  // year and lists its full all-time membership, but its money stats scope to
-  // the year-active members (see buildGroups).
+  // Grouped view: a parent qualifies if ANY member survives the year + phase
+  // filters, and its cards (money, counts, member lists) scope to those
+  // members — year scoping inside buildGroups, phase scoping here.
   const filteredGroups = useMemo(() => {
     const q = search.toLowerCase()
+    // The phase filter scopes the MEMBERSHIP before grouping, so a filtered
+    // board's cards (money, counts, member tables) describe just the matching
+    // phases — the same rule the year filter follows inside buildGroups —
+    // and a property with no match simply produces no group. The yearActive
+    // check matters: the fetch is the ALL-TIME membership, so a bare phase
+    // match would keep a property alive on a phase-11 job from some PAST
+    // year even though the selected year has nothing in phase 11.
+    const source =
+      phaseFilter === "all"
+        ? jobs
+        : jobs.filter((j) => j.yearActive && jobMatchesPhase(j, phaseFilter))
     // Same current-year rule as the list view: a fully-closed property (every
     // member Closed) can't belong to the current calendar year.
-    let list = buildGroups(jobs).filter((g) => g.yearActive && !(hideClosed && g.status === 6))
+    let list = buildGroups(source).filter((g) => g.yearActive && !(hideClosed && g.status === 6))
     if (statusFilter !== "all") list = list.filter((g) => g.status === statusFilter)
-    // A property stays visible if ANY member would survive the list view's
-    // filters for this year + phase (its card still shows the full
-    // membership). The yearActive check matters: the fetch is the ALL-TIME
-    // membership, so a bare phase match would keep a property alive on a
-    // phase-11 job from some PAST year even though the selected year has
-    // nothing in phase 11.
-    if (phaseFilter !== "all")
-      list = list.filter((g) =>
-        [...g.phases, ...g.oneoffs].some((m) => m.yearActive && jobMatchesPhase(m, phaseFilter)),
-      )
     if (q)
       list = list.filter(
         (g) =>
