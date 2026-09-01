@@ -399,7 +399,7 @@ function KpiCards({ kind, year, loading, summary, byYear, share, marginSummary, 
     cards.push(
       <StatWidget
         key="margin"
-        title="Closed-Job Margin"
+        title={`${year ?? "All-Time"} Closed-Job Margin`}
         value={closedMargin}
         loading={loading}
         format={(v) => formatShare(v)}
