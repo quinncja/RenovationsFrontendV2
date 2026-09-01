@@ -2,7 +2,7 @@ import type { BadgeTone } from "../components/Badge"
 
 // AR/AP invoice status code, duplicated verbatim as a label map + a
 // color-class map across 6 files (Invoices, InvoiceDetailModal,
-// ClientDetailPage, VendorDetailPage, SubcontractorDetailPage,
+// PartnerDetailPage,
 // JobcostDetailPage). One source of truth for both.
 
 export const INVOICE_STATUS_LABEL: Record<number, string> = {
