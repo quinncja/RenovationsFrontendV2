@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useNavigate, useParams } from "react-router-dom"
-import { FileText } from "lucide-react"
+import { motion, AnimatePresence, type Transition } from "framer-motion"
+import { ChevronRight, ExternalLink, FileText } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
@@ -16,7 +17,7 @@ import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/I
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
 import { CollapsibleSection, Metric, MetricDivider } from "../../shared/components/CollapsibleSection/CollapsibleSection"
 import { invoiceStatusLabel, invoiceStatusTone } from "../../shared/utils/invoiceStatus"
-import { formatMoneyFull, formatDate } from "../../shared/utils/format"
+import { formatMoneyFull, formatDate, marginTextColor } from "../../shared/utils/format"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import { useJobcostNav } from "../jobcost/useJobcostNav"
@@ -27,18 +28,15 @@ import {
   type RawProject,
   type Job,
   type JobDetail,
-  type Group,
   type SortKey as JobSortKey,
   type SortDir,
 } from "../jobcost/Jobcost"
 import { marginClass, formatMargin } from "../../shared/components/JobDetailPanel/JobDetailPanel"
 import type { PartnerKind } from "./usePartnerNav"
 import { JOB_STATUS_LABELS } from "./directoryShared"
-import JobcostIcon from "../../core/components/JobcostIcon"
 
 // ─── Kind configuration ───────────────────────────────────────────────────────
 
-const PROJECTS_ACCENT = "#c27c3e"
 const INVOICES_ACCENT = "var(--secondary-text)"
 const PRIOR_YEAR_COLOR = "#a9b2be"
 const SERIES_COLOR = "#c27c3e"
@@ -562,6 +560,148 @@ function HistoryChart({ cfg, year, loading, byYear, byMonth }: {
   )
 }
 
+// ─── Jobcost-style deck primitives ────────────────────────────────────────────
+// Same card grammar as the Job Costing board / Employees deck: dark command
+// bar above white jc-project-cards with fixed-width head-stat slots and a
+// height-animated body. (Values mirror EmployeesPage's ENTRANCE_EASE/EXPAND.)
+
+const ENTRANCE_EASE = [0.25, 0.46, 0.45, 0.94] as const
+const EXPAND: Transition = { duration: 0.38, ease: [0.4, 0, 0.2, 1] }
+
+interface DeckStat {
+  label: string
+  value: string
+  color?: string
+}
+
+function DeckCard({ name, subtitle, stats, open, entrance, index, onToggle, reportTo, reportLabel, children }: {
+  name: string
+  subtitle: string
+  stats: DeckStat[]
+  open: boolean
+  entrance: boolean
+  index: number
+  onToggle: () => void
+  /** Route for the card's View tile (e.g. the property report); omit to hide. */
+  reportTo?: string
+  reportLabel?: string
+  children: ReactNode
+}) {
+  const navigate = useNavigate()
+  return (
+    <motion.div
+      className={`jc-project-card${open ? " jc-project-card-open" : ""}`}
+      initial={entrance ? { opacity: 0, y: 12, scale: 0.97 } : false}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.3, delay: entrance ? 0.08 + Math.min(index, 8) * 0.08 : 0, ease: ENTRANCE_EASE }}
+    >
+      <div
+        className="jc-project-head"
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            onToggle()
+          }
+        }}
+        aria-expanded={open}
+      >
+        <span className="jc-head-toggle">
+          <ChevronRight size={15} className={`jc-expand-chevron${open ? " open" : ""}`} />
+        </span>
+        <span className="jc-project-title">
+          <span className="jc-project-name-row">
+            <span className="jc-project-name">{name}</span>
+          </span>
+          <span className="jc-group-client">{subtitle}</span>
+        </span>
+        <span className="jc-head-stats">
+          {stats.map((s) => (
+            <span key={s.label} className="jc-head-stat">
+              <span className="jc-head-stat-label">{s.label}</span>
+              <span className="jc-head-stat-value" style={s.color ? { color: s.color } : undefined}>
+                {s.value}
+              </span>
+            </span>
+          ))}
+        </span>
+        {reportTo && (
+          <button
+            type="button"
+            className="jc-view-tile jc-view-tile-wide"
+            aria-label={reportLabel ?? "Open report"}
+            title={reportLabel ?? "Open report"}
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(reportTo)
+            }}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
+            {reportLabel ?? "Report"} <ExternalLink size={13} />
+          </button>
+        )}
+      </div>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            className="jc-project-body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={EXPAND}
+          >
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
+function DeckGhosts() {
+  return (
+    <motion.div
+      className="jc-skeleton-list"
+      aria-hidden="true"
+      style={{ pointerEvents: "none" }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+    >
+      {Array.from({ length: 4 }, (_, i) => (
+        <motion.div
+          key={i}
+          className="jc-project-card"
+          initial={{ opacity: 0, y: 12, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.3, delay: 0.08 + i * 0.08, ease: ENTRANCE_EASE }}
+        >
+          <div className="jc-project-head jc-skeleton-head">
+            <span className="jc-head-toggle">
+              <span className="skel-line" style={{ width: "0.875rem", height: "0.875rem", borderRadius: 4 }} />
+            </span>
+            <span className="jc-project-title">
+              <span className="jc-project-name-row">
+                <span className="skel-line" style={{ width: i % 2 ? "9rem" : "7rem", height: "1.3125rem" }} />
+              </span>
+              <span className="skel-line" style={{ width: i % 2 ? "6rem" : "7.5rem", height: "1.0625rem" }} />
+            </span>
+            <span className="jc-head-stats">
+              {[0, 1, 2].map((s) => (
+                <span key={s} className="jc-head-stat">
+                  <span className="skel-line" style={{ width: "3rem", height: "0.6875rem" }} />
+                  <span className="skel-line" style={{ width: "3.5rem", height: "1.05rem" }} />
+                </span>
+              ))}
+            </span>
+          </div>
+        </motion.div>
+      ))}
+    </motion.div>
+  )
+}
+
 // ─── Client projects — jobcost-style board ────────────────────────────────────
 
 type BoardView = "property" | "project"
@@ -569,7 +709,6 @@ type BoardView = "property" | "project"
 function ClientProjectsSection({ clientId, year }: { clientId: number; year: number | null }) {
   const { goToJobcost } = useJobcostNav()
   const marginColorsOn = useMarginColorsEnabled()
-  const [open, setOpen] = useState(true)
   const [view, setView] = useLocalStorage<BoardView>("ptrClientProjectView", "property")
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
@@ -669,163 +808,132 @@ function ClientProjectsSection({ clientId, year }: { clientId: number; year: num
   const aggMargin = totalContract > 0 ? ((totalContract - totalCost) / totalContract) * 100 : null
 
   return (
-    <CollapsibleSection
-      title={`Projects — ${year ?? "All Time"}`}
-      open={open}
-      onToggle={() => setOpen((o) => !o)}
-      loading={loading}
-      isEmpty={!loading && jobs.length === 0}
-      emptyMessage="No projects this year."
-      icon={<JobcostIcon size={16} />}
-      accentColor={PROJECTS_ACCENT}
-      metrics={
-        <>
-          <Metric value={groups.length} label={groups.length === 1 ? "Property" : "Properties"} />
-          <MetricDivider />
-          <Metric value={jobs.length} label={jobs.length === 1 ? "Project" : "Projects"} />
-          <MetricDivider />
-          <Metric value={formatMoneyFull(totalContract)} label="Total Contract" />
-          <MetricDivider />
-          <Metric
-            value={formatMargin(aggMargin)}
-            label="Margin"
-            valueClass={marginColorsOn ? marginClass(aggMargin) : undefined}
-          />
-        </>
-      }
-    >
-      <div className="ptr-board">
-        <div className="ptr-board-bar">
-          <SegmentedControl<BoardView>
-            value={view}
-            options={[
-              { key: "property", label: "Property" },
-              { key: "project", label: "Project" },
-            ]}
-            onChange={setView}
-            layoutId="ptr-client-board-view"
-            variant="ohr"
-            ariaLabel="Project grouping"
-          />
-        </div>
-
-        {view === "project" ? (
-          <JobTable
-            jobs={sortedJobs}
-            isManager={false}
-            marginColorsOn={marginColorsOn}
-            sortKey={sortKey}
-            sortDir={sortDir}
-            onSort={handleSort}
-            openJobKey={openJobKey}
-            details={details}
-            onToggleExpand={toggleExpand}
-            onOpenJob={(job) => goToJobcost(Number(job.jobNumber))}
-          />
-        ) : (
-          <PropertyCardList
-            groups={groups}
-            openGroup={openGroup}
-            onToggleGroup={(key) => setOpenGroup((k) => (k === key ? null : key))}
-            marginColorsOn={marginColorsOn}
-            onOpenJob={(recnum) => goToJobcost(Number(recnum))}
-          />
+    <section className="ptr-deck-section">
+      <div className="jc-command-bar">
+        <SegmentedControl<BoardView>
+          value={view}
+          options={[
+            { key: "property", label: "Property" },
+            { key: "project", label: "Project" },
+          ]}
+          onChange={setView}
+          layoutId="ptr-client-board-view"
+          variant="jc"
+          ariaLabel="Project grouping"
+        />
+        <span className="jc-cb-divider" aria-hidden="true" />
+        {!loading && jobs.length > 0 && (
+          <span className="jc-cb-legend">
+            {formatMoneyFull(totalContract)} contract · {formatMargin(aggMargin)} margin
+          </span>
         )}
+        <span className="jc-cb-count">
+          <span className="jc-cb-count-num">{groups.length}</span>{" "}
+          {groups.length === 1 ? "Property" : "Properties"}
+          {" · "}
+          <span className="jc-cb-count-num">{jobs.length}</span>{" "}
+          {jobs.length === 1 ? "Project" : "Projects"}
+        </span>
       </div>
-    </CollapsibleSection>
-  )
-}
 
-function PropertyCardList({ groups, openGroup, onToggleGroup, marginColorsOn, onOpenJob }: {
-  groups: Group[]
-  openGroup: string | null
-  onToggleGroup: (key: string) => void
-  marginColorsOn: boolean
-  onOpenJob: (recnum: string) => void
-}) {
-  const navigate = useNavigate()
-  return (
-    <div className="ptr-prop-list">
-      {groups.map((g) => {
-        const isOpen = openGroup === g.key
-        const members = [...g.phases, ...g.oneoffs]
-        return (
-          <div key={g.key} className={`ptr-prop-card${isOpen ? " ptr-prop-card--open" : ""}`}>
-            <button type="button" className="ptr-prop-head" onClick={() => onToggleGroup(g.key)}>
-              <span className="ptr-prop-name body-text emphasized">{g.key}</span>
-              <span className="ptr-prop-facts subheadline text-secondary">
-                {g.phases.length} {g.phases.length === 1 ? "phase" : "phases"}
-                {g.oneoffs.length > 0 ? ` · ${g.oneoffs.length} one-off${g.oneoffs.length === 1 ? "" : "s"}` : ""}
-              </span>
-              <span className="ptr-prop-figures">
-                <span className="ptr-prop-figure">
-                  <span className="ptr-prop-figure-value body-text emphasized">{formatMoneyFull(g.contract)}</span>
-                  <span className="ptr-prop-figure-label subheadline text-secondary">Contract</span>
-                </span>
-                <span className="ptr-prop-figure">
-                  <span className="ptr-prop-figure-value body-text emphasized">{formatMoneyFull(g.totalCost)}</span>
-                  <span className="ptr-prop-figure-label subheadline text-secondary">Cost</span>
-                </span>
-                <span className="ptr-prop-figure">
-                  <span className={`ptr-prop-figure-value body-text emphasized ${marginColorsOn ? marginClass(g.margin) : ""}`}>
-                    {formatMargin(g.margin)}
-                  </span>
-                  <span className="ptr-prop-figure-label subheadline text-secondary">Margin</span>
-                </span>
-              </span>
-            </button>
-            {isOpen && (
-              <div className="ptr-prop-body">
-                <table className="spend-rank-table">
-                  <thead>
-                    <tr>
-                      <th className="spend-rank-table-num">#</th>
-                      <th className="spend-rank-table-name">Project</th>
-                      <th className="spend-rank-table-name">Status</th>
-                      <th className="spend-rank-table-value">Contract</th>
-                      <th className="spend-rank-table-value">Cost</th>
-                      <th className="spend-rank-table-value">Margin</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {members.map((m) => (
-                      <tr
-                        key={m.recnum}
-                        className="spend-rank-table-row"
-                        onClick={() => onOpenJob(m.jobNumber)}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => e.key === "Enter" && onOpenJob(m.jobNumber)}
-                      >
-                        <td className="spend-rank-table-num subheadline text-secondary">{m.recnum}</td>
-                        <td className="spend-rank-table-name body-text">{m.oneoffName ?? m.name}</td>
-                        <td className="spend-rank-table-name">
-                          <span className={`jc-status-badge jc-badge-${JOB_STATUS_CLASS[m.status] ?? "closed"}`}>
-                            {JOB_STATUS_LABELS[m.status] ?? `Status ${m.status}`}
-                          </span>
-                        </td>
-                        <td className="spend-rank-table-value body-text">{formatMoneyFull(m.contract)}</td>
-                        <td className="spend-rank-table-value body-text">{formatMoneyFull(m.totalCost)}</td>
-                        <td className={`spend-rank-table-value body-text ${marginColorsOn ? marginClass(m.margin) : ""}`}>
-                          {formatMargin(m.margin)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <button
-                  type="button"
-                  className="ptr-prop-report-link subheadline"
-                  onClick={() => navigate(`/jobcost/property/${encodeURIComponent(g.key)}`)}
-                >
-                  Open property report →
-                </button>
+      <div className="jc-swap-stack">
+        <AnimatePresence>{loading && <DeckGhosts key="ghosts" />}</AnimatePresence>
+        {!loading && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, ease: "easeOut" }}>
+            {jobs.length === 0 ? (
+              <div className="jc-empty-note body-text text-secondary">
+                No projects {year != null ? `in ${year}` : "on record"} for this client.
+              </div>
+            ) : view === "project" ? (
+              <Widget className="co-widget jc-table-widget">
+                <JobTable
+                  jobs={sortedJobs}
+                  isManager={false}
+                  marginColorsOn={marginColorsOn}
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={handleSort}
+                  openJobKey={openJobKey}
+                  details={details}
+                  onToggleExpand={toggleExpand}
+                  onOpenJob={(job) => goToJobcost(Number(job.jobNumber))}
+                />
+              </Widget>
+            ) : (
+              <div className="ptr-deck">
+                {groups.map((g, i) => (
+                  <DeckCard
+                    key={g.key}
+                    name={g.key}
+                    subtitle={[
+                      `${g.phases.length} ${g.phases.length === 1 ? "phase" : "phases"}`,
+                      g.oneoffs.length > 0
+                        ? `${g.oneoffs.length} one-off${g.oneoffs.length === 1 ? "" : "s"}`
+                        : null,
+                    ].filter(Boolean).join(" · ")}
+                    stats={[
+                      { label: "Contract", value: formatMoneyFull(g.contract) },
+                      { label: "Cost", value: formatMoneyFull(g.totalCost) },
+                      {
+                        label: "Margin",
+                        value: formatMargin(g.margin),
+                        color: marginColorsOn && g.margin != null ? marginTextColor(g.margin) : undefined,
+                      },
+                    ]}
+                    open={openGroup === g.key}
+                    entrance
+                    index={i}
+                    onToggle={() => setOpenGroup((k) => (k === g.key ? null : g.key))}
+                    reportTo={`/jobcost/property/${encodeURIComponent(g.key)}`}
+                    reportLabel="Report"
+                  >
+                    <div className="ptr-deck-sub">
+                      <table className="spend-rank-table">
+                        <thead>
+                          <tr>
+                            <th className="spend-rank-table-num">#</th>
+                            <th className="spend-rank-table-name">Project</th>
+                            <th className="spend-rank-table-name">Status</th>
+                            <th className="spend-rank-table-value">Contract</th>
+                            <th className="spend-rank-table-value">Cost</th>
+                            <th className="spend-rank-table-value">Margin</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[...g.phases, ...g.oneoffs].map((m) => (
+                            <tr
+                              key={m.recnum}
+                              className="spend-rank-table-row"
+                              onClick={() => goToJobcost(Number(m.jobNumber))}
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => e.key === "Enter" && goToJobcost(Number(m.jobNumber))}
+                            >
+                              <td className="spend-rank-table-num subheadline text-secondary">{m.recnum}</td>
+                              <td className="spend-rank-table-name body-text">{m.oneoffName ?? m.name}</td>
+                              <td className="spend-rank-table-name">
+                                <span className={`jc-status-badge jc-badge-${JOB_STATUS_CLASS[m.status] ?? "closed"}`}>
+                                  {JOB_STATUS_LABELS[m.status] ?? `Status ${m.status}`}
+                                </span>
+                              </td>
+                              <td className="spend-rank-table-value body-text">{formatMoneyFull(m.contract)}</td>
+                              <td className="spend-rank-table-value body-text">{formatMoneyFull(m.totalCost)}</td>
+                              <td className={`spend-rank-table-value body-text ${marginColorsOn ? marginClass(m.margin) : ""}`}>
+                                {formatMargin(m.margin)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </DeckCard>
+                ))}
               </div>
             )}
-          </div>
-        )
-      })}
-    </div>
+          </motion.div>
+        )}
+      </div>
+    </section>
   )
 }
 
@@ -849,8 +957,6 @@ function ContributionSection({ cfg, rows, year, loading }: {
   loading: boolean
 }) {
   const { goToJobcost } = useJobcostNav()
-  const navigate = useNavigate()
-  const [open, setOpen] = useState(true)
   const [view, setView] = useLocalStorage<ContribView>("ptrContributionView", "properties")
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<ContribSortKey>("partnerCost")
@@ -904,138 +1010,116 @@ function ContributionSection({ cfg, rows, year, loading }: {
   }, [rows, sortKey, sortDir])
 
   return (
-    <CollapsibleSection
-      title={`Projects — ${year ?? "All Time"}`}
-      open={open}
-      onToggle={() => setOpen((o) => !o)}
-      loading={loading}
-      isEmpty={!loading && rows.length === 0}
-      emptyMessage="No posted costs this year."
-      icon={<JobcostIcon size={16} />}
-      accentColor={PROJECTS_ACCENT}
-      metrics={
-        <>
-          <Metric value={groups.length} label={groups.length === 1 ? "Property" : "Properties"} />
-          <MetricDivider />
-          <Metric value={rows.length} label={rows.length === 1 ? "Phase" : "Phases"} />
-          <MetricDivider />
-          <Metric value={formatMoneyFull(partnerTotal)} label="Work Performed" />
-          <MetricDivider />
-          <Metric
-            value={overallShare != null ? formatShare(overallShare) : "—"}
-            label="Of Their Projects' Costs"
-          />
-        </>
-      }
-    >
-      <div className="ptr-board">
-        <div className="ptr-board-bar">
-          <SegmentedControl<ContribView>
-            value={view}
-            options={[
-              { key: "properties", label: "Properties" },
-              { key: "phases", label: "Phases" },
-            ]}
-            onChange={setView}
-            layoutId="ptr-contrib-view"
-            variant="ohr"
-            ariaLabel="Contribution grouping"
-          />
-          <span className="ptr-board-note subheadline text-secondary">
-            {cfg.noun} cost vs total posted cost, {year ?? "all time"}
+    <section className="ptr-deck-section">
+      <div className="jc-command-bar">
+        <SegmentedControl<ContribView>
+          value={view}
+          options={[
+            { key: "properties", label: "Properties" },
+            { key: "phases", label: "Phases" },
+          ]}
+          onChange={setView}
+          layoutId="ptr-contrib-view"
+          variant="jc"
+          ariaLabel="Contribution grouping"
+        />
+        <span className="jc-cb-divider" aria-hidden="true" />
+        {!loading && rows.length > 0 && (
+          <span className="jc-cb-legend">
+            {formatMoneyFull(partnerTotal)} of {formatMoneyFull(jobsTotal)} posted cost
+            {overallShare != null ? ` · ${formatShare(overallShare)}` : ""}
           </span>
-        </div>
+        )}
+        <span className="jc-cb-count">
+          <span className="jc-cb-count-num">{groups.length}</span>{" "}
+          {groups.length === 1 ? "Property" : "Properties"}
+          {" · "}
+          <span className="jc-cb-count-num">{rows.length}</span>{" "}
+          {rows.length === 1 ? "Phase" : "Phases"}
+        </span>
+      </div>
 
-        {view === "properties" ? (
-          <div className="ptr-prop-list">
-            {groups.map((g) => {
-              const isOpen = openGroup === g.key
-              const share = g.totalCost > 0 ? (g.partnerCost / g.totalCost) * 100 : null
-              return (
-                <div key={g.key} className={`ptr-prop-card${isOpen ? " ptr-prop-card--open" : ""}`}>
-                  <button
-                    type="button"
-                    className="ptr-prop-head"
-                    onClick={() => setOpenGroup((k) => (k === g.key ? null : g.key))}
-                  >
-                    <span className="ptr-prop-name body-text emphasized">{g.key}</span>
-                    <span className="ptr-prop-facts subheadline text-secondary">
-                      {g.rows.length} {g.rows.length === 1 ? "phase" : "phases"}
-                    </span>
-                    <span className="ptr-prop-figures">
-                      <span className="ptr-prop-figure">
-                        <span className="ptr-prop-figure-value body-text emphasized">
-                          {formatMoneyFull(g.partnerCost)}
-                        </span>
-                        <span className="ptr-prop-figure-label subheadline text-secondary">Their Work</span>
-                      </span>
-                      <span className="ptr-prop-figure">
-                        <span className="ptr-prop-figure-value body-text emphasized">
-                          {formatMoneyFull(g.totalCost)}
-                        </span>
-                        <span className="ptr-prop-figure-label subheadline text-secondary">Total Cost</span>
-                      </span>
-                      <span className="ptr-prop-figure">
-                        <span className="ptr-share-pill">{share != null ? formatShare(share) : "—"}</span>
-                        <span className="ptr-prop-figure-label subheadline text-secondary">Of Spend</span>
-                      </span>
-                    </span>
-                  </button>
-                  {isOpen && (
-                    <div className="ptr-prop-body">
-                      <table className="spend-rank-table">
-                        <thead>
-                          <tr>
-                            <th className="spend-rank-table-num">#</th>
-                            <th className="spend-rank-table-name">Phase</th>
-                            <th className="spend-rank-table-name">Status</th>
-                            <th className="spend-rank-table-value">Their Work</th>
-                            <th className="spend-rank-table-value">Total Cost</th>
-                            <th className="spend-rank-table-value">% of Spend</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {g.rows.map((r) => (
-                            <ContributionRowTr key={r.recnum} row={r} onOpen={() => goToJobcost(r.recnum)} />
-                          ))}
-                        </tbody>
-                      </table>
-                      {g.isProperty && (
-                        <button
-                          type="button"
-                          className="ptr-prop-report-link subheadline"
-                          onClick={() => navigate(`/jobcost/property/${encodeURIComponent(g.key)}`)}
-                        >
-                          Open property report →
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <table className="spend-rank-table">
-            <thead>
-              <tr>
-                <SortTh spendRank col="recnum" label="#" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                <SortTh spendRank col="jobName" label="Phase" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                <SortTh spendRank col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                <SortTh spendRank col="partnerCost" label="Their Work" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                <SortTh spendRank col="totalCost" label="Total Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-                <SortTh spendRank col="share" label="% of Spend" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
-              </tr>
-            </thead>
-            <tbody>
-              {sortedRows.map((r) => (
-                <ContributionRowTr key={r.recnum} row={r} onOpen={() => goToJobcost(r.recnum)} />
-              ))}
-            </tbody>
-          </table>
+      <div className="jc-swap-stack">
+        <AnimatePresence>{loading && <DeckGhosts key="ghosts" />}</AnimatePresence>
+        {!loading && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3, ease: "easeOut" }}>
+            {rows.length === 0 ? (
+              <div className="jc-empty-note body-text text-secondary">
+                No posted costs {year != null ? `in ${year}` : "on record"} for this {cfg.noun.toLowerCase()}.
+              </div>
+            ) : view === "properties" ? (
+              <div className="ptr-deck">
+                {groups.map((g, i) => {
+                  const share = g.totalCost > 0 ? (g.partnerCost / g.totalCost) * 100 : null
+                  return (
+                    <DeckCard
+                      key={g.key}
+                      name={g.key}
+                      subtitle={`${g.rows.length} ${g.rows.length === 1 ? "phase" : "phases"}`}
+                      stats={[
+                        { label: "Their Work", value: formatMoneyFull(g.partnerCost) },
+                        { label: "Total Cost", value: formatMoneyFull(g.totalCost) },
+                        {
+                          label: "Of Spend",
+                          value: share != null ? formatShare(share) : "—",
+                          color: "var(--primary-color)",
+                        },
+                      ]}
+                      open={openGroup === g.key}
+                      entrance
+                      index={i}
+                      onToggle={() => setOpenGroup((k) => (k === g.key ? null : g.key))}
+                      reportTo={g.isProperty ? `/jobcost/property/${encodeURIComponent(g.key)}` : undefined}
+                      reportLabel="Report"
+                    >
+                      <div className="ptr-deck-sub">
+                        <table className="spend-rank-table">
+                          <thead>
+                            <tr>
+                              <th className="spend-rank-table-num">#</th>
+                              <th className="spend-rank-table-name">Phase</th>
+                              <th className="spend-rank-table-name">Status</th>
+                              <th className="spend-rank-table-value">Their Work</th>
+                              <th className="spend-rank-table-value">Total Cost</th>
+                              <th className="spend-rank-table-value">% of Spend</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {g.rows.map((r) => (
+                              <ContributionRowTr key={r.recnum} row={r} onOpen={() => goToJobcost(r.recnum)} />
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </DeckCard>
+                  )
+                })}
+              </div>
+            ) : (
+              <Widget className="co-widget jc-table-widget">
+                <table className="spend-rank-table">
+                  <thead>
+                    <tr>
+                      <SortTh spendRank col="recnum" label="#" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="jobName" label="Phase" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="status" label="Status" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="partnerCost" label="Their Work" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="totalCost" label="Total Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                      <SortTh spendRank col="share" label="% of Spend" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedRows.map((r) => (
+                      <ContributionRowTr key={r.recnum} row={r} onOpen={() => goToJobcost(r.recnum)} />
+                    ))}
+                  </tbody>
+                </table>
+              </Widget>
+            )}
+          </motion.div>
         )}
       </div>
-    </CollapsibleSection>
+    </section>
   )
 }
 
