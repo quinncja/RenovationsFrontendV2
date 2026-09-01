@@ -21722,3 +21722,45 @@ body.pj-painting td.pj-computed {
   color: var(--secondary-text);
   pointer-events: none;
 }
+
+/* Scope backdrop on the expanded property's overview strip: the selected
+   year (or All Time) in the report heroes' recessed copper display type,
+   oversized and cropped by the strip like the project hero's phase mark.
+   Content stacks above it (z-index 1); the left-fade mask keeps the leading
+   stats on quiet ground. */
+.jc-overview-scoped {
+  position: relative;
+  overflow: hidden;
+}
+.jc-overview-scoped > * {
+  position: relative;
+  z-index: 1;
+}
+.jc-overview-scoped > .jc-overview-scope-art {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 1.25rem;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  font-weight: 900;
+  /* Sized past the strip so the caps crop ~5px into the top and bottom
+     edges (overflow:hidden on the strip does the trimming), like the
+     project hero's overrunning phase mark. */
+  font-size: 8.125rem;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  color: light-dark(
+    rgb(from var(--primary-color) r g b / 0.11),
+    rgb(from var(--primary-color) r g b / 0.16)
+  );
+  mask-image: linear-gradient(to left, #000 55%, transparent 92%);
+}
+@media (max-width: 640px) {
+  .jc-overview-scoped > .jc-overview-scope-art { display: none; }
+}

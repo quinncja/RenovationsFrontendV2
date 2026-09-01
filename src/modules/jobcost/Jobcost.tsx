@@ -101,6 +101,9 @@ export interface RawProject {
   pmName?: string | null
   phases?: ProjectPhase[]
   clientName?: string | null
+  // reccln.recnum — lets a caller scope the phase list to one client (the
+  // partner detail page's project board).
+  clientId?: number | string | null
   // Sage custom fields (dbo.actr_u): parent = shared-address grouping key,
   // oneoff = 1 for non-phase projects. Both null/absent when the lazily
   // created actr_u row doesn't exist yet (jobs added after the backfill).
@@ -142,6 +145,7 @@ export interface Job {
   margin: number | null
   supervisor: string
   client: string
+  clientId: number | null
   parent: string
   oneoff: boolean
   // One-off display name (actr_u.oofnme), shown in place of the Sage job
@@ -186,6 +190,7 @@ export function normalizeProject(p: RawProject): Job {
       p.phases?.find((ph) => ph.pmName?.trim())?.pmName?.trim() ??
       "",
     client: p.clientName?.trim() ?? "",
+    clientId: p.clientId != null ? Number(p.clientId) : null,
     // No parent yet (new job, actr_u row not created) → the job is its own
     // single-member group under its own name.
     parent: parent || p.name,
@@ -202,8 +207,9 @@ export function normalizeProject(p: RawProject): Job {
   }
 }
 
-// A parent group — Sage jobs sharing a building address.
-interface Group {
+// A parent group — Sage jobs sharing a building address. Exported (with
+// buildGroups) for the partner detail page's property-grouped project board.
+export interface Group {
   key: string
   client: string
   // min(member status): any Current member → Current; else any Complete →
@@ -219,7 +225,7 @@ interface Group {
   units: number
 }
 
-function buildGroups(jobs: Job[]): Group[] {
+export function buildGroups(jobs: Job[]): Group[] {
   const byParent = new Map<string, Job[]>()
   for (const j of jobs) {
     const list = byParent.get(j.parent)
@@ -249,8 +255,11 @@ function buildGroups(jobs: Job[]): Group[] {
       budget: active.reduce((s, m) => s + m.budget, 0),
       totalCost,
       margin: contract > 0 ? ((contract - totalCost) / contract) * 100 : null,
-      phases: members.filter((m) => !m.oneoff),
-      oneoffs: members.filter((m) => m.oneoff),
+      // Member lists scope to the year too, so the kind cards' counts
+      // ("31 Phases"), their money, and the member tables all describe the
+      // selected year alongside the year-scoped header figures.
+      phases: active.filter((m) => !m.oneoff),
+      oneoffs: active.filter((m) => m.oneoff),
       yearActive: members.some((m) => m.yearActive),
       units: members.reduce((s, m) => s + m.units, 0),
     }
@@ -481,9 +490,13 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
 // One of the two floating sub-cards inside an expanded group (Phases /
 // One-Off Projects). Empty kinds render grayed-out and inert; non-empty cards
 // are buttons that reveal their member rows below the card pair.
-function GroupKindCard({ icon, title, singular, plural, members, open, onToggle, showContract, marginColorsOn }: {
+function GroupKindCard({ icon, title, scopeLabel, singular, plural, members, open, onToggle, showContract, marginColorsOn }: {
   icon: React.ReactNode
   title: string
+  // Scope prefix ("2026" / "All Time", plus " · P8" under a phase filter) —
+  // the counts and money below are scoped to it, so the title names the
+  // period they describe.
+  scopeLabel: string
   // Count noun: "25 Phases ›" / "2 One-Offs ›", not a bare number.
   singular: string
   plural: string
@@ -494,6 +507,8 @@ function GroupKindCard({ icon, title, singular, plural, members, open, onToggle,
   marginColorsOn: boolean
 }) {
   const empty = members.length === 0
+  // members arrive year-scoped from buildGroups (group.phases/oneoffs), so
+  // counts and money here already describe the selected year.
   const contract = members.reduce((s, m) => s + m.contract, 0)
   const budget = members.reduce((s, m) => s + m.budget, 0)
   const totalCost = members.reduce((s, m) => s + m.totalCost, 0)
@@ -518,7 +533,7 @@ function GroupKindCard({ icon, title, singular, plural, members, open, onToggle,
       <div className="jc-group-card-head">
         <span className="jc-group-card-title subheadline text-secondary">
           {icon}
-          {title}
+          {scopeLabel} {title}
           {status != null && (
             <span className={`status-badge status-${status}`}>
               {STATUS_LABELS[status] ?? status}
@@ -675,8 +690,9 @@ function OverviewStat({ label, value, valueColor }: { label: string; value: stri
   )
 }
 
-function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onToggleKind, onOpenJob }: {
+function GroupExpandedPanel({ group, scopeLabel, showContract, marginColorsOn, openKind, onToggleKind, onOpenJob }: {
   group: Group
+  scopeLabel: string
   showContract: boolean
   marginColorsOn: boolean
   // At most one sub-card is open; clicking the other swaps, clicking the open
@@ -690,7 +706,12 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
   return (
     <div className="jc-expand-panel">
       {/* Overall property stats (the row itself only carries counts). */}
-      <div className="jc-group-overview">
+      <div className="jc-group-overview jc-overview-scoped">
+        {/* Scope backdrop: the selected year (or All Time) huge and recessed
+            behind the strip, the same treatment as the /jobcost report
+            heroes' art — every figure here and on the kind cards reads as
+            this period. */}
+        <div className="jc-overview-scope-art" aria-hidden="true">{scopeLabel}</div>
         {showContract && <OverviewStat label="Property Contract Volume" value={formatMoneyFull(group.contract)} />}
         <OverviewStat
           label="Property Gross Margin"
@@ -714,6 +735,7 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
         <GroupKindCard
           icon={<Building2 size={13} />}
           title="Rolling Phase Work"
+          scopeLabel={scopeLabel}
           singular="Phase"
           plural="Phases"
           members={group.phases}
@@ -725,6 +747,7 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
         <GroupKindCard
           icon={<Hammer size={13} />}
           title="One-Off Work"
+          scopeLabel={scopeLabel}
           singular="One-Off"
           plural="One-Offs"
           members={group.oneoffs}
@@ -840,8 +863,9 @@ function KindChip({ icon, count, singular, plural, onOpen }: {
 // memo: the virtualizer re-renders the list on every scroll frame; without it
 // every mounted card re-renders per frame. Handlers take the group as an
 // argument (no per-item closures) so props stay referentially stable.
-const PropertyCard = memo(function PropertyCard({ group, open, openKind, entrance, index, tick, scrollerRef, showContract, marginColorsOn, pinned, tourAnchor, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin, onOpenProperty }: {
+const PropertyCard = memo(function PropertyCard({ group, scopeLabel, open, openKind, entrance, index, tick, scrollerRef, showContract, marginColorsOn, pinned, tourAnchor, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin, onOpenProperty }: {
   group: Group
+  scopeLabel: string
   open: boolean
   openKind: "phases" | "oneoffs" | null
   // Staggered blur-in on the list's first paint only — cards mounted later by
@@ -1041,6 +1065,7 @@ const PropertyCard = memo(function PropertyCard({ group, open, openKind, entranc
             >
               <GroupExpandedPanel
                 group={group}
+                scopeLabel={scopeLabel}
                 showContract={showContract}
                 marginColorsOn={marginColorsOn}
                 openKind={openKind}
@@ -1060,8 +1085,9 @@ const PropertyCard = memo(function PropertyCard({ group, open, openKind, entranc
 // them all at once is what made the view toggle lag). Items are absolutely
 // positioned by measured offset inside a spacer of the total height; card
 // expand/collapse is picked up live by the virtualizer's ResizeObserver.
-function PropertyList({ groups, openGroupKey, openKind, entrance, showContract, marginColorsOn, pins, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin, onOpenProperty }: {
+function PropertyList({ groups, scopeLabel, openGroupKey, openKind, entrance, showContract, marginColorsOn, pins, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin, onOpenProperty }: {
   groups: Group[]
+  scopeLabel: string
   openGroupKey: string | null
   openKind: "phases" | "oneoffs" | null
   // False when the list is re-entered via the view toggle: the blur-in
@@ -1195,6 +1221,7 @@ function PropertyList({ groups, openGroupKey, openKind, entrance, showContract, 
           >
             <PropertyCard
               group={group}
+              scopeLabel={scopeLabel}
               open={isOpen}
               openKind={isOpen ? openKind : null}
               entrance={entrance && entranceRef.current}
@@ -2055,25 +2082,26 @@ export default function Jobcost() {
     setStatusFilter("all")
   }
 
-  // Grouped view: a parent qualifies if ANY member was active in the selected
-  // year and lists its full all-time membership, but its money stats scope to
-  // the year-active members (see buildGroups).
+  // Grouped view: a parent qualifies if ANY member survives the year + phase
+  // filters, and its cards (money, counts, member lists) scope to those
+  // members — year scoping inside buildGroups, phase scoping here.
   const filteredGroups = useMemo(() => {
     const q = search.toLowerCase()
+    // The phase filter scopes the MEMBERSHIP before grouping, so a filtered
+    // board's cards (money, counts, member tables) describe just the matching
+    // phases — the same rule the year filter follows inside buildGroups —
+    // and a property with no match simply produces no group. The yearActive
+    // check matters: the fetch is the ALL-TIME membership, so a bare phase
+    // match would keep a property alive on a phase-11 job from some PAST
+    // year even though the selected year has nothing in phase 11.
+    const source =
+      phaseFilter === "all"
+        ? jobs
+        : jobs.filter((j) => j.yearActive && jobMatchesPhase(j, phaseFilter))
     // Same current-year rule as the list view: a fully-closed property (every
     // member Closed) can't belong to the current calendar year.
-    let list = buildGroups(jobs).filter((g) => g.yearActive && !(hideClosed && g.status === 6))
+    let list = buildGroups(source).filter((g) => g.yearActive && !(hideClosed && g.status === 6))
     if (statusFilter !== "all") list = list.filter((g) => g.status === statusFilter)
-    // A property stays visible if ANY member would survive the list view's
-    // filters for this year + phase (its card still shows the full
-    // membership). The yearActive check matters: the fetch is the ALL-TIME
-    // membership, so a bare phase match would keep a property alive on a
-    // phase-11 job from some PAST year even though the selected year has
-    // nothing in phase 11.
-    if (phaseFilter !== "all")
-      list = list.filter((g) =>
-        [...g.phases, ...g.oneoffs].some((m) => m.yearActive && jobMatchesPhase(m, phaseFilter)),
-      )
     if (q)
       list = list.filter(
         (g) =>
@@ -2522,6 +2550,7 @@ export default function Jobcost() {
                   ) : (
                     <PropertyList
                       groups={filteredGroups}
+                      scopeLabel={`${year == null ? "All Time" : year}${phaseFilter === "all" ? "" : ` · P${phaseFilter}`}`}
                       openGroupKey={openGroupKey}
                       openKind={openKind}
                       entrance={!entrancePlayedRef.current}
