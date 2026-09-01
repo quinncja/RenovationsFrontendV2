@@ -255,8 +255,11 @@ export function buildGroups(jobs: Job[]): Group[] {
       budget: active.reduce((s, m) => s + m.budget, 0),
       totalCost,
       margin: contract > 0 ? ((contract - totalCost) / contract) * 100 : null,
-      phases: members.filter((m) => !m.oneoff),
-      oneoffs: members.filter((m) => m.oneoff),
+      // Member lists scope to the year too, so the kind cards' counts
+      // ("31 Phases"), their money, and the member tables all describe the
+      // selected year alongside the year-scoped header figures.
+      phases: active.filter((m) => !m.oneoff),
+      oneoffs: active.filter((m) => m.oneoff),
       yearActive: members.some((m) => m.yearActive),
       units: members.reduce((s, m) => s + m.units, 0),
     }
@@ -500,14 +503,11 @@ function GroupKindCard({ icon, title, singular, plural, members, open, onToggle,
   marginColorsOn: boolean
 }) {
   const empty = members.length === 0
-  // Money scopes to the members active in the selected year, same rule as
-  // buildGroups — otherwise a year-filtered board shows the year's volume in
-  // the property header while these cards sum the building's lifetime. The
-  // count/status keep full membership (they describe structure, not the year).
-  const active = members.filter((m) => m.yearActive)
-  const contract = active.reduce((s, m) => s + m.contract, 0)
-  const budget = active.reduce((s, m) => s + m.budget, 0)
-  const totalCost = active.reduce((s, m) => s + m.totalCost, 0)
+  // members arrive year-scoped from buildGroups (group.phases/oneoffs), so
+  // counts and money here already describe the selected year.
+  const contract = members.reduce((s, m) => s + m.contract, 0)
+  const budget = members.reduce((s, m) => s + m.budget, 0)
+  const totalCost = members.reduce((s, m) => s + m.totalCost, 0)
   const margin = contract > 0 ? ((contract - totalCost) / contract) * 100 : null
   const marginColor = !marginColorsOn || margin == null ? undefined : marginTextColor(margin)
   // Budget Remaining/Exceeded: POSITIVE = under budget (good); NEGATIVE = over
