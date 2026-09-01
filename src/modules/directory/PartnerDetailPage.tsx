@@ -368,7 +368,7 @@ function KpiCards({ kind, year, loading, summary, byYear, share, marginSummary, 
     />,
     <StatWidget
       key="share"
-      title={`${cfg.shareTitle}${year != null ? ` — ${year}` : ""}`}
+      title={`${year != null ? `${year} ` : ""}${cfg.shareTitle}`}
       value={sharePct}
       loading={loading}
       format={(v) => formatShare(v)}
