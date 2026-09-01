@@ -642,6 +642,8 @@ function InvoicesFooter({ scopeLabel, invoices, loading, graceDays, onOpen }: {
   // filters. The modal still lists voids under "all".
   const billable = invoices.filter((i) => i.status !== 5)
   const totalBilled = billable.reduce((s, i) => s + (i.value ?? 0), 0)
+  // Net of credits — the outstanding modal lists every nonzero balance,
+  // credit memos included, so its rows sum to exactly this figure.
   const totalOutstanding = billable.reduce((s, i) => s + (i.amountRemaining ?? 0), 0)
   const totalOverdue = billable
     .filter((i) => isInvoiceOverdue(i, graceDays))
@@ -671,7 +673,7 @@ function InvoicesFooter({ scopeLabel, invoices, loading, graceDays, onOpen }: {
       label: "Outstanding",
       value: formatMoneyFull(totalOutstanding),
       valueClass: totalOutstanding > 0 ? "invoice-amount-value--remaining" : undefined,
-      enabled: totalOutstanding > 0,
+      enabled: billable.some((i) => (i.amountRemaining ?? 0) !== 0),
     },
   ]
   if (totalOverdue > 0) {
@@ -733,14 +735,16 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
   if (filter != null) lastFilter.current = filter
   const activeFilter = filter ?? lastFilter.current
 
+  // Outstanding lists every nonzero balance — credit memos included, so the
+  // list sums to the (net) tile figure. Overdue is positive past-due balances.
   const rows =
     activeFilter === "all"
       ? invoices
-      : invoices.filter(
-          (i) =>
-            i.status !== 5 &&
-            (i.amountRemaining ?? 0) > 0 &&
-            (activeFilter === "outstanding" || isInvoiceOverdue(i, graceDays))
+      : invoices.filter((i) =>
+          i.status !== 5 &&
+          (activeFilter === "outstanding"
+            ? (i.amountRemaining ?? 0) !== 0
+            : isInvoiceOverdue(i, graceDays))
         )
   // "All" totals bill; the open-balance filters total what's still owed.
   const rollup =
@@ -812,10 +816,10 @@ function InvoiceListModal({ cfg, scopeLabel, filter, invoices, graceDays, onClos
                         <span className="ptr-inv-total body-text emphasized">{formatMoneyFull(inv.value ?? 0)}</span>
                         <span
                           className={`ptr-inv-remaining subheadline ${
-                            (inv.amountRemaining ?? 0) > 0 ? "invoice-amount-value--remaining" : "text-secondary"
+                            (inv.amountRemaining ?? 0) !== 0 ? "invoice-amount-value--remaining" : "text-secondary"
                           }`}
                         >
-                          {(inv.amountRemaining ?? 0) > 0
+                          {(inv.amountRemaining ?? 0) !== 0
                             ? `${formatMoneyFull(inv.amountRemaining)} open`
                             : "Paid"}
                         </span>
