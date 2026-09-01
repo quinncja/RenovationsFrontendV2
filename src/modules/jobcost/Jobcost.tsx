@@ -493,7 +493,7 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
 function GroupKindCard({ icon, title, yearLabel, singular, plural, members, open, onToggle, showContract, marginColorsOn }: {
   icon: React.ReactNode
   title: string
-  // Scope suffix ("2026" / "All Time") — the counts and money below are
+  // Scope prefix ("2026" / "All Time") — the counts and money below are
   // year-scoped, so the title says which year they describe.
   yearLabel: string
   // Count noun: "25 Phases ›" / "2 One-Offs ›", not a bare number.
@@ -532,7 +532,7 @@ function GroupKindCard({ icon, title, yearLabel, singular, plural, members, open
       <div className="jc-group-card-head">
         <span className="jc-group-card-title subheadline text-secondary">
           {icon}
-          {title} — {yearLabel}
+          {yearLabel} {title}
           {status != null && (
             <span className={`status-badge status-${status}`}>
               {STATUS_LABELS[status] ?? status}
@@ -706,9 +706,17 @@ function GroupExpandedPanel({ group, yearLabel, showContract, marginColorsOn, op
     <div className="jc-expand-panel">
       {/* Overall property stats (the row itself only carries counts). */}
       <div className="jc-group-overview">
-        {/* Scope tag: every figure on this strip (and the kind cards below)
-            reads as the selected year, or the property's lifetime. */}
-        <OverviewStat label="Showing" value={yearLabel} />
+        {/* Scope mark: the selected year (or ALL/TIME) in the same recessed
+            copper display type as the /jobcost report heroes' backdrop art —
+            every figure on this strip and the kind cards reads as this
+            period. */}
+        {yearLabel === "All Time" ? (
+          <span className="jc-overview-scope jc-overview-scope-stack" aria-label="Showing all time">
+            <span>All</span><span>Time</span>
+          </span>
+        ) : (
+          <span className="jc-overview-scope" aria-label={`Showing ${yearLabel}`}>{yearLabel}</span>
+        )}
         {showContract && <OverviewStat label="Property Contract Volume" value={formatMoneyFull(group.contract)} />}
         <OverviewStat
           label="Property Gross Margin"

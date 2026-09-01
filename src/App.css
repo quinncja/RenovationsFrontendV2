@@ -21899,3 +21899,36 @@ body.pj-painting td.pj-computed {
     justify-content: center;
   }
 }
+
+/* Scope mark on the expanded property's overview strip: the selected year in
+   the report heroes' recessed copper display type (see .pd-hero-art-text),
+   scaled to the strip and sitting inline at its left edge. Opaque pre-blend
+   against the strip's deck tones — same reasoning as the hero art. */
+.jc-overview-scope {
+  align-self: center;
+  font-weight: 900;
+  font-size: 2.875rem;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums;
+  color: light-dark(
+    color-mix(in srgb, var(--primary-color) 18%, #f8f6f1),
+    color-mix(in srgb, var(--primary-color) 24%, #251f1a)
+  );
+  user-select: none;
+  white-space: nowrap;
+}
+/* ALL/TIME stack — the ONE/OFF art's recipe at strip scale: monospace so both
+   lines land the same width, stroke-fattened to match the numeral weight. */
+.jc-overview-scope-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-transform: uppercase;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 1.375rem;
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  -webkit-text-stroke: 0.025em currentColor;
+}
+.jc-overview-scope-stack span { display: block; }
