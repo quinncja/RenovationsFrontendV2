@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { useNavigate, useParams } from "react-router-dom"
+import { createPortal } from "react-dom"
 import { motion, AnimatePresence, type Transition } from "framer-motion"
-import { ChevronRight, ExternalLink, FileText } from "lucide-react"
+import { ChevronRight, ExternalLink, FileText, X } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
@@ -15,11 +16,12 @@ import { SortTh } from "../../shared/components/SortTh"
 import { YearSelector } from "../../shared/components/YearSelector/YearSelector"
 import { InvoiceDetailModal } from "../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList"
-import { CollapsibleSection, Metric, MetricDivider } from "../../shared/components/CollapsibleSection/CollapsibleSection"
+import { Metric, MetricDivider } from "../../shared/components/CollapsibleSection/CollapsibleSection"
 import { invoiceStatusLabel, invoiceStatusTone } from "../../shared/utils/invoiceStatus"
 import { formatMoneyFull, formatDate, marginTextColor } from "../../shared/utils/format"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
+import { useModalLayer } from "../../shared/hooks/useModalLayer"
 import { useJobcostNav } from "../jobcost/useJobcostNav"
 import {
   JobTable,
@@ -37,7 +39,6 @@ import { JOB_STATUS_LABELS } from "./directoryShared"
 
 // ─── Kind configuration ───────────────────────────────────────────────────────
 
-const INVOICES_ACCENT = "var(--secondary-text)"
 const PRIOR_YEAR_COLOR = "#a9b2be"
 const SERIES_COLOR = "#c27c3e"
 
@@ -271,7 +272,16 @@ function PartnerDetail({ kind, partnerId, year, onYearChange }: {
         </MotionItem>
 
         <MotionItem>
-          <HistoryChart cfg={cfg} year={year} loading={isLoading} byYear={byYear} byMonth={byMonth} />
+          <HistoryChart
+            cfg={cfg}
+            year={year}
+            loading={isLoading}
+            byYear={byYear}
+            byMonth={byMonth}
+            invoices={invoices}
+            overdue={payment?.overdue ?? null}
+            onOpenInvoice={setSelectedInvoiceId}
+          />
         </MotionItem>
 
         <MotionItem>
@@ -280,17 +290,6 @@ function PartnerDetail({ kind, partnerId, year, onYearChange }: {
           ) : (
             <ContributionSection cfg={cfg} rows={contribution} year={year} loading={isLoading} />
           )}
-        </MotionItem>
-
-        <MotionItem>
-          <InvoicesSection
-            cfg={cfg}
-            year={year}
-            loading={isLoading}
-            invoices={invoices}
-            overdue={payment?.overdue ?? null}
-            onOpen={setSelectedInvoiceId}
-          />
         </MotionItem>
       </MotionList>
 
@@ -467,13 +466,17 @@ function KpiCards({ kind, year, loading, summary, byYear, share, marginSummary, 
 
 type HistoryView = "monthly" | "yearly"
 
-function HistoryChart({ cfg, year, loading, byYear, byMonth }: {
+function HistoryChart({ cfg, year, loading, byYear, byMonth, invoices, overdue, onOpenInvoice }: {
   cfg: KindConfig
   year: number | null
   loading: boolean
   byYear: YearPoint[]
   byMonth: MonthlySeries | null
+  invoices: RecentInvoice[]
+  overdue: number | null
+  onOpenInvoice: (id: string) => void
 }) {
+  const [invoicesOpen, setInvoicesOpen] = useState(false)
   // All Time reads best year-over-year; a specific year defaults to its
   // month-over-month story.
   const [view, setView] = useState<HistoryView>(year == null ? "yearly" : "monthly")
@@ -556,7 +559,167 @@ function HistoryChart({ cfg, year, loading, byYear, byMonth }: {
           }}
         />
       )}
+
+      <InvoicesFooter
+        year={year}
+        invoices={invoices}
+        overdue={overdue}
+        onView={() => setInvoicesOpen(true)}
+      />
+
+      <InvoiceListModal
+        cfg={cfg}
+        year={year}
+        open={invoicesOpen}
+        invoices={invoices}
+        onClose={() => setInvoicesOpen(false)}
+        onOpenInvoice={onOpenInvoice}
+      />
     </Widget>
+  )
+}
+
+/** Invoice rollup strip under the history chart — the summary lives with the
+ *  chart; the row-by-row list opens in a modal instead of unrolling the page. */
+function InvoicesFooter({ year, invoices, overdue, onView }: {
+  year: number | null
+  invoices: RecentInvoice[]
+  overdue: number | null
+  onView: () => void
+}) {
+  // Void (status 5) stays out of the rollups, matching the backend's summary
+  // filters. The modal still lists voids.
+  const billable = invoices.filter((i) => i.status !== 5)
+  const totalBilled = billable.reduce((s, i) => s + (i.value ?? 0), 0)
+  const totalOutstanding = billable.reduce((s, i) => s + (i.amountRemaining ?? 0), 0)
+
+  return (
+    <div className="ptr-fin-foot">
+      <div className="ptr-fin-metrics">
+        <Metric value={billable.length} label={`${year ?? "All-Time"} Invoices`} />
+        <MetricDivider />
+        <Metric value={formatMoneyFull(totalBilled)} label="Total Billed" />
+        <MetricDivider />
+        <Metric
+          value={formatMoneyFull(totalOutstanding)}
+          label="Outstanding"
+          valueClass="invoice-amount-value--remaining"
+        />
+        {overdue != null && overdue > 0 && (
+          <>
+            <MetricDivider />
+            <Metric value={formatMoneyFull(overdue)} label="Overdue" valueClass="ptr-metric-overdue" />
+          </>
+        )}
+      </div>
+      <button
+        type="button"
+        className="button primary-button ptr-fin-view"
+        onClick={onView}
+        disabled={invoices.length === 0}
+      >
+        <FileText size={15} /> View Invoices
+      </button>
+    </div>
+  )
+}
+
+function InvoiceListModal({ cfg, year, open, invoices, onClose, onOpenInvoice }: {
+  cfg: KindConfig
+  year: number | null
+  open: boolean
+  invoices: RecentInvoice[]
+  onClose: () => void
+  onOpenInvoice: (id: string) => void
+}) {
+  const { overlayZ, contentZ, isTopLayer } = useModalLayer(open)
+  const billable = invoices.filter((i) => i.status !== 5)
+  const totalBilled = billable.reduce((s, i) => s + (i.value ?? 0), 0)
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            className={`modal-overlay${isTopLayer ? " modal-overlay--blur" : ""}`}
+            style={{ zIndex: overlayZ }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <div className="modal-positioner" style={{ zIndex: contentZ }}>
+            <motion.div
+              className="modal reports-modal"
+              initial={{ opacity: 0, scale: 0.96, y: 16 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 16 }}
+              transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <div className="modal-header">
+                <div className="reports-modal-title">
+                  <div>
+                    <h2 className="title2 emphasized">Invoices — {year ?? "All Time"}</h2>
+                    <span className="reports-modal-subtitle">
+                      {billable.length} invoice{billable.length === 1 ? "" : "s"} · {formatMoneyFull(totalBilled)}
+                      {invoices.length === 25 ? " · 25 most recent" : ""}
+                    </span>
+                  </div>
+                </div>
+                <button className="button modal-close" onClick={onClose}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="reports-modal-body">
+                <div className="ptr-inv-list">
+                  {invoices.map((inv) => (
+                    <button
+                      key={inv.id}
+                      type="button"
+                      className="ptr-inv-row"
+                      onClick={() => onOpenInvoice(inv.id)}
+                    >
+                      <span className="ptr-inv-main">
+                        <span className="ptr-inv-num body-text emphasized">#{inv.invoiceNum}</span>
+                        {(inv.description || inv.jobName) && (
+                          <span className="ptr-inv-desc subheadline text-secondary">
+                            {inv.description || inv.jobName}
+                            {inv.description && inv.jobName ? ` · ${inv.jobName}` : ""}
+                          </span>
+                        )}
+                      </span>
+                      <span className="ptr-inv-date subheadline text-secondary">{formatDate(inv.invoiceDate)}</span>
+                      <span className="ptr-inv-status">
+                        <Badge tone={invoiceStatusTone(inv.status)}>{invoiceStatusLabel(inv.status)}</Badge>
+                      </span>
+                      <span className="ptr-inv-amounts">
+                        <span className="ptr-inv-total body-text emphasized">{formatMoneyFull(inv.value ?? 0)}</span>
+                        <span
+                          className={`ptr-inv-remaining subheadline ${
+                            (inv.amountRemaining ?? 0) > 0 ? "invoice-amount-value--remaining" : "text-secondary"
+                          }`}
+                        >
+                          {(inv.amountRemaining ?? 0) > 0
+                            ? `${formatMoneyFull(inv.amountRemaining)} open`
+                            : "Paid"}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <p className="ptr-inv-footnote subheadline text-secondary">
+                  Click an invoice for its full detail. Showing{" "}
+                  {invoices.length === 25 ? "the 25 most recent invoices" : `${invoices.length} invoice${invoices.length === 1 ? "" : "s"}`}
+                  {year != null ? ` posted in ${year}` : ""} for this {cfg.noun.toLowerCase()}.
+                </p>
+              </div>
+            </motion.div>
+          </div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body
   )
 }
 
@@ -1146,102 +1309,5 @@ function ContributionRowTr({ row, onOpen }: { row: ContributionRow; onOpen: () =
         <span className="ptr-share-pill">{share != null ? formatShare(share) : "—"}</span>
       </td>
     </tr>
-  )
-}
-
-// ─── Invoices ─────────────────────────────────────────────────────────────────
-
-function InvoicesSection({ cfg, year, loading, invoices, overdue, onOpen }: {
-  cfg: KindConfig
-  year: number | null
-  loading: boolean
-  invoices: RecentInvoice[]
-  overdue: number | null
-  onOpen: (id: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-
-  // Void (status 5) stays visible in the list but out of the rollups, matching
-  // the backend summary's `status < 5`.
-  const billable = invoices.filter((i) => i.status !== 5)
-  const totalBilled = billable.reduce((s, i) => s + (i.value ?? 0), 0)
-  const totalOutstanding = billable.reduce((s, i) => s + (i.amountRemaining ?? 0), 0)
-
-  return (
-    <CollapsibleSection
-      title={`Invoices — ${year ?? "All Time"}`}
-      open={open}
-      onToggle={() => setOpen((o) => !o)}
-      loading={loading}
-      isEmpty={!loading && invoices.length === 0}
-      emptyMessage="No invoices this year."
-      icon={<FileText size={16} />}
-      accentColor={INVOICES_ACCENT}
-      metrics={
-        <>
-          <Metric value={billable.length} label="Invoices" />
-          <MetricDivider />
-          <Metric value={formatMoneyFull(totalBilled)} label="Total Billed" />
-          <MetricDivider />
-          <Metric
-            value={formatMoneyFull(totalOutstanding)}
-            label="Outstanding"
-            valueClass="invoice-amount-value--remaining"
-          />
-          {overdue != null && overdue > 0 && (
-            <>
-              <MetricDivider />
-              <Metric
-                value={formatMoneyFull(overdue)}
-                label="Overdue"
-                valueClass="ptr-metric-overdue"
-              />
-            </>
-          )}
-        </>
-      }
-    >
-      <div className="ptr-inv-list">
-        {invoices.map((inv) => (
-          <button
-            key={inv.id}
-            type="button"
-            className="ptr-inv-row"
-            onClick={() => onOpen(inv.id)}
-          >
-            <span className="ptr-inv-main">
-              <span className="ptr-inv-num body-text emphasized">#{inv.invoiceNum}</span>
-              {(inv.description || inv.jobName) && (
-                <span className="ptr-inv-desc subheadline text-secondary">
-                  {inv.description || inv.jobName}
-                  {inv.description && inv.jobName ? ` · ${inv.jobName}` : ""}
-                </span>
-              )}
-            </span>
-            <span className="ptr-inv-date subheadline text-secondary">{formatDate(inv.invoiceDate)}</span>
-            <span className="ptr-inv-status">
-              <Badge tone={invoiceStatusTone(inv.status)}>{invoiceStatusLabel(inv.status)}</Badge>
-            </span>
-            <span className="ptr-inv-amounts">
-              <span className="ptr-inv-total body-text emphasized">{formatMoneyFull(inv.value ?? 0)}</span>
-              <span
-                className={`ptr-inv-remaining subheadline ${
-                  (inv.amountRemaining ?? 0) > 0 ? "invoice-amount-value--remaining" : "text-secondary"
-                }`}
-              >
-                {(inv.amountRemaining ?? 0) > 0
-                  ? `${formatMoneyFull(inv.amountRemaining)} open`
-                  : "Paid"}
-              </span>
-            </span>
-          </button>
-        ))}
-        <p className="ptr-inv-footnote subheadline text-secondary">
-          Showing the {invoices.length === 25 ? "25 most recent" : `${invoices.length}`} invoice
-          {invoices.length === 1 ? "" : "s"}
-          {year != null ? ` posted in ${year}` : ""} for this {cfg.noun.toLowerCase()}.
-        </p>
-      </div>
-    </CollapsibleSection>
   )
 }
