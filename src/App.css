@@ -21471,7 +21471,8 @@ body.pj-painting td.pj-computed {
   left: 0;
   top: 0;
   transform-origin: 0 0;
-  will-change: transform;
+  /* No will-change here: WebKit caches promoted layers as a bitmap at the
+     rasterized scale, so zooming in past 100% goes blurry in Safari. */
 }
 .pp-world--smooth { transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .pp-title {
