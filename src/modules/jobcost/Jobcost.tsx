@@ -54,8 +54,9 @@ import type { BudgetBreakdown, CostItem } from "./types"
 // The fetch always requests the ALL-TIME list with a per-row `yearActive` bit
 // (yearFlag param): the list view filters rows to the active year client-side
 // (identical result to the old server-side filter), while the grouped view
-// keeps a parent visible if ANY member was active that year but still shows
-// its full all-time membership. Both toggles are therefore instant — only the
+// keeps a parent visible if ANY member was active that year and still shows
+// its full all-time membership — but its money stats (volume/margin) sum only
+// the year-active members. Both toggles are therefore instant — only the
 // year selector refetches.
 
 interface ProjectPhase {
@@ -230,8 +231,14 @@ function buildGroups(jobs: Job[]): Group[] {
     // creation order (YY prefix, phase month suffix), so numeric descending
     // is newest → oldest.
     members.sort((a, b) => Number(b.recnum) - Number(a.recnum))
-    const contract = members.reduce((s, m) => s + m.contract, 0)
-    const totalCost = members.reduce((s, m) => s + m.totalCost, 0)
+    // Money figures scope to the members active in the selected year: the
+    // fetch is the ALL-TIME membership, but property volume/margin (and the
+    // sorts on them) must read as the year's numbers, not the building's
+    // lifetime. On an all-time fetch yearActive is true for every member, so
+    // the sums cover everything.
+    const active = members.filter((m) => m.yearActive)
+    const contract = active.reduce((s, m) => s + m.contract, 0)
+    const totalCost = active.reduce((s, m) => s + m.totalCost, 0)
     const firstClient = members.find((m) => m.client)?.client ?? ""
     const multiClient = members.some((m) => m.client && m.client !== firstClient)
     return {
@@ -239,7 +246,7 @@ function buildGroups(jobs: Job[]): Group[] {
       client: multiClient ? "Multiple clients" : firstClient,
       status: Math.min(...members.map((m) => m.status)),
       contract,
-      budget: members.reduce((s, m) => s + m.budget, 0),
+      budget: active.reduce((s, m) => s + m.budget, 0),
       totalCost,
       margin: contract > 0 ? ((contract - totalCost) / contract) * 100 : null,
       phases: members.filter((m) => !m.oneoff),
@@ -2049,7 +2056,8 @@ export default function Jobcost() {
   }
 
   // Grouped view: a parent qualifies if ANY member was active in the selected
-  // year, but its stats/counts always cover the full all-time membership.
+  // year and lists its full all-time membership, but its money stats scope to
+  // the year-active members (see buildGroups).
   const filteredGroups = useMemo(() => {
     const q = search.toLowerCase()
     // Same current-year rule as the list view: a fully-closed property (every
