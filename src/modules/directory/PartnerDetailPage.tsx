@@ -1303,10 +1303,6 @@ function ContributionSection({ cfg, rows, year, loading }: {
       .sort((a, b) => b.partnerCost - a.partnerCost)
   }, [rows])
 
-  const partnerTotal = rows.reduce((s, r) => s + (r.partnerCost ?? 0), 0)
-  const jobsTotal = rows.reduce((s, r) => s + (r.totalCost ?? 0), 0)
-  const overallShare = jobsTotal > 0 ? (partnerTotal / jobsTotal) * 100 : null
-
   function handleSort(key: ContribSortKey) {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"))
     else {
@@ -1346,12 +1342,6 @@ function ContributionSection({ cfg, rows, year, loading }: {
           ariaLabel="Contribution grouping"
         />
         <span className="jc-cb-divider" aria-hidden="true" />
-        {!loading && rows.length > 0 && (
-          <span className="jc-cb-legend">
-            {formatMoneyFull(partnerTotal)} of {formatMoneyFull(jobsTotal)} posted cost
-            {overallShare != null ? ` · ${formatShare(overallShare)}` : ""}
-          </span>
-        )}
         <span className="jc-cb-count">
           <span className="jc-cb-count-num">{groups.length}</span>{" "}
           {groups.length === 1 ? "Property" : "Properties"}
