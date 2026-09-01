@@ -490,9 +490,12 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
 // One of the two floating sub-cards inside an expanded group (Phases /
 // One-Off Projects). Empty kinds render grayed-out and inert; non-empty cards
 // are buttons that reveal their member rows below the card pair.
-function GroupKindCard({ icon, title, singular, plural, members, open, onToggle, showContract, marginColorsOn }: {
+function GroupKindCard({ icon, title, yearLabel, singular, plural, members, open, onToggle, showContract, marginColorsOn }: {
   icon: React.ReactNode
   title: string
+  // Scope suffix ("2026" / "All Time") — the counts and money below are
+  // year-scoped, so the title says which year they describe.
+  yearLabel: string
   // Count noun: "25 Phases ›" / "2 One-Offs ›", not a bare number.
   singular: string
   plural: string
@@ -529,7 +532,7 @@ function GroupKindCard({ icon, title, singular, plural, members, open, onToggle,
       <div className="jc-group-card-head">
         <span className="jc-group-card-title subheadline text-secondary">
           {icon}
-          {title}
+          {title} — {yearLabel}
           {status != null && (
             <span className={`status-badge status-${status}`}>
               {STATUS_LABELS[status] ?? status}
@@ -686,8 +689,9 @@ function OverviewStat({ label, value, valueColor }: { label: string; value: stri
   )
 }
 
-function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onToggleKind, onOpenJob }: {
+function GroupExpandedPanel({ group, yearLabel, showContract, marginColorsOn, openKind, onToggleKind, onOpenJob }: {
   group: Group
+  yearLabel: string
   showContract: boolean
   marginColorsOn: boolean
   // At most one sub-card is open; clicking the other swaps, clicking the open
@@ -702,6 +706,9 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
     <div className="jc-expand-panel">
       {/* Overall property stats (the row itself only carries counts). */}
       <div className="jc-group-overview">
+        {/* Scope tag: every figure on this strip (and the kind cards below)
+            reads as the selected year, or the property's lifetime. */}
+        <OverviewStat label="Showing" value={yearLabel} />
         {showContract && <OverviewStat label="Property Contract Volume" value={formatMoneyFull(group.contract)} />}
         <OverviewStat
           label="Property Gross Margin"
@@ -725,6 +732,7 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
         <GroupKindCard
           icon={<Building2 size={13} />}
           title="Rolling Phase Work"
+          yearLabel={yearLabel}
           singular="Phase"
           plural="Phases"
           members={group.phases}
@@ -736,6 +744,7 @@ function GroupExpandedPanel({ group, showContract, marginColorsOn, openKind, onT
         <GroupKindCard
           icon={<Hammer size={13} />}
           title="One-Off Work"
+          yearLabel={yearLabel}
           singular="One-Off"
           plural="One-Offs"
           members={group.oneoffs}
@@ -851,8 +860,9 @@ function KindChip({ icon, count, singular, plural, onOpen }: {
 // memo: the virtualizer re-renders the list on every scroll frame; without it
 // every mounted card re-renders per frame. Handlers take the group as an
 // argument (no per-item closures) so props stay referentially stable.
-const PropertyCard = memo(function PropertyCard({ group, open, openKind, entrance, index, tick, scrollerRef, showContract, marginColorsOn, pinned, tourAnchor, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin, onOpenProperty }: {
+const PropertyCard = memo(function PropertyCard({ group, yearLabel, open, openKind, entrance, index, tick, scrollerRef, showContract, marginColorsOn, pinned, tourAnchor, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin, onOpenProperty }: {
   group: Group
+  yearLabel: string
   open: boolean
   openKind: "phases" | "oneoffs" | null
   // Staggered blur-in on the list's first paint only — cards mounted later by
@@ -1052,6 +1062,7 @@ const PropertyCard = memo(function PropertyCard({ group, open, openKind, entranc
             >
               <GroupExpandedPanel
                 group={group}
+                yearLabel={yearLabel}
                 showContract={showContract}
                 marginColorsOn={marginColorsOn}
                 openKind={openKind}
@@ -1071,8 +1082,9 @@ const PropertyCard = memo(function PropertyCard({ group, open, openKind, entranc
 // them all at once is what made the view toggle lag). Items are absolutely
 // positioned by measured offset inside a spacer of the total height; card
 // expand/collapse is picked up live by the virtualizer's ResizeObserver.
-function PropertyList({ groups, openGroupKey, openKind, entrance, showContract, marginColorsOn, pins, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin, onOpenProperty }: {
+function PropertyList({ groups, yearLabel, openGroupKey, openKind, entrance, showContract, marginColorsOn, pins, onToggle, onToggleKind, onOpenKind, onOpenJob, onTogglePin, onOpenProperty }: {
   groups: Group[]
+  yearLabel: string
   openGroupKey: string | null
   openKind: "phases" | "oneoffs" | null
   // False when the list is re-entered via the view toggle: the blur-in
@@ -1206,6 +1218,7 @@ function PropertyList({ groups, openGroupKey, openKind, entrance, showContract, 
           >
             <PropertyCard
               group={group}
+              yearLabel={yearLabel}
               open={isOpen}
               openKind={isOpen ? openKind : null}
               entrance={entrance && entranceRef.current}
@@ -2533,6 +2546,7 @@ export default function Jobcost() {
                   ) : (
                     <PropertyList
                       groups={filteredGroups}
+                      yearLabel={year == null ? "All Time" : String(year)}
                       openGroupKey={openGroupKey}
                       openKind={openKind}
                       entrance={!entrancePlayedRef.current}
