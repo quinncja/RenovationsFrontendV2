@@ -21925,7 +21925,10 @@ body.pj-painting td.pj-computed {
   user-select: none;
   white-space: nowrap;
   font-weight: 900;
-  font-size: 6.5rem;
+  /* Sized past the strip so the caps crop ~5px into the top and bottom
+     edges (overflow:hidden on the strip does the trimming), like the
+     project hero's overrunning phase mark. */
+  font-size: 8.75rem;
   line-height: 1;
   letter-spacing: -0.05em;
   font-variant-numeric: tabular-nums;
