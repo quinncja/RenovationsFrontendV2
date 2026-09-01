@@ -437,19 +437,6 @@ function KpiCards({ kind, year, loading, summary, byYear, share, marginSummary, 
       : null
     cards.push(
       <StatWidget
-        key="outstanding"
-        title="Outstanding Balance"
-        value={relationship?.outstanding ?? null}
-        loading={loading}
-        caption={
-          relationship ? (
-            <span className="ptr-kpi-caption subheadline text-secondary">
-              {relationship.invoiceCount} invoices all-time
-            </span>
-          ) : undefined
-        }
-      />,
-      <StatWidget
         key="since"
         title="Partner Since"
         value={sinceYear}
