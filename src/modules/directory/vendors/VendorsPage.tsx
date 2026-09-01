@@ -70,6 +70,10 @@ function VendorsContent({ year, onYearChange }: { year: number | null; onYearCha
     [items]
   )
 
+  // Share of the whole list's spend — the concentration read ("our top three
+  // vendors are half of material spend").
+  const listTotal = useMemo(() => items.reduce((s, v) => s + (v.value ?? 0), 0), [items])
+
   return (
     <Page
       title="Vendors"
@@ -107,6 +111,7 @@ function VendorsContent({ year, onYearChange }: { year: number | null; onYearCha
                     <SortTh spendRank col="label" label="Vendor Name" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh spendRank col="jobCount" label="Jobs" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
                     <SortTh spendRank col="value" label="Spend" align="right" sortKey={sortKey} sortDir={sortDir} onSort={handleSort} />
+                    <th className="spend-rank-table-value">% of Total</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -123,6 +128,9 @@ function VendorsContent({ year, onYearChange }: { year: number | null; onYearCha
                       <td className="spend-rank-table-name body-text">{item.label}</td>
                       <td className="spend-rank-table-value subheadline text-secondary">{item.jobCount}</td>
                       <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(item.value)}</td>
+                      <td className="spend-rank-table-value subheadline text-secondary">
+                        {listTotal > 0 ? `${((item.value / listTotal) * 100).toFixed(1)}%` : "—"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

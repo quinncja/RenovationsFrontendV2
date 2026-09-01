@@ -142,8 +142,11 @@ export const PAGE_QUERIES = {
   clientDetail: [
     "clientSummary",
     "clientRevenueByYear",
+    "clientRevenueByMonth",
+    "clientRevenueShare",
+    "clientMarginSummary",
+    "clientPaymentBehavior",
     "clientRecentInvoices",
-    "clientJobs",
   ],
 
   // Directory — Vendors
@@ -151,8 +154,11 @@ export const PAGE_QUERIES = {
   vendorDetail: [
     "vendorSummary",
     "vendorSpendByYear",
+    "vendorSpendByMonth",
+    "vendorCategoryShare",
+    "vendorRelationship",
     "vendorRecentInvoices",
-    "vendorJobs",
+    "partnerProjectContribution",
   ],
 
   // Directory — Subcontractors
@@ -160,8 +166,11 @@ export const PAGE_QUERIES = {
   subcontractorDetail: [
     "subcontractorSummary",
     "subcontractorSpendByYear",
+    "subcontractorSpendByMonth",
+    "subcontractorCategoryShare",
+    "subcontractorRelationship",
     "subcontractorRecentInvoices",
-    "subcontractorJobs",
+    "partnerProjectContribution",
   ],
 } as const
 

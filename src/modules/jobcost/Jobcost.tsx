@@ -100,6 +100,9 @@ export interface RawProject {
   pmName?: string | null
   phases?: ProjectPhase[]
   clientName?: string | null
+  // reccln.recnum — lets a caller scope the phase list to one client (the
+  // partner detail page's project board).
+  clientId?: number | string | null
   // Sage custom fields (dbo.actr_u): parent = shared-address grouping key,
   // oneoff = 1 for non-phase projects. Both null/absent when the lazily
   // created actr_u row doesn't exist yet (jobs added after the backfill).
@@ -141,6 +144,7 @@ export interface Job {
   margin: number | null
   supervisor: string
   client: string
+  clientId: number | null
   parent: string
   oneoff: boolean
   // One-off display name (actr_u.oofnme), shown in place of the Sage job
@@ -185,6 +189,7 @@ export function normalizeProject(p: RawProject): Job {
       p.phases?.find((ph) => ph.pmName?.trim())?.pmName?.trim() ??
       "",
     client: p.clientName?.trim() ?? "",
+    clientId: p.clientId != null ? Number(p.clientId) : null,
     // No parent yet (new job, actr_u row not created) → the job is its own
     // single-member group under its own name.
     parent: parent || p.name,
@@ -201,8 +206,9 @@ export function normalizeProject(p: RawProject): Job {
   }
 }
 
-// A parent group — Sage jobs sharing a building address.
-interface Group {
+// A parent group — Sage jobs sharing a building address. Exported (with
+// buildGroups) for the partner detail page's property-grouped project board.
+export interface Group {
   key: string
   client: string
   // min(member status): any Current member → Current; else any Complete →
@@ -218,7 +224,7 @@ interface Group {
   units: number
 }
 
-function buildGroups(jobs: Job[]): Group[] {
+export function buildGroups(jobs: Job[]): Group[] {
   const byParent = new Map<string, Job[]>()
   for (const j of jobs) {
     const list = byParent.get(j.parent)

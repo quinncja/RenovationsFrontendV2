@@ -21722,3 +21722,258 @@ body.pj-painting td.pj-computed {
   color: var(--secondary-text);
   pointer-events: none;
 }
+
+/* ─── Partner detail page (ptr-) ─────────────────────────────────────────────
+   Unified client / vendor / subcontractor detail. Styled after the Overhead
+   Report's card language: neutral surfaces, soft pills, --hover-bg hovers
+   (never darkened borders), copper reserved for meaning. */
+
+.ptr-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr));
+  gap: 1rem;
+}
+
+.ptr-kpi-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.ptr-kpi-caption {
+  display: block;
+  margin-top: 0.25rem;
+}
+
+/* Board area inside the Projects section */
+.ptr-board {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.ptr-board-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ptr-board-note {
+  margin-left: auto;
+}
+
+/* Property cards — a quieter cousin of the jobcost board's project cards */
+.ptr-prop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ptr-prop-card {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--card-color);
+  overflow: hidden;
+}
+
+.ptr-prop-head {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ptr-prop-head:hover {
+  background: var(--hover-bg);
+}
+
+.ptr-prop-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ptr-prop-facts {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.ptr-prop-figures {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex: 0 0 auto;
+}
+
+.ptr-prop-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+  min-width: 5.5rem;
+}
+
+.ptr-prop-figure-value {
+  white-space: nowrap;
+}
+
+.ptr-prop-figure-label {
+  white-space: nowrap;
+}
+
+.ptr-prop-body {
+  padding: 0 1rem 0.875rem;
+}
+
+.ptr-prop-card--open .ptr-prop-head {
+  background: var(--hover-bg);
+}
+
+.ptr-prop-report-link {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.625rem;
+  padding: 0.375rem 0.75rem;
+  border: none;
+  border-radius: 999px;
+  background: rgb(from var(--primary-text) r g b / 0.06);
+  color: var(--secondary-text);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+}
+
+.ptr-prop-report-link:hover {
+  background: var(--hover-bg);
+  color: var(--primary-text);
+}
+
+/* Share pill — the "% of that property's spend" figure */
+.ptr-share-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: rgb(from var(--primary-color) r g b / 0.12);
+  color: var(--primary-color);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+/* Invoice rows — modern card rows instead of the old dense table */
+.ptr-inv-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.ptr-inv-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--card-color);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ptr-inv-row:hover {
+  background: var(--hover-bg);
+}
+
+.ptr-inv-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.ptr-inv-desc {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ptr-inv-date {
+  white-space: nowrap;
+}
+
+.ptr-inv-amounts {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+  min-width: 6.5rem;
+}
+
+.ptr-inv-total,
+.ptr-inv-remaining {
+  white-space: nowrap;
+}
+
+.ptr-inv-footnote {
+  margin: 0.5rem 0 0;
+}
+
+.ptr-metric-overdue {
+  color: #dc2626;
+}
+
+@media (max-width: 768px) {
+  .ptr-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .ptr-prop-head {
+    flex-wrap: wrap;
+    row-gap: 0.375rem;
+  }
+
+  .ptr-prop-figures {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .ptr-prop-figure {
+    align-items: flex-start;
+    min-width: 0;
+  }
+
+  .ptr-inv-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: 0.375rem;
+  }
+
+  .ptr-inv-date {
+    order: 3;
+  }
+
+  .ptr-board-note {
+    margin-left: 0;
+  }
+}

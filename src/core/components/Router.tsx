@@ -23,11 +23,9 @@ const RevenueMap = lazy(() => import("../../modules/revenue-map/RevenueMapPage.t
 const OrgChart = lazy(() => import("../../modules/org-chart/OrgChartPage.tsx"))
 const ProjectProcessPage = lazy(() => import("../../modules/project-process/ProjectProcessPage.tsx"))
 const ClientsPage = lazy(() => import("../../modules/directory/clients/ClientsPage.tsx"))
-const ClientDetailPage = lazy(() => import("../../modules/directory/clients/ClientDetailPage.tsx"))
 const VendorsPage = lazy(() => import("../../modules/directory/vendors/VendorsPage.tsx"))
-const VendorDetailPage = lazy(() => import("../../modules/directory/vendors/VendorDetailPage.tsx"))
 const SubcontractorsPage = lazy(() => import("../../modules/directory/subcontractors/SubcontractorsPage.tsx"))
-const SubcontractorDetailPage = lazy(() => import("../../modules/directory/subcontractors/SubcontractorDetailPage.tsx"))
+const PartnerDetailPage = lazy(() => import("../../modules/directory/PartnerDetailPage.tsx"))
 const EmployeeDetailPage = lazy(() => import("../../modules/dashboard/EmployeeDetailPage.tsx"))
 const EmployeesPage = lazy(() => import("../../modules/directory/employees/EmployeesPage.tsx"))
 const MonthlyBreakdownPage = lazy(() => import("../../modules/dashboard/MonthlyBreakdownPage.tsx"))
@@ -125,11 +123,11 @@ export default function Router() {
 
             {/* Directory — admin/executive */}
             <Route path="/clients" element={<RequireRole allowed={["executive", "admin"]}><ClientsPage /></RequireRole>} />
-            <Route path="/clients/:id" element={<RequireRole allowed={["executive", "admin"]}><ClientDetailPage /></RequireRole>} />
+            <Route path="/clients/:id" element={<RequireRole allowed={["executive", "admin"]}><PartnerDetailPage kind="client" /></RequireRole>} />
             <Route path="/vendors" element={<RequireRole allowed={["executive", "admin"]}><VendorsPage /></RequireRole>} />
-            <Route path="/vendors/:id" element={<RequireRole allowed={["executive", "admin"]}><VendorDetailPage /></RequireRole>} />
+            <Route path="/vendors/:id" element={<RequireRole allowed={["executive", "admin"]}><PartnerDetailPage kind="vendor" /></RequireRole>} />
             <Route path="/subcontractors" element={<RequireRole allowed={["executive", "admin"]}><SubcontractorsPage /></RequireRole>} />
-            <Route path="/subcontractors/:id" element={<RequireRole allowed={["executive", "admin"]}><SubcontractorDetailPage /></RequireRole>} />
+            <Route path="/subcontractors/:id" element={<RequireRole allowed={["executive", "admin"]}><PartnerDetailPage kind="subcontractor" /></RequireRole>} />
 
             {/* Charts — admin/executive */}
             <Route path="/cash-flow" element={<RequireRole allowed={["executive", "admin"]}><CashFlow /></RequireRole>} />
