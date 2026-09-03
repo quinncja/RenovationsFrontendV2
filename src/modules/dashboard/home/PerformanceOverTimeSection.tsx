@@ -37,6 +37,7 @@ export function PerformanceOverTimeSection({
           yearly={yearly}
           loading={isLoading}
           onYearChange={onYearChange}
+          companyWide={gmHome}
         />
       </MotionItem>
 

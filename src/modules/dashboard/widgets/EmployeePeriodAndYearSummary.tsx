@@ -3,6 +3,8 @@ import { RotateCcw } from "lucide-react"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import { fullMonth, shortMonth, marginTextColor, formatRatioPercent } from "../../../shared/utils/format"
 import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled"
+import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
+import { useMarginPerformanceFor } from "./useMarginPerformanceFor"
 import { YearSelector } from "../../../shared/components/YearSelector/YearSelector"
 import { SummarySnapshotCard } from "./SummarySnapshotCard"
 
@@ -14,6 +16,13 @@ import { SummarySnapshotCard } from "./SummarySnapshotCard"
 // open period dropdown's "Open" sentinel should resolve to (it's a global
 // concept — same open month for every employee). The actual numbers always
 // come from the breakdown.
+//
+// GM home (`companyWide`): the all-jobs sentinel makes this card company-wide,
+// so it takes the SAME data path as the admin dashboard's Period & Year
+// Summary — billed revenue from marginPerformance / openMonthFinances, with
+// the open period's over/under folded in when the "Incl. WIP" toggle is on.
+// The breakdown's earned-revenue (percentage-of-completion) figures use a
+// different accounting basis and never reconciled with the admin card.
 
 interface MonthlyRow {
   month: number
@@ -34,6 +43,9 @@ interface YearlyRow {
 interface OpenMonth {
   openMonthPeriod?: number
   openMonthYear?: number
+  openMonthIncome?: number
+  openMonthSpent?: number
+  openMonthOverUnder?: number
 }
 
 // Period is either an explicit user-picked month (1..12) or null = "follow
@@ -62,12 +74,28 @@ interface Props {
    *  the page header. Omitted on the admin /employees/:id route, which keeps
    *  its header selector. */
   onYearChange?: (year: number) => void
+  /** GM home: ignore `monthly`/`yearly` and derive both cards from the
+   *  company-wide marginPerformance + openMonthFinances payloads (WIP toggle
+   *  honored), so the figures match the admin dashboard's card. */
+  companyWide?: boolean
 }
 
-export function EmployeePeriodAndYearSummary({ monthly, yearly, loading, onYearChange }: Props) {
+export function EmployeePeriodAndYearSummary({
+  monthly: monthlyProp,
+  yearly: yearlyProp,
+  loading: loadingProp,
+  onYearChange,
+  companyWide = false,
+}: Props) {
   const pageYear = usePageYear()
   const marginColorsOn = useMarginColorsEnabled()
-  const { data } = useWidgetData<{ openMonthFinances: OpenMonth | null }>(["openMonthFinances"])
+  const [includeOverUnder] = useIncludeOverUnder()
+  const { data, isLoading: openLoading } = useWidgetData<{ openMonthFinances: OpenMonth | null }>([
+    "openMonthFinances",
+  ])
+  // Only fetched/used on the company-wide path; on the page year this reuses
+  // the bundled query (the GM home already loads marginPerformance).
+  const { rows: marginRows, isLoading: marginLoading } = useMarginPerformanceFor(pageYear)
 
   const open = data?.openMonthFinances ?? null
   const openMonth = open?.openMonthPeriod ?? null
@@ -82,6 +110,56 @@ export function EmployeePeriodAndYearSummary({ monthly, yearly, loading, onYearC
 
   // Display month: explicit pick wins, otherwise the actually-open month.
   const resolvedMonth: number | null = explicitPeriod ?? openMonth
+
+  // Company-wide rows in the breakdown's shape. Mirrors YearSummaryWidget /
+  // CurrentPeriodSummaryWidget: marginPerformance already includes the open
+  // month's confirmed billings; the open month itself prefers the
+  // openMonthFinances payload (the only source carrying over/under), and the
+  // WIP toggle adds openMonthOverUnder to income + profit (never cost) when
+  // the displayed year is the open year.
+  const company = useMemo(() => {
+    if (!companyWide) return null
+    const rows = Array.isArray(marginRows) ? marginRows : []
+    const wipYear = includeOverUnder && open?.openMonthYear === pageYear
+    const wip = wipYear ? open?.openMonthOverUnder ?? 0 : 0
+    const toRow = (month: number, income: number, totalCost: number): MonthlyRow => ({
+      month,
+      income,
+      totalCost,
+      profit: income - totalCost,
+      margin: income !== 0 ? ((income - totalCost) / Math.abs(income)) * 100 : 0,
+    })
+    const monthlyRows: MonthlyRow[] = rows
+      .filter((r) => r.month >= 1 && r.month <= 12)
+      .map((r) => {
+        if (wipYear && open && r.month === open.openMonthPeriod) {
+          return toRow(r.month, (open.openMonthIncome ?? 0) + wip, open.openMonthSpent ?? 0)
+        }
+        return toRow(r.month, r.revenue ?? 0, r.total_expenses ?? 0)
+      })
+    let income = 0
+    let totalCost = 0
+    for (const r of rows) {
+      income += r.revenue ?? 0
+      totalCost += r.total_expenses ?? 0
+    }
+    income += wip
+    const yearlyRows: YearlyRow[] = [
+      {
+        year: pageYear,
+        income,
+        totalCost,
+        profit: income - totalCost,
+        margin: income !== 0 ? ((income - totalCost) / Math.abs(income)) * 100 : 0,
+      },
+    ]
+    return { monthly: monthlyRows, yearly: yearlyRows }
+  }, [companyWide, marginRows, open, includeOverUnder, pageYear])
+
+  const monthly = company ? company.monthly : monthlyProp
+  const yearly = company ? company.yearly : yearlyProp
+  const loading = companyWide ? openLoading || marginLoading : loadingProp
+  const wipApplied = companyWide && includeOverUnder && open?.openMonthYear === pageYear
 
   // Reset chip visible only when the user has navigated off the open month.
   const showReset =
@@ -132,7 +210,7 @@ export function EmployeePeriodAndYearSummary({ monthly, yearly, loading, onYearC
   return (
     <div className="summary-snapshot-pair">
       <SummarySnapshotCard
-        title="Period Summary"
+        title={wipApplied && status === "Open" ? "Period Summary + WIP" : "Period Summary"}
         className="period-summary-widget"
         actions={
           <>
@@ -182,7 +260,7 @@ export function EmployeePeriodAndYearSummary({ monthly, yearly, loading, onYearC
         loading={loading}
       />
       <SummarySnapshotCard
-        title="Year Summary"
+        title={wipApplied ? "Year Summary + WIP" : "Year Summary"}
         className="year-summary-widget"
         actions={onYearChange && <YearSelector value={pageYear} onChange={onYearChange} />}
         headlineLabel={String(pageYear)}
