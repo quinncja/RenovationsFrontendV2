@@ -25,7 +25,8 @@ import { useJobcostNav } from "../../jobcost/useJobcostNav"
 import { JOB_STATUS_LABELS } from "../directoryShared"
 import { SortTh } from "../../../shared/components/SortTh"
 import { SEG_SPRING } from "../../../shared/animation/springs"
-import { CompositionBar, RiskBadges, OpenJobsPanel, ClientMixStrip, clientShares } from "./WorkloadView"
+import { RiskBadges, OpenJobsPanel, ClientMixStrip, clientShares } from "./WorkloadView"
+import { FormulaTip, useFormulaHover, type Formula } from "../../projections/FormulaTip"
 import { deriveWorkload, oneoffDisplayName, type EmployeeWorkloadPayload, type PmWorkload } from "./workload"
 
 // Directory peer of ClientsPage / VendorsPage / SubcontractorsPage for the
@@ -34,7 +35,7 @@ import { deriveWorkload, oneoffDisplayName, type EmployeeWorkloadPayload, type P
 // and whose body expands (framer height tween, same clock as the property
 // cards) into the detail table beneath. Two lenses on the same cards:
 //  - Workload (default): current-state "who can take the next job" — open
-//    phases, remaining backlog, progress mix, risk badges.
+//    phases, remaining backlog, workload share, risk badges.
 //  - Performance: the year-scoped financial figures (work completed /
 //    budget / cost / variance / margin).
 // The lenses share search and the expanded card (toggling views keeps the
@@ -125,7 +126,8 @@ function EmployeesView({ year, onYearChange }: { year: number | null; onYearChan
     employeePerformance: EmployeeRow[] | null
     employeeWorkload: EmployeeWorkloadPayload | null
     allProjectPhases: PerfPhase[] | null
-  }>(["employeePerformance", "employeeWorkload", "allProjectPhases"])
+    employeeYearRevenue: { sprvsr: number | string; revenue: number | string }[] | null
+  }>(["employeePerformance", "employeeWorkload", "allProjectPhases", "employeeYearRevenue"])
 
   // employeePerformance is a raw recordset — employeeNum can come back as a
   // STRING (mssql BIGINT/NUMERIC) while allProjectPhases' pmId arrives via
@@ -143,10 +145,26 @@ function EmployeesView({ year, onYearChange }: { year: number | null; onYearChan
       })),
     [data?.employeePerformance],
   )
-  const pms = useMemo(
-    () => (data?.employeeWorkload ? deriveWorkload(data.employeeWorkload).pms : []),
+  const { pms, totalContract } = useMemo(
+    () => (data?.employeeWorkload ? deriveWorkload(data.employeeWorkload) : { pms: [], totalContract: 0 }),
     [data?.employeeWorkload],
   )
+  // Each employee's slice of the selected year's revenue — the per-supervisor
+  // split of the home page's Current Year Revenue figure (GL income by the
+  // job on each ledger line), so the shares sum to exactly that number.
+  // Keyed by pmId (the Sage supervisor recnum, 0 = Unassigned Work on both
+  // sides). Raw recordset: coerce, the driver may hand back strings.
+  const yearRevenue = useMemo(() => {
+    const byPm = new Map<number, number>()
+    let total = 0
+    for (const row of data?.employeeYearRevenue ?? []) {
+      const pmId = Number(row.sprvsr) || 0
+      const revenue = Number(row.revenue) || 0
+      byPm.set(pmId, (byPm.get(pmId) ?? 0) + revenue)
+      total += revenue
+    }
+    return { byPm, total }
+  }, [data?.employeeYearRevenue])
   const phasesByPm = useMemo(() => {
     const map = new Map<number, PerfPhase[]>()
     for (const phase of data?.allProjectPhases ?? []) {
@@ -325,13 +343,6 @@ function EmployeesView({ year, onYearChange }: { year: number | null; onYearChan
                 <ChevronDown size={12} className="jc-cb-select-arrow" />
               </span>
             )}
-            {view === "workload" && !isMobile && (
-              <span className="jc-cb-legend">
-                <span className="ewl-legend-swatch ewl-mix-early" /> Early
-                <span className="ewl-legend-swatch ewl-mix-mid" /> Mid
-                <span className="ewl-legend-swatch ewl-mix-closing" /> Closing
-              </span>
-            )}
             <SearchField variant="jc" placeholder="Search employees..." value={search} onChange={setSearch} />
             <span className="jc-cb-count">
               <span className="jc-cb-count-num">{resultCount}</span> {resultCount === 1 ? "Employee" : "Employees"}
@@ -373,6 +384,12 @@ function EmployeesView({ year, onYearChange }: { year: number | null; onYearChan
                         <WorkloadCard
                           key={pm.pmId}
                           pm={pm}
+                          totalContract={totalContract}
+                          // A PM with no revenue this year is a real $0, not unknown —
+                          // only an empty company total marks the share unavailable.
+                          yearRevenue={yearRevenue.byPm.get(pm.pmId) ?? 0}
+                          yearRevenueTotal={yearRevenue.total}
+                          completedYear={year}
                           open={expandedId === pm.pmId}
                           entrance={entrance}
                           index={i}
@@ -412,6 +429,9 @@ interface HeadStat {
   label: string
   value: string
   color?: string
+  /** Hover popover (the projections FormulaTip) spelling out how the value
+   *  is derived, with this card's live figures. */
+  formula?: Formula
 }
 
 // One employee card in the Job Costing property-card language: chevron tile +
@@ -449,6 +469,21 @@ function EmployeeCard({
   children: React.ReactNode
 }) {
   const navigate = useNavigate()
+  // One hover slot per card: the projections formula popover, anchored to
+  // whichever stat (or sub-line) the pointer is on. The formula travels in a
+  // ref alongside the anchor so the hook's element-only API stays untouched.
+  const tip = useFormulaHover(false)
+  const tipFormula = useRef<Formula | null>(null)
+  const hoverProps = (f: Formula | undefined) =>
+    f
+      ? {
+          onMouseEnter: (e: React.MouseEvent<HTMLElement>) => {
+            tipFormula.current = f
+            tip.onEnter(e.currentTarget)
+          },
+          onMouseLeave: tip.onLeave,
+        }
+      : {}
   return (
     <motion.div
       className={`jc-project-card${open ? " jc-project-card-open" : ""}`}
@@ -485,7 +520,9 @@ function EmployeeCard({
         </span>
         <span className="jc-head-stats">
           {stats.map((s) => (
-            <span key={s.label} className="jc-head-stat">
+            // The whole stat block (label + value) is the hover target, with
+            // no visual cue — the popover itself is the reveal.
+            <span key={s.label} className="jc-head-stat" {...hoverProps(s.formula)}>
               <span className="jc-head-stat-label">{s.label}</span>
               <span className="jc-head-stat-value" style={s.color ? { color: s.color } : undefined}>
                 {s.value}
@@ -493,6 +530,7 @@ function EmployeeCard({
             </span>
           ))}
         </span>
+        {tip.anchor && tipFormula.current && <FormulaTip anchor={tip.anchor} formula={tipFormula.current} />}
         {extras && <span className="jc-project-counts">{extras}</span>}
         {/* stopPropagation on click AND keydown — the head is a role=button
             that would otherwise toggle open. */}
@@ -531,21 +569,43 @@ function EmployeeCard({
 
 function WorkloadCard({
   pm,
+  totalContract,
+  yearRevenue,
+  yearRevenueTotal,
+  completedYear,
   open,
   entrance,
   index,
   onToggle,
 }: {
   pm: PmWorkload
+  /** Company-wide contract value across every open job (the share's denominator). */
+  totalContract: number
+  /** This PM's GL income for completedYear (their slice of the home page's year revenue). */
+  yearRevenue: number
+  /** Same, company-wide — the home page's Current Year Revenue figure. 0 hides the line. */
+  yearRevenueTotal: number
+  /** The Performance year selection (null = All Time) the revenue share is scoped to. */
+  completedYear: number | null
   open: boolean
   entrance: boolean
   index: number
   onToggle: (id: number) => void
 }) {
-  const subtitleParts = [`${pm.openCount} open ${pm.openCount === 1 ? "job" : "jobs"}`]
+  // The open count is the head stat; the subtitle splits it into what's
+  // actually moving (active = open − upcoming − dormant) and the two idle
+  // buckets, so the three add back up to Open Jobs.
+  const subtitleParts = [`${pm.activeCount} active ${pm.activeCount === 1 ? "job" : "jobs"}`]
   if (pm.upcomingCount > 0) subtitleParts.push(`${pm.upcomingCount} upcoming`)
   if (pm.dormantCount > 0) subtitleParts.push(`${pm.dormantCount} dormant`)
   const subtitle = pm.openCount === 0 ? "No open jobs" : subtitleParts.join(" · ")
+  // Share of the open contract value is the headline ("how much of what's
+  // on the books is theirs"); their share of the year's revenue lives only
+  // in the popover, as its second line. Sub-1% shares read "<1%" rather than rounding to
+  // a misleading 0.
+  const pctLabel = (p: number | null) => (p == null ? "—" : p > 0 && p < 0.005 ? "<1%" : `${Math.round(p * 100)}%`)
+  const completedScope = completedYear == null ? "all time" : String(completedYear)
+  const completedShare = yearRevenueTotal > 0 ? yearRevenue / yearRevenueTotal : null
   return (
     <EmployeeCard
       id={pm.pmId}
@@ -555,22 +615,40 @@ function WorkloadCard({
       italic={pm.pmId === 0}
       subtitle={subtitle}
       stats={[
-        { label: "Open", value: String(pm.openCount) },
+        { label: "Open Jobs", value: String(pm.openCount) },
         { label: "Units", value: pm.units > 0 ? String(pm.units) : "—" },
-        { label: "Remaining", value: formatMoney(pm.remaining) },
+        {
+          label: "Remaining Work",
+          value: formatMoney(pm.remaining),
+          formula: {
+            label: "Remaining Work",
+            showLabel: true,
+            symbolic: "Budget left to spend across this employee's open jobs",
+          },
+        },
+        {
+          label: "Workload Share",
+          value: pctLabel(pm.openShare),
+          // Title, then the current share, then the year's share.
+          formula: {
+            label: "Workload Share",
+            showLabel: true,
+            symbolic: `${pctLabel(pm.openShare)} of current workload by contract`,
+            lines: [
+              completedShare == null
+                ? `${completedScope} work share unavailable`
+                : `${pctLabel(completedShare)} of ${completedScope} work`,
+            ],
+          },
+        },
       ]}
-      // Fixed-width slots so the mix bar, risk badges, and (with them) the
-      // stat cluster land on the same x across every card — variable badge
-      // text otherwise shoves each card's right side around.
+      // Fixed-width slot so the risk badges and (with them) the stat cluster
+      // land on the same x across every card — variable badge text otherwise
+      // shoves each card's right side around.
       extras={
-        <>
-          <span className="emp-head-mix">
-            <CompositionBar pm={pm} />
-          </span>
-          <span className="emp-head-risk">
-            <RiskBadges pm={pm} />
-          </span>
-        </>
+        <span className="emp-head-risk">
+          <RiskBadges pm={pm} />
+        </span>
       }
       open={open}
       entrance={entrance}

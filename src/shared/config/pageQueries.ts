@@ -135,7 +135,9 @@ export const PAGE_QUERIES = {
   // allProjectPhases for its row expansion (the phases behind each PM's
   // numbers); Workload lens uses the current-state employeeWorkload rollup.
   // All fetched up front so the view toggle is instant.
-  employees: ["employeePerformance", "employeeWorkload", "allProjectPhases"],
+  // employeeYearRevenue = per-supervisor split of the home page's Current
+  // Year Revenue figure, for the workload cards' "% of <year> revenue" line.
+  employees: ["employeePerformance", "employeeWorkload", "allProjectPhases", "employeeYearRevenue"],
 
   // Directory — Clients
   clients: ["allClientsByRevenue"],

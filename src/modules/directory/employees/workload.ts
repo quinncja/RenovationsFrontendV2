@@ -37,10 +37,32 @@ export interface WorkloadActivityRow {
   cost: number
 }
 
+export type ActivityKind = "cost" | "po" | "subcontract" | "changeOrder"
+
 export interface WorkloadLastActivityRow {
   jobnum: number
   /** Most recent insdte/entdte across cost lines, POs, subcontracts, COs. */
   lastActivity: string
+  /** What that most recent entry was (older payloads may lack these). */
+  kind?: ActivityKind
+  description?: string | null
+  amount?: number | string | null
+  vendorName?: string | null
+  /** Change orders only: 1 when approved. */
+  approved?: number | null
+  /** Cost lines only: how many lines (and their total) share the winner's day. */
+  sameDayCount?: number | string | null
+  sameDayTotal?: number | string | null
+}
+
+export interface ActivityDetail {
+  kind: ActivityKind
+  description: string | null
+  amount: number | null
+  vendorName: string | null
+  approved: boolean
+  sameDayCount: number
+  sameDayTotal: number
 }
 
 export interface WorkloadMonthlyRow {
@@ -86,6 +108,8 @@ export interface WorkloadJob {
   upcoming: boolean
   /** Most recent entry date of any kind, null if nothing ever posted. */
   lastActivity: string | null
+  /** What that entry was, for the table's hover; null on older payloads. */
+  lastActivityDetail: ActivityDetail | null
   /** remaining ÷ recent monthly burn; null when dormant or burn is ~0. */
   estMonthsLeft: number | null
   watchlist: boolean
@@ -107,9 +131,15 @@ export interface PmWorkload {
   remaining: number
   contract: number
   budget: number
+  /** Posted + committed cost across the open jobs (budget − cost = remaining, before the per-job floor). */
+  cost: number
   buckets: Record<ProgressBucket, number>
   watchlistCount: number
   missingContractCount: number
+  /** This PM's slice of the company's open work on a contract basis: their
+   *  open jobs' contract total ÷ the same across every PM (0–1). Null when
+   *  no open job anywhere carries a contract amount. */
+  openShare: number | null
 }
 
 // A job is dormant when it HAS started (some cost exists) but NOTHING has
@@ -147,7 +177,7 @@ export function oneoffDisplayName(phase: {
   return property ? `${property} - ${given}` : given
 }
 
-export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkload[] } {
+export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkload[]; totalContract: number } {
   // "Now" in accounting-month terms, for the burn window. Falls back to the
   // newest month with posted costs if the open period is ever missing — a
   // bad reference here must never zero the estimates out.
@@ -169,8 +199,21 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkl
   // with real numbers. Coerce every join key or the Map lookups silently
   // miss and the whole board reads dormant.
   const lastActivityByJob = new Map<number, string>()
+  const lastActivityDetailByJob = new Map<number, ActivityDetail>()
   for (const row of payload.lastActivity ?? []) {
-    lastActivityByJob.set(Number(row.jobnum), row.lastActivity)
+    const jobnum = Number(row.jobnum)
+    lastActivityByJob.set(jobnum, row.lastActivity)
+    if (row.kind) {
+      lastActivityDetailByJob.set(jobnum, {
+        kind: row.kind,
+        description: row.description?.trim() || null,
+        amount: row.amount == null ? null : Number(row.amount),
+        vendorName: row.vendorName?.trim() || null,
+        approved: Number(row.approved) === 1,
+        sameDayCount: Number(row.sameDayCount) || 0,
+        sameDayTotal: Number(row.sameDayTotal) || 0,
+      })
+    }
   }
 
   // Recent burn: mean posted cost over the three months ending at the open
@@ -206,9 +249,11 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkl
         remaining: 0,
         contract: 0,
         budget: 0,
+        cost: 0,
         buckets: { early: 0, mid: 0, closing: 0 },
         watchlistCount: 0,
         missingContractCount: 0,
+        openShare: null,
       }
       byPm.set(pmId, pm)
     }
@@ -244,6 +289,7 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkl
       active,
       upcoming: cost <= 0,
       lastActivity,
+      lastActivityDetail: lastActivityDetailByJob.get(jobnum) ?? null,
       estMonthsLeft: active && burn > 0 && remaining > 0 ? remaining / burn : null,
       watchlist: (phase.totalContract ?? 0) > 0 && (phase.margin ?? 0) < 17,
       missingContract: !phase.totalContract || phase.totalContract <= 0,
@@ -260,8 +306,9 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkl
     pm.remaining += job.remaining
     pm.contract += job.contract
     pm.budget += job.budget
-    // Upcoming jobs stay out of the progress mix — it describes work that has
-    // actually started (the CompositionBar divides by the bucket sum).
+    pm.cost += job.cost
+    // Upcoming jobs stay out of the progress buckets — they describe work
+    // that has actually started.
     if (!job.upcoming) pm.buckets[job.bucket] += 1
     if (job.watchlist) pm.watchlistCount += 1
     if (job.missingContract) pm.missingContractCount += 1
@@ -271,5 +318,12 @@ export function deriveWorkload(payload: EmployeeWorkloadPayload): { pms: PmWorkl
   for (const pm of pms) pm.jobs.sort((a, b) => b.remaining - a.remaining)
   pms.sort((a, b) => b.remaining - a.remaining)
 
-  return { pms }
+  // "How much of the open work is on this person's plate" — contract value
+  // of their open jobs as a share of the whole company's open contract value
+  // (Unassigned Work included, so the shares sum to 100%). Contract, not
+  // remaining budget: a job stays theirs until it closes, however far along.
+  const totalContract = pms.reduce((t, pm) => t + pm.contract, 0)
+  for (const pm of pms) pm.openShare = totalContract > 0 ? pm.contract / totalContract : null
+
+  return { pms, totalContract }
 }

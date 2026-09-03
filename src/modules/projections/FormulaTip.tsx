@@ -15,8 +15,13 @@ const num = (v: number) => String(Math.round(v * 1000) / 1000)
 
 export interface Formula {
   label: string
+  /** Show `label` as a muted title line above everything else. */
+  showLabel?: boolean
   /** Symbolic form, e.g. "Units × Avg Unit Price". */
   symbolic: string
+  /** Extra plain body lines after the symbolic/substituted rows (the
+   *  Employees workload tips stack two figures this way). */
+  lines?: string[]
   /** Same formula with the row's values filled in. Omit both to show the
    *  symbolic form alone (e.g. a plain sum with nothing worth spelling out). */
   substituted?: string
@@ -93,14 +98,24 @@ export function FormulaTip({ anchor, formula }: { anchor: HTMLElement; formula: 
       role="tooltip"
       style={pos ? { left: pos.left, top: pos.top, "--pj-tip-arrow": `${pos.arrow}px` } as React.CSSProperties : { visibility: "hidden", left: 0, top: 0 }}
     >
-      <div className="pj-formula-tip-sym">{formula.symbolic}</div>
+      {formula.showLabel && <div className="pj-formula-tip-title">{formula.label}</div>}
+      <div className={formula.showLabel ? "pj-formula-tip-line" : "pj-formula-tip-sym"}>{formula.symbolic}</div>
       {formula.substituted != null && (
         <div className="pj-formula-tip-sub">
           <span>{formula.substituted}</span>
-          <span className="pj-formula-tip-eq">=</span>
-          <span className="pj-formula-tip-result">{formula.result}</span>
+          {/* A substituted line with no result is a plain second line (the
+              Employees workload tips use it that way) — no dangling "=". */}
+          {formula.result != null && (
+            <>
+              <span className="pj-formula-tip-eq">=</span>
+              <span className="pj-formula-tip-result">{formula.result}</span>
+            </>
+          )}
         </div>
       )}
+      {formula.lines?.map((line) => (
+        <div key={line} className="pj-formula-tip-line">{line}</div>
+      ))}
     </div>,
     document.body
   )

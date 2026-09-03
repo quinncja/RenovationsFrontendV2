@@ -18317,20 +18317,9 @@ button.co-hero-project:hover svg { color: inherit; }
 
 .ewl-dormant { color: var(--secondary-text); font-weight: var(--font-weight-regular); }
 
-/* Progress mix — open phases by stretch, widths by count. Copper ramp:
-   three strengths of the accent so it reads as a progression toward done,
-   with "closing" earning the full copper (the share about to free the PM
-   up — an active-state read, not decoration). Red/amber stay for risk. */
-.ewl-mix {
-  display: inline-flex;
-  width: 110px;
-  height: 8px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--hover-bg);
-  vertical-align: middle;
-}
-.ewl-mix span { display: block; height: 100%; }
+/* Progress stretch colors for the open-jobs table's per-job fill. Copper
+   ramp: three strengths of the accent so it reads as a progression toward
+   done, with "closing" earning the full copper. Red/amber stay for risk. */
 .ewl-mix-early   { background: color-mix(in srgb, var(--primary-color) 28%, transparent); }
 .ewl-mix-mid     { background: color-mix(in srgb, var(--primary-color) 60%, transparent); }
 .ewl-mix-closing { background: var(--primary-color); }
@@ -18396,8 +18385,11 @@ button.co-hero-project:hover svg { color: inherit; }
 .ewl-profile-link:hover { text-decoration: underline; }
 
 /* Progress cell: thin track + % readout, same bucket blues as the mix bar. */
+/* Progress sits centered between Remaining and Last activity (the column is
+   wide, so left-aligned content drifted toward Remaining). */
+.ewl-progress-td { text-align: center; }
 .ewl-progress-cell {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 0.625rem;
 }
@@ -18416,10 +18408,11 @@ button.co-hero-project:hover svg { color: inherit; }
   border-radius: 999px;
 }
 .ewl-progress-pct { font-variant-numeric: tabular-nums; }
+/* Last-activity text + badge as one inline anchor for the hover popover. */
+.ewl-activity { display: inline-flex; align-items: center; gap: 0.375rem; }
 
 @media (max-width: 768px) {
   .ewl-actions { flex-wrap: wrap; }
-  .ewl-mix { width: 84px; }
   .ewl-progress-track { width: 84px; }
 }
 
@@ -18442,15 +18435,16 @@ button.co-hero-project:hover svg { color: inherit; }
 .emp-card-list .jc-head-stat-value {
   font-weight: var(--font-weight-medium);
 }
-/* Fixed-width slots for the workload head's right side, so the mix bar, the
-   risk badges, and with them the stat cluster land on the same x across
-   every card (variable badge text otherwise shoves each card around). */
-.emp-head-mix {
-  display: inline-flex;
-  justify-content: flex-end;
-  width: 120px;
-  flex-shrink: 0;
+/* Four labelled stats (two of them wordy) need more air than the property
+   cards' 1.125rem, and a touch more room before the risk badges so the
+   cluster doesn't read as one run-on line. */
+.emp-card-list .jc-head-stats {
+  gap: 2.25rem;
+  padding-right: 1.25rem;
 }
+/* Fixed-width slot for the workload head's risk badges, so they and with
+   them the stat cluster land on the same x across every card (variable
+   badge text otherwise shoves each card around). */
 .emp-head-risk {
   display: inline-flex;
   justify-content: flex-end;
@@ -18464,18 +18458,6 @@ button.co-hero-project:hover svg { color: inherit; }
   align-items: flex-end;
   gap: 0.25rem;
 }
-/* Progress-mix legend recolored for the command bar's muted ink. */
-.jc-cb-legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: var(--subheadline-size);
-  font-weight: var(--font-weight-medium);
-  color: var(--jcb-muted);
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-.jc-cb-legend .ewl-legend-swatch:not(:first-child) { margin-left: 0.375rem; }
 /* Client-mix strip at the top of the expanded panel: who this employee's
    work is for. One ink hue at descending strengths (same progression trick
    as the workload mix bar) so rank reads without a color legend. */
@@ -21292,6 +21274,20 @@ body.pj-painting td.pj-computed {
   color: var(--secondary-text);
   font-variant-numeric: tabular-nums;
   font-size: 0.75rem;
+}
+/* Titled variant (showLabel): muted uppercase title, then plain body lines
+   in the main voice — the Employees workload stats' popover. */
+.pj-formula-tip-title {
+  color: var(--secondary-text);
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.125rem;
+}
+.pj-formula-tip-line {
+  font-variant-numeric: tabular-nums;
+  white-space: normal;
 }
 .pj-formula-tip-sub {
   display: flex;

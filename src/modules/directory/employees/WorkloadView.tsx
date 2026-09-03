@@ -1,36 +1,16 @@
-import { useMemo, useState } from "react"
-import { formatMoney, formatRelativeTime } from "../../../shared/utils/format"
+import { useMemo, useRef, useState } from "react"
+import { formatMoney, formatMoneyFull, formatRelativeTime } from "../../../shared/utils/format"
+import { FormulaTip, useFormulaHover, type Formula } from "../../projections/FormulaTip"
 import { useJobcostNav } from "../../jobcost/useJobcostNav"
 import { SortTh, type SortDir } from "../../../shared/components/SortTh"
 import { Badge, type BadgeTone } from "../../../shared/components/Badge"
-import type { PmWorkload } from "./workload"
+import type { ActivityDetail, PmWorkload } from "./workload"
 
 // Workload lens pieces — "who can take the next job". Each PM's card head
-// (EmployeesPage) carries how much open work they hold (remaining budget, not
-// job count), the progress mix, and the attention drains (low-margin
+// (EmployeesPage) carries how much open work they hold (remaining budget and
+// contract share, not just job count) and the attention drains (low-margin
 // watchlist, missing contracts); the card expands into the open-jobs table
 // below. The deep work lives on /employees/:id and /jobcost/:recnum.
-
-// Open phases split by progress stretch, widths by count. One hue at three
-// strengths so it reads as a progression (and survives color blindness);
-// "closing" is the strongest — the share about to free the PM up.
-export function CompositionBar({ pm }: { pm: PmWorkload }) {
-  // Buckets only cover started jobs (upcoming ones sit outside the mix), so
-  // the bar divides by the bucket sum, not the open count.
-  const started = pm.buckets.early + pm.buckets.mid + pm.buckets.closing
-  if (started === 0) return null
-  const seg = (n: number) => `${(n / started) * 100}%`
-  return (
-    <div
-      className="ewl-mix"
-      title={`${pm.buckets.early} early · ${pm.buckets.mid} mid · ${pm.buckets.closing} closing`}
-    >
-      {pm.buckets.early > 0 && <span className="ewl-mix-early" style={{ width: seg(pm.buckets.early) }} />}
-      {pm.buckets.mid > 0 && <span className="ewl-mix-mid" style={{ width: seg(pm.buckets.mid) }} />}
-      {pm.buckets.closing > 0 && <span className="ewl-mix-closing" style={{ width: seg(pm.buckets.closing) }} />}
-    </div>
-  )
-}
 
 export function RiskBadges({ pm }: { pm: PmWorkload }) {
   const badges: Array<{ key: string; tone: BadgeTone; label: string; title: string }> = []
@@ -129,12 +109,47 @@ export function ClientMixStrip({ title = "Clients", shares }: { title?: string; 
   )
 }
 
+// What the job's most recent entry was, in the projections formula-tip
+// voice: kind + date on the muted line, the entry itself (description,
+// vendor) with its amount on the main line. A cost line that arrived in a
+// batch reports the batch instead of one arbitrary line from it.
+const KIND_LABEL: Record<ActivityDetail["kind"], string> = {
+  cost: "Cost line",
+  po: "Purchase order",
+  subcontract: "Subcontract",
+  changeOrder: "Change order",
+}
+
+export function describeActivity(detail: ActivityDetail, when: string): Formula {
+  const date = new Date(when).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  const batch = detail.kind === "cost" && detail.sameDayCount > 1
+  const kind = batch
+    ? `${detail.sameDayCount} cost lines`
+    : detail.kind === "changeOrder"
+      ? `${KIND_LABEL.changeOrder}${detail.approved ? " approved" : " entered"}`
+      : KIND_LABEL[detail.kind]
+  const what = batch
+    ? [detail.vendorName, detail.description].filter(Boolean).join(" · ") || "Posted together"
+    : [detail.description, detail.vendorName].filter(Boolean).join(" · ") || KIND_LABEL[detail.kind]
+  const amount = batch ? detail.sameDayTotal : detail.amount
+  return {
+    label: kind,
+    symbolic: `${kind} · ${date}`,
+    substituted: batch ? `Latest: ${what}` : what,
+    result: amount == null ? undefined : formatMoneyFull(amount),
+  }
+}
+
 // ── Expanded panel: the PM's open jobs ───────────────────────────────────────
 
 type JobSortKey = "name" | "units" | "budget" | "remaining" | "progress" | "activity"
 
 export function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
   const { goToJobcost } = useJobcostNav()
+  // One hover slot for the whole table: the last-activity cell under the
+  // pointer anchors the popover, the formula rides along in a ref.
+  const tip = useFormulaHover(false)
+  const tipFormula = useRef<Formula | null>(null)
   // Same sortable headers as the app's project tables, with the Jobcost
   // three-click cycle: natural direction → reversed → cleared (back to the
   // derivation's remaining-desc order, no active column).
@@ -201,7 +216,7 @@ export function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
               <SortTh col="units" label="Units" align="right" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
               <SortTh col="budget" label="Budget" align="right" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
               <SortTh col="remaining" label="Remaining" align="right" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
-              <SortTh col="progress" label="Progress" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
+              <SortTh col="progress" label="Progress" align="center" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
               <SortTh col="activity" label="Last activity" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
             </tr>
           </thead>
@@ -226,7 +241,7 @@ export function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
                 <td style={{ textAlign: "right" }}>{job.units > 0 ? job.units : "—"}</td>
                 <td style={{ textAlign: "right" }}>{formatMoney(job.budget)}</td>
                 <td style={{ textAlign: "right" }}>{formatMoney(job.remaining)}</td>
-                <td>
+                <td className="ewl-progress-td">
                   {job.pct === 0 ? (
                     <span className="text-secondary">Not started</span>
                   ) : (
@@ -242,19 +257,32 @@ export function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
                   )}
                 </td>
                 <td className="text-secondary">
-                  {/* Upcoming jobs skip the dash — silence is expected, the
+                  {/* The hover anchor is the text itself, not the cell — the
+                      popover centers on what the eye is on, not the column.
+                      Upcoming jobs skip the dash — silence is expected, the
                       badge alone says why. */}
-                  {job.lastActivity ? formatRelativeTime(job.lastActivity) : job.upcoming ? null : "—"}
-                  {job.upcoming ? (
-                    <Badge tone="muted" size="compact">Upcoming</Badge>
-                  ) : (
-                    !job.active && <Badge tone="muted" size="compact">Dormant</Badge>
-                  )}
+                  <span
+                    className="ewl-activity"
+                    onMouseEnter={(e) => {
+                      if (!job.lastActivity || !job.lastActivityDetail) return
+                      tipFormula.current = describeActivity(job.lastActivityDetail, job.lastActivity)
+                      tip.onEnter(e.currentTarget)
+                    }}
+                    onMouseLeave={tip.onLeave}
+                  >
+                    {job.lastActivity ? formatRelativeTime(job.lastActivity) : job.upcoming ? null : "—"}
+                    {job.upcoming ? (
+                      <Badge tone="muted" size="compact">Upcoming</Badge>
+                    ) : (
+                      !job.active && <Badge tone="muted" size="compact">Dormant</Badge>
+                    )}
+                  </span>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        {tip.anchor && tipFormula.current && <FormulaTip anchor={tip.anchor} formula={tipFormula.current} />}
         </>
       )}
     </div>

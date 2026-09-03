@@ -49,7 +49,7 @@ export function SortTh<K extends string>({
   const thClass = spendRank
     ? `${align === "right" ? "spend-rank-table-value" : "spend-rank-table-name"}${className ? ` ${className}` : ""}`
     : className
-  const thStyle = !spendRank && align === "right" ? { textAlign: "right" as const } : undefined
+  const thStyle = !spendRank && align !== "left" ? { textAlign: align } : undefined
 
   return (
     <th

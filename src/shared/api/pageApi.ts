@@ -108,6 +108,14 @@ export async function fetchPageData(
 
     const result: PageDataResponse = await response.json()
 
+    // Surface failed queries in dev before they're stripped below — otherwise
+    // a SQL error on the Pi shows up as nothing more than a null payload.
+    if (import.meta.env.DEV && Array.isArray(result._errors)) {
+      for (const e of result._errors as { queryName?: string; error?: string }[]) {
+        console.warn(`[pageApi] query "${e.queryName}" failed: ${e.error}`)
+      }
+    }
+
     // Strip server-side query errors ({ __error: "..." }) → null, and drop the
     // runner's underscore-prefixed metadata (_meta, _errors, _hasErrors) —
     // nothing consumes it, and non-null objects there would mask the
