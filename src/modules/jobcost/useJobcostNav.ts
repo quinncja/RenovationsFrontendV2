@@ -26,6 +26,9 @@ const BACK_LABELS: Array<[string, string]> = [
   ["/invoices", "Invoices"],
   ["/progress-billings", "Progress Billings"],
   ["/dashboard/forecast-billings", "Forecast Billings"],
+  ["/forecast-billings", "Forecast Billings"],
+  ["/overhead-report", "Overhead"],
+  ["/financial-summary", "Financial Summary"],
   ["/dashboard/breakdown", "Breakdown"],
   ["/dashboard", "Dashboard"],
 ]

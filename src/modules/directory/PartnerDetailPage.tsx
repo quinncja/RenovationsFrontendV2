@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
-import { useParams } from "react-router-dom"
+import { useParams, useLocation, useNavigate } from "react-router-dom"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence, type Transition } from "framer-motion"
-import { ChevronRight, ExternalLink, FileText, X } from "lucide-react"
+import { ArrowLeft, ChevronRight, ExternalLink, FileText, X } from "lucide-react"
 import Page from "../../shared/components/Page"
 import { PageDataProvider, useWidgetData } from "../../shared/context/PageContext"
 import { PAGE_QUERIES } from "../../shared/config/pageQueries"
@@ -23,7 +23,8 @@ import { formatMoneyFull, formatDate, marginTextColor } from "../../shared/utils
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import { useModalLayer } from "../../shared/hooks/useModalLayer"
-import { useJobcostNav } from "../jobcost/useJobcostNav"
+import { useJobcostNav, type JobcostBackState } from "../jobcost/useJobcostNav"
+import useIsMobile from "../../shared/hooks/useIsMobile"
 import {
   JobTable,
   normalizeProject,
@@ -35,7 +36,7 @@ import {
   type SortDir,
 } from "../jobcost/Jobcost"
 import { marginClass, formatMargin } from "../../shared/components/JobDetailPanel/JobDetailPanel"
-import type { PartnerKind } from "./usePartnerNav"
+import { PARTNER_PATHS, type PartnerKind } from "./usePartnerNav"
 import { JOB_STATUS_LABELS } from "./directoryShared"
 
 // ─── Kind configuration ───────────────────────────────────────────────────────
@@ -244,6 +245,14 @@ function PartnerDetail({ kind, partnerId, year, onYearChange }: {
   onYearChange: (y: number | null) => void
 }) {
   const cfg = CONFIG[kind]
+  const navigate = useNavigate()
+  const location = useLocation()
+  const isMobile = useIsMobile()
+  // Same contract as the Job Cost detail page: entry points stash where the
+  // user came from; a cold deep-link falls back to this kind's list page.
+  const back = (location.state as JobcostBackState | null) ?? null
+  const backTo = back?.backTo ?? PARTNER_PATHS[kind]
+  const backLabel = back?.backLabel ?? `${cfg.noun}s`
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
   // One job's invoices, opened from a contribution-board row. Uses the
   // page-scope ledger, which matches the board's year scope.
@@ -264,7 +273,16 @@ function PartnerDetail({ kind, partnerId, year, onYearChange }: {
   return (
     <Page
       title={summary?.label ?? cfg.noun}
-      actions={<YearSelector value={year} onChange={onYearChange} allowAllTime />}
+      actions={
+        <>
+          {!isMobile && (
+            <button className="jc-export-btn" onClick={() => navigate(backTo)} title={`Back to ${backLabel}`}>
+              <ArrowLeft size={14} /> {backLabel}
+            </button>
+          )}
+          <YearSelector value={year} onChange={onYearChange} allowAllTime />
+        </>
+      }
     >
       <MotionList className="inv-page-stack">
         <MotionItem>
@@ -344,6 +362,7 @@ function KpiCards({ kind, year, loading, summary, byYear, share, marginSummary, 
   relationship: Relationship | null
 }) {
   const cfg = CONFIG[kind]
+  const marginColorsOn = useMarginColorsEnabled()
 
   // YoY badge for the headline stat — only meaningful with a specific year.
   const prevPoint = year != null ? byYear.find((p) => p.label === String(year - 1)) : undefined
@@ -387,15 +406,11 @@ function KpiCards({ kind, year, loading, summary, byYear, share, marginSummary, 
       marginSummary && marginSummary.closedRevenue > 0
         ? ((marginSummary.closedRevenue - marginSummary.closedCost) / marginSummary.closedRevenue) * 100
         : null
-    const companyMargin =
-      marginSummary && marginSummary.companyClosedRevenue > 0
-        ? ((marginSummary.companyClosedRevenue - marginSummary.companyClosedCost) /
-            marginSummary.companyClosedRevenue) * 100
-        : null
+    // Standard absolute margin scale (green ≥20, yellow ≥15, red below), same
+    // as the job tables — not relative to the company average, which read as
+    // "green" on objectively thin margins.
     const marginColor =
-      closedMargin != null && companyMargin != null && Math.abs(closedMargin - companyMargin) >= 1
-        ? closedMargin > companyMargin ? "#16a34a" : "#dc2626"
-        : undefined
+      marginColorsOn && closedMargin != null ? marginTextColor(closedMargin) : undefined
     cards.push(
       <StatWidget
         key="margin"

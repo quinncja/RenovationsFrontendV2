@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react"
-import { useNavigate } from "react-router-dom"
 import { LayoutGrid } from "lucide-react"
 import { SearchField } from "../../../shared/components/SearchField"
 import Page from "../../../shared/components/Page"
@@ -12,6 +11,7 @@ import { YearSelector } from "../../../shared/components/YearSelector/YearSelect
 import { formatMoneyFull } from "../../../shared/utils/format"
 import useLocalStorage from "../../../shared/hooks/useLocalStorage"
 import { TreemapModal } from "../../../shared/components/TreemapModal/TreemapModal"
+import { usePartnerNav } from "../usePartnerNav"
 
 // Mirrors ClientsPage — see comments there. Differences: query name,
 // title/noun, route, localStorage key.
@@ -37,7 +37,7 @@ export default function SubcontractorsPage() {
 }
 
 function SubcontractorsContent({ year, onYearChange }: { year: number | null; onYearChange: (y: number | null) => void }) {
-  const navigate = useNavigate()
+  const { goToPartner } = usePartnerNav()
   const [search, setSearch] = useState("")
   const [treemapOpen, setTreemapOpen] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>("value")
@@ -80,12 +80,12 @@ function SubcontractorsContent({ year, onYearChange }: { year: number | null; on
       actions={
         <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
           <button
-            className="button primary-button"
+            className="jc-export-btn"
             onClick={() => setTreemapOpen(true)}
             disabled={isLoading || treemapItems.length === 0}
             aria-label="Open treemap"
           >
-            <LayoutGrid size={16} /> Treemap
+            <LayoutGrid size={14} /> Treemap
           </button>
           <YearSelector value={year} onChange={onYearChange} allowAllTime />
         </div>
@@ -119,10 +119,10 @@ function SubcontractorsContent({ year, onYearChange }: { year: number | null; on
                     <tr
                       key={item.id}
                       className="spend-rank-table-row"
-                      onClick={() => navigate(`/subcontractors/${item.id}`)}
+                      onClick={() => goToPartner("subcontractor", item.id)}
                       role="button"
                       tabIndex={0}
-                      onKeyDown={(e) => e.key === "Enter" && navigate(`/subcontractors/${item.id}`)}
+                      onKeyDown={(e) => e.key === "Enter" && goToPartner("subcontractor", item.id)}
                     >
                       <td className="spend-rank-table-num subheadline text-secondary">{item.id}</td>
                       <td className="spend-rank-table-name body-text">{item.label}</td>
@@ -149,7 +149,7 @@ function SubcontractorsContent({ year, onYearChange }: { year: number | null; on
         year={year}
         onItemClick={(id) => {
           setTreemapOpen(false)
-          navigate(`/subcontractors/${id}`)
+          goToPartner("subcontractor", id)
         }}
       />
     </Page>

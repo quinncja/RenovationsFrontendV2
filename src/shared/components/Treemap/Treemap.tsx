@@ -1,11 +1,14 @@
-import { ResponsiveTreeMap } from "@nivo/treemap"
+import { useLayoutEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { formatMoney } from "../../utils/format"
+import { SERIES_PALETTE } from "../../config/chartColors"
 
-// Generic treemap visualization. Tiles are colored by value via a sequential
-// lightness ramp anchored on the brand color, so size and color reinforce
-// each other (biggest tile = deepest fill). Used by TreemapModal to give
-// a single-glance comparison of every client, vendor, or subcontractor by
-// revenue/spend.
+// Generic treemap visualization: a custom squarified layout rendered as HTML
+// tiles, so the tiles can carry the app's card language (rounded corners,
+// soft inner highlight, hover affordance) that an SVG chart library can't.
+// Size encodes magnitude; color's job is just to make each tile individually
+// identifiable, with direct labels + value/share printed on tiles large
+// enough to hold them and a cursor tooltip covering the rest.
 
 export interface TreemapItem {
   id: string
@@ -13,155 +16,184 @@ export interface TreemapItem {
   value: number
 }
 
-interface Datum {
-  name: string
-  id: string
-  value?: number
-  children?: Datum[]
-}
-
 interface TreemapProps {
   items: TreemapItem[]
   totalSum: number
-  /** Root tile label (e.g. "All Clients"). Hidden under the inner tiles
-   *  but used as the dataset identity. */
+  /** Kept for API compatibility with the old nivo wrapper; unused now that
+   *  the root level isn't rendered. */
   rootName?: string
   /** Optional click handler — called with the item id. */
   onNodeClick?: (id: string) => void
 }
 
-// Curated categorical palette — "Mediterranean evening": warm, balanced,
-// jewel-tone-leaning but not candy-bright. All hues sit around 55–65%
-// saturation and ~65–70% lightness so they feel lively and harmonious
-// together, with the brand orange anchoring the warm side as a saturated
-// terracotta. Size already encodes magnitude; color's job is just to make
-// each tile individually identifiable. Order is tuned so adjacent palette
-// entries land far apart on the color wheel — nivo's squarified treemap
-// places larger tiles in a chained sequence, so cycling palette[i] reads
-// "next big tile is a new color" instead of two neighbors landing in the
-// same hue family.
-const PALETTE = [
-  "#d4824a", // terracotta (brand-warm)
-  "#5b9ab5", // mediterranean blue
-  "#82a878", // sage olive
-  "#c08caf", // rose lavender
-  "#e3b167", // saffron
-  "#67a9a3", // teal
-  "#d0758a", // dusty rose
-  "#8b8bcc", // soft lavender
-  "#b5b56e", // gold-green
-  "#b07060", // sienna
-]
+// The tiles wear the dashboard's shared categorical family (SERIES_PALETTE —
+// same depth as the donut and multi-line charts) so the treemap reads as one
+// system with the rest of the graphs. The cycle is REORDERED for treemap
+// adjacency: size-rank neighbors sit next to each other on screen, and this
+// permutation was searched against the CVD/normal-vision separation checks
+// (worst adjacent pair deutan ΔE 8.3, normal 22.1 — both passing; the shared
+// hues themselves are the fixed design-system parameter). Assigned by size
+// rank in fixed order — a 13th item reuses the cycle, but by then tiles are
+// slivers identified by tooltip, not color.
+const PALETTE = [0, 1, 5, 9, 8, 6, 3, 2, 10, 7, 4, 11].map((i) => SERIES_PALETTE[i])
 
-export function Treemap({ items, totalSum, rootName = "All Items", onNodeClick }: TreemapProps) {
-  if (items.length === 0) {
+interface Rect {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+// Standard squarified treemap (Bruls et al.): values must arrive sorted
+// descending; rows are laid along the short side while adding the next tile
+// keeps the row's worst aspect ratio improving.
+function squarify(values: number[], width: number, height: number): Rect[] {
+  const total = values.reduce((s, v) => s + v, 0)
+  if (total <= 0 || width <= 0 || height <= 0) return values.map(() => ({ x: 0, y: 0, w: 0, h: 0 }))
+  const scale = (width * height) / total
+  const areas = values.map((v) => v * scale)
+  const rects: Rect[] = []
+  let x = 0, y = 0, w = width, h = height
+  let i = 0
+  while (i < areas.length) {
+    const side = Math.min(w, h)
+    let row = [areas[i]]
+    let rowSum = areas[i]
+    let worst = worstRatio(row, rowSum, side)
+    i++
+    while (i < areas.length) {
+      const nextSum = rowSum + areas[i]
+      const nextWorst = worstRatio([...row, areas[i]], nextSum, side)
+      if (nextWorst > worst) break
+      row.push(areas[i])
+      rowSum = nextSum
+      worst = nextWorst
+      i++
+    }
+    const thickness = side > 0 ? rowSum / side : 0
+    let offset = 0
+    for (const area of row) {
+      const len = thickness > 0 ? area / thickness : 0
+      if (w >= h) rects.push({ x, y: y + offset, w: thickness, h: len })
+      else rects.push({ x: x + offset, y, w: len, h: thickness })
+      offset += len
+    }
+    if (w >= h) { x += thickness; w -= thickness }
+    else { y += thickness; h -= thickness }
+  }
+  return rects
+}
+
+function worstRatio(row: number[], sum: number, side: number): number {
+  const max = Math.max(...row)
+  const min = Math.min(...row)
+  const s2 = sum * sum
+  const side2 = side * side
+  return Math.max((side2 * max) / s2, s2 / (side2 * min))
+}
+
+// Gap between tiles: the modal surface showing through does the separating,
+// instead of a drawn border grid.
+const GUTTER = 4
+
+interface Hover {
+  item: TreemapItem
+  color: string
+  cx: number
+  cy: number
+}
+
+export function Treemap({ items, totalSum, onNodeClick }: TreemapProps) {
+  const hostRef = useRef<HTMLDivElement>(null)
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null)
+  const [hover, setHover] = useState<Hover | null>(null)
+
+  useLayoutEffect(() => {
+    const el = hostRef.current
+    if (!el) return
+    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight })
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const plotted = items.filter((i) => (i.value ?? 0) > 0).sort((a, b) => b.value - a.value)
+
+  if (items.length === 0 || plotted.length === 0) {
     return <div className="treemap-empty body-text text-secondary">No items to display</div>
   }
 
-  const data: Datum = {
-    name: rootName,
-    id: "root",
-    children: items.map((i) => ({ name: i.label, id: i.id, value: i.value })),
-  }
-
-  // Stable color assignment: hash item id → palette index, so the same
-  // client/vendor/sub keeps the same color across reloads and year toggles.
-  // Falling back to depth-order (via the lookup map populated below) gives
-  // the same result for fresh data while staying deterministic.
-  const colorByName = new Map<string, string>()
-  items.forEach((it, i) => {
-    colorByName.set(it.label, PALETTE[i % PALETTE.length])
-  })
+  const rects = size ? squarify(plotted.map((i) => i.value), size.w, size.h) : []
 
   return (
-    <div className="treemap-canvas">
-      <ResponsiveTreeMap<Datum>
-        data={data}
-        identity="id"
-        value="value"
-        valueFormat={(v) => formatMoney(v)}
-        margin={{ top: 4, right: 0, bottom: 4, left: 0 }}
-        labelSkipSize={24}
-        label={(node) => truncateForWidth(String(node.data.name), node.width)}
-        orientLabel={false}
-        // Auto-contrast label color: derived from the tile color, pushed
-        // ~2.8 steps darker. Across the Mediterranean palette this lands
-        // close enough to near-black that it reads cleanly while still
-        // carrying a hint of the tile's hue so it doesn't feel pasted on.
-        // Previous 1.8 was the prettier choice but it dipped under the
-        // legibility floor — same-tone-as-tile labels needed more depth.
-        labelTextColor={{ from: "color", modifiers: [["darker", 2.8]] }}
-        // Bump label weight from nivo's default 400 → 600. Categorical
-        // treemap labels are short (single-word names, mostly) and the
-        // extra weight does most of the work of "make this readable" once
-        // contrast is sufficient.
-        //
-        // The `tooltip.container` transition smooths the wrapper's
-        // `transform: translate(...)` updates as the cursor moves — without
-        // it the tooltip jumps between per-mousemove positions and reads
-        // as static, unlike the line/bar charts where nivo's continuous
-        // updates make the tooltip feel attached to the cursor. The 80ms
-        // ease tracks the cursor closely enough to feel responsive while
-        // smoothing out per-frame jitter.
-        theme={{
-          labels: {
-            text: {
-              fontSize: 12,
-              fontWeight: 600,
-              letterSpacing: "-0.005em",
-            },
-          },
-          tooltip: {
-            container: {
-              zIndex: 9999,
-              transition: "transform 80ms ease-out",
-            },
-          },
-        }}
-        colors={(node) => colorByName.get(String(node.data.name)) ?? PALETTE[0]}
-        // Hairline of the modal's surface color — gives tile separation
-        // without the heavy black grid that paired-scheme rendering had.
-        borderColor="var(--card-color)"
-        borderWidth={1}
-        nodeOpacity={1}
-        // animate: false is intentional. With animations on, every hover
-        // triggers a framer-motion spring transition on the tile's transform
-        // — on small tiles this reads as a visible grow/shrink wiggle and
-        // the brief SVG reflow can push the modal's overflow-y into
-        // showing a scrollbar. Off, hover just snaps cleanly.
-        animate={false}
-        enableParentLabel={false}
-        tooltip={({ node }) => {
-          const pct = totalSum > 0 ? ((node.value / totalSum) * 100).toFixed(1) : "0"
+    <div ref={hostRef} className="treemap-canvas">
+      {size &&
+        plotted.map((item, i) => {
+          const r = rects[i]
+          const w = Math.max(0, r.w - GUTTER)
+          const h = Math.max(0, r.h - GUTTER)
+          if (w < 1 || h < 1) return null
+          const tile = PALETTE[i % PALETTE.length]
+          const pct = totalSum > 0 ? (item.value / totalSum) * 100 : 0
+          // What fits: name + value + share on big tiles, name + value on
+          // medium ones, name alone on small ones, nothing on slivers.
+          const showValue = w >= 76 && h >= 44
+          const showPct = w >= 96 && h >= 68
+          const showName = w >= 44 && h >= 20
           return (
-            <div className="treemap-tooltip card">
-              <div className="treemap-tooltip-head">
-                <span className="treemap-tooltip-swatch" style={{ background: node.color }} />
-                <span className="treemap-tooltip-name body-text emphasized">{String(node.data.name)}</span>
-              </div>
-              <div className="treemap-tooltip-value title1 emphasized">{formatMoney(node.value)}</div>
-              <div className="treemap-tooltip-pct subheadline text-secondary">{pct}% of total</div>
+            <div
+              key={item.id}
+              className={`treemap-tile${onNodeClick ? " treemap-tile--click" : ""}`}
+              style={{
+                left: r.x + GUTTER / 2,
+                top: r.y + GUTTER / 2,
+                width: w,
+                height: h,
+                ["--tile" as string]: tile,
+              }}
+              role={onNodeClick ? "button" : undefined}
+              tabIndex={onNodeClick ? 0 : undefined}
+              onClick={onNodeClick ? () => onNodeClick(item.id) : undefined}
+              onKeyDown={onNodeClick ? (e) => e.key === "Enter" && onNodeClick(item.id) : undefined}
+              onMouseEnter={(e) => setHover({ item, color: tile, cx: e.clientX, cy: e.clientY })}
+              onMouseMove={(e) => setHover({ item, color: tile, cx: e.clientX, cy: e.clientY })}
+              onMouseLeave={() => setHover(null)}
+            >
+              {showName && (
+                <div className="treemap-tile-text">
+                  <span className="treemap-tile-name">{item.label}</span>
+                  {showValue && <span className="treemap-tile-value">{formatMoney(item.value)}</span>}
+                  {showPct && <span className="treemap-tile-pct">{pct.toFixed(1)}% of total</span>}
+                </div>
+              )}
             </div>
           )
-        }}
-        onClick={
-          onNodeClick
-            ? (node) => {
-                const id = String(node.data.id ?? "")
-                if (id && id !== "root") onNodeClick(id)
-              }
-            : undefined
-        }
-      />
+        })}
+      {hover &&
+        createPortal(
+          <div
+            className="treemap-tooltip card"
+            style={{
+              position: "fixed",
+              zIndex: 9999,
+              pointerEvents: "none",
+              left: Math.min(hover.cx + 14, window.innerWidth - 220),
+              top: Math.min(hover.cy + 16, window.innerHeight - 110),
+              transition: "left 80ms ease-out, top 80ms ease-out",
+            }}
+          >
+            <div className="treemap-tooltip-head">
+              <span className="treemap-tooltip-swatch" style={{ background: hover.color }} />
+              <span className="treemap-tooltip-name body-text emphasized">{hover.item.label}</span>
+            </div>
+            <div className="treemap-tooltip-value title1 emphasized">{formatMoney(hover.item.value)}</div>
+            <div className="treemap-tooltip-pct subheadline text-secondary">
+              {totalSum > 0 ? ((hover.item.value / totalSum) * 100).toFixed(1) : "0"}% of total
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   )
-}
-
-// Rough character budget: ~8px per char at the treemap font size. Mirrors
-// the truncation logic from the old InsightTreeMap so labels don't bleed
-// past their tile when tiles get narrow.
-function truncateForWidth(text: string, width: number): string {
-  const maxChars = Math.max(3, Math.floor(width / 8))
-  if (text.length <= maxChars) return text
-  return text.substring(0, maxChars - 1) + "…"
 }

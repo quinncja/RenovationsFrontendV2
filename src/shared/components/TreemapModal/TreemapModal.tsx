@@ -1,16 +1,25 @@
 import { X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Treemap, type TreemapItem } from "../Treemap/Treemap"
-import { Metric, MetricDivider } from "../CollapsibleSection/CollapsibleSection"
 import { formatMoney } from "../../utils/format"
 import { useModalLayer } from "../../hooks/useModalLayer"
 
-// Modal host for the directory treemap. The header reuses the same Metric /
-// MetricDivider chips the directory detail pages use for their Projects /
-// Invoices section rollups, so the treemap modal reads as part of the same
-// design system. Period label is the active list-page year, or
-// "Since 2018" for All Time (matches the old RD wording — RD's backend
-// data floor is 2018).
+// Modal host for the directory treemap. The header stats speak the app's
+// meta-row voice (the jobcost hero's identity register): inline uppercase
+// label · value pairs, not boxed metric chips. Period label is the active
+// list-page year, or "Since 2018" for All Time (matches the old RD wording —
+// RD's backend data floor is 2018).
+
+// One label · value pair in the header meta row — the jcd-meta recipe on
+// standard card-surface tokens instead of the deck vars.
+function TreemapMeta({ label, value }: { label: string; value: string | number }) {
+  return (
+    <span className="treemap-meta">
+      <span className="treemap-meta-label subheadline">{label}</span>
+      <span className="treemap-meta-value body-text emphasized">{value}</span>
+    </span>
+  )
+}
 
 interface TreemapModalProps {
   open: boolean
@@ -78,14 +87,10 @@ export function TreemapModal({
                     <X size={16} />
                   </button>
                 </div>
-                <div className="treemap-modal-metrics">
-                  <div className="inv-metrics-row">
-                    <Metric value={count} label={countLabel} />
-                    <MetricDivider />
-                    <Metric value={formatMoney(total)} label="Total" />
-                    <MetricDivider />
-                    <Metric value={periodLabel} label="Year" />
-                  </div>
+                <div className="treemap-meta-row">
+                  <TreemapMeta label={countLabel} value={count} />
+                  <TreemapMeta label="Total" value={formatMoney(total)} />
+                  <TreemapMeta label="Year" value={periodLabel} />
                 </div>
               </div>
               <Treemap
