@@ -365,7 +365,7 @@ export function BoardHistoryDrawer({ open, year, refreshKey, bookedActuals, onCl
                   <div className="pj-drawer-empty callout text-secondary">Loading…</div>
                 ) : snapshots.length === 0 ? (
                   <div className="pj-drawer-empty callout text-secondary">
-                    No versions yet. One is captured automatically before each day's first edit.
+                    No versions yet. Start and end of day are captured automatically on any day the board is edited.
                   </div>
                 ) : (
                   <ul className="pj-history-list">
@@ -374,7 +374,9 @@ export function BoardHistoryDrawer({ open, year, refreshKey, bookedActuals, onCl
                         <div>
                           <div className="pj-history-title body-text emphasized">
                             {s.label || "Manual version"}
-                            {s.auto && <span className="pj-auto-badge callout">auto</span>}
+                            {s.auto && (
+                              <span className="pj-auto-badge callout">{s.autoKind === "end" ? "auto · end of day" : "auto · start of day"}</span>
+                            )}
                           </div>
                           <div className="pj-history-meta callout text-secondary">
                             {s.takenBy ? `${who(s.takenBy)} · ` : ""}
@@ -407,7 +409,7 @@ export function BoardHistoryDrawer({ open, year, refreshKey, bookedActuals, onCl
             title="Restore this version"
             message={
               confirmRestore
-                ? `Replace the current board with "${confirmRestore.label || "this version"}"? The current state is preserved in history and today's auto version.`
+                ? `Replace the current board with "${confirmRestore.label || "this version"}"? The current state is saved as a \"Before restore\" version first.`
                 : undefined
             }
             confirmLabel="Restore"

@@ -126,6 +126,8 @@ export interface ProjectionSnapshotMeta {
   id: string
   label: string | null
   auto: boolean
+  /** Auto versions: `start` (frozen before the day's first edit) or `end` (rewritten after every edit). */
+  autoKind: "start" | "end" | null
   takenBy: UserStamp | null
   at: string
   revision: number
