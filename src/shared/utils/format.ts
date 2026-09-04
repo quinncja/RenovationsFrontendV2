@@ -52,14 +52,13 @@ export function formatMoneyFull(value: number): string {
   }).format(value)
 }
 
-// Accepts either a ratio (0.18 → "18.0%") or a whole percentage (18 → "18.0%").
-// NOTE: this guesses by magnitude (|v| <= 1 → ratio), so a *ratio* whose
-// magnitude exceeds 1 (e.g. a 150%+ margin = 1.5) is misread as already-percent
-// and shown 100x too small. When the unit is known, prefer the explicit
-// formatters below instead of relying on the guess.
+// Input is always a WHOLE percentage (18.4 → "18.4%", 0.8 → "0.8%"). Every
+// caller (margin charts, StatWidget "percent", overhead share) already
+// multiplies by 100 upstream. This used to guess the unit by magnitude
+// (|v| <= 1 → ratio), which turned a genuine 0.826% margin into "82.6%" in
+// the chart tooltip. For ratio inputs use formatRatioPercent below.
 export function formatPercent(value: number): string {
-  const pct = Math.abs(value) <= 1 ? value * 100 : value
-  return `${pct.toFixed(1)}%`
+  return `${value.toFixed(1)}%`
 }
 
 // Unambiguous: input is always a ratio (0.18 → "18.0%", 1.5 → "150.0%").
