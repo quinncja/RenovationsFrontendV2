@@ -46,6 +46,17 @@ interface InvoiceHeader {
   enteredAt?: string | null
 }
 
+// A job-cost row the AP invoice posted (jobcst via lgrrec) — the invoice's
+// distribution across jobs and cost types.
+interface APInvoiceCostLine {
+  costRecnum: string
+  jobNum: string | null
+  jobName: string | null
+  costType: number | null
+  amount: number
+  description: string | null
+}
+
 // AP lines carry an account; AR lines carry qty/unit/price.
 interface APInvoiceLine {
   accountNum: string
@@ -77,6 +88,7 @@ interface InvoiceDetail {
   header: InvoiceHeader
   lines: LedgerItem[]
   groups: DetailLineGroup[] | null
+  heading?: string
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -139,6 +151,33 @@ function apLineToItem(l: APInvoiceLine, withJob: boolean): LedgerItem {
 // went. Lines coded to more than one job group by job with a subtotal; on a
 // single-job invoice the job is already the modal's project link, so each
 // line carries only its cost type.
+// The job-cost distribution leads when the invoice has one: it is the split
+// the reader came from (a cost item is one of these rows). Grouped by job
+// whenever the rows span more than one; a single job's rows list flat with
+// their cost type, the job being the modal's project link already.
+function apCostLinesToLedger(rows: APInvoiceCostLine[]): { lines: LedgerItem[]; groups: DetailLineGroup[] | null } {
+  const toItem = (r: APInvoiceCostLine): LedgerItem => ({
+    primary: r.description || costTypeLabel(r.costType) || "Job cost",
+    meta: r.description ? costTypeLabel(r.costType) : null,
+    amount: r.amount,
+  })
+  const jobs = new Set(rows.map((r) => r.jobNum ?? ""))
+  const flat = rows.map(toItem)
+  if (jobs.size <= 1) return { lines: flat, groups: null }
+  const byJob = new Map<string, DetailLineGroup>()
+  for (const r of rows) {
+    const key = r.jobNum ?? ""
+    let g = byJob.get(key)
+    if (!g) {
+      g = { heading: r.jobName || (r.jobNum ? `Job ${r.jobNum}` : "No job"), meta: r.jobNum && r.jobName ? `#${r.jobNum}` : null, subtotal: 0, lines: [] }
+      byJob.set(key, g)
+    }
+    g.lines.push(toItem(r))
+    g.subtotal += r.amount
+  }
+  return { lines: flat, groups: [...byJob.values()] }
+}
+
 function apLinesToLedger(lines: APInvoiceLine[]): { lines: LedgerItem[]; groups: DetailLineGroup[] | null } {
   const jobs = new Set(lines.map((l) => l.jobNum ?? ""))
   const multiJob = jobs.size > 1
@@ -212,7 +251,7 @@ export function InvoiceDetailModal({
     const queries =
       module === "clients"
         ? ["clientInvoiceDetail", "clientInvoiceLines"]
-        : ["supplierInvoiceDetail", "supplierInvoiceLines"]
+        : ["supplierInvoiceDetail", "supplierInvoiceLines", "supplierInvoiceCostLines"]
 
     fetchPageData({ module: "invoices", queries, params: { invoiceRecnum: recnum } })
       .then((data) => {
@@ -224,8 +263,11 @@ export function InvoiceDetailModal({
         } else {
           const header = data.supplierInvoiceDetail as InvoiceHeader | null
           if (!header) { setError("Invoice not found."); setIsLoading(false); return }
-          const ap = apLinesToLedger((data.supplierInvoiceLines as APInvoiceLine[]) ?? [])
-          setDetail({ header, lines: ap.lines, groups: ap.groups })
+          const costRows = (data.supplierInvoiceCostLines as APInvoiceCostLine[] | null) ?? []
+          const ap = costRows.length > 0
+            ? apCostLinesToLedger(costRows)
+            : apLinesToLedger((data.supplierInvoiceLines as APInvoiceLine[]) ?? [])
+          setDetail({ header, lines: ap.lines, groups: ap.groups, heading: costRows.length > 0 ? "Job cost distribution" : "Line items" })
         }
         setIsLoading(false)
       })
@@ -318,7 +360,7 @@ function InvoiceContent({
             }
           : null
       }
-      ledger={detail.lines.length > 0 ? { heading: "Line items", lines: detail.lines, groups: detail.groups } : null}
+      ledger={detail.lines.length > 0 ? { heading: detail.heading ?? "Line items", lines: detail.lines, groups: detail.groups } : null}
       // Provenance reads last and quiet, as on the recap's item modal — who
       // keyed the invoice on the left, when on the right.
       footer={
