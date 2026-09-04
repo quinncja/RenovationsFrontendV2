@@ -2,7 +2,8 @@ import { useState, useEffect } from "react"
 import { useJobcostNav } from "../../../modules/jobcost/useJobcostNav"
 import { usePartnerNav, type PartnerKind } from "../../../modules/directory/usePartnerNav"
 import { fetchPageData } from "../../api/pageApi"
-import { formatMoneyFull, formatDate } from "../../utils/format"
+import { formatMoneyFull, formatDate, formatRelativeTime } from "../../utils/format"
+import { transformUsername } from "../MonthlyDetailTable/MonthlyDetailTable"
 import {
   DetailModal,
   DetailModalContent,
@@ -38,6 +39,10 @@ interface InvoiceHeader {
    *  won't send them and the party stays plain text. */
   clientId?: number | null
   vendorId?: number | null
+  /** Sage audit stamp (acpinv/acrinv insusr + insdte). Optional: an older
+   *  backend deploy won't send them and the footer is omitted. */
+  enteredBy?: string | null
+  enteredAt?: string | null
 }
 
 // AP lines carry an account; AR lines carry qty/unit/price.
@@ -219,6 +224,7 @@ function InvoiceContent({
   // the number becomes the name, so we don't repeat it in the caption.
   const title = hasDesc ? h.description! : `Invoice ${h.invoiceNum}`
   const caption = hasDesc ? `#${h.invoiceNum}` : null
+  const enteredBy = transformUsername(h.enteredBy)
 
   const stats: DetailStat[] = [
     { label: "Paid", value: formatAmount(h.amountPaid), valueClass: "cost-detail-stat-value--paid" },
@@ -262,6 +268,16 @@ function InvoiceContent({
           : null
       }
       ledger={detail.lines.length > 0 ? { heading: "Line items", lines: detail.lines } : null}
+      // Provenance reads last and quiet, as on the recap's item modal — who
+      // keyed the invoice on the left, when on the right.
+      footer={
+        enteredBy || h.enteredAt
+          ? {
+              left: enteredBy ? `Entered by ${enteredBy}` : "Entered",
+              right: h.enteredAt ? `${formatDate(h.enteredAt)} · ${formatRelativeTime(h.enteredAt)}` : null,
+            }
+          : null
+      }
     />
   )
 }
