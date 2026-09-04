@@ -8,6 +8,7 @@ import {
   DetailModal,
   DetailModalContent,
   type DetailStat,
+  type DetailLineGroup,
 } from "../DetailModal/DetailModal"
 import { invoiceStatusLabel, invoiceStatusTone } from "../../utils/invoiceStatus"
 
@@ -50,6 +51,12 @@ interface APInvoiceLine {
   accountNum: string
   description: string | null
   amount: number
+  /** Job-cost coding (apivln jobnum / phsnum / csttyp). Optional: an older
+   *  backend, or a Sage install without the columns, sends none. */
+  jobNum?: string | null
+  jobName?: string | null
+  phase?: number | null
+  costType?: number | null
 }
 interface ARInvoiceLine {
   lineNum: number
@@ -69,6 +76,7 @@ export interface LedgerItem {
 interface InvoiceDetail {
   header: InvoiceHeader
   lines: LedgerItem[]
+  groups: DetailLineGroup[] | null
 }
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -105,12 +113,54 @@ function formatQty(q: number) {
   return q % 1 === 0 ? String(q) : q.toLocaleString("en-US", { maximumFractionDigits: 4 })
 }
 
-function apLinesToLedger(lines: APInvoiceLine[]): LedgerItem[] {
-  return lines.map((l) => ({
-    primary: l.description || `Account ${l.accountNum}`,
-    meta: l.description ? `Account ${l.accountNum}` : null,
+// Sage cost-type codes, as the jobcost breakdown labels them.
+const COST_TYPE_LABEL: Record<number, string> = { 1: "Materials", 2: "Labor", 3: "Equipment", 4: "Subcontractor", 5: "WTPM" }
+function costTypeLabel(t: number | null | undefined) {
+  return t == null ? null : COST_TYPE_LABEL[t] ?? "Other"
+}
+function jobLabel(l: APInvoiceLine) {
+  if (!l.jobNum) return null
+  return l.jobName ? `${l.jobName}` : `Job ${l.jobNum}`
+}
+
+function apLineToItem(l: APInvoiceLine, withJob: boolean): LedgerItem {
+  const primary = l.description || `Account ${l.accountNum}`
+  const coding = [costTypeLabel(l.costType), withJob ? jobLabel(l) : null].filter(Boolean).join(" · ")
+  const account = l.description ? `Account ${l.accountNum}` : null
+  return {
+    primary,
+    meta: [coding || null, account].filter(Boolean).join(" · ") || null,
     amount: l.amount,
-  }))
+  }
+}
+
+// Every line of the invoice, always — a cost item is often one coded line of
+// a bigger invoice, and the reader needs the rest to see where the total
+// went. Lines coded to more than one job group by job with a subtotal; on a
+// single-job invoice the job is already the modal's project link, so each
+// line carries only its cost type.
+function apLinesToLedger(lines: APInvoiceLine[]): { lines: LedgerItem[]; groups: DetailLineGroup[] | null } {
+  const jobs = new Set(lines.map((l) => l.jobNum ?? ""))
+  const multiJob = jobs.size > 1
+  const flat = lines.map((l) => apLineToItem(l, false))
+  if (!multiJob) return { lines: flat, groups: null }
+  const byJob = new Map<string, { heading: string; meta: string | null; lines: LedgerItem[]; subtotal: number }>()
+  for (const l of lines) {
+    const key = l.jobNum ?? ""
+    let g = byJob.get(key)
+    if (!g) {
+      g = {
+        heading: jobLabel(l) ?? "No job",
+        meta: l.jobNum && l.jobName ? `#${l.jobNum}` : null,
+        lines: [],
+        subtotal: 0,
+      }
+      byJob.set(key, g)
+    }
+    g.lines.push(apLineToItem(l, false))
+    g.subtotal += l.amount
+  }
+  return { lines: flat, groups: [...byJob.values()] }
 }
 
 function arLinesToLedger(lines: ARInvoiceLine[]): LedgerItem[] {
@@ -170,11 +220,12 @@ export function InvoiceDetailModal({
         if (module === "clients") {
           const header = data.clientInvoiceDetail as InvoiceHeader | null
           if (!header) { setError("Invoice not found."); setIsLoading(false); return }
-          setDetail({ header, lines: arLinesToLedger((data.clientInvoiceLines as ARInvoiceLine[]) ?? []) })
+          setDetail({ header, lines: arLinesToLedger((data.clientInvoiceLines as ARInvoiceLine[]) ?? []), groups: null })
         } else {
           const header = data.supplierInvoiceDetail as InvoiceHeader | null
           if (!header) { setError("Invoice not found."); setIsLoading(false); return }
-          setDetail({ header, lines: apLinesToLedger((data.supplierInvoiceLines as APInvoiceLine[]) ?? []) })
+          const ap = apLinesToLedger((data.supplierInvoiceLines as APInvoiceLine[]) ?? [])
+          setDetail({ header, lines: ap.lines, groups: ap.groups })
         }
         setIsLoading(false)
       })
@@ -267,7 +318,7 @@ function InvoiceContent({
             }
           : null
       }
-      ledger={detail.lines.length > 0 ? { heading: "Line items", lines: detail.lines } : null}
+      ledger={detail.lines.length > 0 ? { heading: "Line items", lines: detail.lines, groups: detail.groups } : null}
       // Provenance reads last and quiet, as on the recap's item modal — who
       // keyed the invoice on the left, when on the right.
       footer={

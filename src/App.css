@@ -4411,6 +4411,40 @@ button.wc-detail-line:focus-visible .wc-detail-line-chevron {
   color: var(--secondary-text);
 }
 
+/* Grouped ledger: an invoice's lines by job, each run under a label with its
+   subtotal. The group head sits on the same baseline grid as a line. */
+.cost-detail-line-group + .cost-detail-line-group {
+  margin-top: 0.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 55%, transparent);
+}
+.cost-detail-line-group-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: 1.5rem;
+  padding: 0.875rem 0 0.25rem;
+}
+.cost-detail-line-group-title {
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--secondary-text);
+}
+.cost-detail-line-group-title small {
+  margin-left: 0.5rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.cost-detail-line-group-sub {
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+}
+.cost-detail-line-group .cost-detail-line { padding: 0.75rem 0; }
+
 .cost-detail-line-amt {
   font-size: 0.9375rem;
   font-weight: var(--font-weight-semibold);

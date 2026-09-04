@@ -82,11 +82,23 @@ export interface DetailLine {
 }
 
 /** The ledger section under the head — the line items that make up the figure. */
+/** A run of lines under a shared label with its own subtotal — an invoice's
+ *  lines coded to one job, say. */
+export interface DetailLineGroup {
+  heading: string
+  meta?: string | null
+  subtotal: number
+  lines: DetailLine[]
+}
+
 export interface DetailLedger {
   /** Left header cell, e.g. "Line items" or "3 lines". */
   heading: string
   loading?: boolean
   lines: DetailLine[]
+  /** When set (and non-empty) the lines render in these groups instead of as
+   *  one flat list; `lines` should still hold every line for counts. */
+  groups?: DetailLineGroup[] | null
   /** Shown when there are no lines and we're not loading. Omit to render nothing. */
   emptyText?: string
 }
@@ -151,6 +163,24 @@ export interface DetailModalContentProps {
 }
 
 // ─── Content ──────────────────────────────────────────────────────────────────
+
+function LedgerLines({ lines }: { lines: DetailLine[] }) {
+  return (
+    <ul className="cost-detail-lines">
+      {lines.map((line, i) => (
+        <li className="cost-detail-line" key={i}>
+          <span className="cost-detail-line-desc">
+            {line.primary}
+            {line.meta && <small>{line.meta}</small>}
+          </span>
+          <span className="cost-detail-line-amt">
+            {line.amount == null ? "—" : formatMoneyFull(line.amount)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 export function DetailModalContent({
   eyebrow,
@@ -236,20 +266,21 @@ export function DetailModalContent({
           </div>
           {ledger.loading ? (
             <div className="widget-skeleton" style={{ height: "4rem" }} />
+          ) : ledger.groups && ledger.groups.length > 0 ? (
+            ledger.groups.map((g, gi) => (
+              <div className="cost-detail-line-group" key={gi}>
+                <div className="cost-detail-line-group-head">
+                  <span className="cost-detail-line-group-title">
+                    {g.heading}
+                    {g.meta && <small>{g.meta}</small>}
+                  </span>
+                  <span className="cost-detail-line-group-sub">{formatMoneyFull(g.subtotal)}</span>
+                </div>
+                <LedgerLines lines={g.lines} />
+              </div>
+            ))
           ) : ledger.lines.length > 0 ? (
-            <ul className="cost-detail-lines">
-              {ledger.lines.map((line, i) => (
-                <li className="cost-detail-line" key={i}>
-                  <span className="cost-detail-line-desc">
-                    {line.primary}
-                    {line.meta && <small>{line.meta}</small>}
-                  </span>
-                  <span className="cost-detail-line-amt">
-                    {line.amount == null ? "—" : formatMoneyFull(line.amount)}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <LedgerLines lines={ledger.lines} />
           ) : ledger.emptyText ? (
             <p className="body-text text-secondary">{ledger.emptyText}</p>
           ) : null}
