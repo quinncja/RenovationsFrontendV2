@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence } from "framer-motion"
@@ -27,6 +27,7 @@ import {
 } from "./utils/agingForecast"
 import { AR_COLOR, AP_COLOR } from "./widgets/billings/billingsShared"
 import { Fact } from "../jobcost/detailPrimitives"
+import { PeriodSearch, Highlight } from "./PeriodSearch"
 
 // Drill-down for the home Upcoming Billings widget: the forecast chart plus one
 // expandable card per week (accordion — a single card open at a time, so the
@@ -102,6 +103,22 @@ const SIDE_META = {
   ap: { code: "AP", title: "Payables", verb: "paid" },
 } as const
 
+/** Searchable text of an open invoice: client/vendor, invoice #, job, and
+ *  the balance and invoice amounts (formatted digits and raw). */
+function invoiceSearchText(inv: BillingsInvoice) {
+  return [
+    inv.counterparty,
+    inv.invnum,
+    inv.job,
+    formatMoneyFull(inv.amount).replace(/[$,]/g, ""),
+    inv.amount.toFixed(2),
+    formatMoneyFull(inv.total).replace(/[$,]/g, ""),
+    inv.total.toFixed(2),
+  ]
+    .join("\n")
+    .toLowerCase()
+}
+
 /** Past-window totals for one side, for the accuracy strip. */
 function sideTotals(weeks: PastWeek[], side: "ar" | "ap") {
   const projected = weeks.reduce((s, w) => s + w[side].projected, 0)
@@ -114,10 +131,12 @@ type LeafSortKey = "counterparty" | "invnum" | "job" | "due" | "mark" | "total" 
 function InvoiceTable({
   list,
   side,
+  highlight,
   onOpen,
 }: {
   list: BillingsInvoice[]
   side: Side
+  highlight?: string
   onOpen: (recnum: string, side: Side) => void
 }) {
   const color = side === "AR" ? AR_COLOR : AP_COLOR
@@ -161,9 +180,9 @@ function InvoiceTable({
             role={inv.recnum ? "button" : undefined}
             onKeyDown={inv.recnum ? (e) => e.key === "Enter" && onOpen(inv.recnum, side) : undefined}
           >
-            <td>{inv.counterparty || "—"}</td>
-            <td className="text-secondary">{inv.invnum || "—"}</td>
-            <td className="text-secondary">{inv.job || "—"}</td>
+            <td><Highlight text={inv.counterparty || "—"} query={highlight} /></td>
+            <td className="text-secondary"><Highlight text={inv.invnum || "—"} query={highlight} /></td>
+            <td className="text-secondary"><Highlight text={inv.job || "—"} query={highlight} /></td>
             <td className="text-secondary">{formatDate(inv.due)}</td>
             <td className="text-secondary">{formatDate(inv.mark)}</td>
             <td className="num text-secondary">{inv.total ? formatMoneyFull(inv.total) : "—"}</td>
@@ -178,7 +197,7 @@ function InvoiceTable({
 }
 
 /** AR then AP tables for one week, shared by the row body and the modal. */
-function WeekSides({ week, only, onOpenInvoice }: { week: WeekGroup; only?: Side; onOpenInvoice: (recnum: string, side: Side) => void }) {
+function WeekSides({ week, only, highlight, onOpenInvoice }: { week: WeekGroup; only?: Side; highlight?: string; onOpenInvoice: (recnum: string, side: Side) => void }) {
   const sides = (["AR", "AP"] as const).filter((side) => (!only || side === only) && (side === "AR" ? week.ar : week.ap).length > 0)
   if (sides.length === 0) return <p className="reports-modal-empty body-text text-secondary">No invoices this week.</p>
   return (
@@ -194,7 +213,7 @@ function WeekSides({ week, only, onOpenInvoice }: { week: WeekGroup; only?: Side
               </span>
             </div>
             <div className="ohr-cost-items">
-              <InvoiceTable list={list} side={side} onOpen={onOpenInvoice} />
+              <InvoiceTable list={list} side={side} highlight={highlight} onOpen={onOpenInvoice} />
             </div>
           </div>
         )
@@ -211,22 +230,31 @@ function WeekSides({ week, only, onOpenInvoice }: { week: WeekGroup; only?: Side
 function WeekRows({
   weeks,
   openKey,
+  openKeys,
+  highlight,
+  emptyText = "No upcoming invoices.",
   onToggle,
   onOpenInvoice,
 }: {
   weeks: WeekGroup[]
+  /** The single open week (one at a time). */
   openKey: number | null
+  /** When given, every listed week is open at once (search results); `openKey` is ignored. */
+  openKeys?: ReadonlySet<number>
+  /** Search text to mark inside client/vendor, invoice and job cells. */
+  highlight?: string
+  emptyText?: string
   onToggle: (i: number) => void
   onOpenInvoice: (recnum: string, side: Side) => void
 }) {
   if (weeks.every((w) => w.ar.length + w.ap.length === 0)) {
-    return <p className="reports-modal-empty body-text text-secondary">No upcoming invoices.</p>
+    return <p className="reports-modal-empty body-text text-secondary">{emptyText}</p>
   }
   return (
     <div className="ohr-detail-list scrollbar-secondary">
       {weeks.map((week) => {
         const count = week.ar.length + week.ap.length
-        const isOpen = openKey === week.index
+        const isOpen = openKeys ? openKeys.has(week.index) : openKey === week.index
         const net = week.arTotal - week.apTotal
         const money = (v: number, color: string) => (
           <span className="jc-head-stat-value num" style={{ color: v ? color : "var(--secondary-text)" }}>
@@ -272,20 +300,30 @@ function WeekRows({
                 </span>
               </span>
             </div>
-            <AnimatePresence initial={false}>
-              {isOpen && (
-                <motion.div
-                  key="body"
-                  className="ohr-cost-body"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.14 } }}
-                >
-                  <WeekSides week={week} onOpenInvoice={onOpenInvoice} />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            {openKeys ? (
+              // Search mode: many weeks open at once, re-rendered per query,
+              // so no height tween here.
+              isOpen && (
+                <div className="ohr-cost-body">
+                  <WeekSides week={week} highlight={highlight} onOpenInvoice={onOpenInvoice} />
+                </div>
+              )
+            ) : (
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    key="body"
+                    className="ohr-cost-body"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ height: { duration: 0.2, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.14 } }}
+                  >
+                    <WeekSides week={week} onOpenInvoice={onOpenInvoice} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            )}
           </div>
         )
       })}
@@ -662,6 +700,36 @@ function UpcomingBillingsContent() {
 
   // Invoices by week: one open row at a time (the Monthly Spending pattern).
   const [openWeek, setOpenWeek] = useState<number | null>(null)
+  // Search across every week: matching weeks open at once (minus any the
+  // user folds back up); weeks without a match are hidden.
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchFolded, setSearchFolded] = useState<ReadonlySet<number>>(() => new Set())
+  const handleSearchQuery = useCallback((q: string) => {
+    setSearchQuery(q)
+    setSearchFolded(new Set())
+  }, [])
+  const searchIndex = useMemo(() => new Map(invoices.map((inv) => [inv, invoiceSearchText(inv)] as const)), [invoices])
+  const searchWeeks = useMemo<WeekGroup[]>(() => {
+    if (!searchQuery) return weeks
+    const hit = (inv: BillingsInvoice) => (searchIndex.get(inv) ?? "").includes(searchQuery)
+    return weeks.flatMap((w) => {
+      const ar = w.ar.filter(hit)
+      const ap = w.ap.filter(hit)
+      if (ar.length + ap.length === 0) return []
+      return [{ ...w, ar, ap, arTotal: ar.reduce((s, x) => s + x.amount, 0), apTotal: ap.reduce((s, x) => s + x.amount, 0) }]
+    })
+  }, [weeks, searchQuery, searchIndex])
+  const searchSummary = useMemo(() => {
+    if (!searchQuery) return null
+    const count = searchWeeks.reduce((s, w) => s + w.ar.length + w.ap.length, 0)
+    const arTotal = searchWeeks.reduce((s, w) => s + w.arTotal, 0)
+    const apTotal = searchWeeks.reduce((s, w) => s + w.apTotal, 0)
+    return { count, weeks: searchWeeks.length, arTotal, apTotal }
+  }, [searchWeeks, searchQuery])
+  const searchOpenKeys = useMemo<ReadonlySet<number> | undefined>(() => {
+    if (!searchQuery) return undefined
+    return new Set(searchWeeks.map((w) => w.index).filter((k) => !searchFolded.has(k)))
+  }, [searchWeeks, searchQuery, searchFolded])
   // Clicking a forward week on either chart opens that week's invoices in a
   // modal (the Category Trend pattern) instead of scrolling the page.
   const [modalTarget, setModalTarget] = useState<WeekModalTarget | null>(null)
@@ -880,21 +948,73 @@ function UpcomingBillingsContent() {
         <MotionItem>
           <Widget
             title="Invoices by week"
+            description={searchQuery ? `Open invoices matching “${searchQuery}” across every week.` : undefined}
             loading={isLoading}
             noData={!forecast}
             className="ohr-spending-widget"
             actions={
-              openWeek != null ? (
-                <button className="widget-link-btn" onClick={() => setOpenWeek(null)} title="Collapse">
-                  <X size={12} /> Collapse {weeks[openWeek]?.label}
-                </button>
-              ) : undefined
+              <>
+                {openWeek != null && !searchQuery && (
+                  <button className="widget-link-btn" onClick={() => setOpenWeek(null)} title="Collapse">
+                    <X size={12} /> Collapse {weeks[openWeek]?.label}
+                  </button>
+                )}
+                <PeriodSearch onQuery={handleSearchQuery} placeholder="Search all weeks" ariaLabel="Search invoices across all weeks" />
+              </>
             }
           >
+            <AnimatePresence initial={false}>
+              {searchSummary && (
+                <motion.div
+                  key="summary"
+                  className="ohr-search-summary"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ height: { duration: 0.18, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.12 } }}
+                >
+                  <div className="ohr-search-summary-inner">
+                    <span className="ohr-search-summary-text">
+                      {searchSummary.count === 0
+                        ? "No matching invoices"
+                        : `${searchSummary.count} matching ${searchSummary.count === 1 ? "invoice" : "invoices"} across ${searchSummary.weeks} ${searchSummary.weeks === 1 ? "week" : "weeks"}`}
+                    </span>
+                    <span className="ohr-cost-stats">
+                      <span className="jc-head-stat ohr-search-summary-total">
+                        <span className="jc-head-stat-label">AR in</span>
+                        <span className="jc-head-stat-value num" style={{ color: searchSummary.arTotal ? AR_COLOR : "var(--secondary-text)" }}>{formatMoneyFull(searchSummary.arTotal)}</span>
+                      </span>
+                      <span className="jc-head-stat ohr-search-summary-total">
+                        <span className="jc-head-stat-label">AP out</span>
+                        <span className="jc-head-stat-value num" style={{ color: searchSummary.apTotal ? AP_COLOR : "var(--secondary-text)" }}>{formatMoneyFull(searchSummary.apTotal)}</span>
+                      </span>
+                      <span className="jc-head-stat ohr-search-summary-total">
+                        <span className="jc-head-stat-label">Net</span>
+                        <span className="jc-head-stat-value num" style={{ color: searchSummary.arTotal - searchSummary.apTotal > 0 ? AR_COLOR : AP_COLOR }}>{formatMoneyFull(searchSummary.arTotal - searchSummary.apTotal)}</span>
+                      </span>
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <WeekRows
-              weeks={weeks}
+              weeks={searchWeeks}
               openKey={openWeek}
-              onToggle={(i) => setOpenWeek((curr) => (curr === i ? null : i))}
+              openKeys={searchOpenKeys}
+              highlight={searchQuery || undefined}
+              emptyText={searchQuery ? `No open invoices match “${searchQuery}”.` : "No upcoming invoices."}
+              onToggle={(i) => {
+                if (searchQuery) {
+                  setSearchFolded((curr) => {
+                    const next = new Set(curr)
+                    if (next.has(i)) next.delete(i)
+                    else next.add(i)
+                    return next
+                  })
+                } else {
+                  setOpenWeek((curr) => (curr === i ? null : i))
+                }
+              }}
               onOpenInvoice={openInvoice}
             />
           </Widget>

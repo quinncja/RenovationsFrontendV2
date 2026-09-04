@@ -89,7 +89,7 @@ export const PAGE_LABELS: ReadonlyArray<readonly [string, string]> = Object.valu
 const financesGroup: NavGroup = {
   label: "Reports",
   icon: Landmark,
-  items: [navItems.invoices, navItems.upcomingBillings, navItems.progressBillings, navItems.overheadReport],
+  items: [navItems.invoices, navItems.overheadReport, navItems.upcomingBillings, navItems.progressBillings],
 }
 
 const directoryGroup: NavGroup = {

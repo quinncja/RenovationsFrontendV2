@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { motion, AnimatePresence, type Transition } from "framer-motion"
 import { ArrowLeft, ArrowUpRight, ArrowDownRight, Download, X } from "lucide-react"
@@ -25,6 +25,8 @@ import { SECTION_OVERHEAD_REPORT } from "../../core/onboarding/markers"
 import { SegmentedControl } from "../../shared/components/SegmentedControl"
 import { OverheadCategoryDetail, ALL_ID, type DetailCategory } from "./OverheadCategoryDetail"
 import { OverheadCostRows, type CostRow } from "./OverheadCostRows"
+import { buildSearchIndex, lineMatches } from "./overheadSearch"
+import { PeriodSearch } from "./PeriodSearch"
 import { LedgerTransactionModal, type LedgerRef } from "./LedgerTransactionModal"
 import { buildCategoryTrend, type CategoryHistoryRow, type TrendGroup } from "./overheadTrend"
 import { useAuth } from "../../core/auth/AuthProvider"
@@ -294,6 +296,15 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
   const pageYear = usePageYear()
   const lastYear = pageYear - 1
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
+  // Monthly Spending search: matches across every month of the year. While a
+  // query is active every month with a hit is open (minus any the user has
+  // folded back up); months without a hit are hidden.
+  const [searchFolded, setSearchFolded] = useState<ReadonlySet<number>>(() => new Set())
+  const [searchQuery, setSearchQuery] = useState("")
+  const handleSearchQuery = useCallback((q: string) => {
+    setSearchQuery(q)
+    setSearchFolded(new Set())
+  }, [])
   // A clicked cost line in Monthly Spending opens its ledger transaction.
   const [ledger, setLedger] = useState<LedgerRef | null>(null)
   // One trend widget, two reads: month-by-month spending or the running total.
@@ -576,6 +587,30 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
     if (adj.length) rows.push({ key: 13, label: "Year-end adjustments", total: adj.reduce((s, li) => s + netOf(li), 0), count: adj.length, items: adj })
     return rows
   }, [lineItems, monthlyTotals])
+
+  // Search results: each month narrowed to its matching lines, with the
+  // month's count and total recomputed over the matches; months without a
+  // match drop out.
+  const searchIndex = useMemo(() => buildSearchIndex(Array.isArray(lineItems) ? lineItems : []), [lineItems])
+  const searchRows = useMemo<CostRow[]>(() => {
+    if (!searchQuery) return spendingRows
+    return spendingRows.flatMap((row) => {
+      const items = Array.isArray(row.items) ? row.items.filter((li) => lineMatches(searchIndex.get(li), searchQuery)) : []
+      if (items.length === 0) return []
+      const total = items.reduce((s, li) => s + Number(collapseValue(li.net) ?? 0), 0)
+      return [{ ...row, items, count: items.length, total }]
+    })
+  }, [spendingRows, searchQuery, searchIndex])
+  const searchSummary = useMemo(() => {
+    if (!searchQuery) return null
+    const count = searchRows.reduce((s, r) => s + (r.count ?? 0), 0)
+    const total = searchRows.reduce((s, r) => s + r.total, 0)
+    return { count, total, months: searchRows.length }
+  }, [searchRows, searchQuery])
+  const searchOpenKeys = useMemo<ReadonlySet<number> | undefined>(() => {
+    if (!searchQuery) return undefined
+    return new Set(searchRows.map((r) => r.key).filter((k) => !searchFolded.has(k)))
+  }, [searchRows, searchQuery, searchFolded])
 
   function handlePointClick(x: string) {
     const monthNum = currentMonthRows.find((r) => shortMonth(r.month) === x)?.month
@@ -1002,25 +1037,69 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
         <MotionItem className="col-span-full">
           <Widget
             title="Monthly Spending"
-            description={`${pageYear}, by month. Click a month for its costs; click a cost for the full transaction.`}
+            description={
+              searchQuery
+                ? `Costs matching “${searchQuery}” across every month of ${pageYear}. Click a cost for the full transaction.`
+                : `${pageYear}, by month. Click a month for its costs; click a cost for the full transaction.`
+            }
             loading={isLoading && lineItems === null}
             noData={!isLoading && spendingRows.length === 0}
             className="ohr-spending-widget"
             actions={
-              selectedMonth != null ? (
-                <button className="widget-link-btn" onClick={() => setSelectedMonth(null)} title="Collapse">
-                  <X size={12} /> Collapse {fullMonth(selectedMonth)}
-                </button>
-              ) : undefined
+              <>
+                {selectedMonth != null && !searchQuery && (
+                  <button className="widget-link-btn" onClick={() => setSelectedMonth(null)} title="Collapse">
+                    <X size={12} /> Collapse {fullMonth(selectedMonth)}
+                  </button>
+                )}
+                <PeriodSearch onQuery={handleSearchQuery} placeholder="Search all months" ariaLabel="Search costs across all months" />
+              </>
             }
           >
+            <AnimatePresence initial={false}>
+              {searchSummary && (
+                <motion.div
+                  key="summary"
+                  className="ohr-search-summary"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ height: { duration: 0.18, ease: [0.4, 0, 0.2, 1] }, opacity: { duration: 0.12 } }}
+                >
+                  <div className="ohr-search-summary-inner">
+                    <span className="ohr-search-summary-text">
+                      {searchSummary.count === 0
+                        ? "No matching costs"
+                        : `${searchSummary.count} matching ${searchSummary.count === 1 ? "cost" : "costs"} across ${searchSummary.months} ${searchSummary.months === 1 ? "month" : "months"}`}
+                    </span>
+                    <span className="jc-head-stat ohr-search-summary-total">
+                      <span className="jc-head-stat-label">Matched total</span>
+                      <span className="jc-head-stat-value">{formatMoneyFull(searchSummary.total)}</span>
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
             <OverheadCostRows
-              rows={spendingRows}
+              rows={searchRows}
               openKey={selectedMonth}
-              onToggle={(key) => setSelectedMonth((curr) => (curr === key ? null : key))}
+              openKeys={searchOpenKeys}
+              onToggle={(key) => {
+                if (searchQuery) {
+                  setSearchFolded((curr) => {
+                    const next = new Set(curr)
+                    if (next.has(key)) next.delete(key)
+                    else next.add(key)
+                    return next
+                  })
+                } else {
+                  setSelectedMonth((curr) => (curr === key ? null : key))
+                }
+              }}
               onOpen={setLedger}
               showCategory
-              emptyText="No overhead costs recorded."
+              highlight={searchQuery || undefined}
+              emptyText={searchQuery ? `Nothing in ${pageYear} matches “${searchQuery}”.` : "No overhead costs recorded."}
             />
           </Widget>
         </MotionItem>
