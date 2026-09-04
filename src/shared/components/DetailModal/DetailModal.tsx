@@ -89,6 +89,8 @@ export interface DetailLineGroup {
   meta?: string | null
   subtotal: number
   lines: DetailLine[]
+  /** When set the group heading is a link (e.g. to the job the lines belong to). */
+  onOpen?: (() => void) | null
 }
 
 export interface DetailLedger {
@@ -270,10 +272,23 @@ export function DetailModalContent({
             ledger.groups.map((g, gi) => (
               <div className="cost-detail-line-group" key={gi}>
                 <div className="cost-detail-line-group-head">
-                  <span className="cost-detail-line-group-title">
-                    {g.heading}
-                    {g.meta && <small>{g.meta}</small>}
-                  </span>
+                  {g.onOpen ? (
+                    <button
+                      type="button"
+                      className="cost-detail-line-group-title cost-detail-line-group-link"
+                      onClick={g.onOpen}
+                      aria-label={`View project ${g.heading}`}
+                    >
+                      {g.heading}
+                      {g.meta && <small>{g.meta}</small>}
+                      <ArrowUpRight size={13} className="cost-detail-line-group-icon" aria-hidden />
+                    </button>
+                  ) : (
+                    <span className="cost-detail-line-group-title">
+                      {g.heading}
+                      {g.meta && <small>{g.meta}</small>}
+                    </span>
+                  )}
                   <span className="cost-detail-line-group-sub">{formatMoneyFull(g.subtotal)}</span>
                 </div>
                 <LedgerLines lines={g.lines} />

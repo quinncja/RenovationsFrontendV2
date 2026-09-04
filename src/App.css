@@ -4437,6 +4437,23 @@ button.wc-detail-line:focus-visible .wc-detail-line-chevron {
   letter-spacing: 0;
   text-transform: none;
 }
+.cost-detail-line-group-link {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  color: var(--primary-text);
+  transition: color 120ms ease;
+}
+.cost-detail-line-group-link:hover,
+.cost-detail-line-group-link:focus-visible { color: var(--primary-color); outline: none; }
+.cost-detail-line-group-icon { align-self: center; opacity: 0.7; }
+
 .cost-detail-line-group-sub {
   font-size: 0.8125rem;
   font-weight: var(--font-weight-semibold);

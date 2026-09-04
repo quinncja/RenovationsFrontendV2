@@ -87,7 +87,7 @@ export interface LedgerItem {
 interface InvoiceDetail {
   header: InvoiceHeader
   lines: LedgerItem[]
-  groups: DetailLineGroup[] | null
+  groups: JobLineGroup[] | null
   heading?: string
 }
 
@@ -157,7 +157,8 @@ function apLineToItem(l: APInvoiceLine, withJob: boolean): LedgerItem {
 // the reader came from (a cost item is one of these rows). Grouped by job
 // whenever the rows span more than one; a single job's rows list flat with
 // their cost type, the job being the modal's project link already.
-function apCostLinesToLedger(rows: APInvoiceCostLine[]): { lines: LedgerItem[]; groups: DetailLineGroup[] | null } {
+type JobLineGroup = DetailLineGroup & { jobNum: string | null }
+function apCostLinesToLedger(rows: APInvoiceCostLine[]): { lines: LedgerItem[]; groups: JobLineGroup[] | null } {
   const toItem = (r: APInvoiceCostLine): LedgerItem => ({
     primary: r.description || costTypeLabel(r.costType) || "Job cost",
     meta: r.description ? costTypeLabel(r.costType) : null,
@@ -166,12 +167,12 @@ function apCostLinesToLedger(rows: APInvoiceCostLine[]): { lines: LedgerItem[]; 
   const jobs = new Set(rows.map((r) => r.jobNum ?? ""))
   const flat = rows.map(toItem)
   if (jobs.size <= 1) return { lines: flat, groups: null }
-  const byJob = new Map<string, DetailLineGroup>()
+  const byJob = new Map<string, JobLineGroup>()
   for (const r of rows) {
     const key = r.jobNum ?? ""
     let g = byJob.get(key)
     if (!g) {
-      g = { heading: r.jobName || (r.jobNum ? `Job ${r.jobNum}` : "No job"), meta: r.jobNum && r.jobName ? `#${r.jobNum}` : null, subtotal: 0, lines: [] }
+      g = { heading: r.jobName || (r.jobNum ? `Job ${r.jobNum}` : "No job"), meta: r.jobNum && r.jobName ? `#${r.jobNum}` : null, subtotal: 0, lines: [], jobNum: r.jobNum }
       byJob.set(key, g)
     }
     g.lines.push(toItem(r))
@@ -180,12 +181,12 @@ function apCostLinesToLedger(rows: APInvoiceCostLine[]): { lines: LedgerItem[]; 
   return { lines: flat, groups: [...byJob.values()] }
 }
 
-function apLinesToLedger(lines: APInvoiceLine[]): { lines: LedgerItem[]; groups: DetailLineGroup[] | null } {
+function apLinesToLedger(lines: APInvoiceLine[]): { lines: LedgerItem[]; groups: JobLineGroup[] | null } {
   const jobs = new Set(lines.map((l) => l.jobNum ?? ""))
   const multiJob = jobs.size > 1
   const flat = lines.map((l) => apLineToItem(l, false))
   if (!multiJob) return { lines: flat, groups: null }
-  const byJob = new Map<string, { heading: string; meta: string | null; lines: LedgerItem[]; subtotal: number }>()
+  const byJob = new Map<string, JobLineGroup>()
   for (const l of lines) {
     const key = l.jobNum ?? ""
     let g = byJob.get(key)
@@ -195,6 +196,7 @@ function apLinesToLedger(lines: APInvoiceLine[]): { lines: LedgerItem[]; groups:
         meta: l.jobNum && l.jobName ? `#${l.jobNum}` : null,
         lines: [],
         subtotal: 0,
+        jobNum: l.jobNum ?? null,
       }
       byJob.set(key, g)
     }
@@ -365,7 +367,21 @@ function InvoiceContent({
             }
           : null
       }
-      ledger={detail.lines.length > 0 ? { heading: detail.heading ?? "Line items", lines: detail.lines, groups: detail.groups } : null}
+      // Multi-job groups: each heading jumps to that job (the invoice's own
+      // project link is per-invoice, and hidden on the jobcost page, so this
+      // is how a reader reaches the OTHER jobs an invoice touched).
+      ledger={
+        detail.lines.length > 0
+          ? {
+              heading: detail.heading ?? "Line items",
+              lines: detail.lines,
+              groups: detail.groups?.map((g) => ({
+                ...g,
+                onOpen: g.jobNum && !projectBlockedReason ? () => goToJobcost(g.jobNum!) : null,
+              })),
+            }
+          : null
+      }
       // Provenance reads last and quiet, as on the recap's item modal — who
       // keyed the invoice on the left, when on the right.
       footer={
