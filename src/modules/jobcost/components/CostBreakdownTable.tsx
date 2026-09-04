@@ -121,7 +121,7 @@ export function CostBreakdownTable({
   const [costSortDir, setCostSortDir] = useState<SortDir>("asc")
   // Same drill-down wiring as the Daily Recap feed: invoice-shaped items open
   // the invoice modal, POs/subcontracts the generic detail modal.
-  const { openItem, modals } = useItemDrilldown({ backLabel: "Job Costing" })
+  const { openItem, modals } = useItemDrilldown({ backLabel: "Job Costing", hideProject: true })
   const { canViewPartners, goToPartner } = usePartnerNav()
 
   const { groups, totalBudget, totalActual, totalVariance } = computeCostGroups(budget, costItems)

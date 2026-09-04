@@ -170,6 +170,7 @@ export function ItemDetailModal({
   onViewProject,
   window,
   projectBlockedReason,
+  hideProject = false,
 }: {
   item: RecentChangeItem | null
   onClose: () => void
@@ -179,6 +180,8 @@ export function ItemDetailModal({
   /** When set, "View project" is inert and surfaces this as a tooltip (used
    *  during the daily-recap intro, which blocks leaving until it's finished). */
   projectBlockedReason?: string | null
+  /** Omit the project link (already on the project's page). */
+  hideProject?: boolean
 }) {
   const open = item !== null
   const { canViewPartners, goToPartner } = usePartnerNav()
@@ -240,7 +243,7 @@ export function ItemDetailModal({
             right: `${formatDate(shown.occurredAt)} · ${formatRelativeTime(shown.occurredAt)}`,
           }}
           project={
-            shown.jobId
+            shown.jobId && !hideProject
               ? {
                   jobId: shown.jobId,
                   jobName: shown.jobName,

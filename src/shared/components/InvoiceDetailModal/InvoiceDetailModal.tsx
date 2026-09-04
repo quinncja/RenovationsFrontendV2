@@ -100,6 +100,8 @@ interface InvoiceDetailModalProps {
   /** When set, the project link is inert and surfaces this as a tooltip instead
    *  of navigating (the daily-recap intro blocks leaving until it's finished). */
   projectBlockedReason?: string | null
+  /** Omit the project link (already on the project's page). */
+  hideProject?: boolean
 }
 
 // The eyebrow says which ledger this invoice lives on — AR (client, we billed
@@ -230,6 +232,7 @@ export function InvoiceDetailModal({
   module,
   onClose,
   projectBlockedReason,
+  hideProject = false,
 }: InvoiceDetailModalProps) {
   const [detail, setDetail] = useState<InvoiceDetail | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -285,7 +288,7 @@ export function InvoiceDetailModal({
       {isLoading && <div className="widget-skeleton" style={{ height: "9rem" }} />}
       {!isLoading && error && <p className="body-text text-secondary">{error}</p>}
       {!isLoading && !error && detail && (
-        <InvoiceContent detail={detail} module={module} projectBlockedReason={projectBlockedReason} />
+        <InvoiceContent detail={detail} module={module} projectBlockedReason={projectBlockedReason} hideProject={hideProject} />
       )}
     </DetailModal>
   )
@@ -301,10 +304,12 @@ function InvoiceContent({
   detail,
   module,
   projectBlockedReason,
+  hideProject = false,
 }: {
   detail: InvoiceDetail
   module: InvoiceDetailModalProps["module"]
   projectBlockedReason?: string | null
+  hideProject?: boolean
 }) {
   const { goToJobcost } = useJobcostNav()
   const { canViewPartners, goToPartner } = usePartnerNav()
@@ -351,7 +356,7 @@ function InvoiceContent({
           : null
       }
       project={
-        h.jobNum
+        h.jobNum && !hideProject
           ? {
               jobId: h.jobNum,
               jobName: h.jobName,

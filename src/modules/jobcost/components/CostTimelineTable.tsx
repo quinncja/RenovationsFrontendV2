@@ -62,7 +62,7 @@ export function CostTimelineTable({
   onOpenChange?: (open: boolean) => void
 }) {
   const [newestFirst, setNewestFirst] = useState(true)
-  const { openItem, modals } = useItemDrilldown({ backLabel: "Job Costing" })
+  const { openItem, modals } = useItemDrilldown({ backLabel: "Job Costing", hideProject: true })
   const { canViewPartners, goToPartner } = usePartnerNav()
 
   const { groups, totalCommitted, totalPosted } = useMemo(() => {

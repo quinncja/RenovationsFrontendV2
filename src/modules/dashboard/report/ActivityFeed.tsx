@@ -25,6 +25,7 @@ export function useItemDrilldown({
   backLabel,
   window: reportWindow,
   blockProjectNav = false,
+  hideProject = false,
 }: {
   /** Jobcost back-button label for "View project" (see useJobcostNav). */
   backLabel: string
@@ -33,6 +34,9 @@ export function useItemDrilldown({
   /** Block the "View project" jump (the intro walkthrough): the link goes inert
    *  and shows INTRO_PROJECT_BLOCK as a tooltip instead of navigating away. */
   blockProjectNav?: boolean
+  /** Omit the "View project" link — for surfaces already inside the project
+   *  (the jobcost detail page), where it would only point back here. */
+  hideProject?: boolean
 }): { openItem: (item: RecentChangeItem) => void; modals: ReactNode } {
   const [selected, setSelected] = useState<RecentChangeItem | null>(null)
   const [invoice, setInvoice] = useState<{ id: string; module: "clients" | "suppliers" } | null>(
@@ -67,12 +71,14 @@ export function useItemDrilldown({
         onViewProject={(jobId) => goToJobcost(jobId, { backLabel })}
         window={reportWindow}
         projectBlockedReason={projectBlockedReason}
+        hideProject={hideProject}
       />
       <InvoiceDetailModal
         invoiceId={invoice?.id ?? null}
         module={invoice?.module ?? "clients"}
         onClose={() => setInvoice(null)}
         projectBlockedReason={projectBlockedReason}
+        hideProject={hideProject}
       />
     </>
   )
