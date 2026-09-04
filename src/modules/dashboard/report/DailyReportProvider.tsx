@@ -11,7 +11,7 @@ import { useAuth } from "../../../core/auth/AuthProvider"
 import { effectiveRole, isGeneralManager, ALL_JOBS_DETAIL_ID, type AppRole } from "../../../core/auth/roles"
 import { useOnboarding } from "../../../core/onboarding/OnboardingProvider"
 import { initAnalytics, track } from "../../../shared/analytics/analytics"
-import { deriveBackLabel } from "../../jobcost/useJobcostNav"
+import { pageLabel } from "../../jobcost/useJobcostNav"
 import type { ReportPayload } from "./reportTypes"
 import { chicagoToday } from "./chicagoDate"
 import { fetchDailyReport, type ReportSource } from "./useReportData"
@@ -87,7 +87,9 @@ const INERT_ARRIVAL: ArrivalState = {
  *  destinations (dashboard home + jobcost list) would be redundant as one. */
 function deriveContinueTo(pathname: string, search: string): ArrivalDestination | null {
   if (pathname === "/" || pathname.startsWith("/dashboard") || pathname === "/jobcost") return null
-  return { path: pathname + search, label: deriveBackLabel(pathname) }
+  // Never borrow another page's name: an unmapped route reads as a neutral
+  // "where you were" rather than claiming to be Dashboard / Job Costing.
+  return { path: pathname + search, label: pageLabel(pathname) ?? "where you left off" }
 }
 
 // The report fetch must win the wire, but the entry-page preloads shouldn't

@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom"
 import { propertySlug } from "./jobcostShared"
+import { PAGE_LABELS } from "../../core/auth/roles"
 
 // Shared router-state contract for the Job Cost detail page's back button.
 // Every entry point into /jobcost/:recnum stashes { backTo, backLabel } so the
@@ -12,30 +13,31 @@ export interface JobcostBackState {
 
 export const JOBCOST_BACK_FALLBACK = { to: "/jobcost", label: "Job Costing" } as const
 
-// Prefix-matched route → label map. Ordered most-specific-first so a longer
-// path (e.g. /dashboard/employees) wins over a broader catch-all (/dashboard).
-const BACK_LABELS: Array<[string, string]> = [
+// Route → label resolution. Detail/sub-pages that need a more specific name
+// than their parent nav item are listed here; everything else resolves through
+// the nav table in roles.ts so a new page is labelled the moment it's added.
+const DETAIL_LABELS: Array<[string, string]> = [
   ["/jobcost/property", "Property"],
-  ["/jobcost", "Job Costing"],
-  ["/reports", "Activity"],
-  ["/clients", "Clients"],
-  ["/vendors", "Vendors"],
-  ["/subcontractors", "Subcontractors"],
-  ["/employees", "Employees"],
-  ["/change-orders", "Change Orders"],
-  ["/invoices", "Invoices"],
-  ["/progress-billings", "Progress Billings"],
+  ["/jobcost/", "Job Costing"],
   ["/dashboard/forecast-billings", "Forecast Billings"],
-  ["/forecast-billings", "Forecast Billings"],
-  ["/overhead-report", "Overhead"],
-  ["/financial-summary", "Financial Summary"],
   ["/dashboard/breakdown", "Breakdown"],
   ["/dashboard", "Dashboard"],
 ]
 
+/** Human name for a pathname, or null when no route claims it. Matches on
+ *  whole path segments so `/jobcostx` can't borrow Job Costing's label. */
+export function pageLabel(pathname: string): string | null {
+  const matches = (prefix: string) =>
+    pathname === prefix ||
+    pathname.startsWith(prefix.endsWith("/") ? prefix : prefix + "/")
+  const detail = DETAIL_LABELS.find(([prefix]) => matches(prefix))
+  if (detail) return detail[1]
+  const page = PAGE_LABELS.find(([path]) => matches(path))
+  return page ? page[1] : null
+}
+
 export function deriveBackLabel(pathname: string): string {
-  const match = BACK_LABELS.find(([prefix]) => pathname.startsWith(prefix))
-  return match ? match[1] : JOBCOST_BACK_FALLBACK.label
+  return pageLabel(pathname) ?? JOBCOST_BACK_FALLBACK.label
 }
 
 // Wraps navigation to the Job Cost detail page, auto-capturing the current page

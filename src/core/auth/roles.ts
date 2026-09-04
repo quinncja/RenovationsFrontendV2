@@ -80,6 +80,12 @@ const navItems = {
   feedback: { label: "Feedback", path: "/feedback", icon: MessageSquare },
 } as const satisfies Record<string, NavItem>
 
+/** Every top-level page as `[path, label]`, the single source of truth for
+ *  "what is this route called" (back buttons, the arrival's Continue CTA). */
+export const PAGE_LABELS: ReadonlyArray<readonly [string, string]> = Object.values(navItems).map(
+  (item) => [item.path, item.label] as const,
+)
+
 const financesGroup: NavGroup = {
   label: "Reports",
   icon: Landmark,
