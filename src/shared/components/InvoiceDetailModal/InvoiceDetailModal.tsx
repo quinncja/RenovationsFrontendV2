@@ -40,6 +40,10 @@ interface InvoiceHeader {
    *  won't send them and the party stays plain text. */
   clientId?: number | null
   vendorId?: number | null
+  /** AP only: which directory page the payee lives on (the directory splits
+   *  AP by ledger account). Optional: an older backend won't send it and the
+   *  module's default kind applies. */
+  partyKind?: "vendor" | "subcontractor" | null
   /** Sage audit stamp (acpinv/acrinv insusr + insdte). Optional: an older
    *  backend deploy won't send them and the footer is omitted. */
   enteredBy?: string | null
@@ -318,6 +322,7 @@ function InvoiceContent({
   const h = detail.header
   const party = module === "clients" ? h.clientName : h.vendorName
   const partyId = module === "clients" ? h.clientId : h.vendorId
+  const partnerKind: PartnerKind = module === "clients" ? "client" : h.partyKind ?? MODULE_PARTNER_KIND[module]
   const hasDesc = Boolean(h.description)
   // The description is what the invoice is FOR, so it leads as the name; the
   // invoice number rides small beside the eyebrow. When there's no description
@@ -354,7 +359,7 @@ function InvoiceContent({
       // reach the directory routes.
       onPartyOpen={
         canViewPartners && !projectBlockedReason && partyId != null
-          ? () => goToPartner(MODULE_PARTNER_KIND[module], partyId)
+          ? () => goToPartner(partnerKind, partyId)
           : null
       }
       project={

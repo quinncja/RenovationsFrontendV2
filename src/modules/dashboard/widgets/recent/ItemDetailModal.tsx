@@ -231,8 +231,8 @@ export function ItemDetailModal({
             canViewPartners &&
             !projectBlockedReason &&
             shown.partyId != null &&
-            PARTY_PARTNER_KIND[shown.kind]
-              ? () => goToPartner(PARTY_PARTNER_KIND[shown.kind]!, shown.partyId!)
+            (shown.partyKind ?? PARTY_PARTNER_KIND[shown.kind])
+              ? () => goToPartner((shown.partyKind ?? PARTY_PARTNER_KIND[shown.kind])!, shown.partyId!)
               : null
           }
           // Provenance reads last and quiet — who on the left, when on the right.

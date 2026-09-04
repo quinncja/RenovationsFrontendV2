@@ -86,6 +86,7 @@ export function toDrilldownItem(t: CostItem, job: { id: string; name: string } |
     title: t.dscrpt?.trim() || t.id,
     party: t.id,
     partyId: t.vendorId ?? null,
+    partyKind: t.costType === "Subcontractor" ? "subcontractor" : "vendor",
     amount: (t.committedAmount || 0) + (t.postedAmount || 0),
     status: null,
     pmName: null,

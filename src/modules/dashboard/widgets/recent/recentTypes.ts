@@ -31,6 +31,9 @@ export interface RecentChangeItem {
   /** Supervisor of the item's job — shown on the admin (company-wide) feed. */
   pmName: string | null
   enteredBy: string | null
+  /** Overrides the kind-derived directory page for the party (a
+   *  subcontractor's posted cost is kind "cost", whose default is vendor). */
+  partyKind?: "client" | "vendor" | "subcontractor" | null
   /** Record-entry timestamp (insdte/entdte; aprdte for approved COs). */
   occurredAt: string
 }
