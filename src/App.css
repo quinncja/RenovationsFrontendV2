@@ -7956,11 +7956,18 @@ button.jc-kind-chip:hover {
    header row lines up with the widget title. Scoped to .jcd-cost-widget so the
    compact copy embedded in the Job Costing list rows is unaffected. */
 .jcd-cost-widget .jc-cost-breakdown {
-  flex: 1 1 auto;
+  /* Never grow: the widget's 280px min-height would otherwise stretch a
+     short table (a phase with two months) and pad the surplus into its
+     rows until one opens. The card hugs the table instead. */
+  flex: 0 0 auto;
+}
+.jcd-cost-widget.card {
+  min-height: 0;
 }
 
 .jcd-cost-widget .jc-cost-breakdown thead th {
-  padding-top: 0.875rem;
+  /* 0.875rem + the 0.5rem the card head no longer pads beneath the title. */
+  padding-top: 1.375rem;
   padding-bottom: 0.875rem;
 }
 
@@ -22022,4 +22029,255 @@ body.pj-painting td.pj-computed {
 }
 @media (max-width: 640px) {
   .jc-overview-scoped > .jc-overview-scope-art { display: none; }
+}
+
+/* ── Spending Breakdown: Timeline view ──
+   Month rows reuse the category table's expandable-row dress (chevron,
+   open-card frame, jc-txn sub-table). Only the pieces the month sub-table
+   adds are styled here. */
+.jc-tl-th-static {
+  cursor: default;
+}
+.jc-tl-th-static:hover { color: var(--secondary-text); }
+/* Line count beside the month name, in the quiet voice. */
+.jc-tl-month-count {
+  margin-left: 0.5rem;
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-regular);
+}
+.jc-tl-date {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.jc-tl-txn-table td { white-space: nowrap; }
+/* Description absorbs the spare width and truncates rather than wrapping. */
+.jc-tl-txn-table td.jc-tl-desc-col {
+  max-width: 0;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.jc-tl-empty {
+  padding: 1.25rem;
+}
+
+/* ── Spending Breakdown card: page-scroll pinning ──
+   The Projection Board's head-pin recipe (see .pj-pin-scope /
+   .pj-summary-head), on the cost card. Armed (.jcd-cost-pin) only while a
+   category or month is open — useCostPin toggles it. Every band is natively
+   sticky against the page scrollport: the card head pins --jcd-lift above
+   the edge (its airy top padding tucks away, the band reads compact), and
+   beneath it the open group's row (its tbody is the
+   containing block, so it rides its own line items and hands off to the
+   next group) and that group's line-item labels stack up, each offset by
+   the measured height of the bands above (--jcd-head/-group/-sub).
+   The card is the head's containing block, so the stack departs with the
+   card. The card must not be a scroll container (overflow: hidden would
+   swallow every sticky), so it clips instead. Desktop only, like the board. */
+.jcd-cost-widget {
+  --jcd-glass-bg: light-dark(rgba(255, 255, 255, 0.62), rgba(38, 34, 32, 0.6));
+  --jcd-glass-rim: light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.12));
+  --jcd-glass-edge: light-dark(rgba(25, 55, 90, 0.12), rgba(255, 255, 255, 0.1));
+  --jcd-glass-filter: blur(4px) saturate(1.2);
+  --jcd-edge-shadow: light-dark(rgba(31, 26, 21, 0.1), rgba(0, 0, 0, 0.3));
+  /* The head carries its own bottom spacing (below) instead of the widget
+     gap, so nothing can show through between the pinned head and the
+     column labels. Same geometry as the gap it replaces. */
+  gap: 0;
+  position: relative;
+}
+.jcd-cost-widget .widget-header {
+  /* Absorbs the card's 1.25rem top padding so the pinned band is flush with
+     the lift line. Almost no padding below: pinned, the docked row's frame
+     then sits right under the pill instead of a strip of see-through glass
+     below it. The 0.5rem the widget gap used to give the column labels
+     moved into the labels' own top padding (they scroll away), so the
+     resting layout is unchanged. */
+  margin-top: -1.25rem;
+  padding-top: 1.25rem;
+  padding-bottom: 0.25rem;
+  position: relative;
+  isolation: isolate;
+}
+@media (min-width: 769px) {
+  .jcd-cost-widget.jcd-cost-pin.card {
+    overflow: clip;
+  }
+  .jcd-cost-pin .widget-header {
+    position: sticky;
+    top: calc(-2rem - var(--jcd-lift, 0px));
+    z-index: 7;
+  }
+  /* The glass pane under the pinned head: starts at the lift line, not the
+     head's top, so no backdrop-filtered box straddles the scrollport edge
+     (Safari blurs those unevenly). Fades in as the head pins. */
+  .jcd-cost-pin .widget-header::before {
+    content: "";
+    position: absolute;
+    inset: var(--jcd-lift, 0px) 0 0 0;
+    z-index: -1;
+    background: light-dark(rgba(255, 255, 255, 0.5), rgba(38, 34, 32, 0.5));
+    -webkit-backdrop-filter: blur(3px) saturate(1.15);
+    backdrop-filter: blur(3px) saturate(1.15);
+    opacity: 0;
+    transition: opacity 200ms ease;
+    pointer-events: none;
+  }
+  .jcd-cost-head-pinned .widget-header::before {
+    opacity: 1;
+  }
+  /* Pinned dress: the title condenses into a glass pill (transform only —
+     no font reflow, so nothing beneath shifts) and the view pill takes the
+     glass treatment. Same numbers as the board's title (scale 0.846 → the
+     strip's label size; the text box is pre-sized so the scaled pill lands
+     at 1.875rem tall). */
+  .jcd-cost-pin .widget-title {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 2.2163rem;
+    margin: -0.17rem 0;
+    transform-origin: left center;
+    transition: transform 220ms ease;
+    will-change: transform;
+  }
+  .jcd-cost-pin .widget-title::before {
+    content: "";
+    position: absolute;
+    inset: 0 -1.0343rem;
+    z-index: -1;
+    border-radius: 999px;
+    background: var(--jcd-glass-bg);
+    -webkit-backdrop-filter: var(--jcd-glass-filter);
+    backdrop-filter: var(--jcd-glass-filter);
+    border: 1px solid var(--jcd-glass-edge);
+    box-shadow:
+      inset 0 1px 0 var(--jcd-glass-rim),
+      0 4px 14px -4px var(--jcd-edge-shadow);
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+  .jcd-cost-head-pinned .widget-title {
+    transform: translateX(0.875rem) scale(0.846);
+  }
+  .jcd-cost-head-pinned .widget-title::before {
+    opacity: 1;
+  }
+  .jcd-cost-pin .ohr-seg {
+    transition: background-color 200ms ease, box-shadow 200ms ease;
+  }
+  .jcd-cost-head-pinned .ohr-seg {
+    background: var(--jcd-glass-bg);
+    -webkit-backdrop-filter: var(--jcd-glass-filter);
+    backdrop-filter: var(--jcd-glass-filter);
+    box-shadow:
+      inset 0 1px 0 var(--jcd-glass-rim),
+      0 0 0 1px var(--jcd-glass-edge),
+      0 4px 14px -4px var(--jcd-edge-shadow);
+  }
+  /* The open group's row (category or month): docked directly beneath the
+     head. The top-level column labels scroll away with the closed rows. */
+  .jcd-cost-pin .jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open > td {
+    position: sticky;
+    /* --jcd-push (useCostPin, ≤ 0): Safari confines a sticky cell to the
+       TABLE, not its tbody, so the row would ride to the end of the table.
+       The hook slides it up under the head on the group's LAST line item —
+       the row leaves with that item, never reaching the frame's bottom. */
+    top: calc(-2rem - var(--jcd-lift, 0px) + var(--jcd-head, 0px) + var(--jcd-push, 0px));
+    z-index: 4;
+    background: var(--card-color);
+  }
+  /* Docked under the head, the row keeps its rounded corners; the card's
+     inner sliver beside each radius, where rows scroll past sharp, is put
+     behind glass there — a patch at each top corner, clipped to the region
+     outside the frame's 12px arc, carrying the head's own blur so the notch
+     dissolves the way everything under the head does. The card's border
+     itself stays crisp (as on the Projection Board): the patch is anchored
+     at the cell's border-box corner, inside the card's edge. The cell's
+     own glass is a sibling pseudo (below) rather than a filter on the cell:
+     a backdrop-filtered ancestor is a backdrop root, so a patch inside it
+     would have nothing behind the cell to blur. */
+  .jcd-cost-pin .jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open.jcd-stuck > td:first-child::before,
+  .jcd-cost-pin .jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open.jcd-stuck > td:last-child::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    width: 12px;
+    height: 12px;
+    background: light-dark(rgba(255, 255, 255, 0.5), rgba(38, 34, 32, 0.5));
+    -webkit-backdrop-filter: blur(3px) saturate(1.15);
+    backdrop-filter: blur(3px) saturate(1.15);
+    pointer-events: none;
+  }
+  .jcd-cost-pin .jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open.jcd-stuck > td:first-child::before {
+    left: -1px;
+    clip-path: path("M0 0H12A12 12 0 0 0 0 12Z");
+  }
+  .jcd-cost-pin .jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open.jcd-stuck > td:last-child::before {
+    right: -1px;
+    clip-path: path("M12 0H0A12 12 0 0 1 12 12Z");
+  }
+  /* The open group's line-item labels: beneath its row. The reveal must clip
+     rather than hide so it isn't a scroll container for these. */
+  .jcd-cost-pin .jc-cost-breakdown .jc-txn-reveal {
+    overflow: clip;
+  }
+  .jcd-cost-pin .jc-cost-breakdown .jc-txn-table > thead .jc-txn-th {
+    position: sticky;
+    /* Tucked 0.45rem up under the docked row (which paints over them):
+       most of the labels' 0.7rem top padding hides beneath the row, so the
+       label text sits close under the row's edge instead of a see-through
+       strip. */
+    top: calc(-2rem - var(--jcd-lift, 0px) + var(--jcd-head, 0px) + var(--jcd-group, 0px) + var(--jcd-push, 0px) - 0.45rem);
+    z-index: 3;
+  }
+  /* Standing over scrolled content, the docked bands go to glass so the
+     lines dissolve beneath them instead of being cut. */
+  /* Denser glass than the head's pane: these bands carry padding (the
+     labels' 0.7rem, the row's 1.05rem) that read as gaps when rows showed
+     through them at the head's strength. */
+  .jcd-cost-head-pinned .jc-cost-breakdown .jc-txn-table > thead .jc-txn-th {
+    background: light-dark(rgba(255, 255, 255, 0.86), rgba(38, 34, 32, 0.86));
+    -webkit-backdrop-filter: var(--jcd-glass-filter);
+    backdrop-filter: var(--jcd-glass-filter);
+  }
+  /* The docked row's glass rides a pseudo inside each cell (see the corner
+     note above): the cell itself goes clear and the pane fills its BORDER
+     box beneath the content, taking the cell's radii — and draws the row's
+     outline itself. The frame's translucent side borders run on beneath
+     the docked row, and the cell's own border over them read doubled
+     (darker); painted on the pane, over its near-opaque fill, the outline
+     reads the same as at rest. */
+  .jcd-cost-head-pinned .jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open > td,
+  .jcd-cost-head-pinned .jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open:hover > td {
+    background: transparent;
+    border-color: transparent;
+  }
+  .jcd-cost-head-pinned .jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open > td::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    border: 1px solid transparent;
+    border-top-color: var(--jc-open-border);
+    border-bottom-color: var(--border-color);
+    /* The fill runs under the pane's own border (border-box, the default):
+       that is what keeps the frame's border beneath from showing through
+       the outline and doubling it. */
+    background: light-dark(rgba(255, 255, 255, 0.86), rgba(38, 34, 32, 0.86));
+    -webkit-backdrop-filter: var(--jcd-glass-filter);
+    backdrop-filter: var(--jcd-glass-filter);
+    pointer-events: none;
+  }
+  .jcd-cost-head-pinned .jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open > td:first-child::after {
+    border-left-color: var(--jc-open-border);
+  }
+  .jcd-cost-head-pinned .jc-cost-breakdown > tbody > .spend-rank-table-row.jc-row-open > td:last-child::after {
+    border-right-color: var(--jc-open-border);
+  }
+  .jcd-cost-head-pinned .jc-cost-breakdown .jc-txn-table > thead .jc-txn-th {
+    box-shadow: 0 6px 12px -6px var(--jcd-edge-shadow);
+    transition: opacity 120ms ease;
+  }
 }

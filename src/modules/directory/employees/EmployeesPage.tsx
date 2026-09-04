@@ -569,7 +569,6 @@ function EmployeeCard({
 
 function WorkloadCard({
   pm,
-  totalContract,
   yearRevenue,
   yearRevenueTotal,
   completedYear,

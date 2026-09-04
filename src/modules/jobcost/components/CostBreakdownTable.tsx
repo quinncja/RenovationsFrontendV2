@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronRight } from "lucide-react"
 import { formatMoneyFull } from "../../../shared/utils/format"
@@ -71,7 +71,7 @@ type SortDir = "asc" | "desc"
 // card with the posting's own details. Their jobId stays null on purpose:
 // the modal's cost ledger describes a job × cost-type rollup, not this
 // single posting, so a null jobId skips that fetch.
-function toDrilldownItem(t: CostItem, job: { id: string; name: string } | null | undefined): RecentChangeItem {
+export function toDrilldownItem(t: CostItem, job: { id: string; name: string } | null | undefined): RecentChangeItem {
   const kind =
     !t.linkRecnum ? null :
     t.itemType === "po" ? "purchaseOrder" :
@@ -102,14 +102,19 @@ export function CostBreakdownTable({
   budget,
   costItems,
   job,
+  onOpenChange,
 }: {
   budget: BudgetBreakdown | null
   costItems: CostItem[]
   /** Job context for the drill-down modals' "View project" link. Omit on the
    *  project detail page — you're already there, so the link is dropped. */
   job?: { id: string; name: string } | null
+  /** Fires with whether any category is open (drives the detail page card's
+   *  pinning; unused by the Job Costing list's inline copies). */
+  onOpenChange?: (open: boolean) => void
 }) {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  useEffect(() => { onOpenChange?.(expandedGroups.size > 0) }, [expandedGroups, onOpenChange])
   // No default sort — preserve the natural cost-type order until the user
   // explicitly sorts a column.
   const [costSortKey, setCostSortKey] = useState<CostSortKey | null>(null)
@@ -167,13 +172,10 @@ export function CostBreakdownTable({
     )
   }
 
+  // One group open at a time: opening another closes the current one, so
+  // the docked row under the pinned head is always the one being read.
   function toggleGroup(name: string) {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev)
-      if (next.has(name)) next.delete(name)
-      else next.add(name)
-      return next
-    })
+    setExpandedGroups((prev) => (prev.has(name) ? new Set() : new Set([name])))
   }
 
   const totalVarClass = totalVariance < 0 ? "jc-variance-over" : totalVariance > 0 ? "jc-variance-under" : ""

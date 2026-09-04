@@ -7,6 +7,9 @@ import { useModalLayer } from "../../shared/hooks/useModalLayer"
 import { downloadXlsx } from "../../shared/utils/exportXlsx"
 import { buildJobCostXlsx } from "./exportJobCostXlsx"
 import { CostBreakdownTable, CostBreakdownSkeleton } from "./components/CostBreakdownTable"
+import { CostTimelineTable } from "./components/CostTimelineTable"
+import { SegmentedControl } from "../../shared/components/SegmentedControl"
+import { useCostPin, useCostViewSwitch } from "./useCostPin"
 import { SkelText } from "../../shared/components/SkelText"
 import { PieWithListSkeleton, ChartAreaSkeleton } from "../../shared/components/Chart/ChartSkeletons"
 import { computeCostGroups, type BudgetBreakdown, type CostItem } from "./types"
@@ -136,6 +139,11 @@ interface RailSib {
   oneoff: boolean
   label: string
 }
+
+const SPEND_VIEW_OPTIONS = [
+  { key: "category", label: "Categories" },
+  { key: "timeline", label: "Timeline" },
+] as const
 
 // Minimal slice of the property fetch's rows the rail needs.
 interface RailRow {
@@ -397,6 +405,23 @@ function JobcostDetail({ recnum }: { recnum: string }) {
   const invoices = Array.isArray(data?.getJobInvoices) ? data.getJobInvoices : []
   const pb = data?.getProgressBilling ?? null
 
+  // Spending Breakdown view: budget-vs-actual by cost type, or every line
+  // item in the order it was entered. Per-visit — resets on each project.
+  const [spendView, setSpendView] = useState<"category" | "timeline">("category")
+  // Whether a category / month is open in that table — arms the card's
+  // page-scroll pinning (see useCostPin). Reset on a view switch so a stale
+  // "open" from the other table can't leave the pin armed.
+  const [spendOpen, setSpendOpen] = useState(false)
+  const costPinRef = useCostPin(spendOpen)
+  // Switching while the head is pinned: hold the card in place and glide
+  // its height to the new table's (see useCostViewSwitch).
+  const beforeSpendSwitch = useCostViewSwitch(costPinRef, spendView)
+  const switchSpendView = (v: "category" | "timeline") => {
+    if (v === spendView) return
+    beforeSpendSwitch()
+    setSpendOpen(false)
+    setSpendView(v)
+  }
   const [changeOrders, setChangeOrders] = useState<ChangeOrder[]>([])
   const [selectedCO, setSelectedCO] = useState<ChangeOrder | null>(null)
   // Change-order list modal, opened from the Contract Summary's drill row.
@@ -1066,7 +1091,7 @@ function JobcostDetail({ recnum }: { recnum: string }) {
               {/* The full breakdown table leads — it sits directly under the
                   overview's ledger, which it itemizes; the pies below answer
                   "where did it go" at a glance. */}
-              <div className="col-span-full">
+              <div className="col-span-full" ref={costPinRef}>
                 <Widget
                   title="Spending Breakdown"
                   loading={isLoading}
@@ -1075,8 +1100,20 @@ function JobcostDetail({ recnum }: { recnum: string }) {
                   // Real header + category labels with shimmer numbers — the
                   // table's final geometry before the fetch returns.
                   skeleton={<CostBreakdownSkeleton />}
+                  actions={
+                    <SegmentedControl
+                      value={spendView}
+                      options={SPEND_VIEW_OPTIONS}
+                      onChange={switchSpendView}
+                      layoutId="jcdSpendViewSeg"
+                      variant="ohr"
+                      ariaLabel="Spending Breakdown view"
+                    />
+                  }
                 >
-                  <CostBreakdownTable budget={budget} costItems={costItems} />
+                  {spendView === "timeline"
+                    ? <CostTimelineTable costItems={costItems} onOpenChange={setSpendOpen} />
+                    : <CostBreakdownTable budget={budget} costItems={costItems} onOpenChange={setSpendOpen} />}
                 </Widget>
               </div>
 
