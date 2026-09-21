@@ -65,14 +65,17 @@ export async function parseChangeOrderExcel(file: File): Promise<ParsedChangeOrd
     const row = rows[i]
     if (isBlankRow(row)) break
 
-    const desc = String(row[COL.desc] ?? "")
-    const unit = String(row[COL.unit] ?? "")
-    if (!desc || !unit) continue
+    // Unit is optional: common-area work (entrances, gym) has no unit number.
+    const desc = String(row[COL.desc] ?? "").trim()
+    const unit = String(row[COL.unit] ?? "").trim()
+    if (!desc) continue
 
     const liLabor = num(row[COL.labor])
     const liMaterial = num(row[COL.material])
     const liSubs = num(row[COL.subs])
     const liWtpm = num(row[COL.wtpm])
+    // A described row with no dollars is a stray note, not a line item.
+    if (liLabor === 0 && liMaterial === 0 && liSubs === 0 && liWtpm === 0) continue
 
     lineItems.push({
       desc,

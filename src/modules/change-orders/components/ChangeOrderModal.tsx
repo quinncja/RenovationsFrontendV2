@@ -193,7 +193,7 @@ function CoLineItemsTable({ co }: {
           {items.map((row, i) => (
             <tr key={i}>
               <td>{row.desc}</td>
-              <td className="co-col-unit">{row.unit}</td>
+              <td className="co-col-unit">{row.unit || <span className="co-cell-empty">–</span>}</td>
               {CATEGORIES.map((c) => (
                 <td key={c.key} className="co-col-num">
                   {row[c.key] ? formatMoneyFull(row[c.key]) : <span className="co-cell-empty">–</span>}
@@ -206,7 +206,7 @@ function CoLineItemsTable({ co }: {
         <tfoot>
           <tr className="co-modal-foot">
             <td>Totals</td>
-            <td className="co-col-unit">{items.length} Unit{items.length !== 1 ? "s" : ""}</td>
+            <td className="co-col-unit">{items.length} Item{items.length !== 1 ? "s" : ""}</td>
             {CATEGORIES.map((c) => (
               <td key={c.key} className="co-col-num">{formatMoneyFull(co[c.key])}</td>
             ))}
