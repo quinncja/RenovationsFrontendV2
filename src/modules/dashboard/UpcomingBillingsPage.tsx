@@ -26,6 +26,7 @@ import {
   type BillingsInvoice,
 } from "./utils/agingForecast"
 import { AR_COLOR, AP_COLOR } from "./widgets/billings/billingsShared"
+import { UpcomingBillingsWidget } from "./widgets/billings/UpcomingBillingsWidget"
 import { Fact } from "../jobcost/detailPrimitives"
 import { PeriodSearch, Highlight } from "./PeriodSearch"
 
@@ -943,6 +944,21 @@ function UpcomingBillingsContent() {
             })}
           </div>
         </section>
+        </MotionItem>
+
+        <MotionItem>
+          <UpcomingBillingsWidget pastWeeks={pastWeeks.map((week) => ({
+            label: week.label,
+            ar: { actual: past?.arAvailable ? week.ar.actual : null },
+            ap: { actual: past?.apAvailable ? week.ap.actual : null },
+          }))} onWeekSelect={(index) => {
+            setOpenWeek(index)
+            setSearchFolded((curr) => {
+              const next = new Set(curr)
+              next.delete(index)
+              return next
+            })
+          }} />
         </MotionItem>
 
         <MotionItem>

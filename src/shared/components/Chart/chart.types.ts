@@ -172,7 +172,13 @@ export type ChartConfig =
       curve?: "linear" | "monotoneX" | "step" | "natural" | "catmullRom"
       axisBottomTickValues?: string[]
       axisBottomFormat?: (v: string | number) => string
+      /** Draw each line dashed from this x category onward. */
+      dashedFromX?: string
+      /** Customize series names in multi-series tooltip rows by x category. */
+      tooltipSeriesLabel?: (seriesId: string, xLabel: string) => string
       disableGrowthTooltip?: boolean
+      /** Append the signed sum of the series as a Net row in multi-series tooltips. */
+      netTooltip?: boolean
       /** X-axis label of the open month whose value has WIP (over/under)
        *  folded in. When set, that month's slice tooltip header reads
        *  "{Month} Billed + WIP" to flag that the figure isn't billed-only.

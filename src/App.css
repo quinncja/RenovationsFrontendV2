@@ -2134,6 +2134,7 @@ span.skel-text {
 /* Upcoming Billings forecast — now its own widget; must be able to shrink to
    its grid cell so the chart never paints past the row's right edge. */
 .billings-chart-card {
+  gap: 0;
   width: 100%;
   /* This stylesheet has no global border-box reset (see note at .overdue-stat),
      so without this the width:100% sets the CONTENT box to the full cell and the
@@ -2141,7 +2142,7 @@ span.skel-text {
      spilling the chart at every width. */
   box-sizing: border-box;
   min-width: 0;
-  min-height: 340px;
+  min-height: 365px;
   overflow: hidden;
 }
 @media (max-width: 640px) {

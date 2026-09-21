@@ -171,11 +171,13 @@ function everyOtherYTicks(series: LineSeries[], ceiling?: number, divisions?: nu
 
 // ─── Slice tooltip ────────────────────────────────────────────────────────────
 
-function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel, overlayIds, planTooltip, share, shareTotals, shareLabel, overlayAsRows }: {
+function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel, overlayIds, planTooltip, share, shareTotals, shareLabel, overlayAsRows, netTooltip, tooltipSeriesLabel }: {
   slice: { points: readonly { data: { x: unknown; y: unknown }; seriesId: string }[] }
   series: LineSeries[]
   valueFormat?: (v: number) => string
   disableGrowth?: boolean
+  netTooltip?: boolean
+  tooltipSeriesLabel?: (seriesId: string, xLabel: string) => string
   wipMonthLabel?: string | null
   overlayIds?: string[]
   planTooltip?: { delta?: boolean; label?: string; invertColor?: boolean; percent?: boolean; actualLabel?: string }
@@ -350,6 +352,9 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
 
   // Convention for 2-series comparison charts: the FIRST series is the current
   // period (nivo paints series[0] on top), the SECOND is the prior period.
+  const net = rowsBySerie.every((row) => row.value != null)
+    ? rowsBySerie.reduce((sum, row) => sum + (row.value ?? 0), 0)
+    : null
   const currentRow = rowsBySerie[0]
   const prevRow = rowsBySerie[1]
   let growth: number | null = null
@@ -380,7 +385,7 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
           <div key={row.id} className="chart-line-tooltip-row">
             <span className="chart-line-tooltip-label" style={seriesColor ? { display: "inline-flex", alignItems: "center", gap: 6 } : undefined}>
               {seriesColor && <span className="chart-tooltip-dot" style={{ background: seriesColor }} />}
-              {row.id}
+              {tooltipSeriesLabel?.(String(row.id), xLabel) ?? row.id}
             </span>
             <span
               className="chart-line-tooltip-value"
@@ -412,6 +417,17 @@ function SliceTooltip({ slice, series, valueFormat, disableGrowth, wipMonthLabel
         </>
       )}
       {planFooter(currentRow?.value ?? null)}
+      {netTooltip && (
+        <>
+          <div className="chart-line-tooltip-divider" />
+          <div className="chart-line-tooltip-growth-row">
+            <span className="chart-line-tooltip-growth-label">Net</span>
+            <span className="chart-line-tooltip-growth-value" style={{ color: net == null || net === 0 ? undefined : net > 0 ? "#22c55e" : "#ef4444" }}>
+              {net == null ? "—" : `${net > 0 ? "+" : ""}${formatMoneyFull(net)}`}
+            </span>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -1374,6 +1390,44 @@ const DefaultGradientAreas = (props: unknown) => {
   return <GradientAreas series={series} areaGenerator={areaGenerator} innerHeight={innerHeight} yScale={yScale} />
 }
 
+// Clip identical curve paths so the actual/projected transition stays smooth.
+function buildProjectedLinesLayer(fromX: string) {
+  return function ProjectedLines(props: unknown) {
+    const clipId = useId()
+    const { series, lineGenerator, xScale, innerWidth, innerHeight } = props as {
+      series: readonly (ComputedLineSerie & { color?: string })[]
+      lineGenerator: (pts: { x: number; y: number }[]) => string | null
+      xScale: (v: string) => number
+      innerWidth: number
+      innerHeight: number
+    }
+    const boundary = xScale(fromX)
+    const split = Number.isFinite(boundary) ? boundary : innerWidth
+    return (
+      <g pointerEvents="none">
+        <defs>
+          <clipPath id={`${clipId}-actual`}>
+            <rect x={-3} y={-3} width={split + 3} height={innerHeight + 6} />
+          </clipPath>
+          <clipPath id={`${clipId}-projected`}>
+            <rect x={split} y={-3} width={Math.max(0, innerWidth - split) + 3} height={innerHeight + 6} />
+          </clipPath>
+        </defs>
+        {[...series].reverse().map((serie) => (
+          <g key={serie.id} fill="none" stroke={serie.color} strokeWidth={2.5}>
+            {toSegments(serie.data).map((segment, i) => (
+              <g key={i}>
+                <path d={lineGenerator(segment) ?? undefined} clipPath={`url(#${clipId}-actual)`} />
+                <path d={lineGenerator(segment) ?? undefined} clipPath={`url(#${clipId}-projected)`} strokeDasharray="6 5" />
+              </g>
+            ))}
+          </g>
+        ))}
+      </g>
+    )
+  }
+}
+
 function buildDashedSeriesLayers(dashedIds: string[], dotted = false, overlayOnly = false, colorOf?: (id: string) => string | undefined) {
   const isDashed = (id: string | number) => dashedIds.includes(String(id))
   const AreasLayer = function DashedModeAreas(props: unknown) {
@@ -1416,7 +1470,7 @@ function buildDashedSeriesLayers(dashedIds: string[], dotted = false, overlayOnl
 }
 
 function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> }) {
-  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, disableGrowthTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip, topBand, sliceShare, sliceShareTotals, yTickCount, stacked = false, sparkline = false, sliceShareLabel, dashedSeriesAsRows, hidePoints = false, shadeFromX } = config
+  const { series, yFormat, enableArea = true, maxValue = "auto", legend = false, compactTop = false, legendItemWidth, curve = "catmullRom", axisBottomTickValues, axisBottomFormat, dashedFromX, tooltipSeriesLabel, disableGrowthTooltip, netTooltip, wipMonthLabel, markers, pulsePoint, highlightedX, onPointClick, valueColor, bridgeGaps, dashedSeriesIds, planTooltip, topBand, sliceShare, sliceShareTotals, yTickCount, stacked = false, sparkline = false, sliceShareLabel, dashedSeriesAsRows, hidePoints = false, shadeFromX } = config
 
   // Dashed-overlay mode swaps the stock areas/lines layers for versions that
   // stroke the listed series dashed and skip their area fill. Muted highlight
@@ -1549,7 +1603,7 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
       }
       enableSlices="x"
       tooltip={() => null}
-      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} wipMonthLabel={wipMonthLabel} overlayIds={dashedSeriesIds} planTooltip={planTooltip} share={sliceShare} shareTotals={sliceShareTotals} shareLabel={sliceShareLabel} overlayAsRows={dashedSeriesAsRows} />}
+      sliceTooltip={({ slice }) => <SliceTooltip slice={slice} series={series} valueFormat={yFormat} disableGrowth={disableGrowthTooltip} netTooltip={netTooltip} tooltipSeriesLabel={tooltipSeriesLabel} wipMonthLabel={wipMonthLabel} overlayIds={dashedSeriesIds} planTooltip={planTooltip} share={sliceShare} shareTotals={sliceShareTotals} shareLabel={sliceShareLabel} overlayAsRows={dashedSeriesAsRows} />}
       axisLeft={sparkline ? {
         tickSize: 0,
         tickPadding: 6,
@@ -1600,7 +1654,9 @@ function LineChart({ config }: { config: Extract<ChartConfig, { type: "line" }> 
             ? sparkline
               ? ["lines" as const, dashedLayers.LinesLayer, "points" as const]
               : [dashedLayers.LinesLayer, "points" as const]
-            : (["lines", "points"] as const)),
+            : dashedFromX
+              ? [buildProjectedLinesLayer(dashedFromX), "points" as const]
+              : (["lines", "points"] as const)),
         "slices",
         "mesh",
         "legends",
