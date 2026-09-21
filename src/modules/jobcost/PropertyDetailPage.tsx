@@ -566,9 +566,11 @@ function JobsSection({ jobRows, pmStats, isLoading, isManager, marginColorsOn, c
       if (sortKey === "totalCost") return (a.totalCost - b.totalCost) * dir
       if (sortKey === "budget") return (a.budget - b.budget) * dir
       if (sortKey === "variance") return (a.variance - b.variance) * dir
-      // margin can be null — push nulls to the end regardless of direction.
-      const am = a.margin == null ? Number.NEGATIVE_INFINITY : a.margin
-      const bm = b.margin == null ? Number.NEGATIVE_INFINITY : b.margin
+      if (sortKey === "grossProfit") return (a.grossProfit - b.grossProfit) * dir
+      const am = sortKey === "budgetMargin" ? a.budgetMargin : a.margin
+      const bm = sortKey === "budgetMargin" ? b.budgetMargin : b.margin
+      if (am == null) return bm == null ? 0 : 1
+      if (bm == null) return -1
       return (am - bm) * dir
     })
   }, [jobRows, deferredPmFilter, sortKey, sortDir])

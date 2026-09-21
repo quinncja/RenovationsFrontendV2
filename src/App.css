@@ -10325,7 +10325,7 @@ button.jc-kind-chip:hover {
 }
 
 /* Job Costing desktop table wrapper — the ResizeObserver target that drives
-   fit-based column hiding (Jobcost.tsx HIDE_ORDER). overflow-x is a last
+   horizontal scrolling. overflow-x is a
    resort: if even the minimal column set can't fit, the table pans inside the
    card instead of bleeding out of it.
    overflow-y must be pinned to hidden: overflow-x:auto alone computes
@@ -22424,4 +22424,211 @@ body.pj-painting td.pj-computed {
     box-shadow: 0 6px 12px -6px var(--jcd-edge-shadow);
     transition: opacity 120ms ease;
   }
+}
+
+/* Job costing keeps every column; reuse the projections scroll-edge veils. */
+.jc-table-shell { min-width: 0; }
+.jc-scroll-frame {
+  --pj-edge-shadow: light-dark(rgba(31, 26, 21, 0.1), rgba(0, 0, 0, 0.3));
+  isolation: isolate;
+}
+.jc-scroll-frame > .pj-veil-left { left: var(--jc-pinned-width, 0px); }
+.jc-scroll-frame .jc-table-wrap { padding-top: 0; }
+.jc-scroll-frame .jc-column-pinned {
+  position: sticky;
+  z-index: 2;
+  background: var(--card-color);
+}
+.jc-scroll-frame .jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row > td.jc-column-pinned {
+  position: sticky;
+  background: var(--card-color);
+}
+.jc-scroll-frame .jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row:is(:hover, .jc-row-open) > td.jc-column-pinned {
+  background: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+}
+.jc-scroll-frame .jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row:active > td.jc-column-pinned {
+  background: color-mix(in srgb, var(--primary-text) 8%, var(--card-color));
+}
+.jc-scroll-frame th.jc-column-pinned { z-index: 3; }
+.jc-scroll-frame > .pj-veil-right { right: var(--jc-right-pinned-width, 0px); }
+.jc-scroll-frame .jc-table-wrap:focus-visible { outline: 2px solid var(--primary-color); outline-offset: -2px; }
+
+@media (max-width: 768px) {
+  .jc-scroll-frame .jc-name-text { min-width: 7rem; max-width: 7rem; }
+  .jc-scroll-frame .spend-rank-table th.jc-name-col,
+  .jc-scroll-frame .spend-rank-table td.jc-name-col { width: 7rem; }
+  .jc-scroll-frame .spend-rank-table .jc-col-margin { padding-inline: 0.5rem; }
+  .jc-scroll-frame .jc-col-margin .co-th-btn { max-width: 6rem; white-space: normal; }
+}
+
+/* Clip sticky cell surfaces to the card's existing rounded border without
+   creating another scroll container around the horizontal scroller. */
+.co-widget:has(.jc-table-shell) { overflow: clip; }
+@media (max-width: 768px) {
+  /* The wrapper owns scrolling, so sticky offsets and edge shadows share
+     the same scroll surface on phones as they do on desktop. */
+  .co-widget .jc-scroll-frame .spend-rank-table {
+    display: table;
+    overflow: visible;
+  }
+}
+
+/* Keep job-costing column gaps compact and independent of the change-order
+   table's viewport-scaled padding. The two pinned right cells form a group. */
+.co-widget .jc-scroll-frame .spend-rank-table > thead > tr > th,
+.co-widget .jc-scroll-frame .spend-rank-table > tbody > tr > td {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+.co-widget .jc-scroll-frame .spend-rank-table > :is(thead, tbody) > tr > .jc-col-expand {
+  padding-left: 0.625rem;
+  padding-right: 0;
+}
+.co-widget .jc-scroll-frame .spend-rank-table > :is(thead, tbody) > tr > .jc-col-name { padding-left: 0.375rem; }
+.co-widget .jc-scroll-frame .spend-rank-table > :is(thead, tbody) > tr > .jc-col-margin,
+.co-widget .jc-scroll-frame .spend-rank-table > :is(thead, tbody) > tr > .jc-col-actions { width: 1px; white-space: nowrap; }
+.co-widget .jc-scroll-frame .spend-rank-table > :is(thead, tbody) > tr > .jc-col-actions { padding-left: 0.5rem; }
+
+/* Expanded jobs occupy the visible viewport, above the scrolling table's
+   pinned cells and edge veils. Sticky positioning keeps the panel stationary
+   while the surrounding columns pan underneath it. */
+.jc-scroll-frame .jc-table-wrap > .spend-rank-table > tbody:has(> .jc-expand-row) {
+  position: relative;
+  z-index: 5;
+}
+.co-widget .jc-scroll-frame .spend-rank-table > tbody > tr.jc-expand-row > td {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.jc-expanded-surface {
+  position: sticky;
+  left: 0;
+  width: var(--jc-viewport-width);
+  box-sizing: border-box;
+  background: var(--card-color);
+  border: 1px solid var(--jc-open-border);
+  border-top: 0;
+  border-radius: 0 0 var(--jc-open-radius) var(--jc-open-radius);
+  box-shadow: 0 18px 40px -26px rgb(from var(--jc-shadow-ink) r g b / 0.45);
+}
+.jc-expanded-surface .jc-expand-panel {
+  background: color-mix(in srgb, var(--primary-text) 2%, var(--card-color));
+}
+.jc-expanded-surface .jc-expand-breakdown { overflow-x: auto; }
+
+/* The open job header shares the detail panel's viewport-sized surface;
+   its fields wrap as a self-contained summary instead of scrolling. */
+.co-widget .jc-scroll-frame .spend-rank-table > tbody > .jc-expanded-header-row > td {
+  padding: 0;
+  border: 0;
+}
+.jc-expanded-header-surface {
+  position: sticky;
+  left: 0;
+  width: var(--jc-viewport-width);
+  box-sizing: border-box;
+  background: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+  border: 1px solid var(--jc-open-border);
+  border-left: 0;
+  border-right: 0;
+  border-radius: var(--jc-open-radius) var(--jc-open-radius) 0 0;
+  overflow: hidden;
+}
+.jc-expanded-header-table { display: block; width: 100%; border-collapse: collapse; }
+.jc-expanded-header-table tbody { display: block; height: 100%; }
+.jc-expanded-header-table .jc-row-open {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 1rem;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0 0.75rem;
+  background: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
+}
+.co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > td {
+  position: static;
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  white-space: nowrap;
+}
+.co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > .jc-col-name { flex: 0 1 22rem; min-width: 0; }
+.co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > .jc-col-supervisor { flex: 0 1 12rem; min-width: 0; }
+.jc-expanded-header-table .jc-name-text,
+.jc-expanded-header-table .jc-pm-text { contain: none; min-width: 0; max-width: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.jc-financial-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+.jc-expanded-surface { container-type: inline-size; }
+ .co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > .jc-col-actions { margin-left: auto; flex: 0 0 auto; }
+.co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > .jc-col-status,
+.co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > .jc-col-expand { flex: 0 0 auto; }
+@container (max-width: 560px) {
+  .jc-financial-overview { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Match the open header's identity fields to the measured table columns. */
+.jc-expanded-header-table .jc-row-open { gap: 0; padding: 0; }
+.co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > td { box-sizing: border-box; }
+.co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > .jc-col-expand {
+  flex: 0 0 var(--jc-header-expand-width);
+  padding-left: var(--jc-header-expand-left);
+  padding-right: var(--jc-header-expand-right);
+}
+.co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > .jc-col-name {
+  flex: 0 1 var(--jc-header-name-width);
+  padding-left: var(--jc-header-name-left);
+  padding-right: var(--jc-header-name-right);
+}
+.co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > .jc-col-status {
+  flex: 0 0 var(--jc-header-status-width);
+  padding-left: var(--jc-header-status-left);
+  padding-right: var(--jc-header-status-right);
+}
+.co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > .jc-col-supervisor {
+  flex: 0 1 var(--jc-header-supervisor-width);
+  padding-left: var(--jc-header-supervisor-left);
+  padding-right: var(--jc-header-supervisor-right);
+}
+/* Preserve the closed row's reserved right border in the action cell,
+   so the buttons keep exactly the same distance from the table edge. */
+.co-widget .jc-scroll-frame .jc-expanded-header-table .jc-row-open > .jc-col-actions {
+  padding: 0 0.75rem 0 0.5rem;
+  border-right: 1px solid transparent;
+}
+
+/* Paint the frame above the header contents without taking layout space.
+   Its fill belongs to the surface, so row hover rules cannot erase it. */
+.jc-expanded-header-surface::after {
+  content: "";
+  position: absolute;
+  inset: -1px 0;
+  border: 1px solid var(--jc-open-border);
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 4;
+}
+.jc-scroll-frame .jc-expanded-header-table .jc-row-open,
+.jc-scroll-frame .jc-expanded-header-table .jc-row-open:hover,
+.jc-scroll-frame .jc-expanded-header-table .jc-row-open:active {
+  background: transparent;
+}
+
+/* The expanded header now has a spanning row of its own. Suppress the
+   preceding divider so only its rounded opening frame remains visible. */
+.jc-scroll-frame .jc-table-wrap > .spend-rank-table > tbody:has(+ tbody > .jc-expanded-header-row) > .spend-rank-table-row > td,
+.jc-scroll-frame .jc-table-wrap > .spend-rank-table > thead:has(+ tbody.jc-sizer-body + tbody + tbody > .jc-expanded-header-row) th {
+  border-bottom-color: transparent;
+}
+
+/* Use the same opaque fill across pinned and unpinned open-row cells. */
+.jc-scroll-frame .jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row.jc-row-open > td,
+.jc-scroll-frame .jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row.jc-row-open:hover > td {
+  background: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
 }

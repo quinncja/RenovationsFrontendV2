@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, useDeferredValue, memo, type ReactNode } from "react"
+import { useState, useMemo, useEffect, useLayoutEffect, useRef, useCallback, useDeferredValue, memo, Children, cloneElement, isValidElement, type CSSProperties, type ReactNode } from "react"
 import { motion, AnimatePresence, useMotionValue, useTransform, type MotionValue, type Transition } from "framer-motion"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useLocation, useNavigate } from "react-router-dom"
@@ -16,7 +16,7 @@ import { takePreloadedPageData } from "../../shared/api/pageDataCache"
 import { trackProjectView } from "../../shared/analytics/analytics"
 import { formatMoney, formatMoneyFull, marginTextColor } from "../../shared/utils/format"
 import useIsMobile from "../../shared/hooks/useIsMobile"
-import useElementWidth from "../../shared/hooks/useElementWidth"
+import { useOverlayScroll } from "../projections/useOverlayScroll"
 import useMarginColorsEnabled from "../../shared/hooks/useMarginColorsEnabled"
 import useLocalStorage from "../../shared/hooks/useLocalStorage"
 import useSessionStorage, { hasSessionValue } from "../../shared/hooks/useSessionStorage"
@@ -143,6 +143,8 @@ export interface Job {
   // expanded view's Projected Variance).
   variance: number
   margin: number | null
+  budgetMargin: number | null
+  grossProfit: number
   supervisor: string
   client: string
   clientId: number | null
@@ -184,6 +186,8 @@ export function normalizeProject(p: RawProject): Job {
     totalIncome: p.totalIncome ?? 0,
     budget,
     variance: budget - totalCost,
+    budgetMargin: budget > 0 ? ((budget - totalCost) / budget) * 100 : null,
+    grossProfit: contract - totalCost,
     margin: contract > 0 ? ((contract - totalCost) / contract) * 100 : null,
     supervisor:
       p.pmName?.trim() ??
@@ -266,7 +270,7 @@ export function buildGroups(jobs: Job[]): Group[] {
   })
 }
 
-export type SortKey = "name" | "status" | "supervisor" | "contract" | "totalCost" | "budget" | "variance" | "margin"
+export type SortKey = "name" | "status" | "supervisor" | "contract" | "totalCost" | "budget" | "variance" | "budgetMargin" | "margin" | "grossProfit"
 export type SortDir = "asc" | "desc"
 
 // Property-view sorting lives in the command bar (cards have no column
@@ -352,23 +356,39 @@ const SCOPE_GROUP: FilterGroup = {
 }
 const MANAGER_FILTER_DEFAULTS = { ...FILTER_DEFAULTS, scope: "mine" }
 
-// Fit-driven column hiding for the LIST view. Fixed pixel breakpoints can't
-// know the real content widths, so the layout itself is the signal instead:
-// every column except Project is nowrap (PM capped with an ellipsis), Project
-// is the one flexible column with a min-width floor (see .jc-name-col), and
-// when the fixed columns plus that floor can't fit, the table overflows its
-// wrapper. After each layout pass, any overflow hides the least-critical
-// visible column (HIDE_ORDER, front first). Each hide records the container
-// width it happened at, and that column only returns once the container
-// outgrows that mark by RESHOW_BUFFER, so drag-resizing doesn't flap. Hidden
-// data stays reachable: everything lives in the row's expanded panel, and
-// Status folds into the Project cell's sub-line.
-const HIDE_ORDER = ["contract", "supervisor", "status", "variance", "budget"] as const
-type HideableCol = (typeof HIDE_ORDER)[number]
-// How far past the hide-point the container must grow before a column may
-// try to come back.
-const RESHOW_BUFFER = 60
+const JOB_COLUMNS: { key: SortKey; label: string }[] = [
+  { key: "name", label: "Project" },
+  { key: "status", label: "Status" },
+  { key: "supervisor", label: "PM" },
+  { key: "contract", label: "Contract" },
+  { key: "budget", label: "Budget" },
+  { key: "totalCost", label: "Cost" },
+  { key: "budgetMargin", label: "Budget Margin" },
+  { key: "variance", label: "Budget Variance" },
+  { key: "margin", label: "Contract Margin" },
+  { key: "grossProfit", label: "Gross Profit" },
+]
 
+// Headers, sizing cells and virtualized rows share exactly the same order.
+function JobTableCells({ children, columns, expanded = false }: {
+  children: ReactNode
+  columns: string[]
+  expanded?: boolean
+}) {
+  const cells = Children.toArray(children)
+  const ordered = [...columns.filter((key) => key !== "margin" && key !== "actions"), "margin", "actions"]
+  return ordered.filter((key) => !expanded || ["expand", "name", "status", "supervisor", "actions"].includes(key)).map((key) => {
+    const cell = cells[columns.indexOf(key)]
+    if (!isValidElement<{ className?: string; style?: CSSProperties; "data-column-label"?: string }>(cell)) return cell
+    const pinned = key === "expand" || key === "name" || key === "margin" || key === "actions"
+    return cloneElement(cell, {
+      key,
+      "data-column-label": JOB_COLUMNS.find((column) => column.key === key)?.label,
+      className: `${cell.props.className ?? ""} jc-col-${key}${pinned ? " jc-column-pinned" : ""}`,
+      style: { ...cell.props.style, ...(key === "actions" ? { right: 0 } : key === "margin" ? { right: "var(--jc-actions-width, 0px)" } : pinned ? { left: `var(--jc-pin-${key}, 0px)` } : {}) },
+    })
+  })
+}
 
 // Label/value row inside a summary card; `total` bolds it as the card's
 // bottom-line figure. Shared with the detail page's Contract/Cost Summary
@@ -435,13 +455,15 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
   return (
     <div className="jc-expand-panel">
       {/* Contract + Cost summaries */}
-      <div className="jc-summary-grid">
+      <div className="jc-financial-overview">
         <div className="jc-summary-card">
           <div className="jc-summary-title subheadline text-secondary">Contract Summary</div>
           <SummaryRow label="Original Contract" value={formatMoneyFull(job.originalContract)} />
           <SummaryRow label="Change Orders" value={job.changeOrderAmount ? formatMoneyFull(job.changeOrderAmount) : "—"} />
           <div className="jc-summary-totals">
             <SummaryRow label="Revised Contract" value={formatMoneyFull(job.contract)} total />
+            <SummaryRow label="Gross Profit" value={formatMoneyFull(job.grossProfit)} valueColor={marginColor} total />
+            <SummaryRow label={job.status >= 5 ? "Closed Contract Margin" : "Current Contract Margin"} value={job.margin == null ? "—" : `${job.margin.toFixed(1)}%`} valueColor={marginColor} total />
           </div>
         </div>
         <div className="jc-summary-card">
@@ -457,12 +479,7 @@ function JobExpandedPanel({ job, detail, marginColorsOn }: {
               valueClass={varianceClass}
               total
             />
-            <SummaryRow
-              label={job.status >= 5 ? "Final Margin" : "Current Margin"}
-              value={job.margin == null ? "—" : `${job.margin.toFixed(1)}%`}
-              total
-              valueColor={marginColor}
-            />
+            <SummaryRow label="Budget Margin" value={job.budgetMargin == null ? "—" : `${job.budgetMargin.toFixed(1)}%`} valueColor={!marginColorsOn || job.budgetMargin == null ? undefined : marginTextColor(job.budgetMargin)} total />
           </div>
         </div>
       </div>
@@ -1251,7 +1268,7 @@ function PropertyList({ groups, scopeLabel, openGroupKey, openKind, entrance, sh
 // re-rendered per frame, which is what stuttered. Handlers come from Jobcost,
 // which does NOT re-render on scroll, so their identities are stable and a
 // shallow compare holds.
-const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, showContract, showBudget, showPM, showStatus, showVariance, visibleColumnCount, marginColorsOn, pinned, orderDep, traveled, onToggle, onOpen, onTogglePin }: {
+const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, showContract, showBudget, showPM, showStatus, showVariance, showBudgetMargin, showGrossProfit, columns, horizontallyScrollable, visibleColumnCount, marginColorsOn, pinned, orderDep, traveled, onToggle, onOpen, onTogglePin }: {
   job: Job
   isOpen: boolean
   detail: JobDetail | "loading" | undefined
@@ -1262,6 +1279,10 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
   showPM: boolean
   showStatus: boolean
   showVariance: boolean
+  showBudgetMargin: boolean
+  showGrossProfit: boolean
+  columns: string[]
+  horizontallyScrollable: boolean
   visibleColumnCount: number
   marginColorsOn: boolean
   pinned: boolean
@@ -1280,30 +1301,17 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
   // True while a reorder glide is in flight — rows turn opaque so crossing
   // rows don't read through each other.
   const [flying, setFlying] = useState(false)
+  const [headerHeight, setHeaderHeight] = useState(46)
   // Timestamp of the row's last click, for the quick double-click fast path.
   const lastClickRef = useRef(0)
-  return (
-    <motion.tbody
-      data-index={index}
-      ref={measureRef}
-      // Rows are table-flow (no transforms to animate like the property
-      // cards), so reorders glide via framer's FLIP layout animation —
-      // position only, same spring as the cards.
-      layout="position"
-      layoutDependency={orderDep}
-      transition={REORDER_SPRING}
-      onLayoutAnimationStart={() => setFlying(true)}
-      onLayoutAnimationComplete={() => setFlying(false)}
-      className={flying ? `jc-row-flying${traveled ? " jc-row-traveler" : ""}` : undefined}
-    >
-      {/* The project row is unchanged on open/close — it just takes the same
-          quiet ink wash as an open property card and the chevron rotates. */}
+  const header = (
       <tr
         className={`spend-rank-table-row${isOpen ? " jc-row-open" : ""}${pinned ? " jc-row-pinned" : ""}`}
         // Double-click (within the tightened QUICK_DBLCLICK_MS window) is the
         // fast path to the full jobcost report (the two toggle clicks before
         // it cancel out, leaving the row as it was).
         onClick={(e) => {
+          if (!isOpen) setHeaderHeight(e.currentTarget.getBoundingClientRect().height)
           onToggle(job)
           if (e.timeStamp - lastClickRef.current < QUICK_DBLCLICK_MS) onOpen(job)
           lastClickRef.current = e.timeStamp
@@ -1313,8 +1321,9 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
         role="button"
         tabIndex={0}
         aria-expanded={isOpen}
-        onKeyDown={(e) => e.key === "Enter" && onToggle(job)}
+        onKeyDown={(e) => { if (e.key === "Enter") { if (!isOpen) setHeaderHeight(e.currentTarget.getBoundingClientRect().height); onToggle(job) } }}
       >
+        <JobTableCells columns={columns} expanded={isOpen && horizontallyScrollable}>
         <td className="jc-expand-chevron-cell">
           <ChevronRight size={14} className={`jc-expand-chevron${isOpen ? " open" : ""}`} />
         </td>
@@ -1352,15 +1361,16 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
           <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.budget)}</td>
         )}
         <td className="spend-rank-table-value body-text emphasized">{formatMoneyFull(job.totalCost)}</td>
+        {showBudgetMargin && (
+          <td
+            className="spend-rank-table-value body-text emphasized"
+          >
+            {job.budgetMargin == null ? "—" : `${job.budgetMargin.toFixed(1)}%`}
+          </td>
+        )}
         {showVariance && (
           <td
             className="spend-rank-table-value body-text emphasized"
-            style={{
-              color:
-                !marginColorsOn || job.margin == null
-                  ? undefined
-                  : marginTextColor(job.margin),
-            }}
           >
             {formatMoneyFull(job.variance)}
           </td>
@@ -1376,6 +1386,14 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
         >
           {job.margin == null ? "—" : `${job.margin.toFixed(1)}%`}
         </td>
+        {showGrossProfit && (
+          <td
+            className="spend-rank-table-value body-text emphasized"
+            style={{ color: marginColorsOn && job.margin != null ? marginTextColor(job.margin) : undefined }}
+          >
+            {formatMoneyFull(job.grossProfit)}
+          </td>
+        )}
         <td className="spend-rank-table-name jc-view-cell">
           <button
             type="button"
@@ -1417,7 +1435,34 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
             </button>
           )}
         </td>
+        </JobTableCells>
       </tr>
+  )
+  return (
+    <motion.tbody
+      data-index={index}
+      ref={measureRef}
+      // Rows are table-flow (no transforms to animate like the property
+      // cards), so reorders glide via framer's FLIP layout animation —
+      // position only, same spring as the cards.
+      layout="position"
+      layoutDependency={orderDep}
+      transition={REORDER_SPRING}
+      onLayoutAnimationStart={() => setFlying(true)}
+      onLayoutAnimationComplete={() => setFlying(false)}
+      className={flying ? `jc-row-flying${traveled ? " jc-row-traveler" : ""}` : undefined}
+    >
+      {/* The project row is unchanged on open/close — it just takes the same
+          quiet ink wash as an open property card and the chevron rotates. */}
+      {isOpen && horizontallyScrollable ? (
+        <tr className="jc-expanded-header-row">
+          <td colSpan={visibleColumnCount}>
+            <div className="jc-expanded-header-surface" style={{ height: headerHeight }}>
+              <table className="jc-expanded-header-table" style={{ height: Math.max(0, headerHeight - 2) }}><tbody>{header}</tbody></table>
+            </div>
+          </td>
+        </tr>
+      ) : header}
       {/* The detail panel opens/closes as an animated reveal (same timing as
           a property card body). A <tr> can't animate height, so the motion
           div lives inside the cell and the row collapses with it; the tr
@@ -1428,6 +1473,7 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
           <tr key="expand" className="jc-expand-row">
             <td colSpan={visibleColumnCount}>
               <motion.div
+                className="jc-expanded-surface"
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
@@ -1435,6 +1481,7 @@ const JobRow = memo(function JobRow({ job, isOpen, detail, index, measureRef, sh
                 style={{ overflow: "hidden" }}
               >
                 <JobExpandedPanel job={job} detail={detail} marginColorsOn={marginColorsOn} />
+
               </motion.div>
             </td>
           </tr>
@@ -1463,73 +1510,67 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
   onOpenJob: (job: Job) => void
   onTogglePin?: (job: Job) => void
 }) {
-  // Fit-driven column visibility (see HIDE_ORDER above): `hiddenCount` is how
-  // deep into the hide order we currently are.
-  const [observeWrapWidth, tableWidth] = useElementWidth()
-  const wrapElRef = useRef<HTMLDivElement | null>(null)
+  const availableColumns = useMemo(() => JOB_COLUMNS.filter((c) => !isManager || (c.key !== "contract" && c.key !== "grossProfit")), [isManager])
+  const columns = useMemo(() => ["expand", ...availableColumns.map((c) => c.key), "actions"], [availableColumns])
+  const { scrollRef, frameRef, frameClass, onScroll, affordances } = useOverlayScroll(jobs)
+  const [horizontallyScrollable, setHorizontallyScrollable] = useState(false)
   const [scroller, setScroller] = useState<HTMLElement | null>(null)
   const [scrollMargin, setScrollMargin] = useState(0)
-  const [hiddenCount, setHiddenCount] = useState(0)
-  // Container width at the moment each hide happened, indexed by the hide
-  // level it created — the re-show hysteresis marks.
-  const hidAtWidthRef = useRef<number[]>([])
-
-  // Stable callback ref: feeds the width observer, the overflow check, and
-  // the virtualizer's scroll-element/offset resolution exactly once per
-  // mount/unmount (an inline ref here re-ran all of it every render).
   const tableWrapRef = useCallback((el: HTMLDivElement | null) => {
-    wrapElRef.current = el
-    observeWrapWidth(el)
+    scrollRef.current = el
     if (el) {
-      const sc = (el.closest(".page") as HTMLElement) ?? null
+      const sc = el.closest<HTMLElement>(".page")
       setScroller(sc)
-      if (sc) {
-        const sr = sc.getBoundingClientRect()
-        const er = el.getBoundingClientRect()
-        setScrollMargin(Math.max(0, Math.round(er.top - sr.top + sc.scrollTop)))
-      }
+      if (sc) setScrollMargin(Math.max(0, Math.round(el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop)))
     }
-  }, [observeWrapWidth])
+  }, [scrollRef])
 
-  // Managers never get a Contract column, so it isn't part of their sequence.
-  const hideOrder: readonly HideableCol[] = isManager
-    ? HIDE_ORDER.filter((c) => c !== "contract")
-    : HIDE_ORDER
-  const hiddenCols = new Set<HideableCol>(hideOrder.slice(0, hiddenCount))
-  const showContract = !isManager && !hiddenCols.has("contract")
-  const showPM = !hiddenCols.has("supervisor")
-  const showStatus = !hiddenCols.has("status")
-  const showVariance = !hiddenCols.has("variance")
-  const showBudget = !hiddenCols.has("budget")
-  // Chevron + Project + Cost + Margin + View always render; the rest count
-  // only when visible. Drives the expanded panel's colSpan.
-  const visibleColumnCount =
-    5 +
-    (showContract ? 1 : 0) +
-    (showPM ? 1 : 0) +
-    (showStatus ? 1 : 0) +
-    (showVariance ? 1 : 0) +
-    (showBudget ? 1 : 0)
-
-  // Re-measure only when fit inputs actually change — running this on every
-  // commit forced a synchronous reflow per scroll frame (the stutter). Each
-  // pass changes hiddenCount by at most one; setState from a layout effect
-  // re-renders synchronously, so a cascade of hides settles before paint.
   useLayoutEffect(() => {
-    const wrap = wrapElRef.current
-    if (!wrap || tableWidth == null) return
-    const overflow = wrap.scrollWidth - wrap.clientWidth
-    if (overflow > 1 && hiddenCount < hideOrder.length) {
-      hidAtWidthRef.current[hiddenCount] = tableWidth
-      setHiddenCount(hiddenCount + 1)
-    } else if (
-      hiddenCount > 0 &&
-      tableWidth > (hidAtWidthRef.current[hiddenCount - 1] ?? Number.POSITIVE_INFINITY) + RESHOW_BUFFER
-    ) {
-      setHiddenCount(hiddenCount - 1)
+    const el = scrollRef.current
+    const frame = frameRef.current
+    const row = el?.querySelector("thead tr")
+    if (!el || !frame || !row) return
+    const measure = () => {
+      setHorizontallyScrollable(el.scrollWidth - el.clientWidth > 1)
+      frame.style.setProperty("--jc-viewport-width", `${el.clientWidth}px`)
+      for (const key of ["expand", "name", "status", "supervisor"]) {
+        const cell = row.querySelector<HTMLElement>(`.jc-col-${key}`)
+        if (!cell) continue
+        const style = getComputedStyle(cell)
+        frame.style.setProperty(`--jc-header-${key}-width`, `${cell.getBoundingClientRect().width}px`)
+        frame.style.setProperty(`--jc-header-${key}-left`, style.paddingLeft)
+        frame.style.setProperty(`--jc-header-${key}-right`, style.paddingRight)
+      }
+      let left = 0
+      for (const cell of Array.from(row.children) as HTMLElement[]) {
+        const key = ["expand", "name"].find((key) => cell.classList.contains(`jc-col-${key}`))
+        if (!key) continue
+        frame.style.setProperty(`--jc-pin-${key}`, `${left}px`)
+        left += cell.getBoundingClientRect().width
+      }
+      frame.style.setProperty("--jc-pinned-width", `${left}px`)
+      const marginWidth = row.querySelector(".jc-col-margin")?.getBoundingClientRect().width ?? 0
+      const actionsWidth = row.querySelector(".jc-col-actions")?.getBoundingClientRect().width ?? 0
+      frame.style.setProperty("--jc-actions-width", `${actionsWidth}px`)
+      frame.style.setProperty("--jc-right-pinned-width", `${marginWidth + actionsWidth}px`)
+      const sc = el.closest<HTMLElement>(".page")
+      if (sc) setScrollMargin(Math.max(0, Math.round(el.getBoundingClientRect().top - sc.getBoundingClientRect().top + sc.scrollTop)))
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tableWidth, hiddenCount, jobs, isManager])
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    for (const cell of Array.from(row.children)) observer.observe(cell)
+    return () => observer.disconnect()
+  }, [columns, scrollRef, frameRef])
+
+  const showContract = !isManager
+  const showGrossProfit = !isManager
+  const showPM = true
+  const showStatus = true
+  const showVariance = true
+  const showBudget = true
+  const showBudgetMargin = true
+  const visibleColumnCount = columns.length
 
   // Widest rendered content per column across the FULL dataset. Auto table
   // layout sizes columns from mounted content only, and the virtualizer
@@ -1545,6 +1586,8 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
       budget: longest(jobs.map((j) => formatMoneyFull(j.budget))),
       cost: longest(jobs.map((j) => formatMoneyFull(j.totalCost))),
       variance: longest(jobs.map((j) => formatMoneyFull(j.variance))),
+      budgetMargin: longest(jobs.map((j) => (j.budgetMargin == null ? "—" : `${j.budgetMargin.toFixed(1)}%`))),
+      grossProfit: longest(jobs.map((j) => formatMoneyFull(j.grossProfit))),
       margin: longest(jobs.map((j) => (j.margin == null ? "—" : `${j.margin.toFixed(1)}%`))),
     }
   }, [jobs])
@@ -1579,10 +1622,13 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
     : 0
 
   return (
-    <div className="jc-table-wrap" ref={tableWrapRef}>
+    <div className="jc-table-shell">
+      <div className={`${frameClass} jc-scroll-frame`} ref={frameRef}>
+      <div className="jc-table-wrap pj-grid-scroll" ref={tableWrapRef} onScroll={onScroll} tabIndex={0} role="region" aria-label="Projects table, scroll horizontally to see all columns">
       <table className="spend-rank-table">
         <thead>
           <tr>
+            <JobTableCells columns={columns}>
             <th className="spend-rank-table-name jc-expand-th" aria-hidden="true" />
             <SortTh spendRank col="name" label="Project" className="jc-name-col" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             {showStatus && (
@@ -1598,6 +1644,9 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
               <SortTh spendRank col="budget" label="Budget" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
             )}
             <SortTh spendRank col="totalCost" label="Cost" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            {showBudgetMargin && (
+              <SortTh spendRank col="budgetMargin" label="Budget Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            )}
             {showVariance && (
               <SortTh
                 spendRank
@@ -1609,8 +1658,12 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
                 onSort={onSort}
               />
             )}
-            <SortTh spendRank col="margin" label="Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            <SortTh spendRank col="margin" label="Contract Margin" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            {showGrossProfit && (
+              <SortTh spendRank col="grossProfit" label="Gross Profit" align="right" sortKey={sortKey} sortDir={sortDir} onSort={onSort} />
+            )}
             <th className="spend-rank-table-name jc-view-th" aria-label="Actions" />
+            </JobTableCells>
           </tr>
         </thead>
         {/* Zero-height sizer row (see `sizer` above): same cell classes as a
@@ -1618,6 +1671,7 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
             wrappers so it adds no visual height. */}
         <tbody aria-hidden="true" className="jc-sizer-body">
           <tr>
+            <JobTableCells columns={columns}>
             <td className="jc-expand-chevron-cell" />
             <td className="spend-rank-table-name jc-name-col" />
             {showStatus && (
@@ -1641,6 +1695,11 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
             <td className="spend-rank-table-value body-text emphasized">
               <div className="jc-sizer-content">{sizer.cost}</div>
             </td>
+            {showBudgetMargin && (
+              <td className="spend-rank-table-value body-text emphasized">
+                <div className="jc-sizer-content">{sizer.budgetMargin}</div>
+              </td>
+            )}
             {showVariance && (
               <td className="spend-rank-table-value body-text emphasized">
                 <div className="jc-sizer-content">{sizer.variance}</div>
@@ -1649,7 +1708,13 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
             <td className="spend-rank-table-value body-text emphasized">
               <div className="jc-sizer-content">{sizer.margin}</div>
             </td>
+            {showGrossProfit && (
+              <td className="spend-rank-table-value body-text emphasized">
+                <div className="jc-sizer-content">{sizer.grossProfit}</div>
+              </td>
+            )}
             <td className="spend-rank-table-name jc-view-cell" />
+            </JobTableCells>
           </tr>
         </tbody>
         {/* Virtualized: spacer bodies stand in for off-screen rows. */}
@@ -1669,11 +1734,15 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
               orderDep={jobs}
               traveled={prevIndex !== undefined && Math.abs(prevIndex - vi.index) > 1}
               measureRef={rowVirtualizer.measureElement}
+              columns={columns}
+              horizontallyScrollable={horizontallyScrollable}
               showContract={showContract}
               showBudget={showBudget}
               showPM={showPM}
               showStatus={showStatus}
               showVariance={showVariance}
+              showBudgetMargin={showBudgetMargin}
+              showGrossProfit={showGrossProfit}
               visibleColumnCount={visibleColumnCount}
               marginColorsOn={marginColorsOn}
               pinned={pins?.includes(job.recnum) ?? false}
@@ -1687,6 +1756,9 @@ export function JobTable({ jobs, isManager, marginColorsOn, sortKey, sortDir, on
           <tr style={{ height: padBottom }} />
         </tbody>
       </table>
+      </div>
+      {affordances}
+      </div>
     </div>
   )
 }
@@ -1701,9 +1773,8 @@ export default function Jobcost() {
   useEffect(() => {
     if (!seen(SECTION_JOBCOST_REDESIGN)) acknowledge(SECTION_JOBCOST_REDESIGN)
   }, [seen, acknowledge])
-  // Mobile: the table collapses to a simple tap-through list — name + status
-  // on the left, margin + chevron on the right, tap → full project report.
-  // (Grouped view is desktop-only for now; mobile always shows the flat list.)
+  // Mobile uses the same horizontally scrolling project table.
+  // Grouped view remains desktop-only.
   const isMobile = useIsMobile()
   // Managers (PMs) default to their own projects but can flip to the whole
   // company list via a toolbar toggle; everyone else always sees all projects.
@@ -2040,9 +2111,11 @@ export default function Jobcost() {
       if (sortKey === "totalCost") return (a.totalCost - b.totalCost) * dir
       if (sortKey === "budget") return (a.budget - b.budget) * dir
       if (sortKey === "variance") return (a.variance - b.variance) * dir
-      // margin can be null — push nulls to the end regardless of direction.
-      const am = a.margin == null ? Number.NEGATIVE_INFINITY : a.margin
-      const bm = b.margin == null ? Number.NEGATIVE_INFINITY : b.margin
+      if (sortKey === "grossProfit") return (a.grossProfit - b.grossProfit) * dir
+      const am = sortKey === "budgetMargin" ? a.budgetMargin : a.margin
+      const bm = sortKey === "budgetMargin" ? b.budgetMargin : b.margin
+      if (am == null) return bm == null ? 0 : 1
+      if (bm == null) return -1
       return (am - bm) * dir
     })
     // Same pin rule as the property view: pinned projects float to the top
@@ -2401,42 +2474,20 @@ export default function Jobcost() {
                 {search ? `No projects match "${search}"` : "No projects match your filters"}
               </div>
             ) : (
-              <ul className="jc-mobile-list">
-                {filtered.map((job) => (
-                  <li key={job.recnum}>
-                    <button
-                      type="button"
-                      className="jc-mobile-row"
-                      onClick={() => goToJobcost(job.jobNumber)}
-                      title="Open full report"
-                    >
-                      <span className="jc-mobile-main">
-                        <span className="body-text emphasized jc-mobile-name">{job.name}</span>
-                        <span className="jc-mobile-sub">
-                          <span className={`status-badge status-${job.status}`}>
-                            {STATUS_LABELS[job.status] ?? job.status}
-                          </span>
-                          {job.supervisor && <span className="jc-mobile-pm">{job.supervisor}</span>}
-                        </span>
-                      </span>
-                      <span className="jc-mobile-right">
-                        <span
-                          className="jc-mobile-margin"
-                          style={{
-                            color:
-                              !marginColorsOn || job.margin == null
-                                ? undefined
-                                : marginTextColor(job.margin),
-                          }}
-                        >
-                          {job.margin == null ? "—" : `${job.margin.toFixed(1)}%`}
-                        </span>
-                        <ChevronRight size={16} className="jc-mobile-chevron" />
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            <JobTable
+              jobs={filtered}
+              isManager={isManager}
+              marginColorsOn={marginColorsOn}
+              sortKey={sortKey}
+              sortDir={sortDir}
+              onSort={handleSort}
+              openJobKey={openJobKey}
+              details={details}
+              pins={projectPins}
+              onToggleExpand={toggleExpand}
+              onOpenJob={openJob}
+              onTogglePin={togglePinProject}
+            />
             )}
           </Widget>
           </MotionItem>

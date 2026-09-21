@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react"
 import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react"
 
 // Sortable column header for spend-rank-table / data-table layouts: a quiet
@@ -27,6 +28,7 @@ export function SortTh<K extends string>({
   className,
   fill,
   colSpan,
+  style,
 }: {
   col: K
   label: string
@@ -40,6 +42,7 @@ export function SortTh<K extends string>({
   className?: string
   /** Column absorbs the table's slack width (Progress Billings' Project column). */
   fill?: boolean
+  style?: CSSProperties
   colSpan?: number
 }) {
   const active = sortKey === col
@@ -55,7 +58,7 @@ export function SortTh<K extends string>({
     <th
       className={thClass}
       colSpan={colSpan}
-      style={fill ? { width: "100%", ...thStyle } : thStyle}
+      style={{ ...(fill ? { width: "100%" } : {}), ...thStyle, ...style }}
     >
       <button
         className={`co-th-btn${alignBtnClass}${active ? " co-th-btn-active" : ""}`}
