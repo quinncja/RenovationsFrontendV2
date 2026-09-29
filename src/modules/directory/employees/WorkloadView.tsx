@@ -142,7 +142,7 @@ export function describeActivity(detail: ActivityDetail, when: string): Formula 
 
 // ── Expanded panel: the PM's open jobs ───────────────────────────────────────
 
-type JobSortKey = "name" | "units" | "budget" | "remaining" | "progress" | "activity"
+type JobSortKey = "name" | "units" | "contract" | "budget" | "remaining" | "progress" | "activity"
 
 export function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
   const { goToJobcost } = useJobcostNav()
@@ -179,6 +179,7 @@ export function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
       }
       if (sort.key === "progress") return (a.pct - b.pct) * dir
       if (sort.key === "units") return (a.units - b.units) * dir
+      if (sort.key === "contract") return (a.contract - b.contract) * dir
       if (sort.key === "budget") return (a.budget - b.budget) * dir
       return (a.remaining - b.remaining) * dir
     })
@@ -214,6 +215,7 @@ export function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
             <tr>
               <SortTh col="name" label="Project" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
               <SortTh col="units" label="Units" align="right" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
+              <SortTh col="contract" label="Contract" align="right" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
               <SortTh col="budget" label="Budget" align="right" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
               <SortTh col="remaining" label="Remaining" align="right" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
               <SortTh col="progress" label="Progress" align="center" sortKey={sort.key} sortDir={sort.dir} onSort={handleSort} />
@@ -239,6 +241,7 @@ export function OpenJobsPanel({ pm }: { pm: PmWorkload }) {
                   <div className="cell-secondary">#{job.recnum}</div>
                 </td>
                 <td style={{ textAlign: "right" }}>{job.units > 0 ? job.units : "—"}</td>
+                <td style={{ textAlign: "right" }}>{job.contract > 0 ? formatMoney(job.contract) : "—"}</td>
                 <td style={{ textAlign: "right" }}>{formatMoney(job.budget)}</td>
                 <td style={{ textAlign: "right" }}>{formatMoney(job.remaining)}</td>
                 <td className="ewl-progress-td">
