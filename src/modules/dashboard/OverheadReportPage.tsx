@@ -29,8 +29,6 @@ import { buildSearchIndex, lineMatches } from "./overheadSearch"
 import { PeriodSearch } from "./PeriodSearch"
 import { LedgerTransactionModal, type LedgerRef } from "./LedgerTransactionModal"
 import { buildCategoryTrend, type CategoryHistoryRow, type TrendGroup } from "./overheadTrend"
-import { useAuth } from "../../core/auth/AuthProvider"
-import { isTechRole } from "../../core/auth/roles"
 
 // Full overhead-spending report (Finances → Overhead Report). Where the
 // dashboard's /dashboard/breakdown/overhead drill-down shows one chart and
@@ -87,9 +85,8 @@ interface OpenMonthPayload {
 type LineItem = Record<string, unknown>
 
 // The backend splits ledger transactions described "Monthly Draw" out of their
-// real account into this virtual one. Only the tech role sees it as its own
-// category for now; every other role gets the rows folded back into the parent
-// account so their numbers are unchanged.
+// real account into this virtual one. The page currently folds the rows back
+// into the parent account for everyone (see showOwnersSalary).
 const OWNERS_SALARY_ID = "OWNERS_SALARY"
 
 function foldOwnersSalary<T extends { account_number: number | string; parent_account?: number | string }>(
@@ -332,8 +329,10 @@ function OverheadReportContent({ year, setYear }: { year: number; setYear: (y: n
   const openMonth = data?.openMonthFinances?.openMonthPeriod ?? null
   const openYear = data?.openMonthFinances?.openMonthYear ?? null
 
-  const { claims } = useAuth()
-  const showOwnersSalary = isTechRole(claims["role"] as string | undefined)
+  // Owners Salary is folded back into its parent account for every role
+  // (the tech-only split was turned off Sep 29); flip to true to bring the
+  // separate category back.
+  const showOwnersSalary = false
 
   const categories = useMemo(() => {
     const raw = data?.overheadCategoryComparison
