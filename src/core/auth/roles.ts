@@ -55,6 +55,7 @@ export function isNavDivider(item: NavEntry): item is NavDivider {
 }
 
 const navItems = {
+  cc: { label: "CC", path: "/cc", icon: Receipt },
   home: { label: "Dashboard", path: "/dashboard", icon: Home },
   businessSummary: { label: "Company", path: "/company", icon: Building2 },
   jobcost: { label: "Job Costing", path: "/jobcost", icon: JobcostIcon as unknown as LucideIcon },
@@ -109,6 +110,7 @@ const chartsGroup: NavGroup = {
 const executiveNav: NavEntry[] = [
   navItems.home,
   navItems.jobcost,
+  navItems.cc,
   navItems.projections,
   NAV_DIVIDER,
   navItems.employees,
@@ -126,6 +128,7 @@ const executiveNav: NavEntry[] = [
 const managerNav: NavEntry[] = [
   navItems.home,
   navItems.jobcost,
+  navItems.cc,
   NAV_DIVIDER,
   navItems.businessSummary,
   navItems.employees,
@@ -144,6 +147,7 @@ const managerNav: NavEntry[] = [
 const generalManagerNav: NavEntry[] = [
   navItems.home,
   navItems.jobcost,
+  navItems.cc,
   NAV_DIVIDER,
   navItems.dailyReports,
   navItems.employees,

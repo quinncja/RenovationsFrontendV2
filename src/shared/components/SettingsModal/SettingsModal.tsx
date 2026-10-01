@@ -1,3 +1,4 @@
+import { CCSettings } from "../../../modules/cc/CCSettings"
 import { useState, useEffect, useCallback } from "react"
 import { X, Sun, Moon, Database, LogOut } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -108,6 +109,7 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                 <section>
                   <span className="settings-group-title">Display</span>
                   <div className="settings-group">
+                    {user?.email?.toLowerCase() === "qsieja@renovationsdelivered.com" && <CCSettings />}
                     <div className="settings-row">
                       <div className="settings-row-info">
                         <span className="settings-row-label">

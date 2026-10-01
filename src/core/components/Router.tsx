@@ -10,6 +10,7 @@ import SignoutPage from "../auth/pages/SignoutPage.tsx"
 // the next chunk loads instead of flashing a blank fallback (see App.tsx).
 import { lazy } from "react"
 
+const CCPage = lazy(() => import("../../modules/cc/CCPage"))
 const Dashboard = lazy(() => import("../../modules/dashboard/Dashboard.tsx"))
 const BusinessSummary = lazy(() => import("../../modules/business-summary/BusinessSummaryPage.tsx"))
 const Jobcost = lazy(() => import("../../modules/jobcost/Jobcost.tsx"))
@@ -50,6 +51,7 @@ export default function Router() {
         <Route element={<App />}>
           <Route element={<RequireAuth />}>
             {/* Dashboard — admin/executive see full, PM sees limited */}
+            <Route path="/cc" element={<RequireRole allowed={["executive", "admin", "manager", "generalManager"]}><CCPage /></RequireRole>} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/dashboard/breakdown/:category" element={<RequireRole allowed={["executive", "admin"]}><MonthlyBreakdownPage /></RequireRole>} />
             <Route path="/dashboard/forecast-billings" element={<RequireRole allowed={["executive", "admin"]}><UpcomingBillingsPage /></RequireRole>} />

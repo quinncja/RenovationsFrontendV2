@@ -1,0 +1,65 @@
+/* Standalone shell: same dashboard palette and typography, no dashboard CSS or JS. */
+:root {
+  color-scheme: light;
+  --primary-color: #c27c3e;
+  --primary-color-hover: #d18a4c;
+  --background-color: #f7f8fd;
+  --card-color: #fff;
+  --primary-text: #19375a;
+  --secondary-text: #5e7086;
+  --border-color: #dde2e8;
+  --hover-bg: #19375a08;
+  --active-bg: #c27c3e14;
+  --font-family:
+    "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+body {
+  margin: 0;
+  background: var(--background-color);
+  -webkit-font-smoothing: antialiased;
+}
+.cc-mobile {
+  max-width: 680px;
+  padding: 24px 16px;
+  margin: auto;
+}
+.cc-brand {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+.cc-brand span {
+  display: block;
+  font-size: 12px;
+  color: var(--secondary-text);
+  margin-top: 4px;
+  font-weight: 400;
+}
+.cc-mobile-card {
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 24px;
+}
+.cc-mobile footer {
+  color: var(--secondary-text);
+  text-align: center;
+  font-size: 12px;
+  line-height: 2;
+  margin: 24px 0;
+}
+.cc-mobile a {
+  color: inherit;
+}
+@media (max-width: 480px) {
+  .cc-mobile {
+    padding: 16px 8px;
+  }
+  .cc-mobile-card {
+    padding: 16px;
+  }
+  .cc-brand {
+    padding: 0 8px;
+    margin-bottom: 16px;
+  }
+}
