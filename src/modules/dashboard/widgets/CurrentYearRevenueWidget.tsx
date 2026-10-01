@@ -2,6 +2,7 @@ import { StatWidget } from "../../../shared/components/StatWidget/StatWidget"
 import { useWidgetData, usePageYear } from "../../../shared/context/PageContext"
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
+import { homeYearRevenue } from "../utils/homeYearRevenue"
 
 interface OpenMonth {
   openMonthYear?: number
@@ -27,15 +28,7 @@ export function CurrentYearRevenueWidget() {
     openMonthFinances: OpenMonth | null
   }>(["annualRevenueTrend", "openMonthFinances"])
 
-  let value: number | null = null
-  if (Array.isArray(data?.annualRevenueTrend)) {
-    value = data.annualRevenueTrend.find((d) => d.year === year)?.revenue ?? null
-    const open = data.openMonthFinances
-    if (open?.openMonthYear === year) {
-      const wip = includeOverUnder ? open.openMonthOverUnder ?? 0 : 0
-      value = (value ?? 0) + (open.openMonthIncome ?? 0) + wip
-    }
-  }
+  const value = homeYearRevenue(year, data?.annualRevenueTrend, data?.openMonthFinances, includeOverUnder)
 
   return (
     <StatWidget

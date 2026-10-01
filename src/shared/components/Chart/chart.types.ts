@@ -132,6 +132,10 @@ export type ChartConfig =
        *  axis, a negative bar's just above). Uses yFormat for the text and
        *  colorBy (if set) for the color. */
       oppositeAxisLabels?: boolean
+      /** Render each simple bar's value ON the bar (white, centred near the
+       *  top) when the bar is tall enough, otherwise just above it in the
+       *  bar's own color. Uses yFormat for the text. */
+      insideLabels?: boolean
       /** Category label of the bar whose value has WIP (over/under) folded in.
        *  When set, that bar's tooltip header reads "{label} Billed + WIP" to
        *  flag it isn't billed-only. Other bars are unaffected. */

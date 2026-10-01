@@ -23,6 +23,7 @@ import {
   Clock,
   ChartPie,
   Table2,
+  Percent,
 } from "lucide-react"
 
 export interface NavItem {
@@ -67,6 +68,7 @@ const navItems = {
   invoices: { label: "Invoices", path: "/invoices", icon: FileText },
   upcomingBillings: { label: "Forecast Billings", path: "/forecast-billings", icon: CalendarClock },
   progressBillings: { label: "Progress Billings", path: "/progress-billings", icon: Receipt },
+  marginReport: { label: "Margin Report", path: "/margin-report", icon: Percent },
   overheadReport: { label: "Overhead Report", path: "/overhead-report", icon: ChartPie },
   users: { label: "Users", path: "/users", icon: Users },
   clients: { label: "Clients", path: "/clients", icon: Users2 },
@@ -89,7 +91,7 @@ export const PAGE_LABELS: ReadonlyArray<readonly [string, string]> = Object.valu
 const financesGroup: NavGroup = {
   label: "Reports",
   icon: Landmark,
-  items: [navItems.invoices, navItems.overheadReport, navItems.upcomingBillings, navItems.progressBillings],
+  items: [navItems.invoices, navItems.marginReport, navItems.overheadReport, navItems.upcomingBillings, navItems.progressBillings],
 }
 
 const directoryGroup: NavGroup = {
@@ -132,6 +134,9 @@ const managerNav: NavEntry[] = [
   // View-only for managers: the backend scopes the list to their own jobs
   // and rejects create/delete; the page hides those affordances.
   navItems.changeOrders,
+  // No Reports group in this nav: the margin report sits top-level, scoped to
+  // the manager's own jobs by default.
+  navItems.marginReport,
   navItems.dailyReports,
   // Top-level for PMs (no Charts group in this nav): the process flowchart.
   navItems.projectProcess,
@@ -148,6 +153,7 @@ const generalManagerNav: NavEntry[] = [
   navItems.dailyReports,
   navItems.employees,
   navItems.changeOrders,
+  navItems.marginReport,
   navItems.projectProcess,
 ]
 

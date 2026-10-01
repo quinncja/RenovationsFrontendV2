@@ -50,6 +50,10 @@ export const PAGE_QUERIES = {
     "overheadCategoryHistory",
   ],
 
+  // Margin Report (Reports tab) — one per-job row set (contract-basis margin,
+  // sliced client-side) plus the home page's GL margin chart queries.
+  marginReport: ["annualRevenueTrend", "marginReportJobs", "marginPerformance", "annualMarginTrend", "openMonthFinances"],
+
   // Upcoming Billings breakdown — the per-invoice open AR/AP rows behind the chart.
   dashboardUpcomingBillings: ["agingSummaryOpen", "weeklyBillingAccuracy"],
 

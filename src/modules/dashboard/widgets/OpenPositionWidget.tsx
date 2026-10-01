@@ -15,9 +15,9 @@ import { InvoiceListModal } from "./billings/InvoiceListModal"
 // overdue slice the Overdue Billings card shows. Net position is AR - AP:
 // money owed to us less money we owe.
 //
-// Dressed as the Period & Year Summary columns beside it: warm card, the
-// eyebrow on that warm ground, and one white sheet holding the content —
-// AR block, seam, AP block, seam, and a closing net row that lands on the
+// Dressed as the Period & Year Summary columns beside it: warm, copper-
+// edged card and one white sheet holding everything — the eyebrow, the AR
+// block, seam, AP block, seam, and a closing net row that lands on the
 // same line as those cards' Net Profit. The AR/AP blocks keep the Overdue
 // Billings card's stat voice and its click-through to the invoice list and
 // on into the invoice detail.
@@ -78,10 +78,10 @@ export function OpenPositionWidget() {
     <>
       <Widget className="current-period-widget pys-widget pys-position-widget">
         <div className="pys-col">
-          <div className="pys-eyebrow">
-            <span className="pys-title widget-title headline">Open Position</span>
-          </div>
           <div className="pys-sheet">
+            <div className="pys-eyebrow">
+              <span className="pys-title widget-title headline">Open Position</span>
+            </div>
             <div className="pys-band">
               <button
                 type="button"

@@ -33,6 +33,7 @@ const UpcomingBillingsPage = lazy(() => import("../../modules/dashboard/Upcoming
 const ProgressBillingsPage = lazy(() => import("../../modules/dashboard/ProgressBillingsPage.tsx"))
 const Invoices = lazy(() => import("../../modules/invoices/Invoices.tsx"))
 const OverheadReportPage = lazy(() => import("../../modules/dashboard/OverheadReportPage.tsx"))
+const MarginReportPage = lazy(() => import("../../modules/dashboard/MarginReportPage.tsx"))
 const Users = lazy(() => import("../../modules/users/Users.tsx"))
 const FeedbackPage = lazy(() => import("../../modules/feedback/FeedbackPage.tsx"))
 
@@ -118,6 +119,13 @@ export default function Router() {
             <Route path="/overhead-report" element={
               <RequireRole allowed={["executive", "admin"]}>
                 <OverheadReportPage />
+              </RequireRole>
+            } />
+            {/* Manager-tier and up: managers see their own jobs by default
+                (employeeId claim), with an in-page All jobs toggle. */}
+            <Route path="/margin-report" element={
+              <RequireRole allowed={["executive", "admin", "manager", "generalManager"]}>
+                <MarginReportPage />
               </RequireRole>
             } />
 

@@ -460,7 +460,7 @@ function shadeHex(hex: string, amt: number): string {
 }
 
 function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> }) {
-  const { data, keys, indexBy, groupMode = "stacked", compactTop = false, color = CHART_COLORS[0], barGradient, colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, axisBottomTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, wipMonthLabel, onBarClick, barTooltip, oppositeAxisLabels, selectedBarLabel } = config
+  const { data, keys, indexBy, groupMode = "stacked", compactTop = false, color = CHART_COLORS[0], barGradient, colors, colorBy, yFormat, minValue = "auto", maxValue = "auto", axisLeftTickValues, axisBottomTickValues, scaleType = "linear", scaleConstant, emphasizeZero, groupTooltip, tooltipTotalLabel, markers: configMarkers, hideLegend, wipMonthLabel, onBarClick, barTooltip, oppositeAxisLabels, insideLabels, selectedBarLabel } = config
 
   const dark = useDarkMode()
   const nivoTheme = useMemo(() => buildNivoTheme(dark), [dark])
@@ -853,6 +853,49 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
     )
   }
 
+  // Value label on the bar itself: white inside the bar when there's room for
+  // it, otherwise perched just above the bar in the bar's own color. Simple
+  // bars only (no stacks).
+  type InsideBar = { x: number; y: number; width: number; height: number; data: { value: number | null; indexValue: string | number } }
+  const BarInsideLabelsLayer = ({ bars }: { bars: readonly InsideBar[] }) => {
+    const { showTooltipFromEvent, hideTooltip } = useTooltip()
+    if (!insideLabels || stacked) return null
+    const fmt = yFormat ?? ((v: number) => formatMoney(v))
+    const MIN_INSIDE = 26
+    return (
+      <g>
+        {bars.map((b, i) => {
+          const value = Number(b.data.value) || 0
+          if (value === 0) return null
+          const inside = b.height >= MIN_INSIDE
+          const cx = b.x + b.width / 2
+          const y = inside ? b.y + 8 : b.y - 6
+          const barColor = colorBy ? colorBy(value) : color
+          const tip = barTooltip ? barTooltip(String(b.data.indexValue), value) : null
+          return (
+            <text
+              key={i}
+              x={cx}
+              y={y}
+              textAnchor="middle"
+              dominantBaseline={inside ? "hanging" : "auto"}
+              fill={inside ? "#fff" : barColor}
+              fontSize={13}
+              fontWeight={700}
+              pointerEvents={tip ? "all" : "none"}
+              style={tip ? { cursor: "default" } : undefined}
+              onMouseEnter={tip ? (e) => showTooltipFromEvent(<><TooltipPing />{tip}</>, e) : undefined}
+              onMouseMove={tip ? (e) => showTooltipFromEvent(<><TooltipPing />{tip}</>, e) : undefined}
+              onMouseLeave={tip ? () => hideTooltip() : undefined}
+            >
+              {fmt(value)}
+            </text>
+          )
+        })}
+      </g>
+    )
+  }
+
   return (
     <SizedBar
       data={barData}
@@ -928,6 +971,7 @@ function BarChart({ config }: { config: Extract<ChartConfig, { type: "bar" }> })
         "axes",
         "bars",
         ...(oppositeAxisLabels && !stacked ? [BarValueLabelsLayer] : []),
+        ...(insideLabels && !stacked ? [BarInsideLabelsLayer] : []),
         BarDimLayer,
         "markers",
         "legends",

@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react"
+import { Link } from "react-router-dom"
+import { ChevronRight } from "lucide-react"
 import { Widget } from "../../../shared/components/Widget/Widget"
 import { Chart } from "../../../shared/components/Chart/Chart"
 import { SegmentedControl } from "../../../shared/components/SegmentedControl"
@@ -9,6 +11,9 @@ import useMarginColorsEnabled from "../../../shared/hooks/useMarginColorsEnabled
 import useIncludeOverUnder from "../../../shared/hooks/useIncludeOverUnder"
 import type { LineMarker } from "../../../shared/components/Chart/chart.types"
 import { useSummaryYear } from "./summaryYearContext"
+import type { DashboardWidgetProps } from "../config/widgetRegistry"
+import { useAuth } from "../../../core/auth/AuthProvider"
+import { effectiveRole } from "../../../core/auth/roles"
 
 interface MarginRow {
   month: number
@@ -81,8 +86,14 @@ function symlogFromBars(bars: { label: string; value: number }[]) {
   return { bars, minValue, maxValue, scaleConstant, ticks }
 }
 
-export function MarginWidget() {
+export function MarginWidget({ showReportLink = true }: DashboardWidgetProps & { showReportLink?: boolean }) {
   const pageYear = usePageYear()
+  // "View" link to the full Margin Report for the roles that can open it;
+  // the report itself renders this widget with the link off.
+  const { claims } = useAuth()
+  const role = effectiveRole(claims["role"] as string | undefined)
+  const canOpenReport =
+    showReportLink && (role === "executive" || role === "admin" || role === "manager" || role === "generalManager")
   // Bars drive the Period & Year Summary card when it shares this page: a
   // month bar pins that month (and the page's year, since the monthly chart
   // plots the page year), a year bar moves the Year column to that year.
@@ -275,6 +286,12 @@ export function MarginWidget() {
       loading={isLoading}
       noData={!chart}
       actions={
+        <>
+        {canOpenReport && (
+          <Link to="/margin-report" className="widget-link-btn" title="Open the Margin Report">
+            View <ChevronRight size={12} />
+          </Link>
+        )}
         <SegmentedControl
           value={range}
           options={RANGE_OPTIONS}
@@ -292,6 +309,7 @@ export function MarginWidget() {
           variant="ohr"
           ariaLabel="Margin chart range"
         />
+        </>
       }
     >
       {chart && (
