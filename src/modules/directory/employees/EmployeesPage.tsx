@@ -79,11 +79,12 @@ function budgetVariance(e: EmployeeRow): number {
 
 type ViewMode = "workload" | "performance"
 type SortDir = "asc" | "desc"
-type WlSortKey = "name" | "open" | "units" | "remaining"
+type WlSortKey = "name" | "open" | "units" | "total" | "remaining"
 type PerfSortKey = "name" | "totalIncome" | "totalBudget" | "totalCost" | "variance" | "margin"
 
 const WL_SORT_OPTIONS: { key: WlSortKey; label: string }[] = [
-  { key: "remaining", label: "Remaining" },
+  { key: "remaining", label: "Remaining Budget" },
+  { key: "total", label: "Total Work" },
   { key: "open", label: "Open Jobs" },
   { key: "units", label: "Units" },
   { key: "name", label: "Name" },
@@ -186,6 +187,7 @@ function EmployeesView({ year, onYearChange }: { year: number | null; onYearChan
       if (wlSort.key === "name") cmp = a.pmName.localeCompare(b.pmName)
       else if (wlSort.key === "open") cmp = a.openCount - b.openCount
       else if (wlSort.key === "units") cmp = a.units - b.units
+      else if (wlSort.key === "total") cmp = a.contract - b.contract
       else cmp = a.remaining - b.remaining
       // Name breaks ties so equal counts keep a stable, scannable order.
       return cmp * dir || a.pmName.localeCompare(b.pmName)
@@ -617,10 +619,19 @@ function WorkloadCard({
         { label: "Open Jobs", value: String(pm.openCount) },
         { label: "Units", value: pm.units > 0 ? String(pm.units) : "—" },
         {
-          label: "Remaining Work",
+          label: "Total Work",
+          value: formatMoney(pm.contract),
+          formula: {
+            label: "Total Work",
+            showLabel: true,
+            symbolic: "Contract value across this employee's open jobs",
+          },
+        },
+        {
+          label: "Remaining Budget",
           value: formatMoney(pm.remaining),
           formula: {
-            label: "Remaining Work",
+            label: "Remaining Budget",
             showLabel: true,
             symbolic: "Budget left to spend across this employee's open jobs",
           },
@@ -876,7 +887,7 @@ function GhostCards() {
               <span className="skel-line" style={{ width: i % 2 ? "6rem" : "7.5rem", height: "1.0625rem" }} />
             </span>
             <span className="jc-head-stats">
-              {[0, 1, 2].map((s) => (
+              {[0, 1, 2, 3, 4].map((s) => (
                 <span key={s} className="jc-head-stat">
                   <span className="skel-line" style={{ width: "3rem", height: "0.6875rem" }} />
                   <span className="skel-line" style={{ width: "3.5rem", height: "1.05rem" }} />
