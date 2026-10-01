@@ -53,6 +53,36 @@ interface ReportDefinition {
   /** Short label for the compact pill rendering (GM home alert strip). */
   shortTitle: string
   subtitle: string
+  /** Reference table shown beside the modal (left of it on wide screens). */
+  mapping?: { title: string; rows: { from: string; to: string }[] }
+}
+
+// Mirrors AcctCostTypeMap in the backend's dashboard.queries.js; change both
+// together.
+const ACCOUNT_COST_TYPE_MAPPING = {
+  title: "Account to Cost Type",
+  rows: [
+    { from: "5005", to: "5 · WTPM" },
+    { from: "5200", to: "4 · Subcontractor" },
+    { from: "5400", to: "2 · Labor" },
+    { from: "5500", to: "1 · Material" },
+  ],
+}
+
+function MappingCard({ mapping, className }: { mapping: NonNullable<ReportDefinition["mapping"]>; className: string }) {
+  return (
+    <div className={`reports-mapping ${className}`}>
+      <span className="reports-mapping-title footnote emphasized">{mapping.title}</span>
+      <dl className="reports-mapping-list">
+        {mapping.rows.map((r) => (
+          <div key={r.from} className="reports-mapping-row">
+            <dt className="num">{r.from}</dt>
+            <dd>{r.to}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
 }
 
 // One definition per split widget. Was the `REPORTS` array in ReportsWidget.
@@ -112,6 +142,7 @@ const REPORT_DEFINITIONS: Record<ReportWidgetId, ReportDefinition> = {
     title: "Cost Type Mismatch Report",
     shortTitle: "Cost Type Mismatch",
     subtitle: "Invoice Accounts Not Matching Job Cost Types",
+    mapping: ACCOUNT_COST_TYPE_MAPPING,
   },
 }
 
@@ -207,6 +238,18 @@ export function ReportWidget({ reportId, compact = false }: { reportId: ReportWi
                 onClick={() => setOpen(false)}
               />
               <div className="modal-positioner" style={{ zIndex: contentZ }}>
+                <div className="reports-modal-anchor">
+                {report.mapping && (
+                  <motion.div
+                    className="reports-mapping-side"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <MappingCard mapping={report.mapping} className="card" />
+                  </motion.div>
+                )}
                 <motion.div
                   className="modal reports-modal"
                   initial={{ opacity: 0, scale: 0.96, y: 16 }}
@@ -226,6 +269,10 @@ export function ReportWidget({ reportId, compact = false }: { reportId: ReportWi
                       <X size={16} />
                     </button>
                   </div>
+
+                  {report.mapping && (
+                    <MappingCard mapping={report.mapping} className="reports-mapping--inline" />
+                  )}
 
                   <div className="reports-modal-body">
                     {activeRows.length === 0 ? (
@@ -270,6 +317,7 @@ export function ReportWidget({ reportId, compact = false }: { reportId: ReportWi
                     )}
                   </div>
                 </motion.div>
+                </div>
               </div>
             </>
           )}
