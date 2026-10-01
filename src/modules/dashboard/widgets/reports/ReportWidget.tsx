@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import { useWidgetData, usePageDisconnected } from "../../../../shared/context/PageContext"
 import { useModalLayer } from "../../../../shared/hooks/useModalLayer"
 import { formatNumber, formatMoneyFull } from "../../../../shared/utils/format"
+import { InvoiceDetailModal } from "../../../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 
 // Summary counts come from the `dataValidation` query (a single-row recordset),
 // the per-issue job rows from `dataValidationOpen` (tagged with `category`).
@@ -31,6 +32,7 @@ interface ValidationDetailRow {
   status: number
   detail: string
   // Cost type mismatch rows only (NULL for every other category).
+  invoiceRecnum?: string | null
   invoiceNum?: string | null
   vendorName?: string | null
   accountNums?: string | null
@@ -350,11 +352,17 @@ export function ReportWidget({ reportId, compact = false }: { reportId: ReportWi
 /**
  * Cost type mismatch rows as columns: the invoice's account (and the cost type
  * it implies) beside the cost type the job cost was actually coded to.
- * Largest dollar mismatches first.
+ * Largest dollar mismatches first. A row opens its AP invoice in the shared
+ * invoice modal (stacked above this one); the job cell still opens the job.
  */
 function CostTypeMismatchTable({ rows, onJob }: { rows: ValidationDetailRow[]; onJob: (n: string | number) => void }) {
   const sorted = [...rows].sort((a, b) => Math.abs(Number(b.amount ?? 0)) - Math.abs(Number(a.amount ?? 0)))
+  const [invoice, setInvoice] = useState<ValidationDetailRow | null>(null)
+  const openInvoice = (row: ValidationDetailRow) => {
+    if (row.invoiceRecnum) setInvoice(row)
+  }
   return (
+    <>
     <table className="data-table ctm-table">
       <thead>
         <tr>
@@ -367,13 +375,25 @@ function CostTypeMismatchTable({ rows, onJob }: { rows: ValidationDetailRow[]; o
       </thead>
       <tbody>
         {sorted.map((row, i) => (
-          <tr key={`${row.invoiceNum}-${row.JobNumber}-${i}`} className="reports-modal-row">
+          <tr
+            key={`${row.invoiceNum}-${row.JobNumber}-${i}`}
+            className={`reports-modal-row${row.invoiceRecnum ? " clickable-row" : ""}`}
+            onClick={() => openInvoice(row)}
+            title={row.invoiceRecnum ? "Open invoice" : undefined}
+          >
             <td
               className="reports-modal-job-cell"
-              onClick={() => onJob(row.JobNumber)}
+              onClick={(e) => {
+                e.stopPropagation()
+                onJob(row.JobNumber)
+              }}
               role="button"
               tabIndex={0}
-              onKeyDown={(e) => e.key === "Enter" && onJob(row.JobNumber)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return
+                e.stopPropagation()
+                onJob(row.JobNumber)
+              }}
               title="Open job"
             >
               <span className="ctm-primary">{row.jobnme}</span>
@@ -396,6 +416,12 @@ function CostTypeMismatchTable({ rows, onJob }: { rows: ValidationDetailRow[]; o
         ))}
       </tbody>
     </table>
+    <InvoiceDetailModal
+      invoiceId={invoice?.invoiceRecnum ?? null}
+      module={invoice?.accountTypes?.includes("Subcontractor") ? "subcontractors" : "suppliers"}
+      onClose={() => setInvoice(null)}
+    />
+    </>
   )
 }
 
