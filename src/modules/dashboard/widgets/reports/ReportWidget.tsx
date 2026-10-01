@@ -40,6 +40,8 @@ interface ValidationDetailRow {
   codedTypes?: string | null
   codedTypeNums?: string | null
   amount?: number | null
+  /** jobcst.recnum(s) behind the row, comma-separated. */
+  costRecnums?: string | null
 }
 
 type ReportVariant = "red" | "orange" | "gray" | "navy" | "teal" | "plum" | "indigo"
@@ -410,6 +412,11 @@ function CostTypeMismatchTable({ rows, onJob }: { rows: ValidationDetailRow[]; o
             <td>
               <span className="ctm-primary ctm-coded">{row.codedTypes}</span>
               <span className="ctm-secondary num">Cost type {row.codedTypeNums}</span>
+              {row.costRecnums && (
+                <span className="ctm-secondary num">
+                  {row.costRecnums.includes(",") ? "Job cost recs" : "Job cost rec"} {row.costRecnums}
+                </span>
+              )}
             </td>
             <td className="ctm-num num">{row.amount == null ? "—" : formatMoneyFull(Number(row.amount))}</td>
           </tr>
