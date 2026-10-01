@@ -14150,6 +14150,7 @@ svg.placeholder-illustration {
 .report-icon-navy { --icon-color: #19375a; }
 .report-icon-teal { --icon-color: #2f7d72; }
 .report-icon-plum { --icon-color: #6b4d78; }
+.report-icon-indigo { --icon-color: #4a5596; }
 
 .report-card-count {
   font-size: 2.5rem;

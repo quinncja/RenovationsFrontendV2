@@ -29,6 +29,7 @@ import {
   OpenProjectsNoBudgetWidget,
   MissingUnitCountsWidget,
   MissingOneOffNamesWidget,
+  CostTypeMismatchWidget,
 } from "../widgets/reports/ReportWidget"
 import { BankingOverdueWidget } from "../widgets/banking/BankingOverdueWidget"
 import { UpcomingBillingsWidget } from "../widgets/billings/UpcomingBillingsWidget"
@@ -101,6 +102,13 @@ export const WIDGET_REGISTRY: Record<WidgetId, WidgetRegistryEntry> = {
     id: "missingOneOffNames",
     component: MissingOneOffNamesWidget,
     label: "Missing One-Off Names Report",
+    visualType: "stat",
+    defaultColSpan: 1,
+  },
+  costTypeMismatch: {
+    id: "costTypeMismatch",
+    component: CostTypeMismatchWidget,
+    label: "Cost Type Mismatch Report",
     visualType: "stat",
     defaultColSpan: 1,
   },

@@ -6,10 +6,11 @@ import {
   OpenProjectsNoBudgetWidget,
   MissingUnitCountsWidget,
   MissingOneOffNamesWidget,
+  CostTypeMismatchWidget,
 } from "../widgets/reports/ReportWidget"
 
 /**
- * GM home's Reports section — the same six data-validation report widgets the
+ * GM home's Reports section — the same seven data-validation report widgets the
  * admin home's Reports section shows, in the same three-column grid.
  */
 export function ReportsSection() {
@@ -32,6 +33,9 @@ export function ReportsSection() {
       </MotionItem>
       <MotionItem>
         <MissingOneOffNamesWidget />
+      </MotionItem>
+      <MotionItem>
+        <CostTypeMismatchWidget />
       </MotionItem>
     </MotionList>
   )

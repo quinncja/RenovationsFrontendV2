@@ -33,6 +33,7 @@ export type WidgetId =
   | "openProjectsNoBudget"
   | "missingUnitCounts"
   | "missingOneOffNames"
+  | "costTypeMismatch"
   // ADVIA cash in bank + line of credit, one widget (two cards).
   | "banking"
   // Overdue AR/AP + Upcoming Billings forecast, as one full-width unit (Overdue

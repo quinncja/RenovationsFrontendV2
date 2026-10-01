@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { createPortal } from "react-dom"
 import { useJobcostNav } from "../../../jobcost/useJobcostNav"
-import { X, TriangleAlert, Calculator, Hash, Type } from "lucide-react"
+import { X, TriangleAlert, Calculator, Hash, Type, ArrowLeftRight } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useWidgetData, usePageDisconnected } from "../../../../shared/context/PageContext"
 import { useModalLayer } from "../../../../shared/hooks/useModalLayer"
@@ -21,6 +21,7 @@ interface ValidationCounts {
   noBudget: number
   noUnitCount: number
   noOneOffName: number
+  costTypeMismatch: number
 }
 
 interface ValidationDetailRow {
@@ -31,7 +32,7 @@ interface ValidationDetailRow {
   detail: string
 }
 
-type ReportVariant = "red" | "orange" | "gray" | "navy" | "teal" | "plum"
+type ReportVariant = "red" | "orange" | "gray" | "navy" | "teal" | "plum" | "indigo"
 
 type ReportWidgetId =
   | "reconciliation"
@@ -40,6 +41,7 @@ type ReportWidgetId =
   | "openProjectsNoBudget"
   | "missingUnitCounts"
   | "missingOneOffNames"
+  | "costTypeMismatch"
 
 interface ReportDefinition {
   /** Field on the counts row, also the `category` tag on detail rows. */
@@ -102,6 +104,14 @@ const REPORT_DEFINITIONS: Record<ReportWidgetId, ReportDefinition> = {
     title: "Missing One-Off Names Report",
     shortTitle: "Missing One-Off Names",
     subtitle: "One-Off Jobs Without a One-Off Name",
+  },
+  costTypeMismatch: {
+    accessor: "costTypeMismatch",
+    variant: "indigo",
+    glyph: <ArrowLeftRight size={16} strokeWidth={2.5} />,
+    title: "Cost Type Mismatch Report",
+    shortTitle: "Cost Type Mismatch",
+    subtitle: "Invoice Accounts Not Matching Job Cost Types",
   },
 }
 
@@ -292,4 +302,8 @@ export function MissingUnitCountsWidget() {
 
 export function MissingOneOffNamesWidget() {
   return <ReportWidget reportId="missingOneOffNames" />
+}
+
+export function CostTypeMismatchWidget() {
+  return <ReportWidget reportId="costTypeMismatch" />
 }
