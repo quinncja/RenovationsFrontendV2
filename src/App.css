@@ -14233,7 +14233,7 @@ svg.placeholder-illustration {
 
 /* Reference mapping beside a report modal. The anchor wraps only the modal,
    so the modal stays centered and the card hangs off its left edge; below
-   1240px there is no room, so the inline copy inside the modal shows instead. */
+   1360px there is no room, so the inline copy inside the modal shows instead. */
 .reports-modal-anchor {
   position: relative;
   display: flex;
@@ -14244,7 +14244,7 @@ svg.placeholder-illustration {
   position: absolute;
   top: 0;
   right: calc(100% + 1rem);
-  width: 220px;
+  width: max-content;
   pointer-events: auto;
 }
 
@@ -14258,26 +14258,38 @@ svg.placeholder-illustration {
 
 .reports-mapping-title { color: var(--secondary-text); }
 
-.reports-mapping-list {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-
-.reports-mapping-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
+/* Category · account → cost type. Rows are subgrids so the account and type
+   columns line up under their heads. */
+.reports-mapping-grid {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  column-gap: 0.625rem;
+  row-gap: 0.375rem;
+  align-items: center;
   font-size: var(--callout-size);
 }
 
-.reports-mapping-row dt { font-weight: 600; }
-.reports-mapping-row dd { margin: 0; color: var(--secondary-text); }
+.reports-mapping-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.reports-mapping-head {
+  font-size: 0.6875rem;
+  color: var(--secondary-text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.reports-mapping-category { font-weight: 600; }
+.reports-mapping-row .num { text-align: right; color: var(--secondary-text); }
+.reports-mapping-arrow { color: var(--secondary-text); opacity: 0.7; }
 
 .reports-mapping--inline { display: none; }
 
-@media (max-width: 1240px) {
+@media (max-width: 1360px) {
   .reports-mapping-side { display: none; }
   .reports-mapping--inline {
     display: flex;
@@ -14286,13 +14298,19 @@ svg.placeholder-illustration {
     border-radius: 10px;
     background: var(--hover-bg);
   }
-  .reports-mapping--inline .reports-mapping-list {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 0.375rem 1.25rem;
-  }
-  .reports-mapping--inline .reports-mapping-row { justify-content: flex-start; gap: 0.5rem; }
+  .reports-mapping--inline .reports-mapping-grid { max-width: 320px; }
 }
+
+/* Cost type mismatch table: two-line cells (value over its code). */
+.ctm-table td { vertical-align: top; }
+.ctm-primary { display: block; }
+.ctm-secondary {
+  display: block;
+  font-size: var(--callout-size);
+  color: var(--secondary-text);
+}
+.ctm-coded { font-weight: 600; }
+.ctm-table .ctm-num { text-align: right; white-space: nowrap; }
 
 /* Job / Job # cells in the reports modal navigate to the job page on click. */
 .reports-modal-job-cell {
