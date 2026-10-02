@@ -517,6 +517,7 @@ export default function CCPage() {
                                   })
                                 }
                                 onOpen={() => void open(r._id)}
+                                onOpenJob={(recnum) => goToJobcost(recnum)}
                               />
                             </Fragment>
                           );
@@ -686,6 +687,7 @@ function ReceiptRow({
   selected,
   onSelect,
   onOpen,
+  onOpenJob,
 }: {
   r: Receipt;
   tab: Tab;
@@ -693,6 +695,7 @@ function ReceiptRow({
   selected: boolean;
   onSelect: (on: boolean) => void;
   onOpen: () => void;
+  onOpenJob: (recnum: string) => void;
 }) {
   const showStatus = tab === "past" || tab === "all";
   const unassigned = r.employeeId == null && r.mode !== "test";
@@ -747,8 +750,35 @@ function ReceiptRow({
       </td>
       <td className="body-text">
         {r.allocations.length ? (
+          // Each job opens its Job Costing page; overhead accounts have none.
           <span className="cc-cell-alloc" style={{ display: "block" }}>
-            {r.allocations.map((a) => a.name || a.destination).join(", ")}
+            {r.allocations.map((a, i) => (
+              <span key={`${a.destination}-${i}`}>
+                {i > 0 && ", "}
+                {a.kind === "job" ? (
+                  <span
+                    className="cc-job-link"
+                    role="link"
+                    tabIndex={0}
+                    title="Open job costing"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenJob(a.destination);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.stopPropagation();
+                        onOpenJob(a.destination);
+                      }
+                    }}
+                  >
+                    {a.name || a.destination}
+                  </span>
+                ) : (
+                  a.name || a.destination
+                )}
+              </span>
+            ))}
           </span>
         ) : (
           <span className="text-secondary">Not categorized</span>

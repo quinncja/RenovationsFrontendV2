@@ -1457,3 +1457,18 @@ a.cc-file:not([href]) { cursor: default; }
   font-size: 0.9375rem;
 }
 .cc-viewer-note a { color: #fff; text-decoration: underline; }
+
+/* Job names in the list's "Charged to" column open Job Costing (the row
+   itself opens the receipt). Same hover voice as .co-project-link. */
+.cc-job-link {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s ease;
+}
+.cc-job-link:hover,
+.cc-job-link:focus-visible {
+  color: var(--primary-color);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  outline: none;
+}
