@@ -11,6 +11,7 @@ import {
   MotionItem,
 } from "../../shared/components/MotionList/MotionList";
 import { useAuth } from "../../core/auth/AuthProvider";
+import { useJobcostNav } from "../jobcost/useJobcostNav";
 import { staffRequest, staffFile, watchReceipts } from "./staffApi";
 import { json } from "./api";
 import { CCModal } from "./CCModal";
@@ -51,6 +52,7 @@ const emptyCopy: Record<Tab, string> = {
 };
 
 export default function CCPage() {
+  const { goToJobcost } = useJobcostNav();
   const { claims, user } = useAuth(),
     gm = ["generalManager", "admin", "executive", "owner", "tech"].includes(
       String(claims.role),
@@ -504,6 +506,7 @@ export default function CCPage() {
                 </Banner>
               )
             }
+            onOpenJob={(recnum) => goToJobcost(recnum)}
             onDelete={
               gm ||
               (receipt.manual &&

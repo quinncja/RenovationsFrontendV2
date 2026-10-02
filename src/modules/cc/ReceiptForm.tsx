@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Camera,
   CheckCircle2,
+  ChevronRight,
   ExternalLink,
   FileText,
   FileUp,
@@ -336,6 +337,7 @@ export default function ReceiptForm({
   verdict,
   onDismiss,
   onDelete,
+  onOpenJob,
 }: {
   initial: Receipt;
   path: string;
@@ -350,6 +352,8 @@ export default function ReceiptForm({
   verdict?: ReactNode;
   /** Dashboard only: soft-deletes the receipt (asks first). */
   onDelete?: () => Promise<void>;
+  /** Dashboard only: opens a job line's Job Cost page. */
+  onOpenJob?: (recnum: string) => void;
   /** Dismiss outright (GM) instead of asking a GM to dismiss. */
   onDismiss?: (reason: string) => Promise<void>;
 }) {
@@ -952,9 +956,25 @@ export default function ReceiptForm({
                 {r.allocations.map((a, i) => (
                   <div className="cc-ledger-line" key={i}>
                     <span className="cc-ledger-desc">
-                      <span className="cc-ledger-name">
-                        {a.name || a.destination}
-                      </span>
+                      {a.kind === "job" && onOpenJob ? (
+                        // A link: the read-only <fieldset disabled> would
+                        // disable a button here.
+                        <a
+                          className="cc-ledger-name cc-ledger-link"
+                          href={`/jobcost/${a.destination}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            onOpenJob(a.destination);
+                          }}
+                        >
+                          {a.name || a.destination}
+                          <ChevronRight size={14} aria-hidden="true" />
+                        </a>
+                      ) : (
+                        <span className="cc-ledger-name">
+                          {a.name || a.destination}
+                        </span>
+                      )}
                       <span className="cc-ledger-meta">
                         {a.kind === "job"
                           ? `Job ${a.destination} · ${label(opts?.costTypes, a.costType)}`
