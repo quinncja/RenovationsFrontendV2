@@ -104,17 +104,6 @@ export function Picker({
     const cap = keyboardOpen() ? 640 : 352;
     setPlace({ up, max: Math.max(160, Math.min(cap, up ? above : below)) });
   }
-  // Phone search: once the keyboard is up, scroll the page so the field rests
-  // just above it, leaving the whole screen above for the list to scroll.
-  function dock() {
-    if (!searchable || !keyboardOpen() || !wrap.current) return;
-    for (let p = wrap.current.parentElement; p; p = p.parentElement) {
-      if (/(auto|scroll)/.test(getComputedStyle(p).overflowY)) return;
-    }
-    const gap =
-      wrap.current.getBoundingClientRect().bottom - (visible().bottom - 10);
-    if (Math.abs(gap) > 4) window.scrollBy(0, gap);
-  }
   function show() {
     if (disabled) return;
     measure();
@@ -137,42 +126,23 @@ export function Picker({
     field.current?.blur();
   }
 
-  // Phone search: dock the field above the keyboard ONCE, after the keyboard
-  // has finished opening (no resize for 300ms). Re-docking on every viewport
-  // change fights Safari's own focus scrolling and makes the page bounce, so
-  // later viewport changes only re-measure the list.
+  // Phone search: as the keyboard opens and Safari scrolls the focused field
+  // into place, keep the list sized to the room above it. The page itself is
+  // never scrolled here; doing so fought Safari's focus scrolling.
   useEffect(() => {
     const vv = window.visualViewport;
     if (!open || !searchable || !vv) return;
-    let frame = 0,
-      docked = false,
-      quiet: ReturnType<typeof setTimeout> | undefined;
+    let frame = 0;
     const remeasure = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(measure);
     };
-    const settle = () => {
-      clearTimeout(quiet);
-      quiet = setTimeout(() => {
-        if (!docked) {
-          docked = true;
-          dock();
-        }
-        remeasure();
-      }, 300);
-    };
-    const onResize = () => {
-      remeasure();
-      settle();
-    };
-    vv.addEventListener("resize", onResize);
+    vv.addEventListener("resize", remeasure);
     vv.addEventListener("scroll", remeasure);
-    settle();
     return () => {
-      vv.removeEventListener("resize", onResize);
+      vv.removeEventListener("resize", remeasure);
       vv.removeEventListener("scroll", remeasure);
       cancelAnimationFrame(frame);
-      clearTimeout(quiet);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, searchable]);
