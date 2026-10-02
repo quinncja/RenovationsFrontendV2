@@ -93,7 +93,8 @@ export function MarginWidget({ showReportLink = true }: DashboardWidgetProps & {
   const { claims } = useAuth()
   const role = effectiveRole(claims["role"] as string | undefined)
   const canOpenReport =
-    showReportLink && (role === "executive" || role === "admin")
+    // Margin Report is still in testing: dev builds only.
+    import.meta.env.DEV && showReportLink && (role === "executive" || role === "admin")
   // Bars drive the Period & Year Summary card when it shares this page: a
   // month bar pins that month (and the page's year, since the monthly chart
   // plots the page year), a year bar moves the Year column to that year.

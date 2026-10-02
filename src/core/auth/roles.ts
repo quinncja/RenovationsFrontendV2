@@ -91,7 +91,14 @@ export const PAGE_LABELS: ReadonlyArray<readonly [string, string]> = Object.valu
 const financesGroup: NavGroup = {
   label: "Reports",
   icon: Landmark,
-  items: [navItems.invoices, navItems.marginReport, navItems.overheadReport, navItems.upcomingBillings, navItems.progressBillings],
+  items: [
+    navItems.invoices,
+    // Margin Report is still in testing: dev builds only.
+    ...(import.meta.env.DEV ? [navItems.marginReport] : []),
+    navItems.overheadReport,
+    navItems.upcomingBillings,
+    navItems.progressBillings,
+  ],
 }
 
 const directoryGroup: NavGroup = {

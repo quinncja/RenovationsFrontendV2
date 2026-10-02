@@ -121,15 +121,19 @@ export default function Router() {
                 <OverheadReportPage />
               </RequireRole>
             } />
-            {/* Still in testing: exec/admin only. The page already supports
-                managers (own jobs by default, All jobs toggle); add
-                "manager"/"generalManager" back here, to the widget link, and
-                to their navs when it's released. */}
-            <Route path="/margin-report" element={
-              <RequireRole allowed={["executive", "admin"]}>
-                <MarginReportPage />
-              </RequireRole>
-            } />
+            {/* Still in testing: dev builds only (import.meta.env.DEV is false
+                in production, so the route doesn't exist there). The page
+                already supports managers (own jobs by default, All jobs
+                toggle); on release drop the DEV gate here, in the Reports nav
+                group and the Margin widget link, and add
+                "manager"/"generalManager" back to the roles and their navs. */}
+            {import.meta.env.DEV && (
+              <Route path="/margin-report" element={
+                <RequireRole allowed={["executive", "admin"]}>
+                  <MarginReportPage />
+                </RequireRole>
+              } />
+            )}
 
             {/* Directory — admin/executive */}
             <Route path="/clients" element={<RequireRole allowed={["executive", "admin"]}><ClientsPage /></RequireRole>} />
