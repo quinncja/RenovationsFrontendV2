@@ -121,10 +121,12 @@ export default function Router() {
                 <OverheadReportPage />
               </RequireRole>
             } />
-            {/* Manager-tier and up: managers see their own jobs by default
-                (employeeId claim), with an in-page All jobs toggle. */}
+            {/* Still in testing: exec/admin only. The page already supports
+                managers (own jobs by default, All jobs toggle); add
+                "manager"/"generalManager" back here, to the widget link, and
+                to their navs when it's released. */}
             <Route path="/margin-report" element={
-              <RequireRole allowed={["executive", "admin", "manager", "generalManager"]}>
+              <RequireRole allowed={["executive", "admin"]}>
                 <MarginReportPage />
               </RequireRole>
             } />

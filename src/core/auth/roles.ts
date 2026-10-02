@@ -134,9 +134,6 @@ const managerNav: NavEntry[] = [
   // View-only for managers: the backend scopes the list to their own jobs
   // and rejects create/delete; the page hides those affordances.
   navItems.changeOrders,
-  // No Reports group in this nav: the margin report sits top-level, scoped to
-  // the manager's own jobs by default.
-  navItems.marginReport,
   navItems.dailyReports,
   // Top-level for PMs (no Charts group in this nav): the process flowchart.
   navItems.projectProcess,
@@ -153,7 +150,6 @@ const generalManagerNav: NavEntry[] = [
   navItems.dailyReports,
   navItems.employees,
   navItems.changeOrders,
-  navItems.marginReport,
   navItems.projectProcess,
 ]
 
