@@ -22,6 +22,7 @@ import {
   type ReceiptFile,
   type Allocation,
 } from "./types";
+import { Picker, type PickerItem } from "./Picker";
 import "./cc.css";
 
 // Shared by the dashboard review modal and the isolated /r/:token page, so it
@@ -330,10 +331,33 @@ export default function ReceiptForm({
       setBusy(false);
     }
   }
-  // Test receipts list Test Job in its own group above everything else.
-  const testJobs = opts?.jobs.filter((j) => j.test) || [],
-    ownJobs = opts?.jobs.filter((j) => j.own && !j.test) || [],
-    otherJobs = opts?.jobs.filter((j) => !j.own && !j.test) || [];
+  // Picker rows: the name leads, the number is reference. Test receipts list
+  // Test Job in its own group above the user's jobs and everything else.
+  const jobs = opts?.jobs || [];
+  const hasGroups = jobs.some((j) => j.test || j.own);
+  const jobItems: PickerItem[] = [
+    ...jobs.filter((j) => j.test).map((j) => ({ ...j, group: "Test" })),
+    ...jobs
+      .filter((j) => j.own && !j.test)
+      .map((j) => ({ ...j, group: "Your jobs" })),
+    ...jobs
+      .filter((j) => !j.own && !j.test)
+      .map((j) => ({ ...j, group: hasGroups ? "All other jobs" : undefined })),
+  ].map((j) => ({
+    id: j.id,
+    name: j.name,
+    group: j.group,
+    meta: `Job ${j.id}${j.status !== undefined && j.status !== 4 && !j.test ? " · not current" : ""}`,
+  }));
+  const accountItems: PickerItem[] = (opts?.accounts || []).map((o) => ({
+    id: o.id,
+    name: o.name,
+    meta: `Account ${o.id}`,
+  }));
+  const costTypeItems: PickerItem[] = (opts?.costTypes || []).map((o) => ({
+    id: o.id,
+    name: o.name,
+  }));
   const split = draft.length > 1;
   // A lone allocation has no amount field: it always carries the full total.
   const effective = split ? draft : draft.map((a) => ({ ...a, amount }));
@@ -778,65 +802,30 @@ export default function ReceiptForm({
                   ))}
                 </div>
                 <div className="cc-grid">
-                  <label
+                  <div
                     className={`cc-field${split || a.kind === "job" ? "" : " cc-span-all"}`}
                   >
                     <span className="cc-field-label">
                       {a.kind === "job" ? "Job and phase" : "Overhead account"}
                     </span>
-                    <select
-                      className="cc-input"
-                      required
-                      value={a.destination}
-                      onChange={(e) =>
-                        edit(index, { destination: e.target.value })
-                      }
-                    >
-                      <option value="">Choose…</option>
-                      {a.kind === "job" ? (
-                        <>
-                          {testJobs.length > 0 && (
-                            <optgroup label="Test">
-                              {testJobs.map((j) => (
-                                <option key={j.id} value={j.id}>
-                                  {j.name} · {j.id}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                          {ownJobs.length > 0 && (
-                            <optgroup label="Your jobs">
-                              {ownJobs.map((j) => (
-                                <option key={j.id} value={j.id}>
-                                  {j.name} · {j.id}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
-                          <optgroup
-                            label={
-                              ownJobs.length || testJobs.length
-                                ? "All other jobs"
-                                : "Jobs"
-                            }
-                          >
-                            {otherJobs.map((j) => (
-                              <option key={j.id} value={j.id}>
-                                {j.name} · {j.id}
-                                {j.status !== 4 ? " (not current)" : ""}
-                              </option>
-                            ))}
-                          </optgroup>
-                        </>
-                      ) : (
-                        opts.accounts.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.id} · {o.name}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  </label>
+                    {a.kind === "job" ? (
+                      <Picker
+                        searchable
+                        label="Job and phase"
+                        placeholder="Search by address or job name"
+                        items={jobItems}
+                        value={a.destination}
+                        onChange={(id) => edit(index, { destination: id })}
+                      />
+                    ) : (
+                      <Picker
+                        label="Overhead account"
+                        items={accountItems}
+                        value={a.destination}
+                        onChange={(id) => edit(index, { destination: id })}
+                      />
+                    )}
+                  </div>
                   {split && (
                     <label className="cc-field">
                       <span className="cc-field-label">Amount</span>
@@ -851,24 +840,15 @@ export default function ReceiptForm({
                     </label>
                   )}
                   {a.kind === "job" && (
-                    <label className="cc-field">
+                    <div className="cc-field">
                       <span className="cc-field-label">Cost type</span>
-                      <select
-                        className="cc-input"
-                        required
+                      <Picker
+                        label="Cost type"
+                        items={costTypeItems}
                         value={a.costType}
-                        onChange={(e) =>
-                          edit(index, { costType: e.target.value })
-                        }
-                      >
-                        <option value="">Choose…</option>
-                        {opts.costTypes.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
+                        onChange={(id) => edit(index, { costType: id })}
+                      />
+                    </div>
                   )}
                 </div>
               </div>
