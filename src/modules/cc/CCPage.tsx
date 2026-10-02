@@ -166,10 +166,11 @@ export default function CCPage() {
         `cc/receipts?state=${tab}&page=${page}&search=${encodeURIComponent(query)}`,
         { signal: controller.signal },
       ),
+      // Totals are extra: if they fail, the list still loads without them.
       staffRequest<Week[]>(
         `cc/receipts/weeks?state=${tab}&search=${encodeURIComponent(query)}`,
         { signal: controller.signal },
-      ),
+      ).catch(() => [] as Week[]),
     ])
       .then(([next, w]) => {
         setList(next);
@@ -192,10 +193,11 @@ export default function CCPage() {
         `cc/receipts?state=${tab}&page=${page}&search=${encodeURIComponent(query)}`,
         { signal: controller.signal },
       ),
+      // Totals are extra: if they fail, the list still loads without them.
       staffRequest<Week[]>(
         `cc/receipts/weeks?state=${tab}&search=${encodeURIComponent(query)}`,
         { signal: controller.signal },
-      ),
+      ).catch(() => [] as Week[]),
     ])
       .then(([next, w]) => {
         setList(next);
