@@ -61,6 +61,8 @@ export interface Option {
   name: string;
   own?: boolean;
   status?: number;
+  /** Test Job, pinned first on test receipts. */
+  test?: boolean;
 }
 export interface Options {
   jobs: Option[];
@@ -91,13 +93,13 @@ export const statusLabel = (state: Receipt["state"]) =>
 export type Tone = "blue" | "green" | "amber" | "red" | "gray" | "muted";
 export const statusTone = (state: Receipt["state"]): Tone =>
   (
-    {
+    ({
       pending: "amber",
       awaiting: "blue",
       posting: "blue",
       approved: "green",
       dismissed: "gray",
-    } as const
+    }) as const
   )[state];
 // Receipt dates are plain YYYY-MM-DD; format in UTC so no zone shifts the day.
 export const day = (iso: string) => {

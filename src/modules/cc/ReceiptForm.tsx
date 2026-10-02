@@ -272,9 +272,7 @@ export default function ReceiptForm({
         });
         update(current);
       }
-      setNotice(
-        "Files added. Submit when the categorization is complete.",
-      );
+      setNotice("Files added. Submit when the categorization is complete.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -315,8 +313,10 @@ export default function ReceiptForm({
       setBusy(false);
     }
   }
-  const ownJobs = opts?.jobs.filter((j) => j.own) || [],
-    otherJobs = opts?.jobs.filter((j) => !j.own) || [];
+  // Test receipts list Test Job in its own group above everything else.
+  const testJobs = opts?.jobs.filter((j) => j.test) || [],
+    ownJobs = opts?.jobs.filter((j) => j.own && !j.test) || [],
+    otherJobs = opts?.jobs.filter((j) => !j.own && !j.test) || [];
   const split = draft.length > 1;
   // A lone allocation has no amount field: it always carries the full total.
   const effective = split ? draft : draft.map((a) => ({ ...a, amount }));
@@ -706,34 +706,32 @@ export default function ReceiptForm({
                     </button>
                   </div>
                 )}
-                {r.mode !== "test" && (
-                  <div
-                    className="cc-seg"
-                    role="radiogroup"
-                    aria-label="Charge to"
-                  >
-                    {(
-                      [
-                        ["job", "Job"],
-                        ["overhead", "Overhead"],
-                      ] as const
-                    ).map(([kind, label]) => (
-                      <button
-                        key={kind}
-                        type="button"
-                        role="radio"
-                        aria-checked={a.kind === kind}
-                        className={`cc-seg-btn${a.kind === kind ? " cc-seg-btn--active" : ""}`}
-                        onClick={() =>
-                          a.kind !== kind &&
-                          edit(index, { kind, destination: "", costType: "" })
-                        }
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <div
+                  className="cc-seg"
+                  role="radiogroup"
+                  aria-label="Charge to"
+                >
+                  {(
+                    [
+                      ["job", "Job"],
+                      ["overhead", "Overhead"],
+                    ] as const
+                  ).map(([kind, label]) => (
+                    <button
+                      key={kind}
+                      type="button"
+                      role="radio"
+                      aria-checked={a.kind === kind}
+                      className={`cc-seg-btn${a.kind === kind ? " cc-seg-btn--active" : ""}`}
+                      onClick={() =>
+                        a.kind !== kind &&
+                        edit(index, { kind, destination: "", costType: "" })
+                      }
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
                 <div className="cc-grid">
                   <label
                     className={`cc-field${split || a.kind === "job" ? "" : " cc-span-all"}`}
@@ -752,6 +750,15 @@ export default function ReceiptForm({
                       <option value="">Choose…</option>
                       {a.kind === "job" ? (
                         <>
+                          {testJobs.length > 0 && (
+                            <optgroup label="Test">
+                              {testJobs.map((j) => (
+                                <option key={j.id} value={j.id}>
+                                  {j.name} · {j.id}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
                           {ownJobs.length > 0 && (
                             <optgroup label="Your jobs">
                               {ownJobs.map((j) => (
@@ -762,7 +769,11 @@ export default function ReceiptForm({
                             </optgroup>
                           )}
                           <optgroup
-                            label={ownJobs.length ? "All other jobs" : "Jobs"}
+                            label={
+                              ownJobs.length || testJobs.length
+                                ? "All other jobs"
+                                : "Jobs"
+                            }
                           >
                             {otherJobs.map((j) => (
                               <option key={j.id} value={j.id}>
