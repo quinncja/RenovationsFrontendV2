@@ -171,6 +171,11 @@ export default function ReceiptForm({
   // A receipt started by hand has no card alert behind it, so they lead.
   const [editing, setEditing] = useState(initial.manual);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // Flips on the first Submit; from then on an incomplete section is marked
+  // red until it's filled in (checked live, so the red clears as they fix it).
+  const [attempted, setAttempted] = useState(false);
+  const receiptRef = useRef<HTMLElement>(null),
+    codingRef = useRef<HTMLElement>(null);
   async function remove() {
     setBusy(true);
     setError("");
@@ -221,8 +226,20 @@ export default function ReceiptForm({
     setDraft((rows) =>
       rows.map((a, i) => (i === index ? { ...a, ...patch } : a)),
     );
-  // One way out of the form: submit. The server checks it is complete.
+  // One way out of the form: submit. Incomplete sections are flagged here
+  // first; the server repeats every check.
   async function submit() {
+    setAttempted(true);
+    setNotice("");
+    const first = receiptProblem
+      ? receiptRef
+      : codingProblem
+        ? codingRef
+        : null;
+    if (first) {
+      first.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     setBusy(true);
     setError("");
     setNotice("");
@@ -325,6 +342,21 @@ export default function ReceiptForm({
     0,
   );
   const remaining = Math.round(Number(amount || 0) * 100) - allocated;
+  const receiptProblem =
+    !r.files.length && !missing.trim()
+      ? "Add a photo of the receipt, or explain why there isn't one."
+      : "";
+  const codingProblem = effective.some(
+    (a) => !a.destination || (a.kind === "job" && !a.costType),
+  )
+    ? split
+      ? "Choose a job or account, and a cost type for job lines, on every split."
+      : "Choose where this charge goes, and a cost type for job lines."
+    : remaining !== 0
+      ? "The splits must add up to the receipt total."
+      : "";
+  const invalid = (problem: string) =>
+    attempted && problem ? " cc-band--invalid" : "";
   const label = (
     list: { id: string; name: string }[] | undefined,
     id: string,
@@ -549,12 +581,12 @@ export default function ReceiptForm({
           </section>
         )}
 
-        <section className="cc-band">
+        <section
+          ref={receiptRef}
+          className={`cc-band${readonly ? "" : invalid(receiptProblem)}`}
+        >
           <div className="cc-band-head">
             <h3 className="cc-band-title">Receipt</h3>
-            {!r.files.length && !missing.trim() && !readonly && (
-              <span className="cc-badge cc-badge--amber">Needed</span>
-            )}
           </div>
           {(r.files.length > 0 || !readonly) && (
             <div className="cc-files">
@@ -634,9 +666,18 @@ export default function ReceiptForm({
               </button>
             )
           )}
+          {!readonly && attempted && receiptProblem && (
+            <p className="cc-band-error" role="alert">
+              <AlertTriangle size={14} aria-hidden="true" />
+              {receiptProblem}
+            </p>
+          )}
         </section>
 
-        <section className="cc-band">
+        <section
+          ref={codingRef}
+          className={`cc-band${readonly || !opts ? "" : invalid(codingProblem)}`}
+        >
           <div className="cc-band-head">
             <h3 className="cc-band-title">
               {readonly ? "Charged to" : "Categorization"}
@@ -851,14 +892,35 @@ export default function ReceiptForm({
               Split across another job
             </button>
           )}
+          {!readonly && opts && attempted && codingProblem && (
+            <p className="cc-band-error" role="alert">
+              <AlertTriangle size={14} aria-hidden="true" />
+              {codingProblem}
+            </p>
+          )}
         </section>
 
+        {!!r.relatedReceipts?.length && (
+          <div className="cc-related">
+            {r.relatedReceipts.map((item, i) => (
+              <a
+                key={item.id}
+                className="cc-link"
+                href={`/r/${item.token}`}
+                rel="noreferrer"
+              >
+                Open related receipt{" "}
+                {r.relatedReceipts!.length > 1 ? i + 1 : ""}
+              </a>
+            ))}
+          </div>
+        )}
         {!readonly && (onDismiss || !r.dismissalRequested) && (
-          <details className="cc-disclosure">
+          <details className="cc-disclosure cc-disclosure--end">
             <summary>
               {onDismiss
                 ? "Dismiss this charge"
-                : "Charge canceled or no longer showing?"}
+                : "Was this charge canceled or refunded?"}
             </summary>
             <div className="cc-disclosure-body">
               <label className="cc-field">
@@ -888,22 +950,6 @@ export default function ReceiptForm({
               </button>
             </div>
           </details>
-        )}
-
-        {!!r.relatedReceipts?.length && (
-          <div className="cc-related">
-            {r.relatedReceipts.map((item, i) => (
-              <a
-                key={item.id}
-                className="cc-link"
-                href={`/r/${item.token}`}
-                rel="noreferrer"
-              >
-                Open related receipt{" "}
-                {r.relatedReceipts!.length > 1 ? i + 1 : ""}
-              </a>
-            ))}
-          </div>
         )}
       </fieldset>
 

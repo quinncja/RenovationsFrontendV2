@@ -644,6 +644,28 @@ select.cc-input {
   gap: 0.75rem;
 }
 .cc-disclosure-body .cc-field { align-self: stretch; }
+/* The dismissal path: last thing on the form, centered and set apart. */
+.cc-disclosure--end { margin-top: 1rem; }
+.cc-disclosure--end > summary { text-align: center; }
+
+/* A section Submit found incomplete: tinted fill (no border, per the
+   no-dark-borders rule) plus one line saying what's missing. */
+.cc-band--invalid {
+  margin: 0 -1.125rem;
+  padding: 1rem 1.125rem;
+  border-radius: 12px;
+  background: light-dark(rgba(239, 68, 68, 0.07), rgba(248, 113, 113, 0.1));
+  transition: background-color 0.2s ease;
+}
+.cc-band-error {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  color: light-dark(#dc2626, #f87171);
+}
 
 /* ─── Dashboard: modal shell (on App.css .modal + .co-modal) ──────────────── */
 
