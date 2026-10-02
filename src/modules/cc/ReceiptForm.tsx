@@ -349,9 +349,7 @@ export default function ReceiptForm({
   const codingProblem = effective.some(
     (a) => !a.destination || (a.kind === "job" && !a.costType),
   )
-    ? split
-      ? "Choose a job or account, and a cost type for job lines, on every split."
-      : "Choose where this charge goes, and a cost type for job lines."
+    ? "Categorize this charge before submitting."
     : remaining !== 0
       ? "The splits must add up to the receipt total."
       : "";
@@ -585,6 +583,12 @@ export default function ReceiptForm({
           ref={receiptRef}
           className={`cc-band${readonly ? "" : invalid(receiptProblem)}`}
         >
+          {!readonly && attempted && receiptProblem && (
+            <p className="cc-band-error" role="alert">
+              <AlertTriangle size={14} aria-hidden="true" />
+              {receiptProblem}
+            </p>
+          )}
           <div className="cc-band-head">
             <h3 className="cc-band-title">Receipt</h3>
           </div>
@@ -666,18 +670,18 @@ export default function ReceiptForm({
               </button>
             )
           )}
-          {!readonly && attempted && receiptProblem && (
-            <p className="cc-band-error" role="alert">
-              <AlertTriangle size={14} aria-hidden="true" />
-              {receiptProblem}
-            </p>
-          )}
         </section>
 
         <section
           ref={codingRef}
           className={`cc-band${readonly || !opts ? "" : invalid(codingProblem)}`}
         >
+          {!readonly && opts && attempted && codingProblem && (
+            <p className="cc-band-error" role="alert">
+              <AlertTriangle size={14} aria-hidden="true" />
+              {codingProblem}
+            </p>
+          )}
           <div className="cc-band-head">
             <h3 className="cc-band-title">
               {readonly ? "Charged to" : "Categorization"}
@@ -891,12 +895,6 @@ export default function ReceiptForm({
               <Plus size={15} aria-hidden="true" />
               Split across another job
             </button>
-          )}
-          {!readonly && opts && attempted && codingProblem && (
-            <p className="cc-band-error" role="alert">
-              <AlertTriangle size={14} aria-hidden="true" />
-              {codingProblem}
-            </p>
           )}
         </section>
 
