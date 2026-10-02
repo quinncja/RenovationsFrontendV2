@@ -8,7 +8,7 @@ import { Badge } from "../../shared/components/Badge";
 import { SkelText } from "../../shared/components/SkelText";
 import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList";
 import { useAuth } from "../../core/auth/AuthProvider";
-import { staffRequest, staffFile } from "./staffApi";
+import { staffRequest, staffFile, watchReceipts } from "./staffApi";
 import { json } from "./api";
 import { CCModal } from "./CCModal";
 import { MappingModal } from "./MappingModal";
@@ -71,19 +71,22 @@ export default function CCPage() {
     [create, setCreate] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set()),
     [busy, setBusy] = useState(false),
-    [reason, setReason] = useState(""),
     [formVersion, setFormVersion] = useState(0);
   const [settings, setSettings] = useState<CCSettings | null>(null);
   const [intake, setIntake] = useState<
     { _id: string; mode: string; error: string; receivedAt?: string }[]
   >([]);
   const selecting = gm && tab === "awaiting";
+  // Live updates: a receipt written anywhere (email intake, phone form, another
+  // reviewer) bumps this, and the list reloads quietly in place.
+  const [live, setLive] = useState(0);
+  useEffect(() => watchReceipts(() => setLive((n) => n + 1)), []);
   useEffect(() => {
     if (gm)
       staffRequest<typeof intake>("cc/intake-errors")
         .then(setIntake)
         .catch(() => {});
-  }, [gm, version]);
+  }, [gm, version, live]);
   async function retryIntake(id: string) {
     setBusy(true);
     try {
@@ -133,17 +136,35 @@ export default function CCPage() {
       });
     return () => controller.abort();
   }, [tab, page, query, version]);
+  // Quiet reload on live updates: no skeleton, selection kept where possible.
+  useEffect(() => {
+    if (!live) return;
+    const controller = new AbortController();
+    staffRequest<Listing>(
+      `cc/receipts?state=${tab}&page=${page}&search=${encodeURIComponent(query)}`,
+      { signal: controller.signal },
+    )
+      .then((next) => {
+        setList(next);
+        setSelected(
+          (old) =>
+            new Set(next.items.filter((r) => old.has(r._id)).map((r) => r._id)),
+        );
+      })
+      .catch(() => {});
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live]);
   async function open(id: string) {
     setError("");
     try {
       setReceipt(await staffRequest<Receipt>(`cc/receipts/${id}`));
-      setReason("");
       setFormVersion((v) => v + 1);
     } catch (e) {
       setError((e as Error).message);
     }
   }
-  async function action(action: string) {
+  async function action(action: string, reason = "") {
     if (!receipt) return;
     setBusy(true);
     setError("");
@@ -453,110 +474,46 @@ export default function CCPage() {
             onChange={(r) =>
               setReceipt({ ...r, canApprove: receipt.canApprove })
             }
-          />
-          {gm && ["pending", "awaiting"].includes(receipt.state) && (
-            <section className="cc-band">
-              <div className="cc-band-head">
-                <h3 className="cc-band-title">Review</h3>
-                {settings && !settings.sageReady && (
-                  <span className="cc-badge cc-badge--muted">
-                    Sage posting not enabled yet
-                  </span>
-                )}
-              </div>
-              <label className="cc-field">
-                <span className="cc-field-label">Reason</span>
-                <textarea
-                  className="cc-input"
-                  rows={2}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Required to return or dismiss a charge"
-                />
-              </label>
-              {error && <Banner tone="red">{error}</Banner>}
-              <div className="cc-review-actions">
-                {receipt.employeeId == null && receipt.mode !== "test" && (
-                  <button
-                    className="cc-btn"
-                    disabled={busy}
-                    onClick={() => void action("assign")}
-                  >
-                    Assign from card mapping
-                  </button>
-                )}
-                <button
-                  className="cc-btn cc-btn--danger"
-                  disabled={busy || !reason.trim() || !receipt.canApprove}
-                  onClick={() => void action("dismiss")}
-                >
-                  Dismiss charge
-                </button>
-                <span className="cc-spacer" />
-                {receipt.state === "awaiting" && (
-                  <>
+            alert={
+              gm &&
+              receipt.employeeId == null &&
+              receipt.mode !== "test" &&
+              !["approved", "dismissed"].includes(receipt.state) && (
+                <Banner tone="amber">
+                  <span className="cc-banner-row">
+                    <span>
+                      <strong>Unassigned.</strong> Nobody is mapped to card
+                      •••• {receipt.cardLast4}.
+                    </span>
                     <button
                       className="cc-btn"
-                      disabled={busy || !reason.trim()}
-                      onClick={() => void action("return")}
+                      disabled={busy}
+                      onClick={() => void action("assign")}
                     >
-                      Return for correction
+                      Assign from card mapping
                     </button>
-                    <button
-                      className="cc-btn cc-btn--primary"
-                      disabled={
-                        busy || !receipt.canApprove || !settings?.sageReady
-                      }
-                      onClick={() => void action("approve")}
-                    >
-                      Approve and post
-                    </button>
-                  </>
-                )}
-              </div>
-            </section>
-          )}
-          {!!receipt.audit?.length && (
-            <section className="cc-band">
-              <div className="cc-band-head">
-                <h3 className="cc-band-title">Activity</h3>
-              </div>
-              <ol className="cc-trail">
-                {receipt.audit
-                  .slice()
-                  .reverse()
-                  .map((a, i) => (
-                    <li key={i} className="cc-trail-item">
-                      <span className="cc-trail-dot" aria-hidden="true" />
-                      <span className="cc-trail-action">
-                        {a.action.replaceAll("-", " ")}
-                      </span>
-                      <span className="cc-trail-meta">
-                        {a.name} ·{" "}
-                        {new Date(a.at).toLocaleString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                      {(a.before !== undefined || a.after !== undefined) && (
-                        <details className="cc-disclosure cc-trail-diff">
-                          <summary>Show changes</summary>
-                          <pre>
-                            {JSON.stringify(
-                              { before: a.before, after: a.after },
-                              null,
-                              2,
-                            )}
-                          </pre>
-                        </details>
-                      )}
-                    </li>
-                  ))}
-              </ol>
-            </section>
-          )}
+                  </span>
+                </Banner>
+              )
+            }
+            onDismiss={
+              gm && receipt.canApprove
+                ? (why) => action("dismiss", why)
+                : undefined
+            }
+            verdict={
+              gm && (
+                <ReviewBar
+                  busy={busy}
+                  error={error}
+                  canApprove={!!receipt.canApprove}
+                  sageReady={!!settings?.sageReady}
+                  onAction={action}
+                />
+              )
+            }
+          />
+          {!!receipt.audit?.length && <Activity audit={receipt.audit} />}
         </CCModal>
       )}
     </Page>
@@ -736,5 +693,143 @@ function NewReceipt({
       </label>
       {error && <Banner tone="red">{error}</Banner>}
     </CCModal>
+  );
+}
+
+// The GM's verdict, in the receipt's sticky bar. Return and Dismiss need a
+// reason, so they swap the bar for one field instead of keeping it on screen.
+function ReviewBar({
+  busy,
+  error,
+  canApprove,
+  sageReady,
+  onAction,
+}: {
+  busy: boolean;
+  error: string;
+  canApprove: boolean;
+  sageReady: boolean;
+  onAction: (action: string, reason?: string) => Promise<void>;
+}) {
+  const [asking, setAsking] = useState<"return" | "dismiss" | null>(null),
+    [reason, setReason] = useState("");
+  if (asking)
+    return (
+      <div className="cc-verdict-ask">
+        <input
+          className="cc-input"
+          autoFocus
+          value={reason}
+          placeholder={
+            asking === "return" ? "What needs fixing?" : "Why dismiss it?"
+          }
+          onChange={(e) => setReason(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && reason.trim())
+              void onAction(asking, reason);
+            if (e.key === "Escape") {
+              e.stopPropagation();
+              setAsking(null);
+            }
+          }}
+        />
+        <button className="cc-btn" onClick={() => setAsking(null)}>
+          Cancel
+        </button>
+        <button
+          className={`cc-btn ${asking === "return" ? "cc-btn--primary" : "cc-btn--danger"}`}
+          disabled={busy || !reason.trim()}
+          onClick={() => void onAction(asking, reason)}
+        >
+          {asking === "return" ? "Send back" : "Dismiss"}
+        </button>
+      </div>
+    );
+  return (
+    <>
+      <span className="cc-actionbar-note">
+        {error ? (
+          <span className="cc-error-text">{error}</span>
+        ) : !sageReady ? (
+          "Sage posting is not enabled yet."
+        ) : !canApprove ? (
+          "Not ready to approve."
+        ) : (
+          ""
+        )}
+      </span>
+      {canApprove && (
+        <button
+          className="cc-btn cc-btn--quiet cc-btn--danger"
+          disabled={busy}
+          onClick={() => setAsking("dismiss")}
+        >
+          Dismiss
+        </button>
+      )}
+      <button
+        className="cc-btn"
+        disabled={busy}
+        onClick={() => setAsking("return")}
+      >
+        Return for correction
+      </button>
+      <button
+        className="cc-btn cc-btn--primary"
+        disabled={busy || !canApprove || !sageReady}
+        onClick={() => void onAction("approve")}
+      >
+        Approve and post
+      </button>
+    </>
+  );
+}
+
+// Latest event up front; the full trail (and its raw diffs) on request.
+function Activity({ audit }: { audit: NonNullable<Receipt["audit"]> }) {
+  const events = audit.slice().reverse();
+  const when = (at: string) =>
+    new Date(at).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  const what = (action: string) => {
+    const text = action.replaceAll("-", " ");
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  };
+  return (
+    <details className="cc-disclosure cc-activity">
+      <summary>
+        <span>
+          {what(events[0].action)} by {events[0].name} · {when(events[0].at)}
+        </span>
+        {events.length > 1 && (
+          <span className="cc-activity-more">
+            Show all {events.length} events
+          </span>
+        )}
+      </summary>
+      <ol className="cc-trail">
+        {events.map((a, i) => (
+          <li key={i} className="cc-trail-item">
+            <span className="cc-trail-dot" aria-hidden="true" />
+            <span className="cc-trail-action">{what(a.action)}</span>
+            <span className="cc-trail-meta">
+              {a.name} · {when(a.at)}
+            </span>
+            {(a.before !== undefined || a.after !== undefined) && (
+              <details className="cc-disclosure cc-trail-diff">
+                <summary>Show changes</summary>
+                <pre>
+                  {JSON.stringify({ before: a.before, after: a.after }, null, 2)}
+                </pre>
+              </details>
+            )}
+          </li>
+        ))}
+      </ol>
+    </details>
   );
 }

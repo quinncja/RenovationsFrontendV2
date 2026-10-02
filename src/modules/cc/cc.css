@@ -362,6 +362,30 @@ select.cc-input {
   white-space: nowrap;
 }
 
+/* "Edit description or total": the head band's only control. */
+.cc-head-edit {
+  align-self: flex-start;
+  font-size: 0.8125rem;
+}
+.cc-quote {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--secondary-text);
+}
+.cc-banner-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.cc-related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
 .cc-notes {
   display: flex;
   flex-direction: column;
@@ -426,6 +450,18 @@ select.cc-input {
   font-weight: var(--font-weight-semibold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+/* Read-only allocation: where it went, then job/code/type beneath. */
+.cc-ledger-desc:has(.cc-ledger-name) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.cc-ledger-name { font-weight: var(--font-weight-semibold); }
+.cc-ledger-meta {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
 }
 .cc-ledger-foot {
   padding: 0.75rem 0;
@@ -646,14 +682,31 @@ select.cc-input {
 .cc-modal .co-modal-header { padding-left: 1.75rem; padding-right: 1.25rem; }
 .cc-modal-footer > :first-child:not(:only-child) { margin-right: auto; }
 
-/* GM review band: decision actions split, quiet ones left, verdict right. */
-.cc-review-actions {
+/* GM verdict in the sticky bar; Return/Dismiss swap it for one reason field. */
+.cc-verdict-ask {
+  flex: 1;
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
   gap: 0.625rem;
 }
-.cc-review-actions .cc-spacer { flex: 1; }
+.cc-verdict-ask .cc-input { flex: 1; min-width: 0; }
+.cc-error-text { color: light-dark(#dc2626, #f87171); }
+
+/* Activity: latest event as the summary line, the full trail on open. */
+.cc-activity > summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border-color);
+  font-weight: var(--font-weight-medium);
+}
+.cc-activity-more {
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+.cc-activity[open] .cc-activity-more { display: none; }
 
 /* Activity trail (twin of the timeline voice used by What's Changed). */
 .cc-trail {
@@ -949,5 +1002,6 @@ select.cc-input {
   .cc-actionbar-note { display: none; }
   .cc-files { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .cc-widget .co-search-wrapper { max-width: none; flex-basis: 100%; }
-  .cc-review-actions .cc-spacer { display: none; }
+  .cc-verdict-ask { flex-wrap: wrap; }
+  .cc-verdict-ask .cc-input { flex-basis: 100%; }
 }

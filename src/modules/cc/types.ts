@@ -2,7 +2,9 @@ export interface Allocation {
   kind: "job" | "overhead";
   destination: string;
   name?: string;
+  /** Always "1000" on job lines (set by the server); empty for overhead. */
   costCode: string;
+  /** Job lines only; overhead posts to a GL account with no cost type. */
   costType: string;
   amountCents: number;
 }
@@ -63,7 +65,6 @@ export interface Option {
 export interface Options {
   jobs: Option[];
   accounts: Option[];
-  costCodes: Option[];
   costTypes: Option[];
 }
 export interface CCSettings {

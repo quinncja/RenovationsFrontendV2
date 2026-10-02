@@ -6,6 +6,7 @@ import {
   FileText,
   FileUp,
   Info,
+  Pencil,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -80,8 +81,8 @@ export function FilePreview({
       if (blob) URL.revokeObjectURL(blob);
     };
   }, [file.id, path, loadFile]);
-  const image =
-    url && file.mime.startsWith("image/") && file.mime !== "image/heic";
+  const isImage = file.mime.startsWith("image/") && file.mime !== "image/heic";
+  const image = url && isImage;
   return (
     <a
       className="cc-file"
@@ -97,7 +98,9 @@ export function FilePreview({
           <FileText size={26} aria-hidden="true" />
         )}
       </span>
-      <span className="cc-file-name">{error || file.name}</span>
+      {(error || !isImage) && (
+        <span className="cc-file-name">{error || file.name}</span>
+      )}
     </a>
   );
 }
@@ -109,6 +112,9 @@ export default function ReceiptForm({
   onChange,
   onSubmitted,
   loadFile,
+  alert,
+  verdict,
+  onDismiss,
 }: {
   initial: Receipt;
   path: string;
@@ -117,6 +123,12 @@ export default function ReceiptForm({
   /** Called after a successful submit (the link portal swaps to its done screen). */
   onSubmitted?: (receipt: Receipt) => void;
   loadFile?: (path: string) => Promise<string>;
+  /** Extra note for the notes stack (the GM's unassigned-card prompt). */
+  alert?: ReactNode;
+  /** Replaces Submit in the sticky bar while the receipt awaits approval. */
+  verdict?: ReactNode;
+  /** Dismiss outright (GM) instead of asking a GM to dismiss. */
+  onDismiss?: (reason: string) => Promise<void>;
 }) {
   const [r, setReceipt] = useState(initial);
   const [opts, setOpts] = useState<Options | null>(null);
@@ -152,12 +164,21 @@ export default function ReceiptForm({
     }[]
   >([]);
   const [dismissReason, setDismissReason] = useState("");
+  // Description and total ride the head band; their fields open on request.
+  // A receipt started by hand has no card alert behind it, so they lead.
+  const [editing, setEditing] = useState(initial.manual);
+  const touch =
+    typeof window !== "undefined" &&
+    !!window.matchMedia?.("(pointer: coarse)").matches;
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const uploadRef = useRef<HTMLInputElement>(null),
     cameraRef = useRef<HTMLInputElement>(null);
-  const readonly = ["approved", "posting", "dismissed"].includes(r.state);
+  // A GM reviewing a submitted receipt reads it; fixes go back via Return.
+  const reviewing = !!verdict && r.state === "awaiting";
+  const readonly =
+    reviewing || ["approved", "posting", "dismissed"].includes(r.state);
   useEffect(() => {
     let alive = true;
     request<Options>(`${path}/options`)
@@ -290,6 +311,10 @@ export default function ReceiptForm({
     0,
   );
   const remaining = Math.round(Number(amount || 0) * 100) - allocated;
+  const label = (
+    list: { id: string; name: string }[] | undefined,
+    id: string,
+  ) => list?.find((o) => o.id === id)?.name || id;
   // The card's merchant names the purchase; grouped charges fall back to the
   // receipt description, and their merchants list in the ledger below.
   const headline =
@@ -313,6 +338,7 @@ export default function ReceiptForm({
             <p className="cc-party">
               {r.employeeName}
               {r.receiptDate ? ` · ${day(r.receiptDate)}` : ""}
+              {r.invoiceNumber ? ` · #${r.invoiceNumber}` : ""}
             </p>
           </div>
           <div className="cc-figure-block">
@@ -322,34 +348,38 @@ export default function ReceiptForm({
             </span>
           </div>
         </div>
+        {!readonly && !editing && (
+          <button
+            type="button"
+            className="cc-btn cc-btn--quiet cc-head-edit"
+            onClick={() => setEditing(true)}
+          >
+            <Pencil size={13} aria-hidden="true" />
+            Edit description or total
+          </button>
+        )}
       </header>
 
       {(r.correctionReason ||
-        r.state === "awaiting" ||
-        readonly ||
+        r.dismissalRequested ||
+        alert ||
         !!r.matchCandidates?.length) && (
         <div className="cc-notes">
-          {r.correctionReason && (
+          {r.correctionReason && !readonly && (
             <Banner tone="amber">
               <strong>Correction requested.</strong> {r.correctionReason}
             </Banner>
           )}
-          {r.state === "awaiting" && (
-            <Banner>
-              Submitted for approval. Saving changes returns it to Pending
-              Submission.
+          {r.dismissalRequested && (
+            <Banner tone="amber">
+              <strong>Dismissal requested.</strong> {r.dismissalRequested}
             </Banner>
           )}
-          {readonly && (
-            <Banner>
-              This receipt is {statusLabel(r.state).toLowerCase()} and can no
-              longer be edited.
-            </Banner>
-          )}
+          {alert}
           {!!r.matchCandidates?.length && (
             <Banner tone="amber">
-              This may duplicate a receipt you already started. Resolve it
-              below before submitting.
+              This may duplicate a receipt you already started. Resolve it below
+              before submitting.
             </Banner>
           )}
         </div>
@@ -361,10 +391,6 @@ export default function ReceiptForm({
             <div className="cc-band-head">
               <h3 className="cc-band-title">Possible existing receipt</h3>
             </div>
-            <p className="cc-band-sub">
-              Same card, date and amount. Use the existing receipt to avoid a
-              duplicate invoice.
-            </p>
             <div className="cc-option-list">
               {candidates
                 .filter((c) => r.matchCandidates?.includes(c.id))
@@ -400,42 +426,50 @@ export default function ReceiptForm({
           </section>
         )}
 
-        <section className="cc-band">
-          <div className="cc-band-head">
-            <h3 className="cc-band-title">Details</h3>
-          </div>
-          <div className={r.manual ? "cc-grid cc-grid--3" : "cc-grid"}>
-            <label className="cc-field">
-              <span className="cc-field-label">Description</span>
-              <input
-                className="cc-input"
-                value={description}
-                maxLength={200}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </label>
-            <label className="cc-field">
-              <span className="cc-field-label">Total</span>
-              <input
-                className="cc-input cc-input--money"
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-              />
-            </label>
-            {r.manual && (
+        {editing && !readonly && (
+          <section className="cc-band">
+            <div className="cc-band-head">
+              <h3 className="cc-band-title">Details</h3>
+            </div>
+            <div className={r.manual ? "cc-grid cc-grid--3" : "cc-grid"}>
               <label className="cc-field">
-                <span className="cc-field-label">Receipt date</span>
+                <span className="cc-field-label">Description</span>
                 <input
                   className="cc-input"
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  value={description}
+                  maxLength={200}
+                  onChange={(e) => setDescription(e.target.value)}
                 />
               </label>
-            )}
-          </div>
-          {r.charges.length > 1 && (
+              <label className="cc-field">
+                <span className="cc-field-label">Total</span>
+                <input
+                  className="cc-input cc-input--money"
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </label>
+              {r.manual && (
+                <label className="cc-field">
+                  <span className="cc-field-label">Receipt date</span>
+                  <input
+                    className="cc-input"
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                  />
+                </label>
+              )}
+            </div>
+          </section>
+        )}
+
+        {r.charges.length > 1 && (
+          <section className="cc-band">
+            <div className="cc-band-head">
+              <h3 className="cc-band-title">{r.charges.length} card charges</h3>
+            </div>
             <div className="cc-ledger">
               {r.charges.map((c) => (
                 <div className="cc-ledger-line" key={c.messageId}>
@@ -456,53 +490,48 @@ export default function ReceiptForm({
                   <span className="cc-ledger-amt">{money(c.amountCents)}</span>
                 </div>
               ))}
-              <div className="cc-ledger-foot">
-                <label className="cc-check">
-                  <input
-                    type="checkbox"
-                    checked={confirmed}
-                    onChange={(e) => setConfirmed(e.target.checked)}
-                  />
-                  These charges belong to one receipt
-                </label>
-              </div>
+              {!readonly && (
+                <div className="cc-ledger-foot">
+                  <label className="cc-check">
+                    <input
+                      type="checkbox"
+                      checked={confirmed}
+                      onChange={(e) => setConfirmed(e.target.checked)}
+                    />
+                    These charges belong to one receipt
+                  </label>
+                </div>
+              )}
             </div>
-          )}
-        </section>
+          </section>
+        )}
 
-        {r.amountCents < 0 && (
+        {r.amountCents < 0 && !r.originalReceiptId && !readonly && (
           <section className="cc-band">
             <div className="cc-band-head">
               <h3 className="cc-band-title">Original purchase</h3>
             </div>
-            {r.originalReceiptId ? (
-              <p className="cc-band-sub" style={{ marginTop: 0 }}>
-                Linked to the original receipt. Review the return
-                categorization below.
-              </p>
-            ) : (
-              <label className="cc-field">
-                <span className="cc-field-label">Link this return</span>
-                <select
-                  className="cc-input"
-                  defaultValue=""
-                  onChange={(e) => {
-                    if (e.target.value)
-                      void relationship("link-return", {
-                        receiptId: e.target.value,
-                      });
-                  }}
-                >
-                  <option value="">Choose the original receipt</option>
-                  {candidates.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {day(c.receiptDate)} · {c.description} ·{" "}
-                      {money(c.amountCents)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+            <label className="cc-field">
+              <span className="cc-field-label">Link this return</span>
+              <select
+                className="cc-input"
+                defaultValue=""
+                onChange={(e) => {
+                  if (e.target.value)
+                    void relationship("link-return", {
+                      receiptId: e.target.value,
+                    });
+                }}
+              >
+                <option value="">Choose the original receipt</option>
+                {candidates.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {day(c.receiptDate)} · {c.description} ·{" "}
+                    {money(c.amountCents)}
+                  </option>
+                ))}
+              </select>
+            </label>
           </section>
         )}
 
@@ -513,58 +542,62 @@ export default function ReceiptForm({
               <span className="cc-badge cc-badge--amber">Needed</span>
             )}
           </div>
-          <div className="cc-files">
-            {r.files.map((f) => (
-              <FilePreview
-                key={f.id}
-                file={f}
-                path={path}
-                loadFile={loadFile}
-              />
-            ))}
-            {!readonly && (
-              <>
-                <button
-                  type="button"
-                  className="cc-add-tile"
-                  onClick={() => cameraRef.current?.click()}
-                >
-                  <Camera size={20} aria-hidden="true" />
-                  Take photo
-                </button>
-                <button
-                  type="button"
-                  className="cc-add-tile"
-                  onClick={() => uploadRef.current?.click()}
-                >
-                  <FileUp size={20} aria-hidden="true" />
-                  Upload file
-                </button>
-                <input
-                  hidden
-                  ref={cameraRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={(e) => void upload(e.target.files)}
+          {(r.files.length > 0 || !readonly) && (
+            <div className="cc-files">
+              {r.files.map((f) => (
+                <FilePreview
+                  key={f.id}
+                  file={f}
+                  path={path}
+                  loadFile={loadFile}
                 />
-                <input
-                  hidden
-                  ref={uploadRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
-                  multiple
-                  onChange={(e) => void upload(e.target.files)}
-                />
-              </>
-            )}
-          </div>
-          {!readonly && (
-            <span className="cc-field-hint">
-              Photos or PDFs, up to 15 MB each.
-            </span>
+              ))}
+              {!readonly && (
+                <>
+                  {touch && (
+                    <button
+                      type="button"
+                      className="cc-add-tile"
+                      onClick={() => cameraRef.current?.click()}
+                    >
+                      <Camera size={20} aria-hidden="true" />
+                      Take photo
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="cc-add-tile"
+                    title="Photos or PDFs, up to 15 MB each"
+                    onClick={() => uploadRef.current?.click()}
+                  >
+                    <FileUp size={20} aria-hidden="true" />
+                    {touch ? "Upload file" : "Add receipt"}
+                  </button>
+                  <input
+                    hidden
+                    ref={cameraRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) => void upload(e.target.files)}
+                  />
+                  <input
+                    hidden
+                    ref={uploadRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
+                    multiple
+                    onChange={(e) => void upload(e.target.files)}
+                  />
+                </>
+              )}
+            </div>
           )}
-          {showMissing ? (
+          {readonly ? (
+            r.missingReceipt && (
+              <p className="cc-quote">No receipt: {r.missingReceipt}</p>
+            )
+          ) : showMissing ? (
             <label className="cc-field">
               <span className="cc-field-label">Why is there no receipt?</span>
               <textarea
@@ -576,7 +609,7 @@ export default function ReceiptForm({
               />
             </label>
           ) : (
-            !readonly && (
+            !r.files.length && (
               <button
                 type="button"
                 className="cc-btn cc-btn--quiet"
@@ -591,8 +624,10 @@ export default function ReceiptForm({
 
         <section className="cc-band">
           <div className="cc-band-head">
-            <h3 className="cc-band-title">Categorization</h3>
-            {opts && (
+            <h3 className="cc-band-title">
+              {readonly ? "Charged to" : "Categorization"}
+            </h3>
+            {opts && !readonly && (split || remaining !== 0) && (
               <span
                 className={`cc-badge cc-badge--${remaining === 0 ? "green" : remaining > 0 ? "amber" : "red"}`}
               >
@@ -604,7 +639,35 @@ export default function ReceiptForm({
               </span>
             )}
           </div>
-          {!opts ? (
+          {readonly ? (
+            r.allocations.length ? (
+              <div className="cc-ledger">
+                {r.allocations.map((a, i) => (
+                  <div className="cc-ledger-line" key={i}>
+                    <span className="cc-ledger-desc">
+                      <span className="cc-ledger-name">
+                        {a.name || a.destination}
+                      </span>
+                      <span className="cc-ledger-meta">
+                        {a.kind === "job"
+                          ? `Job ${a.destination} · ${label(opts?.costTypes, a.costType)}`
+                          : `Overhead account ${a.destination}`}
+                      </span>
+                    </span>
+                    {r.allocations.length > 1 && (
+                      <span className="cc-ledger-amt">
+                        {money(a.amountCents)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="cc-band-sub" style={{ marginTop: 0 }}>
+                Not categorized
+              </p>
+            )
+          ) : !opts ? (
             <p className="cc-band-sub" style={{ marginTop: 0 }}>
               Loading jobs and account codes…
             </p>
@@ -617,22 +680,24 @@ export default function ReceiptForm({
                 {split && (
                   <div className="cc-alloc-head">
                     <span className="cc-alloc-title">Split {index + 1}</span>
-                    {!readonly && (
-                      <button
-                        type="button"
-                        aria-label={`Remove split ${index + 1}`}
-                        className="cc-icon-btn"
-                        onClick={() =>
-                          setDraft(draft.filter((_, i) => i !== index))
-                        }
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      aria-label={`Remove split ${index + 1}`}
+                      className="cc-icon-btn"
+                      onClick={() =>
+                        setDraft(draft.filter((_, i) => i !== index))
+                      }
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 )}
                 {r.mode !== "test" && (
-                  <div className="cc-seg" role="radiogroup" aria-label="Charge to">
+                  <div
+                    className="cc-seg"
+                    role="radiogroup"
+                    aria-label="Charge to"
+                  >
                     {(
                       [
                         ["job", "Job"],
@@ -647,7 +712,7 @@ export default function ReceiptForm({
                         className={`cc-seg-btn${a.kind === kind ? " cc-seg-btn--active" : ""}`}
                         onClick={() =>
                           a.kind !== kind &&
-                          edit(index, { kind, destination: "" })
+                          edit(index, { kind, destination: "", costType: "" })
                         }
                       >
                         {label}
@@ -656,7 +721,9 @@ export default function ReceiptForm({
                   </div>
                 )}
                 <div className="cc-grid">
-                  <label className={`cc-field${split ? "" : " cc-span-all"}`}>
+                  <label
+                    className={`cc-field${split || a.kind === "job" ? "" : " cc-span-all"}`}
+                  >
                     <span className="cc-field-label">
                       {a.kind === "job" ? "Job and phase" : "Overhead account"}
                     </span>
@@ -713,42 +780,26 @@ export default function ReceiptForm({
                       />
                     </label>
                   )}
-                  <label className="cc-field">
-                    <span className="cc-field-label">Cost code</span>
-                    <select
-                      className="cc-input"
-                      required
-                      value={a.costCode}
-                      onChange={(e) =>
-                        edit(index, { costCode: e.target.value })
-                      }
-                    >
-                      <option value="">Choose…</option>
-                      {opts.costCodes.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.id} · {o.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="cc-field">
-                    <span className="cc-field-label">Cost type</span>
-                    <select
-                      className="cc-input"
-                      required
-                      value={a.costType}
-                      onChange={(e) =>
-                        edit(index, { costType: e.target.value })
-                      }
-                    >
-                      <option value="">Choose…</option>
-                      {opts.costTypes.map((o) => (
-                        <option key={o.id} value={o.id}>
-                          {o.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  {a.kind === "job" && (
+                    <label className="cc-field">
+                      <span className="cc-field-label">Cost type</span>
+                      <select
+                        className="cc-input"
+                        required
+                        value={a.costType}
+                        onChange={(e) =>
+                          edit(index, { costType: e.target.value })
+                        }
+                      >
+                        <option value="">Choose…</option>
+                        {opts.costTypes.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
                 </div>
               </div>
             ))
@@ -777,12 +828,18 @@ export default function ReceiptForm({
           )}
         </section>
 
-        {!readonly && (
+        {!readonly && (onDismiss || !r.dismissalRequested) && (
           <details className="cc-disclosure">
-            <summary>Charge canceled or no longer showing?</summary>
+            <summary>
+              {onDismiss
+                ? "Dismiss this charge"
+                : "Charge canceled or no longer showing?"}
+            </summary>
             <div className="cc-disclosure-body">
               <label className="cc-field">
-                <span className="cc-field-label">What happened</span>
+                <span className="cc-field-label">
+                  {onDismiss ? "Reason" : "What happened"}
+                </span>
                 <textarea
                   className="cc-input"
                   rows={2}
@@ -792,25 +849,24 @@ export default function ReceiptForm({
               </label>
               <button
                 type="button"
-                className="cc-btn"
+                className="cc-btn cc-btn--danger"
                 disabled={!dismissReason.trim()}
                 onClick={() =>
-                  void relationship("request-dismissal", {
-                    reason: dismissReason,
-                  })
+                  void (onDismiss
+                    ? onDismiss(dismissReason)
+                    : relationship("request-dismissal", {
+                        reason: dismissReason,
+                      }))
                 }
               >
-                Request dismissal
+                {onDismiss ? "Dismiss charge" : "Request dismissal"}
               </button>
             </div>
           </details>
         )}
 
         {!!r.relatedReceipts?.length && (
-          <section className="cc-band">
-            <div className="cc-band-head">
-              <h3 className="cc-band-title">Related receipts</h3>
-            </div>
+          <div className="cc-related">
             {r.relatedReceipts.map((item, i) => (
               <a
                 key={item.id}
@@ -818,10 +874,11 @@ export default function ReceiptForm({
                 href={`/r/${item.token}`}
                 rel="noreferrer"
               >
-                Open related receipt {r.relatedReceipts!.length > 1 ? i + 1 : ""}
+                Open related receipt{" "}
+                {r.relatedReceipts!.length > 1 ? i + 1 : ""}
               </a>
             ))}
-          </section>
+          </div>
         )}
       </fieldset>
 
@@ -835,30 +892,42 @@ export default function ReceiptForm({
         </div>
       )}
 
-      {!readonly && (
-        <div className="cc-actionbar">
-          <span className="cc-actionbar-note">
-            {r.firstSubmittedAt
-              ? "Corrections are allowed until approval."
-              : "Save anytime and finish later."}
-          </span>
-          <button
-            type="button"
-            className="cc-btn"
-            disabled={!opts || busy}
-            onClick={() => void save(false)}
-          >
-            Save
-          </button>
-          <button
-            type="button"
-            className="cc-btn cc-btn--primary"
-            disabled={!opts || busy}
-            onClick={() => void save(true)}
-          >
-            {busy ? "Saving…" : r.firstSubmittedAt ? "Resubmit" : "Submit receipt"}
-          </button>
-        </div>
+      {reviewing ? (
+        <div className="cc-actionbar">{verdict}</div>
+      ) : (
+        !readonly && (
+          <div className="cc-actionbar">
+            {
+              <>
+                <span className="cc-actionbar-note">
+                  {r.firstSubmittedAt
+                    ? "Corrections are allowed until approval."
+                    : "Save anytime and finish later."}
+                </span>
+                <button
+                  type="button"
+                  className="cc-btn"
+                  disabled={!opts || busy}
+                  onClick={() => void save(false)}
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--primary"
+                  disabled={!opts || busy}
+                  onClick={() => void save(true)}
+                >
+                  {busy
+                    ? "Saving…"
+                    : r.firstSubmittedAt
+                      ? "Resubmit"
+                      : "Submit receipt"}
+                </button>
+              </>
+            }
+          </div>
+        )
       )}
     </div>
   );
