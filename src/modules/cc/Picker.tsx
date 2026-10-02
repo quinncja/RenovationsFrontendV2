@@ -6,6 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal, flushSync } from "react-dom";
 import { Check, ChevronDown, Search } from "lucide-react";
 
 // One chooser for the receipt form (rendered by the isolated /r/:token bundle
@@ -16,6 +17,13 @@ import { Check, ChevronDown, Search } from "lucide-react";
 // searchable: the field becomes a search box (long job list). Typing only
 // filters; a value is set solely by choosing a row, and leaving the field
 // without choosing restores the current selection.
+//
+// On phones a searchable picker opens a full-screen sheet instead: title and
+// Cancel on top, the list filling the middle, the search box pinned at the
+// bottom. The sheet sizes itself to the visual viewport (the strip above the
+// keyboard), so the search box sits right on the keyboard without the page
+// ever being scrolled; scrolling the page to place the field fought Safari's
+// own focus scrolling and bounced.
 
 export interface PickerItem {
   id: string;
@@ -34,6 +42,21 @@ function visible() {
   return vv
     ? { top: vv.offsetTop, bottom: vv.offsetTop + vv.height }
     : { top: 0, bottom: window.innerHeight };
+}
+// Phones get the sheet; touch tablets and desktops keep the dropdown.
+const phoneQuery = "(max-width: 600px) and (pointer: coarse)";
+function useIsPhone() {
+  const [phone, setPhone] = useState(
+    () =>
+      typeof window !== "undefined" && window.matchMedia(phoneQuery).matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(phoneQuery);
+    const on = () => setPhone(mq.matches);
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return phone;
 }
 const keyboardOpen = () =>
   !!window.visualViewport &&
@@ -84,7 +107,16 @@ export function Picker({
     [thumb, setThumb] = useState<{ top: number; height: number } | null>(null);
   const wrap = useRef<HTMLDivElement>(null),
     field = useRef<HTMLInputElement & HTMLButtonElement>(null),
-    list = useRef<HTMLUListElement>(null);
+    list = useRef<HTMLUListElement>(null),
+    sheet = useRef<HTMLDivElement>(null),
+    sheetSearch = useRef<HTMLInputElement>(null);
+  const phone = useIsPhone();
+  const sheetMode = !!searchable && phone;
+  // The sheet's frame: the visible part of the screen, above any keyboard.
+  const [frame, setFrame] = useState(() => ({
+    top: 0,
+    height: typeof window !== "undefined" ? window.innerHeight : 0,
+  }));
   const listId = useId();
   const selected = items.find((i) => i.id === value);
 
@@ -116,6 +148,27 @@ export function Picker({
     );
     setOpen(true);
   }
+  // Open the phone sheet. Rendering and focusing inside the tap itself is what
+  // lets iOS raise the keyboard (a focus from a later effect is ignored).
+  function openSheet() {
+    if (disabled) return;
+    const vv = window.visualViewport;
+    flushSync(() => {
+      setFrame({
+        top: vv?.offsetTop ?? 0,
+        height: vv?.height ?? window.innerHeight,
+      });
+      setQuery("");
+      setActive(
+        Math.max(
+          0,
+          items.findIndex((i) => i.id === value),
+        ),
+      );
+      setOpen(true);
+    });
+    sheetSearch.current?.focus({ preventScroll: true });
+  }
   function close() {
     setOpen(false);
     setQuery("");
@@ -124,34 +177,58 @@ export function Picker({
     onChange(item.id);
     close();
     field.current?.blur();
+    sheetSearch.current?.blur();
   }
+
+  // Sheet: follow the visual viewport as the keyboard opens or closes (the
+  // sheet moves; the page never does) and keep the page behind it still.
+  useEffect(() => {
+    if (!open || !sheetMode) return;
+    const vv = window.visualViewport;
+    const follow = () =>
+      setFrame({
+        top: vv?.offsetTop ?? 0,
+        height: vv?.height ?? window.innerHeight,
+      });
+    vv?.addEventListener("resize", follow);
+    vv?.addEventListener("scroll", follow);
+    const root = document.documentElement,
+      prior = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      vv?.removeEventListener("resize", follow);
+      vv?.removeEventListener("scroll", follow);
+      root.style.overflow = prior;
+    };
+  }, [open, sheetMode]);
 
   // Phone search: as the keyboard opens and Safari scrolls the focused field
   // into place, keep the list sized to the room above it. The page itself is
   // never scrolled here; doing so fought Safari's focus scrolling.
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!open || !searchable || !vv) return;
-    let frame = 0;
+    if (!open || !searchable || sheetMode || !vv) return;
+    let raf = 0;
     const remeasure = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(measure);
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(measure);
     };
     vv.addEventListener("resize", remeasure);
     vv.addEventListener("scroll", remeasure);
     return () => {
       vv.removeEventListener("resize", remeasure);
       vv.removeEventListener("scroll", remeasure);
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(raf);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, searchable]);
+  }, [open, searchable, sheetMode]);
 
   // Close when a tap lands anywhere outside the field and its list.
   useEffect(() => {
     if (!open) return;
     const outside = (e: PointerEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) close();
+      const t = e.target as Node;
+      if (!wrap.current?.contains(t) && !sheet.current?.contains(t)) close();
     };
     document.addEventListener("pointerdown", outside);
     return () => document.removeEventListener("pointerdown", outside);
@@ -206,13 +283,10 @@ export function Picker({
   useLayoutEffect(() => {
     if (open) track();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, shown, place.max]);
+  }, [open, shown, place.max, frame.height]);
 
-  const popover = open && (
-    <div
-      className={`cc-pick-pop${place.up ? " cc-pick-pop--up" : ""}`}
-      style={{ maxHeight: place.max }}
-    >
+  const listBody = (
+    <>
       {shown.length ? (
         <ul
           ref={list}
@@ -236,8 +310,11 @@ export function Picker({
                   role="option"
                   aria-selected={item.id === value}
                   className={`cc-pick-row${i === active ? " cc-pick-row--active" : ""}${item.id === value ? " cc-pick-row--selected" : ""}${item.meta ? "" : " cc-pick-row--single"}`}
-                  // pointerdown keeps focus in the search box until the choice lands.
-                  onPointerDown={(e) => e.preventDefault()}
+                  // A mouse press keeps focus in the search box until the choice
+                  // lands; on touch, cancelling the press would cancel the tap.
+                  onPointerDown={(e) => {
+                    if (e.pointerType === "mouse") e.preventDefault();
+                  }}
                   onPointerEnter={() => setActive(i)}
                   onClick={() => choose(item)}
                 >
@@ -269,12 +346,84 @@ export function Picker({
           aria-hidden="true"
         />
       )}
+    </>
+  );
+  const popover = open && !sheetMode && (
+    <div
+      className={`cc-pick-pop${place.up ? " cc-pick-pop--up" : ""}`}
+      style={{ maxHeight: place.max }}
+    >
+      {listBody}
     </div>
   );
+  const sheetLayer =
+    open &&
+    sheetMode &&
+    createPortal(
+      <div
+        ref={sheet}
+        className={`cc-sheet${keyboardOpen() ? "" : " cc-sheet--full"}`}
+        style={{ top: frame.top, height: frame.height }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={label}
+      >
+        <div className="cc-sheet-head">
+          <span className="cc-sheet-title">{label}</span>
+          <button type="button" className="cc-sheet-cancel" onClick={close}>
+            Cancel
+          </button>
+        </div>
+        <div className="cc-sheet-body">{listBody}</div>
+        <div className="cc-sheet-foot">
+          <div className="cc-input cc-pick-field cc-pick-field--open">
+            <Search size={16} className="cc-pick-icon" aria-hidden="true" />
+            <input
+              ref={sheetSearch}
+              role="combobox"
+              aria-label={`Search ${label.toLowerCase()}`}
+              aria-expanded
+              aria-controls={listId}
+              aria-autocomplete="list"
+              className="cc-pick-search"
+              placeholder={placeholder}
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setActive(0);
+                if (list.current) list.current.scrollTop = 0;
+              }}
+              onKeyDown={onKey}
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="search"
+            />
+          </div>
+        </div>
+      </div>,
+      document.body,
+    );
 
   return (
     <div className="cc-pick" ref={wrap}>
-      {searchable ? (
+      {sheetMode ? (
+        <button
+          ref={field}
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-label={selected ? `${label}: ${selected.name}` : label}
+          className="cc-input cc-pick-field cc-pick-button"
+          disabled={disabled}
+          onClick={openSheet}
+        >
+          <Search size={15} className="cc-pick-icon" aria-hidden="true" />
+          <span className={selected ? "cc-pick-value" : "cc-pick-placeholder"}>
+            {selected?.name || placeholder}
+          </span>
+        </button>
+      ) : searchable ? (
         <div
           className={`cc-input cc-pick-field${open ? " cc-pick-field--open" : ""}`}
         >
@@ -328,6 +477,7 @@ export function Picker({
         </button>
       )}
       {popover}
+      {sheetLayer}
     </div>
   );
 }

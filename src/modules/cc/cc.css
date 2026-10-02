@@ -1201,3 +1201,77 @@ select.cc-input {
   opacity: 0.85;
   pointer-events: none;
 }
+
+/* ─── Phone job sheet: full-screen picker sized to the visible viewport ───── */
+
+.cc-sheet {
+  box-sizing: border-box;
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-color);
+  color: var(--primary-text);
+  font-family: var(--font-family);
+}
+.cc-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1rem 0.75rem;
+  padding-top: max(0.875rem, env(safe-area-inset-top));
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+.cc-sheet-title {
+  font-size: 1.0625rem;
+  font-weight: var(--font-weight-bold);
+}
+.cc-sheet-cancel {
+  padding: 0.375rem 0.25rem;
+  border: none;
+  background: none;
+  font-family: var(--font-family);
+  font-size: 1rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--secondary-text);
+  cursor: pointer;
+}
+.cc-sheet-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cc-sheet-body .cc-pick-list {
+  flex: 1;
+  min-height: 0;
+  padding: 0.375rem 0.5rem;
+}
+.cc-sheet-body .cc-pick-empty {
+  flex: 1;
+  padding-top: 2rem;
+}
+.cc-sheet-foot {
+  flex-shrink: 0;
+  padding: 0.625rem 0.875rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--card-color);
+}
+/* Keyboard closed: clear the home indicator. */
+.cc-sheet--full .cc-sheet-foot {
+  padding-bottom: max(0.625rem, env(safe-area-inset-bottom));
+}
+.cc-sheet-foot .cc-pick-field {
+  height: 2.75rem;
+}
+.cc-sheet .cc-pick-search {
+  font-size: 1rem;
+}
+.cc-sheet .cc-pick-search:focus-visible {
+  outline: none;
+}
