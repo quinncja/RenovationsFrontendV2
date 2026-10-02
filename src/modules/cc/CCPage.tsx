@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, CreditCard, Plus } from "lucide-react";
 import Page from "../../shared/components/Page";
 import { Widget } from "../../shared/components/Widget/Widget";
@@ -39,6 +39,38 @@ const tabs = [
 ] as const;
 type Tab = (typeof tabs)[number]["key"];
 const PAGE_SIZE = 50;
+interface Week {
+  start: string;
+  count: number;
+  totalCents: number;
+  dismissedCount: number;
+  dismissedCents: number;
+}
+// Monday (YYYY-MM-DD) of a receipt date's Monday-to-Sunday week; mirrors the
+// server's weekStart so rows land under the header that carries their total.
+function weekStart(date: string) {
+  const d = new Date(`${date}T00:00:00Z`);
+  if (!date || isNaN(d.getTime())) return "";
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
+const utc = (iso: string, opts: Intl.DateTimeFormatOptions) =>
+  new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
+    ...opts,
+    timeZone: "UTC",
+  });
+// "Sep week 5" (the month and ordinal of its Monday) + "Sep 28 – Oct 4".
+function weekLabel(start: string) {
+  if (!start) return { name: "No date yet", range: "" };
+  const end = new Date(`${start}T00:00:00Z`);
+  end.setUTCDate(end.getUTCDate() + 6);
+  const endIso = end.toISOString().slice(0, 10);
+  const short = { month: "short", day: "numeric" } as const;
+  return {
+    name: `${utc(start, { month: "short" })} week ${Math.ceil(Number(start.slice(8)) / 7)}`,
+    range: `${utc(start, short)} – ${utc(endIso, short)}`,
+  };
+}
 interface Listing {
   items: Receipt[];
   total: number;
@@ -67,7 +99,8 @@ export default function CCPage() {
       page: 0,
       pageSize: PAGE_SIZE,
     }),
-    [loading, setLoading] = useState(true);
+    [loading, setLoading] = useState(true),
+    [weeks, setWeeks] = useState<Map<string, Week>>(new Map());
   const [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [version, setVersion] = useState(0);
@@ -128,11 +161,20 @@ export default function CCPage() {
     setLoading(true);
     setError("");
     setSelected(new Set());
-    staffRequest<Listing>(
-      `cc/receipts?state=${tab}&page=${page}&search=${encodeURIComponent(query)}`,
-      { signal: controller.signal },
-    )
-      .then(setList)
+    Promise.all([
+      staffRequest<Listing>(
+        `cc/receipts?state=${tab}&page=${page}&search=${encodeURIComponent(query)}`,
+        { signal: controller.signal },
+      ),
+      staffRequest<Week[]>(
+        `cc/receipts/weeks?state=${tab}&search=${encodeURIComponent(query)}`,
+        { signal: controller.signal },
+      ),
+    ])
+      .then(([next, w]) => {
+        setList(next);
+        setWeeks(new Map(w.map((x) => [x.start, x])));
+      })
       .catch((e) => {
         if (!controller.signal.aborted) setError(e.message);
       })
@@ -145,12 +187,19 @@ export default function CCPage() {
   useEffect(() => {
     if (!live) return;
     const controller = new AbortController();
-    staffRequest<Listing>(
-      `cc/receipts?state=${tab}&page=${page}&search=${encodeURIComponent(query)}`,
-      { signal: controller.signal },
-    )
-      .then((next) => {
+    Promise.all([
+      staffRequest<Listing>(
+        `cc/receipts?state=${tab}&page=${page}&search=${encodeURIComponent(query)}`,
+        { signal: controller.signal },
+      ),
+      staffRequest<Week[]>(
+        `cc/receipts/weeks?state=${tab}&search=${encodeURIComponent(query)}`,
+        { signal: controller.signal },
+      ),
+    ])
+      .then(([next, w]) => {
         setList(next);
+        setWeeks(new Map(w.map((x) => [x.start, x])));
         setSelected(
           (old) =>
             new Set(next.items.filter((r) => old.has(r._id)).map((r) => r._id)),
@@ -220,6 +269,8 @@ export default function CCPage() {
     refresh();
   }, [refresh]);
 
+  // Week headers span every column but Amount, which carries the total.
+  const columns = (selecting ? 1 : 0) + 6 + (tab === "past" ? 1 : 0);
   const allSelected =
     list.items.length > 0 && selected.size === list.items.length;
   const firstRow = page * PAGE_SIZE + 1,
@@ -412,24 +463,38 @@ export default function CCPage() {
                             </td>
                           </tr>
                         ))
-                      : list.items.map((r) => (
-                          <ReceiptRow
-                            key={r._id}
-                            r={r}
-                            tab={tab}
-                            selecting={selecting}
-                            selected={selected.has(r._id)}
-                            onSelect={(on) =>
-                              setSelected((old) => {
-                                const next = new Set(old);
-                                if (on) next.add(r._id);
-                                else next.delete(r._id);
-                                return next;
-                              })
-                            }
-                            onOpen={() => void open(r._id)}
-                          />
-                        ))}
+                      : list.items.map((r, i) => {
+                          const wk = weekStart(r.receiptDate);
+                          const first =
+                            i === 0 ||
+                            weekStart(list.items[i - 1].receiptDate) !== wk;
+                          return (
+                            <Fragment key={r._id}>
+                              {first && (
+                                <WeekRow
+                                  start={wk}
+                                  week={weeks.get(wk)}
+                                  span={columns - 1}
+                                />
+                              )}
+                              <ReceiptRow
+                                r={r}
+                                tab={tab}
+                                selecting={selecting}
+                                selected={selected.has(r._id)}
+                                onSelect={(on) =>
+                                  setSelected((old) => {
+                                    const next = new Set(old);
+                                    if (on) next.add(r._id);
+                                    else next.delete(r._id);
+                                    return next;
+                                  })
+                                }
+                                onOpen={() => void open(r._id)}
+                              />
+                            </Fragment>
+                          );
+                        })}
                   </tbody>
                 </table>
               </div>
@@ -547,6 +612,38 @@ export default function CCPage() {
         </CCModal>
       )}
     </Page>
+  );
+}
+
+// A week's header row: name and dates on the left, its total under Amount.
+// Totals come from the server, so they cover the whole week across pages.
+function WeekRow({
+  start,
+  week,
+  span,
+}: {
+  start: string;
+  week: Week | undefined;
+  span: number;
+}) {
+  const { name, range } = weekLabel(start);
+  return (
+    <tr className="cc-week-row">
+      <td colSpan={span}>
+        <span className="cc-week-name">{name}</span>
+        {range && <span className="cc-week-range">{range}</span>}
+        {week && (
+          <span className="cc-week-meta">
+            {week.count} {week.count === 1 ? "receipt" : "receipts"}
+            {week.dismissedCount > 0 &&
+              ` · ${week.dismissedCount} dismissed (${money(week.dismissedCents)}, not in total)`}
+          </span>
+        )}
+      </td>
+      <td className="spend-rank-table-value cc-week-total">
+        {week ? money(week.totalCents) : ""}
+      </td>
+    </tr>
   );
 }
 

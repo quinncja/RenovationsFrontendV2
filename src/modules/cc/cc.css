@@ -1298,6 +1298,32 @@ a.cc-file:not([href]) { cursor: default; }
   cursor: not-allowed;
 }
 
+/* Week header rows in the receipt list: a quiet band (hover-bg fill, no
+   borders) naming the week, its dates and count, with the total under Amount. */
+.spend-rank-table tr.cc-week-row > td {
+  padding-top: 0.875rem;
+  padding-bottom: 0.625rem;
+  background: var(--hover-bg);
+  white-space: nowrap;
+}
+.cc-week-name {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--primary-text);
+}
+.cc-week-range,
+.cc-week-meta {
+  margin-left: 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
+}
+.cc-week-meta::before { content: "· "; }
+.cc-week-total {
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ─── In-app file viewer (portal over everything, both entry points) ────── */
 .cc-viewer {
   position: fixed;
