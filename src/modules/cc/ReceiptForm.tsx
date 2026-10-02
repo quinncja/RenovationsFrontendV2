@@ -107,12 +107,15 @@ export default function ReceiptForm({
   path,
   request,
   onChange,
+  onSubmitted,
   loadFile,
 }: {
   initial: Receipt;
   path: string;
   request: Request;
   onChange: (receipt: Receipt) => void;
+  /** Called after a successful submit (the link portal swaps to its done screen). */
+  onSubmitted?: (receipt: Receipt) => void;
   loadFile?: (path: string) => Promise<string>;
 }) {
   const [r, setReceipt] = useState(initial);
@@ -187,21 +190,21 @@ export default function ReceiptForm({
     setError("");
     setNotice("");
     try {
-      update(
-        await request<Receipt>(
-          path,
-          json("PATCH", {
-            revision: r.revision,
-            amount,
-            description,
-            receiptDate: date,
-            allocations: effective,
-            missingReceipt: missing,
-            combinedConfirmed: confirmed,
-            submit,
-          }),
-        ),
+      const next = await request<Receipt>(
+        path,
+        json("PATCH", {
+          revision: r.revision,
+          amount,
+          description,
+          receiptDate: date,
+          allocations: effective,
+          missingReceipt: missing,
+          combinedConfirmed: confirmed,
+          submit,
+        }),
       );
+      update(next);
+      if (submit && onSubmitted) return onSubmitted(next);
       setNotice(
         submit
           ? "Receipt submitted. You can make corrections until it is approved."

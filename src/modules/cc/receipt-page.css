@@ -99,3 +99,100 @@ body {
     --cc-pad: 1.125rem;
   }
 }
+
+/* Done screen after a submit: the checkmark leads; a list of what's left
+   (rows in the dashboard's list voice) or the all-set line beneath it. */
+.cc-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 0 0.5rem;
+  text-align: center;
+}
+.cc-done-mark {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  margin-bottom: 0.5rem;
+  border-radius: 50%;
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+}
+.cc-done-mark--small {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 0.25rem;
+}
+.cc-done-title {
+  margin: 0;
+  font-size: 1.375rem;
+  line-height: 1.25;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+}
+.cc-done-sub {
+  margin: 0;
+  max-width: 22rem;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--secondary-text);
+}
+.cc-done-list {
+  align-self: stretch;
+  list-style: none;
+  margin: 0.75rem 0 0.5rem;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  text-align: left;
+}
+.cc-done-list li + li {
+  border-top: 1px solid var(--border-color);
+}
+.cc-done-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  color: var(--primary-text);
+  text-decoration: none;
+  transition: background-color 0.15s ease;
+}
+.cc-done-row:hover,
+.cc-done-row:active {
+  background: var(--hover-bg);
+}
+.cc-done-row svg {
+  flex-shrink: 0;
+  color: var(--secondary-text);
+}
+.cc-done-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.cc-done-row-text strong {
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cc-done-row-text span {
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+}
+.cc-done-row-amt {
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cc-done .cc-btn--quiet {
+  margin-left: 0;
+}
