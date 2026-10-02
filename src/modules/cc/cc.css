@@ -1,444 +1,911 @@
-.cc {
-  color: var(--primary-text);
-  font-family: var(--font-family);
-  font-size: 14px;
-}
-.cc button,
-.cc input,
-.cc select,
-.cc textarea {
-  font: inherit;
-}
-.cc button {
+/* ─── CC receipts ─────────────────────────────────────────────────────────────
+   One stylesheet for both entry points. The dashboard side (CCPage, the review
+   and mapping modals) leans on App.css primitives: Page, co-widget,
+   spend-rank-table, Badge, modal shell, primary/secondary pill buttons. The
+   receipt form is ALSO rendered by the isolated /r/:token bundle, which never
+   loads App.css, so everything the form draws is defined here as a `cc-*` twin
+   of the dashboard primitive it mirrors (named in each block). Values come from
+   the same tokens; receipt-page.css supplies them on the standalone page.
+   Nothing here restyles bare elements: every rule is class-scoped. */
+
+/* ─── Buttons (twins of .secondary-button / .primary-button / .modal-close) ── */
+
+.cc-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  color: var(--primary-text);
-  background: var(--card-color);
+  gap: 0.375rem;
+  padding: 0.4rem 0.875rem;
+  font-family: var(--font-family);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.25rem;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-color);
+  background: transparent;
+  color: var(--secondary-text);
   cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
 }
-.cc button:hover:not(:disabled) {
+.cc-btn:hover:not(:disabled) {
   background: var(--hover-bg);
+  color: var(--primary-text);
 }
-.cc button:disabled {
-  opacity: 0.5;
+.cc-btn:disabled {
+  opacity: 0.45;
   cursor: not-allowed;
 }
-.cc button.cc-primary {
-  background: var(--primary-color);
-  color: #fff;
+.cc-btn--primary {
   border-color: transparent;
+  background: var(--copper-btn-bg);
+  box-shadow: var(--copper-btn-shadow);
+  color: #fff;
 }
-.cc button.cc-primary:hover:not(:disabled) {
-  background: var(--primary-color-hover);
+.cc-btn--primary:hover:not(:disabled) {
+  background: var(--copper-btn-bg-hover);
+  color: #fff;
 }
-.cc :is(button, input, select, textarea, a):focus-visible {
+/* Text-only action for secondary paths (Split allocation, Can't provide one). */
+.cc-btn--quiet {
+  border-color: transparent;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  margin-left: -0.5rem;
+}
+.cc-btn--danger:hover:not(:disabled) {
+  color: light-dark(#dc2626, #f87171);
+  background: rgba(239, 68, 68, 0.08);
+}
+.cc-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--secondary-text);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.cc-icon-btn:hover:not(:disabled) {
+  background: var(--hover-bg);
+  color: var(--primary-text);
+}
+.cc-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--primary-text);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--primary-text) 30%, transparent);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.cc-form :is(button, a, input, select, textarea, summary):focus-visible,
+.cc-modal :is(button, a, input, select, textarea, summary):focus-visible,
+.cc-widget :is(button, a, input):focus-visible {
   outline: 2px solid var(--primary-color);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
-.cc fieldset {
+
+/* ─── Badge (twin of .badge / Badge.tsx, standard size) ───────────────────── */
+
+.cc-badge {
+  display: inline-block;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  padding: 0.2rem 0.55rem;
+}
+.cc-badge--blue  { background: rgba(59, 130, 246, 0.12); color: #3b82f6; }
+.cc-badge--amber { background: rgba(245, 158, 11, 0.12); color: #d97706; }
+.cc-badge--red   { background: rgba(239, 68, 68, 0.12);  color: #dc2626; }
+.cc-badge--green { background: rgba(22, 163, 74, 0.12);  color: #16a34a; }
+.cc-badge--gray  { background: rgba(107, 114, 128, 0.12); color: #6b7280; }
+.cc-badge--muted { background: var(--hover-bg); color: var(--secondary-text); }
+
+/* ─── Banners: one quiet line of state, tinted by tone ────────────────────── */
+
+.cc-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--hover-bg);
+  color: var(--primary-text);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+.cc-banner > svg {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+  color: var(--secondary-text);
+}
+.cc-banner-body {
+  flex: 1;
+  min-width: 0;
+}
+.cc-banner--amber { background: rgba(245, 158, 11, 0.1); }
+.cc-banner--amber > svg { color: #d97706; }
+.cc-banner--red { background: rgba(239, 68, 68, 0.08); }
+.cc-banner--red > svg { color: light-dark(#dc2626, #f87171); }
+.cc-banner--green { background: rgba(22, 163, 74, 0.08); }
+.cc-banner--green > svg { color: #16a34a; }
+
+/* ─── Form fields (twin of .form-field in the dashboard's auth form) ──────── */
+
+.cc-fieldset {
+  display: contents;
   border: 0;
   margin: 0;
   padding: 0;
   min-width: 0;
 }
-.cc label {
+.cc-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 500;
+  gap: 0.375rem;
+  min-width: 0;
 }
-.cc input:not([type="checkbox"]):not([type="file"]),
-.cc select,
-.cc textarea {
-  color: var(--primary-text);
-  background: var(--card-color);
+.cc-field-label {
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
+  color: var(--secondary-text);
+  letter-spacing: 0.01em;
+}
+.cc-field-hint {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--secondary-text);
+}
+.cc-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 2.5rem;
+  padding: 0 0.875rem;
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 10px 12px;
-  min-height: 44px;
-  min-width: 0;
-  width: 100%;
-  box-sizing: border-box;
+  background: var(--card-color);
+  color: var(--primary-text);
+  font-family: var(--font-family);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.cc textarea {
+.cc-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgb(from var(--primary-color) r g b / 0.2);
+}
+.cc-input:focus-visible {
+  outline: none;
+}
+.cc-input:disabled {
+  background: var(--hover-bg);
+  color: var(--secondary-text);
+  cursor: not-allowed;
+}
+.cc-input--money {
+  font-variant-numeric: tabular-nums;
+}
+textarea.cc-input {
+  height: auto;
+  min-height: 4.5rem;
+  padding: 0.625rem 0.875rem;
+  line-height: 1.45;
   resize: vertical;
 }
-.cc input:disabled,
-.cc select:disabled,
-.cc textarea:disabled {
-  opacity: 0.7;
+select.cc-input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.25rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237d8ea3' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.875rem center;
+  text-overflow: ellipsis;
 }
-.cc input[type="checkbox"] {
-  accent-color: var(--primary-color);
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-}
-.cc h2 {
-  font-size: 22px;
-  line-height: 1.3;
-  margin: 4px 0;
-}
-.cc h3 {
-  font-size: 16px;
-  margin: 0 0 12px;
-}
-.cc p {
-  line-height: 1.5;
-}
-.cc small,
-.cc-muted {
-  color: var(--secondary-text);
-  font-size: 12px;
-}
-.cc td small,
-.cc-mapping-list small {
-  display: block;
-  margin-top: 4px;
-}
-.cc-actions {
+.cc-check {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--primary-text);
+  cursor: pointer;
+}
+.cc-check input {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  flex-shrink: 0;
+  accent-color: var(--primary-color);
+}
+.cc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.875rem 1rem;
+}
+.cc-grid--3 {
+  grid-template-columns: 2fr 1fr 1fr;
+}
+.cc-span-all {
+  grid-column: 1 / -1;
+}
+
+/* Two-option toggle (Job | Overhead): the .ohr-seg recessed well with a
+   static copper thumb, so the isolated bundle needs no motion library. */
+.cc-seg {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgb(from var(--primary-text) r g b / 0.06);
+  box-shadow: inset 0 1px 2px rgb(from var(--primary-text) r g b / 0.1);
+}
+.cc-seg-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0.3rem 0.8rem;
+  border-radius: 8px;
+  font-family: var(--font-family);
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  color: var(--secondary-text);
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+.cc-seg-btn:hover:not(:disabled) { color: var(--primary-text); }
+.cc-seg-btn--active,
+.cc-seg-btn--active:hover:not(:disabled) {
+  color: #fff;
+  background: linear-gradient(180deg, var(--primary-color-hover) 0%, var(--primary-color) 100%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+/* ─── Receipt form ────────────────────────────────────────────────────────── */
+
+.cc-form {
+  --cc-pad: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+  color: var(--primary-text);
+  font-family: var(--font-family);
+}
+
+/* Head band (twin of .cost-detail-head): what it is small above, the purchase
+   leads, who + when emphasized beneath; the amount rides at the right. */
+.cc-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.cc-eyebrow-row {
+  display: flex;
   align-items: center;
   flex-wrap: wrap;
+  gap: 0.375rem;
+  padding-right: 2.75rem; /* clear the modal's close button */
 }
-.cc-section {
-  padding-top: 24px;
-  margin-top: 24px;
-  border-top: 1px solid var(--border-color);
+.cc-eyebrow {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  color: var(--secondary-text);
 }
-.cc-section-heading,
-.cc-receipt-heading,
-.cc-dialog-header,
-.cc-pagination {
+.cc-dot {
+  color: color-mix(in srgb, var(--secondary-text) 55%, transparent);
+  font-size: 0.6875rem;
+}
+.cc-caption {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+}
+.cc-headline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.5rem;
+}
+.cc-headline-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-width: 0;
+}
+.cc-title {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.25;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+  color: var(--primary-text);
+  overflow-wrap: anywhere;
+}
+.cc-party {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.4;
+  font-weight: var(--font-weight-semibold);
+  color: var(--secondary-text);
+}
+.cc-figure-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.cc-figure {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.25;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+  white-space: nowrap;
+}
+
+.cc-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* A band of the form: eyebrow title (twin of .settings-group-title), an
+   optional right-side status, then its content. */
+.cc-band {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  min-width: 0;
+}
+.cc-band-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 1rem;
+  min-height: 1.375rem;
 }
-.cc-receipt-heading {
-  margin-bottom: 24px;
-}
-.cc-total {
-  font-size: 28px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.cc-eyebrow {
-  font-size: 11px;
-  font-weight: 600;
+.cc-band-title {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
   color: var(--secondary-text);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
-.cc-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin: 16px 0;
+.cc-band-sub {
+  margin: -0.5rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--secondary-text);
 }
-.cc-fields > label:first-child {
-  grid-column: 1 / -1;
-}
-.cc-check {
-  flex-direction: row !important;
-  align-items: center;
-  min-height: 44px;
-  font-weight: 400 !important;
-}
-.cc-notice,
-.cc-error {
-  padding: 12px 16px;
-  border-radius: 8px;
-  margin: 0 0 16px;
-  background: var(--active-bg);
-  color: var(--primary-text);
-  line-height: 1.5;
-}
-.cc-error {
-  border-left: 3px solid #c44848;
-}
-.cc-error-text {
-  color: light-dark(#a52e2e, #f3a4a4);
-}
-.cc-charge-lines {
-  margin-top: 16px;
-  padding: 16px;
-  background: var(--hover-bg);
-  border-radius: 8px;
-}
-.cc-charge-lines > div {
+
+/* Original card charges: a ledger on a faint well (twin of .cost-detail-lines
+   inside the .cost-detail-stats surface). */
+.cc-ledger {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  padding-top: 12px;
+  flex-direction: column;
+  padding: 0.25rem 1.125rem;
+  border-radius: 12px;
+  background: var(--hover-bg);
 }
-.cc-charge-lines strong {
+.cc-ledger-line {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  font-size: 0.875rem;
+}
+.cc-ledger-line + .cc-ledger-line {
+  border-top: 1px solid var(--border-color);
+}
+.cc-ledger-desc {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cc-ledger-amt {
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cc-ledger-foot {
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Candidate rows (possible duplicate, return link). */
+.cc-option-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.cc-option {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+.cc-option + .cc-option {
+  border-top: 1px solid var(--border-color);
+}
+.cc-option-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.cc-option-meta {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
   font-variant-numeric: tabular-nums;
 }
+
+/* Receipt files: square thumbnails, then dashed add tiles in the
+   .co-upload-zone language. */
 .cc-files {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin: 16px 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
+  gap: 0.75rem;
 }
 .cc-file {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 120px;
-  padding: 8px;
-  min-height: 120px;
+  gap: 0.375rem;
+  min-width: 0;
   color: var(--primary-text);
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
   text-decoration: none;
 }
-.cc-file img {
-  width: 100%;
-  height: 100px;
-  object-fit: cover;
-  border-radius: 4px;
+.cc-file-thumb {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background: var(--hover-bg);
+  color: var(--secondary-text);
+  overflow: hidden;
+  transition: box-shadow 0.15s ease;
 }
-.cc-file span {
-  max-width: 100%;
+.cc-file:hover .cc-file-thumb {
+  box-shadow: var(--button-shadow);
+}
+.cc-file-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cc-file-name {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
 }
-.cc-section > .cc-actions {
-  margin: 12px 0 16px;
+.cc-add-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  aspect-ratio: 1;
+  padding: 0.5rem;
+  border: 2px dashed var(--border-color);
+  border-radius: 10px;
+  background: none;
+  color: var(--secondary-text);
+  font-family: var(--font-family);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
-.cc-allocation {
+.cc-add-tile:hover:not(:disabled) {
+  background: var(--hover-bg);
+  color: var(--primary-text);
+}
+.cc-add-tile:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Allocations: one bordered sub-card per split; a single allocation draws
+   its fields bare (no card, no "Allocation 1" header). */
+.cc-alloc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+.cc-alloc--card {
+  padding: 1rem 1.125rem 1.125rem;
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
 }
-.cc-submit {
+.cc-alloc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.cc-alloc-title {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The verdict bar (twin of .co-wizard-footer). Sticky so Submit is always in
+   reach: inside the modal it pins to the modal's scroll body, on the phone
+   page to the bottom of the screen. Negative margins run it edge to edge. */
+.cc-actionbar {
   position: sticky;
   bottom: 0;
-  background: var(--card-color);
-  padding: 16px 0;
-  margin-top: 16px;
-  border-top: 1px solid var(--border-color);
-  justify-content: flex-end;
-}
-.cc-dialog {
-  width: min(800px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
-  padding: 0;
-  background: var(--card-color);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  box-shadow: 0 16px 56px #0003;
-}
-.cc-dialog::backdrop {
-  background: #16131088;
-  backdrop-filter: blur(3px);
-}
-.cc-dialog-header {
-  position: sticky;
-  top: 0;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--card-color);
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.625rem;
+  margin: 0 calc(-1 * var(--cc-pad)) calc(-1 * var(--cc-pad));
+  padding: 0.875rem var(--cc-pad);
+  border-top: 1px solid var(--border-color);
+  background: var(--card-color);
 }
-.cc-dialog-header h2 {
-  font-size: 18px;
+.cc-actionbar-note {
+  margin-right: auto;
+  font-size: 0.75rem;
+  color: var(--secondary-text);
 }
-.cc-dialog-body {
-  padding: 24px;
+
+.cc-disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--secondary-text);
 }
-.cc-icon-button {
-  padding: 8px !important;
-  width: 40px;
+.cc-disclosure > summary::-webkit-details-marker { display: none; }
+.cc-disclosure > summary:hover { color: var(--primary-text); }
+.cc-disclosure[open] > summary { margin-bottom: 0.875rem; }
+.cc-disclosure-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.cc-disclosure-body .cc-field { align-self: stretch; }
+
+/* ─── Dashboard: modal shell (on App.css .modal + .co-modal) ──────────────── */
+
+.modal.cc-modal {
+  position: relative;
+  width: min(720px, 92vw);
+  max-width: min(720px, 92vw);
+  max-height: 88vh;
+}
+.modal.cc-modal--narrow {
+  width: min(560px, 92vw);
+  min-width: 0;
+  max-width: min(560px, 92vw);
+}
+.cc-modal-close {
+  position: absolute;
+  top: 1.125rem;
+  right: 1.125rem;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+}
+.cc-modal-body {
+  --cc-pad: 1.75rem;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--cc-pad);
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+/* The receipt form's sticky bar must sit at the very bottom of the scroll
+   body, so the GM bands that follow it render above it instead. */
+.cc-modal-body > .cc-form { display: contents; }
+.cc-modal-body > .cc-form > .cc-feedback { order: 98; }
+.cc-modal-body > .cc-form > .cc-actionbar { order: 99; margin-bottom: 0; }
+/* WebKit pins a sticky bar inside the scroller's padding, letting content
+   show beneath it; with a bar present the bar itself closes the body. */
+.cc-modal-body:has(> .cc-form > .cc-actionbar) { padding-bottom: 0; }
+.cc-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.625rem;
+  padding: 0.875rem 1.75rem;
+  border-top: 1px solid var(--border-color);
   flex-shrink: 0;
 }
-.cc-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding: 4px 0 16px;
-}
-.cc-toolbar .ohr-seg {
-  display: inline-flex;
-  background: var(--hover-bg);
-  border-radius: 8px;
-  padding: 4px;
-}
-.cc-toolbar .ohr-seg-btn {
-  position: relative;
-  background: transparent;
-  border: 0;
-  font-size: 12px;
-}
-.cc-toolbar .ohr-seg-thumb {
-  position: absolute;
-  inset: 0;
-  background: var(--active-bg);
-  border-radius: 6px;
-}
-.cc-toolbar .ohr-seg-label {
-  z-index: 1;
-}
-.cc-toolbar .co-search-wrapper {
-  min-width: min(100%, 280px);
-}
-.cc-table-scroll {
-  overflow: auto;
-  max-height: 62vh;
-  min-height: 180px;
-}
-.cc-table {
-  width: 100%;
-  min-width: 800px;
-  border-collapse: collapse;
-}
-.cc-table th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--card-color);
-  text-align: left;
-  color: var(--secondary-text);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 12px;
-  border-bottom: 1px solid var(--border-color);
-}
-.cc-table td {
-  padding: 14px 12px;
-  border-bottom: 1px solid var(--border-color);
-  max-width: 250px;
-}
-.cc-table tr:hover td {
-  background: var(--hover-bg);
-}
-.cc-table .cc-number {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  font-weight: 600;
-}
-.cc button.cc-link {
-  display: inline;
-  min-height: 32px;
-  text-align: left;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-weight: 500;
-}
-.cc button.cc-link:hover {
-  color: var(--primary-color);
-  background: none;
-  text-decoration: underline;
-}
-.cc-status {
-  font-size: 12px;
-}
-.cc-pagination {
-  padding-top: 16px;
-  font-size: 12px;
-  color: var(--secondary-text);
-}
-.cc-empty {
-  text-align: center;
-  height: 140px;
-  color: var(--secondary-text);
-}
-.cc-batch {
+/* Header insets match the body's so every edge lines up. */
+.cc-modal .co-modal-header { padding-left: 1.75rem; padding-right: 1.25rem; }
+.cc-modal-footer > :first-child:not(:only-child) { margin-right: auto; }
+
+/* GM review band: decision actions split, quiet ones left, verdict right. */
+.cc-review-actions {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 0 16px;
   flex-wrap: wrap;
+  gap: 0.625rem;
 }
-.cc-audit {
+.cc-review-actions .cc-spacer { flex: 1; }
+
+/* Activity trail (twin of the timeline voice used by What's Changed). */
+.cc-trail {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
 }
-.cc-audit li {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border-color);
+.cc-trail-item {
+  display: grid;
+  grid-template-columns: 0.5rem 1fr auto;
+  align-items: baseline;
+  column-gap: 0.875rem;
+  padding: 0.625rem 0;
 }
-.cc-audit li > span {
-  display: block;
-  font-size: 12px;
+.cc-trail-item + .cc-trail-item {
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
+}
+.cc-trail-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--secondary-text) 35%, transparent);
+  align-self: center;
+}
+.cc-trail-action {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+}
+.cc-trail-action::first-letter { text-transform: uppercase; }
+.cc-trail-meta {
+  font-size: 0.75rem;
   color: var(--secondary-text);
-  margin-top: 4px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
-.cc-audit summary {
-  cursor: pointer;
-  padding: 8px 0;
-  color: var(--secondary-text);
-  font-size: 12px;
+.cc-trail-diff {
+  grid-column: 2 / -1;
+  margin-top: 0.375rem;
 }
-.cc-audit pre {
+.cc-trail-diff > summary {
+  font-size: 0.75rem;
+}
+.cc-trail-diff pre {
+  margin: 0;
+  padding: 0.75rem 0.875rem;
+  border-radius: 10px;
+  background: var(--hover-bg);
+  font-size: 0.6875rem;
+  line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 11px;
+  color: var(--secondary-text);
 }
-.cc-mapping-list {
-  display: grid;
-  gap: 8px;
-  max-height: 250px;
+
+/* Card mapping rows (twin of .co-project-option). */
+.cc-map-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 15rem;
   overflow-y: auto;
-  margin: 16px 0 24px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
 }
-.cc-mapping-list button {
-  justify-content: space-between;
+.cc-map-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  font-family: var(--font-family);
   text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
 }
+.cc-map-row + .cc-map-row {
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 62%, transparent);
+}
+.cc-map-row:hover { background: var(--hover-bg); }
+.cc-map-row--active { background: var(--active-bg); }
+.cc-map-row--active:hover { background: var(--active-bg); }
+.cc-map-row--active .cc-map-name { color: var(--primary-color); }
+.cc-map-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.cc-map-name {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+}
+.cc-map-meta {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+}
+.cc-card-num {
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+  white-space: nowrap;
+}
+
+/* ─── Dashboard: receipts list (on App.css .co-widget + .spend-rank-table) ── */
+
+.cc-page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.cc-widget .co-widget-toolbar {
+  flex-wrap: wrap;
+  row-gap: 0.75rem;
+}
+.cc-widget .co-search-wrapper {
+  min-width: 14rem;
+}
+/* Even column rhythm. Overrides the Change Orders column-group padding that
+   .co-widget applies by nth-child; the first and last cells line up with the
+   toolbar's 1.25rem inset. */
+.co-widget.cc-widget .spend-rank-table th,
+.co-widget.cc-widget .spend-rank-table td {
+  padding-left: clamp(0.625rem, 1.6vw, 1.25rem);
+  padding-right: clamp(0.625rem, 1.6vw, 1.25rem);
+  vertical-align: middle;
+}
+.co-widget.cc-widget .spend-rank-table th:first-child,
+.co-widget.cc-widget .spend-rank-table td:first-child {
+  padding-left: 1.25rem;
+}
+.co-widget.cc-widget .spend-rank-table th:last-child,
+.co-widget.cc-widget .spend-rank-table td:last-child {
+  padding-right: 1.25rem;
+}
+.co-widget.cc-widget .spend-rank-table thead th {
+  padding-top: 0.625rem;
+  padding-bottom: 0.625rem;
+}
+.co-widget.cc-widget .spend-rank-table td {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+.cc-col-check {
+  width: 1rem;
+}
+.cc-col-check input {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  accent-color: var(--primary-color);
+  cursor: pointer;
+}
+.cc-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1875rem;
+  min-width: 0;
+}
+.cc-cell-primary {
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cc-cell-alloc {
+  max-width: 16rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cc-cell-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+}
+.cc-cell-icon svg {
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--secondary-text) 75%, transparent);
+}
+.cc-empty {
+  padding: 3rem 1.25rem;
+  text-align: center;
+}
+.cc-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--border-color);
+}
+.cc-pager-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* Intake errors (GM): banner with its retry rows beneath. */
+.cc-intake-list {
+  list-style: none;
+  margin: 0.625rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.cc-intake-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.cc-intake-row > span {
+  flex: 1;
+  min-width: 0;
+  color: var(--secondary-text);
+}
+
+/* Settings rows (CCSettings inside the Settings modal). */
+.cc-settings-consent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0 1rem 0.875rem;
+}
+.cc-settings-consent .cc-field { align-self: stretch; }
+
+/* ─── Small screens ───────────────────────────────────────────────────────── */
+
 @media (max-width: 600px) {
-  .cc-dialog {
-    width: calc(100vw - 16px);
-    max-height: calc(100dvh - 16px);
-    border-radius: 12px;
-  }
-  .cc-dialog-header,
-  .cc-dialog-body {
-    padding: 16px;
-  }
-  .cc-fields {
-    grid-template-columns: 1fr;
-  }
-  .cc-total {
-    font-size: 24px;
-  }
-  .cc-receipt-heading {
-    align-items: flex-start;
-  }
-  .cc-toolbar .ohr-seg {
-    width: 100%;
-    overflow-x: auto;
-  }
-  .cc-toolbar .ohr-seg-btn {
-    flex: 1;
-    padding: 8px;
-  }
-  .cc-toolbar .co-search-wrapper {
-    width: 100%;
-  }
-  .cc-submit button {
-    flex: 1;
-    min-height: 48px;
-  }
+  .cc-form { --cc-pad: 1.125rem; gap: 1.5rem; }
+  .cc-modal-body { --cc-pad: 1.125rem; gap: 1.5rem; }
+  .modal.cc-modal { width: 100%; min-width: 0; max-width: calc(100vw - 1rem); max-height: 92vh; }
+  .cc-modal-footer { padding: 0.875rem 1.125rem; }
+  .cc-modal .co-modal-header { padding-left: 1.125rem; padding-right: 1rem; }
+  .cc-grid,
+  .cc-grid--3 { grid-template-columns: minmax(0, 1fr); }
+  .cc-headline { flex-direction: column; gap: 0.75rem; }
+  .cc-figure-block { flex-direction: row; align-items: center; gap: 0.625rem; }
+  .cc-title { font-size: 1.3125rem; }
+  /* 16px stops iOS Safari from zooming into a focused field. */
+  .cc-input { font-size: 1rem; height: 2.75rem; }
+  .cc-actionbar .cc-btn { flex: 1; padding-top: 0.6rem; padding-bottom: 0.6rem; }
+  .cc-actionbar-note { display: none; }
+  .cc-files { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .cc-widget .co-search-wrapper { max-width: none; flex-basis: 100%; }
+  .cc-review-actions .cc-spacer { display: none; }
 }

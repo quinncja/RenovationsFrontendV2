@@ -85,3 +85,26 @@ export const statusLabel = (state: Receipt["state"]) =>
     approved: "Approved",
     dismissed: "Dismissed",
   })[state];
+export type Tone = "blue" | "green" | "amber" | "red" | "gray" | "muted";
+export const statusTone = (state: Receipt["state"]): Tone =>
+  (
+    {
+      pending: "amber",
+      awaiting: "blue",
+      posting: "blue",
+      approved: "green",
+      dismissed: "gray",
+    } as const
+  )[state];
+// Receipt dates are plain YYYY-MM-DD; format in UTC so no zone shifts the day.
+export const day = (iso: string) => {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+};

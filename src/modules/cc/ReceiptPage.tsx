@@ -22,11 +22,15 @@ function ReceiptPage() {
     return () => meta.remove();
   }, [path]);
   return (
-    <main className="cc-mobile cc">
-      <header className="cc-brand">
-        Renovations Delivered<span>Company card receipts</span>
+    <main className="cc-shell">
+      <header className="cc-shell-brand">
+        <img src="/r-logo.png" alt="" />
+        <div>
+          <strong>Renovations Delivered</strong>
+          <span>Company card receipt</span>
+        </div>
       </header>
-      <div className="cc-mobile-card">
+      <div className="cc-shell-card">
         {receipt ? (
           <ReceiptForm
             initial={receipt}
@@ -35,12 +39,12 @@ function ReceiptPage() {
             onChange={setReceipt}
           />
         ) : (
-          <p role={error ? "alert" : "status"}>
+          <p className="cc-shell-status" role={error ? "alert" : "status"}>
             {error || "Loading your receipt…"}
           </p>
         )}
       </div>
-      <footer>
+      <footer className="cc-shell-footer">
         Need help?{" "}
         <a href="mailto:qsieja@renovationsdelivered.com">Contact support</a>
         <div>

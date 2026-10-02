@@ -109,7 +109,6 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                 <section>
                   <span className="settings-group-title">Display</span>
                   <div className="settings-group">
-                    {user?.email?.toLowerCase() === "qsieja@renovationsdelivered.com" && <CCSettings />}
                     <div className="settings-row">
                       <div className="settings-row-info">
                         <span className="settings-row-label">
@@ -235,6 +234,15 @@ export function SettingsModal({ open, onClose, theme, onThemeChange }: SettingsM
                           {sqlLoading ? "..." : sqlConnected === null ? "Checking..." : sqlConnected ? "Connected" : "Disconnected"}
                         </button>
                       </div>
+                    </div>
+                  </section>
+                )}
+
+                {user?.email?.toLowerCase() === "qsieja@renovationsdelivered.com" && (
+                  <section>
+                    <span className="settings-group-title">Company Card</span>
+                    <div className="settings-group">
+                      <CCSettings />
                     </div>
                   </section>
                 )}

@@ -1,30 +1,52 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { Plus, Users, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ChevronLeft, ChevronRight, CreditCard, Paperclip, Plus } from "lucide-react";
 import Page from "../../shared/components/Page";
 import { Widget } from "../../shared/components/Widget/Widget";
 import { SearchField } from "../../shared/components/SearchField";
 import { SegmentedControl } from "../../shared/components/SegmentedControl";
+import { Badge } from "../../shared/components/Badge";
+import { SkelText } from "../../shared/components/SkelText";
+import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList";
 import { useAuth } from "../../core/auth/AuthProvider";
 import { staffRequest, staffFile } from "./staffApi";
 import { json } from "./api";
 import { CCModal } from "./CCModal";
 import { MappingModal } from "./MappingModal";
-import ReceiptForm, { FilePreview } from "./ReceiptForm";
-import { money, statusLabel, type Receipt, type CCSettings } from "./types";
+import ReceiptForm, { Banner } from "./ReceiptForm";
+import {
+  day,
+  money,
+  statusLabel,
+  statusTone,
+  type Receipt,
+  type CCSettings,
+} from "./types";
 import "./cc.css";
+
+// Receipts list in the directory pages' language: one co-widget card whose
+// toolbar carries the status tabs, search and count, over a spend-rank-table
+// whose rows open the receipt. The review modal leads with the receipt's own
+// head band (DetailModal voice) and adds the GM Review + Activity bands.
+
 const tabs = [
-  { key: "pending", label: "Pending Submission" },
-  { key: "awaiting", label: "Awaiting Approval" },
-  { key: "past", label: "Past Receipts" },
+  { key: "pending", label: "Pending" },
+  { key: "awaiting", label: "Awaiting approval" },
+  { key: "past", label: "Past" },
 ] as const;
 type Tab = (typeof tabs)[number]["key"];
+const PAGE_SIZE = 50;
 interface Listing {
   items: Receipt[];
   total: number;
   page: number;
   pageSize: number;
 }
+const emptyCopy: Record<Tab, string> = {
+  pending: "Nothing is waiting on a receipt.",
+  awaiting: "Nothing is waiting for approval.",
+  past: "No approved or dismissed receipts yet.",
+};
+
 export default function CCPage() {
   const { claims } = useAuth(),
     gm = ["generalManager", "admin", "executive", "owner", "tech"].includes(
@@ -38,7 +60,7 @@ export default function CCPage() {
       items: [],
       total: 0,
       page: 0,
-      pageSize: 50,
+      pageSize: PAGE_SIZE,
     }),
     [loading, setLoading] = useState(true);
   const [error, setError] = useState(""),
@@ -55,6 +77,7 @@ export default function CCPage() {
   const [intake, setIntake] = useState<
     { _id: string; mode: string; error: string; receivedAt?: string }[]
   >([]);
+  const selecting = gm && tab === "awaiting";
   useEffect(() => {
     if (gm)
       staffRequest<typeof intake>("cc/intake-errors")
@@ -76,13 +99,6 @@ export default function CCPage() {
       setBusy(false);
     }
   }
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const virtual = useVirtualizer({
-    count: list.items.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => 76,
-    overscan: 5,
-  });
   const refresh = useCallback(() => {
     setSelected(new Set());
     setVersion((v) => v + 1);
@@ -160,14 +176,11 @@ export default function CCPage() {
             .map((r) => ({ id: r._id, revision: r.revision })),
         }),
       );
+      const failed = result.results.filter((r) => !r.ok);
       setNotice(
-        `${result.results.filter((r) => r.ok).length} approved. ${result.results.filter((r) => !r.ok).length} need attention.`,
+        `${result.results.length - failed.length} approved.${failed.length ? ` ${failed.length} need attention.` : ""}`,
       );
-      setError(
-        [
-          ...new Set(result.results.filter((r) => !r.ok).map((r) => r.message)),
-        ].join(" "),
-      );
+      setError([...new Set(failed.map((r) => r.message))].join(" "));
       refresh();
     } catch (e) {
       setError((e as Error).message);
@@ -175,302 +188,250 @@ export default function CCPage() {
       setBusy(false);
     }
   }
+  const closeReceipt = useCallback(() => {
+    setReceipt(null);
+    setError("");
+    refresh();
+  }, [refresh]);
+
+  const allSelected =
+    list.items.length > 0 && selected.size === list.items.length;
+  const firstRow = page * PAGE_SIZE + 1,
+    lastRow = Math.min((page + 1) * PAGE_SIZE, list.total);
+
   return (
     <Page
       title="CC"
-      subtitle="Company card receipts and reconciliation"
+      subtitle="Company card receipts"
       actions={
-        <div className="cc cc-actions">
+        <>
           {gm && (
-            <button onClick={() => setMappings(true)}>
-              <Users size={16} />
-              Card mapping
+            <button
+              className="button secondary-button"
+              onClick={() => setMappings(true)}
+            >
+              <CreditCard size={15} /> Card mapping
             </button>
           )}
-          <button onClick={() => setCreate(true)}>
-            <Plus size={16} />
-            New receipt
+          <button
+            className="button primary-button"
+            onClick={() => setCreate(true)}
+          >
+            <Plus size={16} /> New receipt
           </button>
-        </div>
+        </>
       }
     >
-      <div className="cc">
-        {gm && intake.length > 0 && (
-          <details className="cc-notice">
-            <summary>
-              {intake.length} incoming email{intake.length > 1 ? "s" : ""} need
-              review
-            </summary>
-            {intake.map((item) => (
-              <div key={item._id} className="cc-actions">
-                <span>
-                  {item.receivedAt
-                    ? new Date(item.receivedAt).toLocaleString()
-                    : item._id}{" "}
-                  · {item.error}
-                </span>
+      <MotionList className="cc-page-stack">
+        {(settings?.testMode ||
+          (gm && intake.length > 0) ||
+          (error && !receipt) ||
+          notice) && (
+          <MotionItem>
+            <div className="cc-notes">
+              {settings?.testMode && (
+                <Banner>
+                  <strong>Test mode.</strong> New charges go to Test Job and
+                  texts route to Quinn.
+                </Banner>
+              )}
+              {gm && intake.length > 0 && (
+                <Banner tone="amber">
+                  <strong>
+                    {intake.length} incoming email
+                    {intake.length > 1 ? "s" : ""} could not be read.
+                  </strong>
+                  <ul className="cc-intake-list">
+                    {intake.map((item) => (
+                      <li key={item._id} className="cc-intake-row">
+                        <span>
+                          {item.receivedAt
+                            ? new Date(item.receivedAt).toLocaleString()
+                            : item._id}
+                          : {item.error}
+                        </span>
+                        <button
+                          className="button secondary-button"
+                          disabled={busy}
+                          onClick={() => void retryIntake(item._id)}
+                        >
+                          Retry
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </Banner>
+              )}
+              {error && !receipt && <Banner tone="red">{error}</Banner>}
+              {notice && <Banner tone="green">{notice}</Banner>}
+            </div>
+          </MotionItem>
+        )}
+        <MotionItem>
+          <Widget className="co-widget cc-widget">
+            <div className="co-widget-toolbar">
+              <SegmentedControl
+                variant="ohr"
+                value={tab}
+                options={tabs}
+                onChange={(t) => {
+                  setTab(t);
+                  setPage(0);
+                }}
+                layoutId="cc-tabs"
+                ariaLabel="Receipt status"
+              />
+              <SearchField
+                variant="co"
+                value={search}
+                onChange={setSearch}
+                placeholder="Search charges, people, jobs..."
+              />
+              <span className="co-count subheadline text-secondary">
+                {loading ? (
+                  <SkelText ch={9} />
+                ) : (
+                  `${list.total} ${list.total === 1 ? "receipt" : "receipts"}`
+                )}
+              </span>
+              {selecting && (
                 <button
-                  disabled={busy}
-                  onClick={() => void retryIntake(item._id)}
+                  className="button primary-button"
+                  disabled={busy || !selected.size || !settings?.sageReady}
+                  title={
+                    settings && !settings.sageReady
+                      ? "Available once Sage posting is verified"
+                      : undefined
+                  }
+                  onClick={() => void approveBatch()}
                 >
-                  Retry parsing
+                  Approve {selected.size || ""} selected
                 </button>
-              </div>
-            ))}
-          </details>
-        )}
-        {settings?.testMode && (
-          <div className="cc-notice">
-            Test mode · New charges are limited to Test Job and texts route to
-            Quinn.
-          </div>
-        )}
-        {error && !receipt && (
-          <p className="cc-error" role="alert">
-            {error}
-          </p>
-        )}
-        {notice && (
-          <p className="cc-notice" role="status">
-            {notice}
-          </p>
-        )}
-        <Widget
-          title="Receipts"
-          actions={
-            <button
-              aria-label="Refresh receipts"
-              className="cc-icon-button"
-              onClick={refresh}
-            >
-              <RefreshCw size={16} />
-            </button>
-          }
-        >
-          <div className="cc-toolbar">
-            <SegmentedControl
-              variant="ohr"
-              value={tab}
-              options={tabs}
-              onChange={(t) => {
-                setTab(t);
-                setPage(0);
-              }}
-              layoutId="cc-tabs"
-              ariaLabel="Receipt status"
-            />
-            <SearchField
-              variant="co"
-              value={search}
-              onChange={setSearch}
-              placeholder="Search charges, employees, jobs…"
-            />
-          </div>
-          {gm && tab === "awaiting" && (
-            <div className="cc-batch">
-              <label className="cc-check">
-                <input
-                  type="checkbox"
-                  checked={
-                    list.items.length > 0 && selected.size === list.items.length
-                  }
-                  onChange={(e) =>
-                    setSelected(
-                      e.target.checked
-                        ? new Set(list.items.map((r) => r._id))
-                        : new Set(),
-                    )
-                  }
-                />
-                Select this page
-              </label>
-              <button
-                className="cc-primary"
-                disabled={busy || !selected.size || !settings?.sageReady}
-                onClick={() => void approveBatch()}
-              >
-                Approve selected ({selected.size})
-              </button>
-              {settings && !settings.sageReady && (
-                <span className="cc-muted">Sage posting setup pending</span>
               )}
             </div>
-          )}
-          <div ref={scrollRef} className="cc-table-scroll" aria-busy={loading}>
-            <table className="spend-rank-table cc-table">
-              <thead>
-                <tr>
-                  {gm && tab === "awaiting" && <th aria-label="Select" />}
-                  <th>Charge / employee</th>
-                  <th>Receipt date</th>
-                  <th>Allocation</th>
-                  <th>Receipt</th>
-                  <th>Status</th>
-                  <th className="cc-number">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="cc-empty">
-                      Loading receipts…
-                    </td>
-                  </tr>
-                ) : !list.items.length ? (
-                  <tr>
-                    <td colSpan={7} className="cc-empty">
-                      {error
-                        ? "Receipts could not be loaded."
-                        : query
-                          ? "No receipts match your search."
-                          : `No ${tab === "past" ? "past receipts" : tab === "awaiting" ? "receipts awaiting approval" : "receipts pending submission"}.`}
-                    </td>
-                  </tr>
-                ) : (
-                  <>
-                    {virtual.getVirtualItems()[0]?.start > 0 && (
-                      <tr aria-hidden="true">
-                        <td
-                          colSpan={7}
-                          style={{
-                            height: virtual.getVirtualItems()[0].start,
-                            padding: 0,
-                          }}
-                        />
-                      </tr>
-                    )}
-                    {virtual.getVirtualItems().map((v) => {
-                      const r = list.items[v.index];
-                      return (
-                        <tr
-                          key={r._id}
-                          data-index={v.index}
-                          ref={virtual.measureElement}
-                        >
-                          {gm && tab === "awaiting" && (
+
+            {!loading && !list.items.length ? (
+              <div className="cc-empty body-text text-secondary">
+                {error
+                  ? "Receipts could not be loaded."
+                  : query
+                    ? `No receipts match "${query}"`
+                    : emptyCopy[tab]}
+              </div>
+            ) : (
+              <div className="co-table-scroll">
+                <table className="spend-rank-table">
+                  <thead>
+                    <tr>
+                      {selecting && (
+                        <th className="cc-col-check">
+                          <input
+                            type="checkbox"
+                            aria-label="Select all on this page"
+                            checked={allSelected}
+                            disabled={loading}
+                            onChange={(e) =>
+                              setSelected(
+                                e.target.checked
+                                  ? new Set(list.items.map((r) => r._id))
+                                  : new Set(),
+                              )
+                            }
+                          />
+                        </th>
+                      )}
+                      <th style={{ width: "34%" }}>Charge</th>
+                      <th>Date</th>
+                      <th>Charged to</th>
+                      <th>Receipt</th>
+                      {tab === "past" && <th>Status</th>}
+                      <th className="spend-rank-table-value">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading
+                      ? Array.from({ length: 6 }, (_, i) => (
+                          <tr key={i} className="spend-rank-table-row-plain">
+                            {selecting && <td className="cc-col-check" />}
                             <td>
-                              <input
-                                type="checkbox"
-                                aria-label={`Select ${r.description}`}
-                                checked={selected.has(r._id)}
-                                onChange={(e) =>
-                                  setSelected((old) => {
-                                    const next = new Set(old);
-                                    if (e.target.checked) next.add(r._id);
-                                    else next.delete(r._id);
-                                    return next;
-                                  })
-                                }
-                              />
+                              <div className="cc-cell-stack">
+                                <span className="body-text emphasized">
+                                  <SkelText ch={22 - (i % 3) * 4} />
+                                </span>
+                                <span className="cell-secondary">
+                                  <SkelText ch={16} />
+                                </span>
+                              </div>
                             </td>
-                          )}
-                          <td>
-                            <button
-                              className="cc-link"
-                              onClick={() => void open(r._id)}
-                            >
-                              {r.description}
-                            </button>
-                            <small>
-                              {r.employeeName} · •••• {r.cardLast4}
-                              {r.mode === "test" ? " · Test" : ""}
-                            </small>
-                          </td>
-                          <td>{r.receiptDate}</td>
-                          <td>
-                            {r.allocations.length ? (
-                              r.allocations
-                                .map((a) => a.name || a.destination)
-                                .join(", ")
-                            ) : (
-                              <span className="cc-muted">Not categorized</span>
+                            <td className="subheadline">
+                              <SkelText ch={10} />
+                            </td>
+                            <td className="body-text">
+                              <SkelText ch={14 - (i % 2) * 4} />
+                            </td>
+                            <td className="body-text">
+                              <SkelText ch={6} />
+                            </td>
+                            {tab === "past" && (
+                              <td className="body-text">
+                                <SkelText ch={8} />
+                              </td>
                             )}
-                          </td>
-                          <td>
-                            {r.files[0] ? (
-                              <>
-                                <InlineReceipt receipt={r} />
-                                <button
-                                  className="cc-link"
-                                  onClick={() => void open(r._id)}
-                                >
-                                  View {r.files.length} file
-                                  {r.files.length > 1 ? "s" : ""}
-                                </button>
-                              </>
-                            ) : (
-                              <span className="cc-muted">
-                                {r.missingReceipt
-                                  ? "Missing receipt explained"
-                                  : "Not uploaded"}
-                              </span>
-                            )}
-                          </td>
-                          <td>
-                            <span className="cc-status">
-                              {!r.ownerUid && r.mode !== "test"
-                                ? "Unassigned"
-                                : statusLabel(r.state)}
-                            </span>
-                            <small>
-                              {r.invoiceNumber ||
-                                (r.dropboxError
-                                  ? "Dropbox retry pending"
-                                  : r.firstSubmittedAt &&
-                                      r.dropboxRevision !==
-                                        r.dropboxSyncedRevision
-                                    ? "Dropbox pending"
-                                    : "")}
-                            </small>
-                          </td>
-                          <td className="cc-number">{money(r.amountCents)}</td>
-                        </tr>
-                      );
-                    })}
-                    {!!virtual.getVirtualItems().length && (
-                      <tr aria-hidden="true">
-                        <td
-                          colSpan={7}
-                          style={{
-                            height: Math.max(
-                              0,
-                              virtual.getTotalSize() -
-                                (virtual.getVirtualItems().at(-1)?.end || 0),
-                            ),
-                            padding: 0,
-                          }}
-                        />
-                      </tr>
-                    )}
-                  </>
-                )}
-              </tbody>
-            </table>
-          </div>
-          <div className="cc-pagination">
-            <span>
-              {list.total} receipts
-              {list.total > 0
-                ? ` · ${page * 50 + 1}–${Math.min((page + 1) * 50, list.total)}`
-                : ""}
-            </span>
-            <div className="cc-actions">
-              <button
-                disabled={page === 0 || loading}
-                onClick={() => setPage(page - 1)}
-              >
-                Previous
-              </button>
-              <button
-                disabled={(page + 1) * 50 >= list.total || loading}
-                onClick={() => setPage(page + 1)}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        </Widget>
-      </div>
+                            <td className="spend-rank-table-value body-text">
+                              <SkelText ch={8} />
+                            </td>
+                          </tr>
+                        ))
+                      : list.items.map((r) => (
+                          <ReceiptRow
+                            key={r._id}
+                            r={r}
+                            tab={tab}
+                            selecting={selecting}
+                            selected={selected.has(r._id)}
+                            onSelect={(on) =>
+                              setSelected((old) => {
+                                const next = new Set(old);
+                                if (on) next.add(r._id);
+                                else next.delete(r._id);
+                                return next;
+                              })
+                            }
+                            onOpen={() => void open(r._id)}
+                          />
+                        ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {list.total > PAGE_SIZE && (
+              <div className="cc-pager">
+                <span className="subheadline text-secondary">
+                  {firstRow}–{lastRow} of {list.total}
+                </span>
+                <div className="cc-pager-buttons">
+                  <button
+                    className="button secondary-button"
+                    disabled={page === 0 || loading}
+                    onClick={() => setPage(page - 1)}
+                  >
+                    <ChevronLeft size={14} /> Previous
+                  </button>
+                  <button
+                    className="button secondary-button"
+                    disabled={lastRow >= list.total || loading}
+                    onClick={() => setPage(page + 1)}
+                  >
+                    Next <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </Widget>
+        </MotionItem>
+      </MotionList>
+
       {mappings && <MappingModal onClose={() => setMappings(false)} />}
       {create && (
         <NewReceipt
@@ -483,19 +444,7 @@ export default function CCPage() {
         />
       )}
       {receipt && (
-        <CCModal
-          title="Receipt review"
-          onClose={() => {
-            setReceipt(null);
-            setError("");
-            refresh();
-          }}
-        >
-          {error && (
-            <p className="cc-error" role="alert">
-              {error}
-            </p>
-          )}
+        <CCModal onClose={closeReceipt}>
           <ReceiptForm
             key={`${receipt._id}-${formVersion}`}
             initial={receipt}
@@ -507,108 +456,221 @@ export default function CCPage() {
             }
           />
           {gm && ["pending", "awaiting"].includes(receipt.state) && (
-            <section className="cc-section">
-              <h3>Review</h3>
-              <label>
-                Reason
+            <section className="cc-band">
+              <div className="cc-band-head">
+                <h3 className="cc-band-title">Review</h3>
+                {settings && !settings.sageReady && (
+                  <span className="cc-badge cc-badge--muted">
+                    Sage posting not enabled yet
+                  </span>
+                )}
+              </div>
+              <label className="cc-field">
+                <span className="cc-field-label">Reason</span>
                 <textarea
+                  className="cc-input"
+                  rows={2}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="Required for returning or dismissing a charge."
+                  placeholder="Required to return or dismiss a charge"
                 />
               </label>
-              <div className="cc-actions">
+              {error && <Banner tone="red">{error}</Banner>}
+              <div className="cc-review-actions">
                 {!receipt.ownerUid && receipt.mode !== "test" && (
-                  <button disabled={busy} onClick={() => void action("assign")}>
+                  <button
+                    className="cc-btn"
+                    disabled={busy}
+                    onClick={() => void action("assign")}
+                  >
                     Assign from card mapping
                   </button>
                 )}
+                <button
+                  className="cc-btn cc-btn--danger"
+                  disabled={busy || !reason.trim() || !receipt.canApprove}
+                  onClick={() => void action("dismiss")}
+                >
+                  Dismiss charge
+                </button>
+                <span className="cc-spacer" />
                 {receipt.state === "awaiting" && (
                   <>
                     <button
+                      className="cc-btn"
                       disabled={busy || !reason.trim()}
                       onClick={() => void action("return")}
                     >
                       Return for correction
                     </button>
                     <button
-                      className="cc-primary"
+                      className="cc-btn cc-btn--primary"
                       disabled={
                         busy || !receipt.canApprove || !settings?.sageReady
                       }
                       onClick={() => void action("approve")}
                     >
-                      Approve & post to Sage
+                      Approve and post
                     </button>
                   </>
                 )}
-                <button
-                  disabled={busy || !reason.trim() || !receipt.canApprove}
-                  onClick={() => void action("dismiss")}
-                >
-                  Dismiss charge
-                </button>
               </div>
-              {!settings?.sageReady && (
-                <p className="cc-muted">
-                  Approval becomes available after Sage posting is verified.
-                </p>
-              )}
             </section>
           )}
-          <section className="cc-section">
-            <h3>Audit trail</h3>
-            <ol className="cc-audit">
-              {receipt.audit
-                ?.slice()
-                .reverse()
-                .map((a, i) => (
-                  <li key={i}>
-                    <strong>{a.action.replaceAll("-", " ")}</strong>
-                    <span>
-                      {a.name} · {new Date(a.at).toLocaleString()}
-                    </span>
-                    <details>
-                      <summary>Changes</summary>
-                      <pre>
-                        {JSON.stringify(
-                          { before: a.before, after: a.after },
-                          null,
-                          2,
-                        )}
-                      </pre>
-                    </details>
-                  </li>
-                ))}
-            </ol>
-          </section>
+          {!!receipt.audit?.length && (
+            <section className="cc-band">
+              <div className="cc-band-head">
+                <h3 className="cc-band-title">Activity</h3>
+              </div>
+              <ol className="cc-trail">
+                {receipt.audit
+                  .slice()
+                  .reverse()
+                  .map((a, i) => (
+                    <li key={i} className="cc-trail-item">
+                      <span className="cc-trail-dot" aria-hidden="true" />
+                      <span className="cc-trail-action">
+                        {a.action.replaceAll("-", " ")}
+                      </span>
+                      <span className="cc-trail-meta">
+                        {a.name} ·{" "}
+                        {new Date(a.at).toLocaleString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      {(a.before !== undefined || a.after !== undefined) && (
+                        <details className="cc-disclosure cc-trail-diff">
+                          <summary>Show changes</summary>
+                          <pre>
+                            {JSON.stringify(
+                              { before: a.before, after: a.after },
+                              null,
+                              2,
+                            )}
+                          </pre>
+                        </details>
+                      )}
+                    </li>
+                  ))}
+              </ol>
+            </section>
+          )}
         </CCModal>
       )}
     </Page>
   );
 }
-function InlineReceipt({ receipt }: { receipt: Receipt }) {
-  const [show, setShow] = useState(false);
+
+function ReceiptRow({
+  r,
+  tab,
+  selecting,
+  selected,
+  onSelect,
+  onOpen,
+}: {
+  r: Receipt;
+  tab: Tab;
+  selecting: boolean;
+  selected: boolean;
+  onSelect: (on: boolean) => void;
+  onOpen: () => void;
+}) {
+  const unassigned = !r.ownerUid && r.mode !== "test";
+  const syncNote = r.dropboxError
+    ? "Dropbox retry pending"
+    : r.firstSubmittedAt && r.dropboxRevision !== r.dropboxSyncedRevision
+      ? "Dropbox sync pending"
+      : "";
   return (
-    <div>
-      <button
-        type="button"
-        className="cc-link"
-        aria-expanded={show}
-        onClick={() => setShow(!show)}
-      >
-        {show ? "Hide image" : "Preview image"}
-      </button>
-      {show && (
-        <FilePreview
-          file={receipt.files[0]}
-          path={`cc/receipts/${receipt._id}`}
-          loadFile={staffFile}
-        />
+    <tr
+      className="spend-rank-table-row"
+      onClick={onOpen}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === "Enter" && onOpen()}
+    >
+      {selecting && (
+        <td className="cc-col-check" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            aria-label={`Select ${r.description}`}
+            checked={selected}
+            onChange={(e) => onSelect(e.target.checked)}
+          />
+        </td>
       )}
-    </div>
+      <td>
+        <div className="cc-cell-stack">
+          <span className="body-text emphasized cc-cell-primary">
+            {r.description}
+          </span>
+          <span className="cell-secondary">
+            {unassigned ? (
+              <Badge tone="red" size="compact">
+                Unassigned
+              </Badge>
+            ) : (
+              r.employeeName
+            )}{" "}
+            · •••• {r.cardLast4}
+            {r.mode === "test" ? " · Test" : ""}
+          </span>
+        </div>
+      </td>
+      <td className="subheadline text-secondary" style={{ whiteSpace: "nowrap" }}>
+        {day(r.receiptDate)}
+      </td>
+      <td className="body-text">
+        {r.allocations.length ? (
+          <span className="cc-cell-alloc" style={{ display: "block" }}>
+            {r.allocations.map((a) => a.name || a.destination).join(", ")}
+          </span>
+        ) : (
+          <span className="text-secondary">Not categorized</span>
+        )}
+      </td>
+      <td className="body-text">
+        <div className="cc-cell-stack">
+          {r.files.length ? (
+            <span className="cc-cell-icon">
+              <Paperclip size={13} />
+              {r.files.length} {r.files.length === 1 ? "file" : "files"}
+            </span>
+          ) : r.missingReceipt ? (
+            <span className="text-secondary">Explained</span>
+          ) : (
+            <span>
+              <Badge tone="amber" size="compact">
+                Missing
+              </Badge>
+            </span>
+          )}
+          {syncNote && <span className="cell-secondary">{syncNote}</span>}
+        </div>
+      </td>
+      {tab === "past" && (
+        <td>
+          <div className="cc-cell-stack">
+            <span>
+              <Badge tone={statusTone(r.state)}>{statusLabel(r.state)}</Badge>
+            </span>
+            {r.invoiceNumber && (
+              <span className="cell-secondary">#{r.invoiceNumber}</span>
+            )}
+          </div>
+        </td>
+      )}
+      <td className="spend-rank-table-value body-text emphasized">
+        {money(r.amountCents)}
+      </td>
+    </tr>
   );
 }
+
 function NewReceipt({
   onClose,
   onCreated,
@@ -621,6 +683,7 @@ function NewReceipt({
     [busy, setBusy] = useState(false);
   async function create() {
     setBusy(true);
+    setError("");
     try {
       onCreated(
         await staffRequest<Receipt>(
@@ -634,34 +697,45 @@ function NewReceipt({
       setBusy(false);
     }
   }
+  const valid = /^\d{4}$/.test(card);
   return (
-    <CCModal title="New receipt" onClose={onClose}>
-      <p className="cc-muted">
+    <CCModal
+      eyebrow="Company card"
+      title="New receipt"
+      narrow
+      onClose={onClose}
+      footer={
+        <>
+          <button className="button secondary-button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="button primary-button"
+            disabled={busy || !valid}
+            onClick={() => void create()}
+          >
+            {busy ? "Creating…" : "Create receipt"}
+          </button>
+        </>
+      }
+    >
+      <p className="body-text text-secondary" style={{ margin: 0, lineHeight: 1.5 }}>
         Start a receipt before the card notification arrives.
       </p>
-      {error && (
-        <p role="alert" className="cc-error">
-          {error}
-        </p>
-      )}
-      <label>
-        Card last four digits
+      <label className="cc-field">
+        <span className="cc-field-label">Card last four digits</span>
         <input
+          className="cc-input cc-input--money"
           inputMode="numeric"
+          autoFocus
           maxLength={4}
+          placeholder="1234"
           value={card}
-          onChange={(e) => setCard(e.target.value)}
+          onChange={(e) => setCard(e.target.value.replace(/\D/g, ""))}
+          onKeyDown={(e) => e.key === "Enter" && valid && void create()}
         />
       </label>
-      <div className="cc-actions">
-        <button
-          className="cc-primary"
-          disabled={busy || !/^\d{4}$/.test(card)}
-          onClick={() => void create()}
-        >
-          Create receipt
-        </button>
-      </div>
+      {error && <Banner tone="red">{error}</Banner>}
     </CCModal>
   );
 }

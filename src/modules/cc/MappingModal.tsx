@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import { CCModal } from "./CCModal";
+import { Banner } from "./ReceiptForm";
 import { staffRequest } from "./staffApi";
 import { json } from "./api";
 interface Mapping {
@@ -26,13 +28,22 @@ const blank = {
   revision: 0,
   active: true,
 };
+const consentLabel = (m: Mapping) => {
+  const status = m.consent?.status;
+  if (!status) return "No SMS consent";
+  return `SMS ${status.replaceAll("_", " ")}`;
+};
+
+// Card list on top (rows in the change-order project picker's voice; copper
+// marks the one being edited), the add/edit form beneath, Save in the footer.
 export function MappingModal({ onClose }: { onClose: () => void }) {
   const [data, setData] = useState<Data | null>(null),
     [draft, setDraft] = useState(blank);
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [consent, setConsent] = useState(false),
-    [script, setScript] = useState("");
+    [script, setScript] = useState(""),
+    [editingCard, setEditingCard] = useState<string | null>(null);
   const load = () =>
     staffRequest<Data>("cc/mappings")
       .then(setData)
@@ -40,6 +51,12 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     void load();
   }, []);
+  function reset() {
+    setDraft(blank);
+    setEditingCard(null);
+    setConsent(false);
+    setScript("");
+  }
   async function save() {
     setBusy(true);
     setError("");
@@ -54,175 +71,211 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
         }),
       );
       await load();
-      setDraft(blank);
-      setConsent(false);
-      setScript("");
+      reset();
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
+  const editing = editingCard !== null;
   return (
-    <CCModal title="Card & employee mapping" onClose={onClose}>
-      <p className="cc-muted">
-        Changes apply to future charges. Existing receipts keep their
-        responsible employee.
-      </p>
-      {error && (
-        <p role="alert" className="cc-error">
-          {error}
-        </p>
-      )}
+    <CCModal
+      eyebrow="Company card"
+      title="Card mapping"
+      onClose={onClose}
+      footer={
+        <>
+          <span className="subheadline text-secondary">
+            Applies to future charges only.
+          </span>
+          <button
+            className="button primary-button"
+            disabled={busy || !data || !/^\d{4}$/.test(draft.cardLast4)}
+            onClick={() => void save()}
+          >
+            {busy ? "Saving…" : editing ? "Save changes" : "Add card"}
+          </button>
+        </>
+      }
+    >
       {!data ? (
-        <p>Loading mappings…</p>
+        error ? (
+          <Banner tone="red">{error}</Banner>
+        ) : (
+          <p className="body-text text-secondary" style={{ margin: 0 }}>
+            Loading cards…
+          </p>
+        )
       ) : (
         <>
-          <div className="cc-mapping-list">
-            {data.mappings.map((m) => (
-              <button
-                key={m.cardLast4}
-                type="button"
-                onClick={() => {
-                  setDraft({
-                    ...m,
-                    employeeId: String(m.employeeId || ""),
-                    ownerUid: m.ownerUid || "",
-                    phone: m.phone || "",
-                  });
-                  setConsent(false);
-                  setScript("");
-                }}
-              >
-                <span>
-                  <strong>{m.employeeName}</strong>
-                  <small>
-                    {m.phone || "No phone"} ·{" "}
-                    {m.consent?.status.replaceAll("_", " ") ||
-                      "Consent not recorded"}
-                  </small>
-                </span>
-                <span>•••• {m.cardLast4}</span>
-              </button>
-            ))}
-          </div>
-          <h3>
-            {data.mappings.some((m) => m.cardLast4 === draft.cardLast4)
-              ? "Edit mapping"
-              : "Add mapping"}
-          </h3>
-          <fieldset disabled={busy}>
-            <div className="cc-fields">
-              <label>
-                Card last four
-                <input
-                  value={draft.cardLast4}
-                  inputMode="numeric"
-                  maxLength={4}
-                  onChange={(e) =>
-                    setDraft({ ...draft, cardLast4: e.target.value })
-                  }
-                />
-              </label>
-              <label>
-                Dashboard user
-                <select
-                  value={draft.ownerUid}
-                  onChange={(e) => {
-                    const u = data.users.find((u) => u.id === e.target.value);
-                    setDraft({
-                      ...draft,
-                      ownerUid: e.target.value,
-                      employeeName: u?.name || "",
-                    });
-                  }}
+          <section className="cc-band">
+            <div className="cc-band-head">
+              <h3 className="cc-band-title">Cards</h3>
+              {editing && (
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--quiet"
+                  onClick={reset}
                 >
-                  <option value="">Choose employee…</option>
-                  {data.users.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Sage employee
-                <select
-                  value={draft.employeeId}
-                  onChange={(e) =>
-                    setDraft({ ...draft, employeeId: e.target.value })
-                  }
-                >
-                  <option value="">Choose employee…</option>
-                  {data.employees.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name} · {e.id}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Phone (+1…)
-                <input
-                  type="tel"
-                  value={draft.phone}
-                  onChange={(e) =>
-                    setDraft({ ...draft, phone: e.target.value })
-                  }
-                />
-              </label>
+                  <Plus size={15} aria-hidden="true" />
+                  Add another card
+                </button>
+              )}
             </div>
-            <label className="cc-check">
-              <input
-                type="checkbox"
-                checked={draft.active}
-                onChange={(e) =>
-                  setDraft({ ...draft, active: e.target.checked })
-                }
-              />
-              Active mapping
-            </label>
-            <label className="cc-check">
-              <input
-                type="checkbox"
-                checked={consent}
-                onChange={(e) => setConsent(e.target.checked)}
-              />
-              I collected this employee’s explicit SMS consent today.
-            </label>
-            {consent && (
-              <label>
-                Exact consent script read to the employee
-                <textarea
-                  rows={5}
-                  value={script}
-                  onChange={(e) => setScript(e.target.value)}
-                />
-                <small>
-                  Your identity and today’s date will be recorded with the
-                  script.
-                </small>
-              </label>
+            {data.mappings.length ? (
+              <div className="cc-map-list">
+                {data.mappings.map((m) => (
+                  <button
+                    key={m.cardLast4}
+                    type="button"
+                    className={`cc-map-row${editingCard === m.cardLast4 ? " cc-map-row--active" : ""}`}
+                    onClick={() => {
+                      setDraft({
+                        ...m,
+                        employeeId: String(m.employeeId || ""),
+                        ownerUid: m.ownerUid || "",
+                        phone: m.phone || "",
+                      });
+                      setEditingCard(m.cardLast4);
+                      setConsent(false);
+                      setScript("");
+                    }}
+                  >
+                    <span className="cc-map-text">
+                      <span className="cc-map-name">{m.employeeName}</span>
+                      <span className="cc-map-meta">
+                        {m.phone || "No phone"} · {consentLabel(m)}
+                      </span>
+                    </span>
+                    {!m.active && (
+                      <span className="cc-badge cc-badge--muted">Inactive</span>
+                    )}
+                    <span className="cc-card-num">•••• {m.cardLast4}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="cc-band-sub" style={{ marginTop: 0 }}>
+                No cards mapped yet.
+              </p>
             )}
-            <div className="cc-actions">
-              <button
-                type="button"
-                onClick={() => {
-                  setDraft(blank);
-                  setConsent(false);
-                  setScript("");
-                }}
-              >
-                New mapping
-              </button>
-              <button
-                className="cc-primary"
-                type="button"
-                onClick={() => void save()}
-              >
-                {busy ? "Saving…" : "Save mapping"}
-              </button>
-            </div>
+          </section>
+
+          <fieldset className="cc-fieldset" disabled={busy}>
+            <section className="cc-band">
+              <div className="cc-band-head">
+                <h3 className="cc-band-title">
+                  {editing ? `Card •••• ${draft.cardLast4}` : "Add a card"}
+                </h3>
+              </div>
+              <div className="cc-grid">
+                <label className="cc-field">
+                  <span className="cc-field-label">Card last four</span>
+                  <input
+                    className="cc-input cc-input--money"
+                    value={draft.cardLast4}
+                    inputMode="numeric"
+                    maxLength={4}
+                    disabled={editing}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        cardLast4: e.target.value.replace(/\D/g, ""),
+                      })
+                    }
+                  />
+                </label>
+                <label className="cc-field">
+                  <span className="cc-field-label">Mobile number</span>
+                  <input
+                    className="cc-input"
+                    type="tel"
+                    placeholder="+1"
+                    value={draft.phone}
+                    onChange={(e) =>
+                      setDraft({ ...draft, phone: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="cc-field">
+                  <span className="cc-field-label">Dashboard user</span>
+                  <select
+                    className="cc-input"
+                    value={draft.ownerUid}
+                    onChange={(e) => {
+                      const u = data.users.find(
+                        (u) => u.id === e.target.value,
+                      );
+                      setDraft({
+                        ...draft,
+                        ownerUid: e.target.value,
+                        employeeName: u?.name || "",
+                      });
+                    }}
+                  >
+                    <option value="">Choose a person…</option>
+                    {data.users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="cc-field">
+                  <span className="cc-field-label">Sage employee</span>
+                  <select
+                    className="cc-input"
+                    value={draft.employeeId}
+                    onChange={(e) =>
+                      setDraft({ ...draft, employeeId: e.target.value })
+                    }
+                  >
+                    <option value="">Choose an employee…</option>
+                    {data.employees.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name} · {e.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <label className="cc-check">
+                <input
+                  type="checkbox"
+                  checked={draft.active}
+                  onChange={(e) =>
+                    setDraft({ ...draft, active: e.target.checked })
+                  }
+                />
+                Active
+              </label>
+              <label className="cc-check">
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={(e) => setConsent(e.target.checked)}
+                />
+                I collected this employee’s explicit SMS consent today
+              </label>
+              {consent && (
+                <label className="cc-field">
+                  <span className="cc-field-label">
+                    Exact consent script read to the employee
+                  </span>
+                  <textarea
+                    className="cc-input"
+                    rows={4}
+                    value={script}
+                    onChange={(e) => setScript(e.target.value)}
+                  />
+                  <span className="cc-field-hint">
+                    Your name and today’s date are recorded with the script.
+                  </span>
+                </label>
+              )}
+              {error && <Banner tone="red">{error}</Banner>}
+            </section>
           </fieldset>
         </>
       )}
