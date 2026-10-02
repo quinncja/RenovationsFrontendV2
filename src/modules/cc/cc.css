@@ -1324,6 +1324,37 @@ a.cc-file:not([href]) { cursor: default; }
   font-variant-numeric: tabular-nums;
 }
 
+/* Confirmation toast (same surface as the Projections undo toast): bottom
+   center, fades in place, no y-travel. */
+.cc-toast {
+  position: fixed;
+  bottom: 1.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0.55rem 1rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  box-shadow: light-dark(0 14px 36px rgba(0, 0, 0, 0.18), 0 14px 36px rgba(0, 0, 0, 0.55));
+  color: var(--primary-text);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  pointer-events: none;
+  animation: ccToastIn 160ms ease-out;
+}
+.cc-toast svg { color: light-dark(#16a34a, #4ade80); flex-shrink: 0; }
+@keyframes ccToastIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cc-toast { animation: none; }
+}
+
 /* ─── In-app file viewer (portal over everything, both entry points) ────── */
 .cc-viewer {
   position: fixed;

@@ -1,5 +1,11 @@
-import { Fragment, useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, CreditCard, Plus } from "lucide-react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  Plus,
+} from "lucide-react";
 import Page from "../../shared/components/Page";
 import { Widget } from "../../shared/components/Widget/Widget";
 import { SearchField } from "../../shared/components/SearchField";
@@ -33,7 +39,7 @@ import "./cc.css";
 // head band (DetailModal voice) and adds the GM Review + Activity bands.
 
 const tabs = [
-  { key: "pending", label: "Pending" },
+  { key: "pending", label: "Pending entry" },
   { key: "awaiting", label: "Awaiting approval" },
   { key: "past", label: "Past" },
   { key: "all", label: "All" },
@@ -105,6 +111,7 @@ export default function CCPage() {
     [weeks, setWeeks] = useState<Map<string, Week>>(new Map());
   const [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
+    [toast, setToast] = useState<{ id: number; text: string } | null>(null),
     [version, setVersion] = useState(0);
   const [receipt, setReceipt] = useState<Receipt | null>(null),
     [mappings, setMappings] = useState(false),
@@ -142,6 +149,19 @@ export default function CCPage() {
       setBusy(false);
     }
   }
+  // Brief confirmation pill, bottom center; re-keyed so a repeat restarts it.
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (text: string) => {
+    setToast({ id: Date.now(), text });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  };
+  useEffect(
+    () => () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    },
+    [],
+  );
   const refresh = useCallback(() => {
     setSelected(new Set());
     setVersion((v) => v + 1);
@@ -533,6 +553,12 @@ export default function CCPage() {
         </MotionItem>
       </MotionList>
 
+      {toast && (
+        <div key={toast.id} className="cc-toast callout" role="status">
+          <CheckCircle2 size={14} aria-hidden="true" />
+          <span>{toast.text}</span>
+        </div>
+      )}
       {mappings && <MappingModal onClose={() => setMappings(false)} />}
       {create && (
         <NewReceipt
@@ -592,7 +618,7 @@ export default function CCPage() {
                       }),
                     );
                     setReceipt(null);
-                    setNotice("Receipt deleted.");
+                    showToast("Receipt deleted");
                     refresh();
                   }
                 : undefined
