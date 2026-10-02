@@ -137,27 +137,42 @@ export function Picker({
     field.current?.blur();
   }
 
-  // Follow the keyboard as it opens (and any scroll it causes) while searching.
+  // Phone search: dock the field above the keyboard ONCE, after the keyboard
+  // has finished opening (no resize for 300ms). Re-docking on every viewport
+  // change fights Safari's own focus scrolling and makes the page bounce, so
+  // later viewport changes only re-measure the list.
   useEffect(() => {
     const vv = window.visualViewport;
     if (!open || !searchable || !vv) return;
-    let frame = 0;
-    const settle = () => {
+    let frame = 0,
+      docked = false,
+      quiet: ReturnType<typeof setTimeout> | undefined;
+    const remeasure = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        dock();
-        measure();
-      });
+      frame = requestAnimationFrame(measure);
     };
-    vv.addEventListener("resize", settle);
-    vv.addEventListener("scroll", settle);
-    const late = setTimeout(settle, 350);
+    const settle = () => {
+      clearTimeout(quiet);
+      quiet = setTimeout(() => {
+        if (!docked) {
+          docked = true;
+          dock();
+        }
+        remeasure();
+      }, 300);
+    };
+    const onResize = () => {
+      remeasure();
+      settle();
+    };
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", remeasure);
     settle();
     return () => {
-      vv.removeEventListener("resize", settle);
-      vv.removeEventListener("scroll", settle);
+      vv.removeEventListener("resize", onResize);
+      vv.removeEventListener("scroll", remeasure);
       cancelAnimationFrame(frame);
-      clearTimeout(late);
+      clearTimeout(quiet);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, searchable]);
