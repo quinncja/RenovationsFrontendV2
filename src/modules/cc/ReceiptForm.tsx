@@ -221,7 +221,8 @@ export default function ReceiptForm({
     setDraft((rows) =>
       rows.map((a, i) => (i === index ? { ...a, ...patch } : a)),
     );
-  async function save(submit: boolean) {
+  // One way out of the form: submit. The server checks it is complete.
+  async function submit() {
     setBusy(true);
     setError("");
     setNotice("");
@@ -236,15 +237,13 @@ export default function ReceiptForm({
           allocations: effective,
           missingReceipt: missing,
           combinedConfirmed: confirmed,
-          submit,
+          submit: true,
         }),
       );
       update(next);
-      if (submit && onSubmitted) return onSubmitted(next);
+      if (onSubmitted) return onSubmitted(next);
       setNotice(
-        submit
-          ? "Receipt submitted. You can make corrections until it is approved."
-          : "Changes saved.",
+        "Receipt submitted. You can make corrections until it is approved.",
       );
     } catch (e) {
       setError((e as Error).message);
@@ -274,7 +273,7 @@ export default function ReceiptForm({
         update(current);
       }
       setNotice(
-        "Files saved. Submit the form when your categorization is complete.",
+        "Files added. Submit when the categorization is complete.",
       );
     } catch (e) {
       setError((e as Error).message);
@@ -939,7 +938,7 @@ export default function ReceiptForm({
                 <span className="cc-actionbar-note">
                   {r.firstSubmittedAt
                     ? "Corrections are allowed until approval."
-                    : "Save anytime and finish later."}
+                    : "Add the receipt and categorization, then submit."}
                 </span>
                 {onDelete && (
                   <button
@@ -954,20 +953,12 @@ export default function ReceiptForm({
                 )}
                 <button
                   type="button"
-                  className="cc-btn"
-                  disabled={!opts || busy}
-                  onClick={() => void save(false)}
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
                   className="cc-btn cc-btn--primary"
                   disabled={!opts || busy}
-                  onClick={() => void save(true)}
+                  onClick={() => void submit()}
                 >
                   {busy
-                    ? "Saving…"
+                    ? "Submitting…"
                     : r.firstSubmittedAt
                       ? "Resubmit"
                       : "Submit receipt"}
