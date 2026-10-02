@@ -320,13 +320,14 @@ export default function CCPage() {
               {selecting && (
                 <button
                   className="button primary-button"
-                  disabled={busy || !selected.size || !settings?.sageReady}
-                  title={
+                  disabled={busy || !selected.size}
+                  onClick={() =>
                     settings && !settings.sageReady
-                      ? "Available once Sage posting is verified"
-                      : undefined
+                      ? setError(
+                          "Receipts can't be approved until Sage posting is turned on.",
+                        )
+                      : void approveBatch()
                   }
-                  onClick={() => void approveBatch()}
                 >
                   Approve {selected.size || ""} selected
                 </button>

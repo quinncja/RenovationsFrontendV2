@@ -1,4 +1,10 @@
-import { useEffect, useState, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  useRef,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
@@ -12,6 +18,8 @@ import {
   Plus,
   Trash2,
   X,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { json, base } from "./api";
 import {
@@ -116,9 +124,14 @@ export function FilePreview({
   );
 }
 
-// Full-screen in-app viewer for a receipt file: images fit the screen, PDFs
+// Full-screen in-app viewer for a receipt file: images open fitted to the
+// screen and zoom (wheel, pinch, double-click, or the bar's buttons), PDFs
 // render inline, anything the browser can't draw (HEIC outside Safari) gets
 // a plain "open" link. Escape closes it without closing the receipt modal.
+const MIN_ZOOM = 1,
+  MAX_ZOOM = 8;
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+
 export function FileViewer({
   file,
   url,
@@ -128,6 +141,11 @@ export function FileViewer({
   url: string;
   onClose: () => void;
 }) {
+  // view.x/y pan the image (px from centered); view.z = 1 is "fit".
+  const [view, setView] = useState({ z: 1, x: 0, y: 0 });
+  const stageRef = useRef<HTMLDivElement>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; z: number } | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
@@ -144,16 +162,108 @@ export function FileViewer({
       : file.mime.startsWith("image/")
         ? "image"
         : "other";
+
+  // Zoom to `next`, keeping the stage point (cx, cy) under the cursor/fingers.
+  const zoomAt = (next: number, cx = 0, cy = 0) =>
+    setView((v) => {
+      const z = clampZoom(next);
+      if (z === 1) return { z, x: 0, y: 0 };
+      const k = z / v.z;
+      return { z, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k };
+    });
+  const fromCenter = (clientX: number, clientY: number) => {
+    const box = stageRef.current!.getBoundingClientRect();
+    return {
+      cx: clientX - box.left - box.width / 2,
+      cy: clientY - box.top - box.height / 2,
+    };
+  };
+  // Wheel needs a non-passive listener to stop the page from scrolling.
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el || kind !== "image") return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const { cx, cy } = fromCenter(e.clientX, e.clientY);
+      setView((v) => {
+        const z = clampZoom(v.z * Math.exp(-e.deltaY * 0.001));
+        if (z === 1) return { z, x: 0, y: 0 };
+        const k = z / v.z;
+        return { z, x: cx - (cx - v.x) * k, y: cy - (cy - v.y) * k };
+      });
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [kind]);
+
+  const spread = () => {
+    const [a, b] = [...pointers.current.values()];
+    return Math.hypot(a.x - b.x, a.y - b.y);
+  };
+  const onPointerDown = (e: ReactPointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2)
+      pinch.current = { dist: spread(), z: view.z };
+  };
+  const onPointerMove = (e: ReactPointerEvent) => {
+    const last = pointers.current.get(e.pointerId);
+    if (!last) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size === 2 && pinch.current) {
+      const [a, b] = [...pointers.current.values()];
+      const { cx, cy } = fromCenter((a.x + b.x) / 2, (a.y + b.y) / 2);
+      zoomAt((pinch.current.z * spread()) / pinch.current.dist, cx, cy);
+    } else if (pointers.current.size === 1 && view.z > 1) {
+      const dx = e.clientX - last.x,
+        dy = e.clientY - last.y;
+      setView((v) => ({ ...v, x: v.x + dx, y: v.y + dy }));
+    }
+  };
+  const onPointerUp = (e: ReactPointerEvent) => {
+    pointers.current.delete(e.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+  };
+
   return createPortal(
     <div
       className="cc-viewer"
       role="dialog"
       aria-modal="true"
       aria-label={file.name}
-      onClick={onClose}
     >
-      <div className="cc-viewer-bar" onClick={(e) => e.stopPropagation()}>
+      <div className="cc-viewer-bar">
         <span className="cc-viewer-name">{file.name}</span>
+        {kind === "image" && (
+          <div className="cc-viewer-zoom">
+            <button
+              type="button"
+              className="cc-viewer-btn"
+              aria-label="Zoom out"
+              disabled={view.z <= MIN_ZOOM}
+              onClick={() => zoomAt(view.z / 1.5)}
+            >
+              <ZoomOut size={16} />
+            </button>
+            <button
+              type="button"
+              className="cc-viewer-pct"
+              title="Fit to screen"
+              onClick={() => zoomAt(1)}
+            >
+              {Math.round(view.z * 100)}%
+            </button>
+            <button
+              type="button"
+              className="cc-viewer-btn"
+              aria-label="Zoom in"
+              disabled={view.z >= MAX_ZOOM}
+              onClick={() => zoomAt(view.z * 1.5)}
+            >
+              <ZoomIn size={16} />
+            </button>
+          </div>
+        )}
         <a
           className="cc-viewer-btn"
           href={url}
@@ -173,23 +283,36 @@ export function FileViewer({
           <X size={18} />
         </button>
       </div>
-      <div className="cc-viewer-stage">
+      <div
+        ref={stageRef}
+        className="cc-viewer-stage"
+        onClick={(e) => {
+          // A tap on the dark surround closes; the file itself doesn't.
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
         {kind === "pdf" ? (
-          <iframe
-            className="cc-viewer-pdf"
-            src={url}
-            title={file.name}
-            onClick={(e) => e.stopPropagation()}
-          />
+          <iframe className="cc-viewer-pdf" src={url} title={file.name} />
         ) : kind === "image" ? (
           <img
-            className="cc-viewer-img"
+            className={`cc-viewer-img${view.z > 1 ? " cc-viewer-img--zoomed" : ""}`}
             src={url}
             alt={file.name}
-            onClick={(e) => e.stopPropagation()}
+            draggable={false}
+            style={{
+              transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})`,
+            }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            onDoubleClick={(e) => {
+              const { cx, cy } = fromCenter(e.clientX, e.clientY);
+              zoomAt(view.z > 1 ? 1 : 2.5, cx, cy);
+            }}
           />
         ) : (
-          <p className="cc-viewer-note" onClick={(e) => e.stopPropagation()}>
+          <p className="cc-viewer-note">
             This file type can't be previewed here.{" "}
             <a href={url} target="_blank" rel="noopener noreferrer">
               Open it
