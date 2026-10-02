@@ -1,14 +1,17 @@
 import { useEffect, useState, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   Camera,
   CheckCircle2,
+  ExternalLink,
   FileText,
   FileUp,
   Info,
   Pencil,
   Plus,
   Trash2,
+  X,
 } from "lucide-react";
 import { json, base } from "./api";
 import {
@@ -56,10 +59,13 @@ export function FilePreview({
   file,
   path,
   loadFile,
+  onOpen,
 }: {
   file: ReceiptFile;
   path: string;
   loadFile?: (path: string) => Promise<string>;
+  /** Opens the file in the in-app viewer (never a new window). */
+  onOpen: (file: ReceiptFile, url: string) => void;
 }) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
@@ -85,12 +91,12 @@ export function FilePreview({
   const isImage = file.mime.startsWith("image/") && file.mime !== "image/heic";
   const image = url && isImage;
   return (
-    <a
+    <button
+      type="button"
       className="cc-file"
-      href={url || undefined}
-      target="_blank"
-      rel="noopener noreferrer"
-      title={error || `Open ${file.name}`}
+      disabled={!url}
+      title={error || `View ${file.name}`}
+      onClick={() => url && onOpen(file, url)}
     >
       <span className="cc-file-thumb">
         {image ? (
@@ -102,7 +108,93 @@ export function FilePreview({
       {(error || !isImage) && (
         <span className="cc-file-name">{error || file.name}</span>
       )}
-    </a>
+    </button>
+  );
+}
+
+// Full-screen in-app viewer for a receipt file: images fit the screen, PDFs
+// render inline, anything the browser can't draw (HEIC outside Safari) gets
+// a plain "open" link. Escape closes it without closing the receipt modal.
+export function FileViewer({
+  file,
+  url,
+  onClose,
+}: {
+  file: ReceiptFile;
+  url: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      onClose();
+    };
+    // Capture phase: runs before the modal's own window-level Escape handler.
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+  const kind =
+    file.mime === "application/pdf"
+      ? "pdf"
+      : file.mime.startsWith("image/")
+        ? "image"
+        : "other";
+  return createPortal(
+    <div
+      className="cc-viewer"
+      role="dialog"
+      aria-modal="true"
+      aria-label={file.name}
+      onClick={onClose}
+    >
+      <div className="cc-viewer-bar" onClick={(e) => e.stopPropagation()}>
+        <span className="cc-viewer-name">{file.name}</span>
+        <a
+          className="cc-viewer-btn"
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Open in a new tab"
+          title="Open in a new tab"
+        >
+          <ExternalLink size={16} />
+        </a>
+        <button
+          type="button"
+          className="cc-viewer-btn"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          <X size={18} />
+        </button>
+      </div>
+      <div className="cc-viewer-stage">
+        {kind === "pdf" ? (
+          <iframe
+            className="cc-viewer-pdf"
+            src={url}
+            title={file.name}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : kind === "image" ? (
+          <img
+            className="cc-viewer-img"
+            src={url}
+            alt={file.name}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <p className="cc-viewer-note" onClick={(e) => e.stopPropagation()}>
+            This file type can't be previewed here.{" "}
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              Open it
+            </a>
+          </p>
+        )}
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -172,6 +264,10 @@ export default function ReceiptForm({
   // A receipt started by hand has no card alert behind it, so they lead.
   const [editing, setEditing] = useState(initial.manual);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [viewing, setViewing] = useState<{
+    file: ReceiptFile;
+    url: string;
+  } | null>(null);
   // Flips on the first Submit; from then on an incomplete section is marked
   // red until it's filled in (checked live, so the red clears as they fix it).
   const [attempted, setAttempted] = useState(false);
@@ -624,6 +720,7 @@ export default function ReceiptForm({
                   file={f}
                   path={path}
                   loadFile={loadFile}
+                  onOpen={(file, url) => setViewing({ file, url })}
                 />
               ))}
               {!readonly && (
@@ -1002,6 +1099,13 @@ export default function ReceiptForm({
             )}
           </div>
         )
+      )}
+      {viewing && (
+        <FileViewer
+          file={viewing.file}
+          url={viewing.url}
+          onClose={() => setViewing(null)}
+        />
       )}
     </div>
   );

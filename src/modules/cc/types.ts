@@ -6,6 +6,8 @@ export interface Allocation {
   costCode: string;
   /** Job lines only; overhead posts to a GL account with no cost type. */
   costType: string;
+  /** List rows only: the cost type's Sage name, for the Category column. */
+  costTypeName?: string;
   amountCents: number;
 }
 export interface ReceiptFile {

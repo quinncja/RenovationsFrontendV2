@@ -524,6 +524,16 @@ select.cc-input {
   color: var(--primary-text);
   text-decoration: none;
 }
+/* Thumbnails are buttons (they open the in-app viewer). */
+button.cc-file {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: zoom-in;
+}
+button.cc-file:disabled { cursor: progress; }
 .cc-file-thumb {
   display: grid;
   place-items: center;
@@ -1275,3 +1285,75 @@ select.cc-input {
 .cc-sheet .cc-pick-search:focus-visible {
   outline: none;
 }
+
+/* ─── In-app file viewer (portal over everything, both entry points) ────── */
+.cc-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 12, 16, 0.86);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-family: var(--font-family);
+}
+.cc-viewer-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  color: #fff;
+}
+.cc-viewer-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+}
+.cc-viewer-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.cc-viewer-btn:hover { background: rgba(255, 255, 255, 0.22); }
+.cc-viewer-stage {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 0 1rem 1rem;
+}
+.cc-viewer-img {
+  /* Fill the stage, letterboxed, so small scans scale up too. */
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  cursor: default;
+}
+.cc-viewer-pdf {
+  width: min(900px, 100%);
+  height: 100%;
+  border: 0;
+  border-radius: 8px;
+  background: #fff;
+}
+.cc-viewer-note {
+  margin: 0;
+  color: #fff;
+  font-size: 0.9375rem;
+}
+.cc-viewer-note a { color: #fff; text-decoration: underline; }

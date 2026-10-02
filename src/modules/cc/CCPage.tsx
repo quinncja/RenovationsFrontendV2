@@ -1,11 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  CreditCard,
-  Paperclip,
-  Plus,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, CreditCard, Plus } from "lucide-react";
 import Page from "../../shared/components/Page";
 import { Widget } from "../../shared/components/Widget/Widget";
 import { SearchField } from "../../shared/components/SearchField";
@@ -369,9 +363,10 @@ export default function CCPage() {
                           />
                         </th>
                       )}
-                      <th style={{ width: "34%" }}>Charge</th>
-                      <th>Date</th>
+                      <th style={{ width: "30%" }}>Charge</th>
                       <th>Charged to</th>
+                      <th>Category</th>
+                      <th>Date</th>
                       <th>Receipt</th>
                       {tab === "past" && <th>Status</th>}
                       <th className="spend-rank-table-value">Amount</th>
@@ -392,11 +387,14 @@ export default function CCPage() {
                                 </span>
                               </div>
                             </td>
-                            <td className="subheadline">
-                              <SkelText ch={10} />
-                            </td>
                             <td className="body-text">
                               <SkelText ch={14 - (i % 2) * 4} />
+                            </td>
+                            <td className="body-text">
+                              <SkelText ch={8} />
+                            </td>
+                            <td className="subheadline">
+                              <SkelText ch={10} />
                             </td>
                             <td className="body-text">
                               <SkelText ch={6} />
@@ -564,6 +562,14 @@ function ReceiptRow({
   onOpen: () => void;
 }) {
   const unassigned = r.employeeId == null && r.mode !== "test";
+  // Cost type per job line, "Overhead" for GL lines; each named once.
+  const categories = [
+    ...new Set(
+      r.allocations
+        .map((a) => (a.kind === "overhead" ? "Overhead" : a.costTypeName))
+        .filter(Boolean),
+    ),
+  ].join(", ");
   const syncNote = r.dropboxError
     ? "Dropbox retry pending"
     : r.firstSubmittedAt && r.dropboxRevision !== r.dropboxSyncedRevision
@@ -605,12 +611,6 @@ function ReceiptRow({
           </span>
         </div>
       </td>
-      <td
-        className="subheadline text-secondary"
-        style={{ whiteSpace: "nowrap" }}
-      >
-        {day(r.receiptDate)}
-      </td>
       <td className="body-text">
         {r.allocations.length ? (
           <span className="cc-cell-alloc" style={{ display: "block" }}>
@@ -621,11 +621,25 @@ function ReceiptRow({
         )}
       </td>
       <td className="body-text">
+        {categories && (
+          <span className="cc-cell-alloc" style={{ display: "block" }}>
+            {categories}
+          </span>
+        )}
+      </td>
+      <td
+        className="subheadline text-secondary"
+        style={{ whiteSpace: "nowrap" }}
+      >
+        {day(r.receiptDate)}
+      </td>
+      <td className="body-text">
         <div className="cc-cell-stack">
           {r.files.length ? (
-            <span className="cc-cell-icon">
-              <Paperclip size={13} />
-              {r.files.length} {r.files.length === 1 ? "file" : "files"}
+            <span>
+              <Badge tone="green" size="compact">
+                {r.files.length === 1 ? "Attached" : `${r.files.length} files`}
+              </Badge>
             </span>
           ) : r.missingReceipt ? (
             <span className="text-secondary">Explained</span>
