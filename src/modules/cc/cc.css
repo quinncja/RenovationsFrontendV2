@@ -1286,6 +1286,15 @@ button.cc-file:disabled { cursor: progress; }
   outline: none;
 }
 
+/* App.css gives .primary-button no disabled look, so "Approve selected"
+   read as live with nothing picked. Grayed and inert until it can act. */
+.cc-widget .primary-button:disabled {
+  background: var(--hover-bg) !important;
+  color: var(--secondary-text) !important;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
 /* ─── In-app file viewer (portal over everything, both entry points) ────── */
 .cc-viewer {
   position: fixed;
