@@ -162,6 +162,9 @@ export interface DetailModalContentProps {
   ledger?: DetailLedger | null
   /** Who entered it and when — the quiet provenance line at the card's base. */
   footer?: DetailFooter | null
+  /** An extra band between the ledger and the footer (e.g. the card receipt
+   *  behind a Capital One invoice). */
+  extra?: ReactNode
 }
 
 // ─── Content ──────────────────────────────────────────────────────────────────
@@ -196,6 +199,7 @@ export function DetailModalContent({
   project,
   ledger,
   footer,
+  extra,
 }: DetailModalContentProps) {
   const hasFooter = Boolean(footer && (footer.left || footer.right))
   return (
@@ -301,6 +305,8 @@ export function DetailModalContent({
           ) : null}
         </div>
       )}
+
+      {extra}
 
       {/* Provenance — who entered it, when — reads last and quiet, split to the
           two edges of the card's base. */}

@@ -1472,3 +1472,21 @@ a.cc-file:not([href]) { cursor: default; }
   text-underline-offset: 2px;
   outline: none;
 }
+
+/* Card receipt band inside the shared invoice modal (Job Costing). Sits in
+   the cost-detail ledger voice; thumbnails reuse .cc-files / .cc-file. */
+.cc-invoice-receipts .cc-invoice-receipt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding-top: 0.75rem;
+}
+.cc-invoice-receipt-meta {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+}
+.cc-invoice-receipt-missing {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+}

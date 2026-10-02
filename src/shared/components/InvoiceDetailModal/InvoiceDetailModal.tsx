@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, lazy, Suspense } from "react"
 import { useJobcostNav } from "../../../modules/jobcost/useJobcostNav"
 import { usePartnerNav, type PartnerKind } from "../../../modules/directory/usePartnerNav"
 import { fetchPageData } from "../../api/pageApi"
@@ -11,6 +11,14 @@ import {
   type DetailLineGroup,
 } from "../DetailModal/DetailModal"
 import { invoiceStatusLabel, invoiceStatusTone } from "../../utils/invoiceStatus"
+// Loaded only when a card invoice opens, so the receipt viewer stays out of
+// every page that merely uses this modal.
+const InvoiceReceipts = lazy(() =>
+  import("../../../modules/cc/InvoiceReceipts").then((m) => ({ default: m.InvoiceReceipts })),
+)
+
+// Capital One Business: card invoices Card Receipts posts carry their receipt.
+const CARD_VENDOR = 471
 
 function formatAmount(v: number | null | undefined) {
   return v == null || isNaN(v) ? "N/A" : formatMoneyFull(v)
@@ -297,7 +305,7 @@ export function InvoiceDetailModal({
       {isLoading && <div className="widget-skeleton" style={{ height: "9rem" }} />}
       {!isLoading && error && <p className="body-text text-secondary">{error}</p>}
       {!isLoading && !error && detail && (
-        <InvoiceContent detail={detail} module={module} projectBlockedReason={projectBlockedReason} hideProject={hideProject} />
+        <InvoiceContent invoiceId={invoiceId!} detail={detail} module={module} projectBlockedReason={projectBlockedReason} hideProject={hideProject} />
       )}
     </DetailModal>
   )
@@ -310,11 +318,13 @@ export function InvoiceDetailModal({
 // Paid/Remaining/[Retainage] strip, the project, and the line items.
 
 function InvoiceContent({
+  invoiceId,
   detail,
   module,
   projectBlockedReason,
   hideProject = false,
 }: {
+  invoiceId: string
   detail: InvoiceDetail
   module: InvoiceDetailModalProps["module"]
   projectBlockedReason?: string | null
@@ -389,6 +399,14 @@ function InvoiceContent({
               })),
             }
           : null
+      }
+      // A card charge posted from Card Receipts shows its receipt photos.
+      extra={
+        module !== "clients" && Number(h.vendorId) === CARD_VENDOR ? (
+          <Suspense fallback={null}>
+            <InvoiceReceipts invoiceRecnum={invoiceId} />
+          </Suspense>
+        ) : null
       }
       // Provenance reads last and quiet, as on the recap's item modal — who
       // keyed the invoice on the left, when on the right.
