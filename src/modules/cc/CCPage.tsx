@@ -36,6 +36,7 @@ const tabs = [
   { key: "pending", label: "Pending" },
   { key: "awaiting", label: "Awaiting approval" },
   { key: "past", label: "Past" },
+  { key: "all", label: "All" },
 ] as const;
 type Tab = (typeof tabs)[number]["key"];
 const PAGE_SIZE = 50;
@@ -81,6 +82,7 @@ const emptyCopy: Record<Tab, string> = {
   pending: "All card charges have receipts.",
   awaiting: "Nothing is waiting for approval.",
   past: "No approved or dismissed receipts yet.",
+  all: "No receipts yet.",
 };
 
 export default function CCPage() {
@@ -271,8 +273,10 @@ export default function CCPage() {
     refresh();
   }, [refresh]);
 
+  // Past and All mix states, so their rows say which.
+  const showStatus = tab === "past" || tab === "all";
   // Week headers span every column but Amount, which carries the total.
-  const columns = (selecting ? 1 : 0) + 6 + (tab === "past" ? 1 : 0);
+  const columns = (selecting ? 1 : 0) + 6 + (showStatus ? 1 : 0);
   const allSelected =
     list.items.length > 0 && selected.size === list.items.length;
   const firstRow = page * PAGE_SIZE + 1,
@@ -424,7 +428,7 @@ export default function CCPage() {
                       <th>Category</th>
                       <th>Date</th>
                       <th>Receipt</th>
-                      {tab === "past" && <th>Status</th>}
+                      {showStatus && <th>Status</th>}
                       <th className="spend-rank-table-value">Amount</th>
                     </tr>
                   </thead>
@@ -455,7 +459,7 @@ export default function CCPage() {
                             <td className="body-text">
                               <SkelText ch={6} />
                             </td>
-                            {tab === "past" && (
+                            {showStatus && (
                               <td className="body-text">
                                 <SkelText ch={8} />
                               </td>
@@ -664,6 +668,7 @@ function ReceiptRow({
   onSelect: (on: boolean) => void;
   onOpen: () => void;
 }) {
+  const showStatus = tab === "past" || tab === "all";
   const unassigned = r.employeeId == null && r.mode !== "test";
   // Cost type per job line, "Overhead" for GL lines; each named once.
   const categories = [
@@ -756,7 +761,7 @@ function ReceiptRow({
           {syncNote && <span className="cell-secondary">{syncNote}</span>}
         </div>
       </td>
-      {tab === "past" && (
+      {showStatus && (
         <td>
           <div className="cc-cell-stack">
             <span>
