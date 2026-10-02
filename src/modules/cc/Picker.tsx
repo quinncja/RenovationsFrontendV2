@@ -27,12 +27,22 @@ export interface PickerItem {
 }
 
 const clipping = /(auto|scroll|hidden|clip)/;
+// The part of the page actually visible: on a phone with the keyboard open the
+// visual viewport is the strip above the keyboard.
+function visible() {
+  const vv = window.visualViewport;
+  return vv
+    ? { top: vv.offsetTop, bottom: vv.offsetTop + vv.height }
+    : { top: 0, bottom: window.innerHeight };
+}
+const keyboardOpen = () =>
+  !!window.visualViewport &&
+  window.visualViewport.height < window.innerHeight * 0.8;
 // The nearest ancestor that would cut the list off (the review modal's scroll
 // body), or the visible viewport.
 function room(el: HTMLElement) {
   const rect = el.getBoundingClientRect();
-  let top = 0,
-    bottom = window.visualViewport?.height ?? window.innerHeight;
+  let { top, bottom } = visible();
   for (let p = el.parentElement; p; p = p.parentElement) {
     const s = getComputedStyle(p);
     if (clipping.test(s.overflowY) || clipping.test(s.overflow)) {
@@ -69,7 +79,9 @@ export function Picker({
     [place, setPlace] = useState<{ up: boolean; max: number }>({
       up: true,
       max: 320,
-    });
+    }),
+    // Custom scroll indicator (phones hide native scrollbars until scrolling).
+    [thumb, setThumb] = useState<{ top: number; height: number } | null>(null);
   const wrap = useRef<HTMLDivElement>(null),
     field = useRef<HTMLInputElement & HTMLButtonElement>(null),
     list = useRef<HTMLUListElement>(null);
@@ -85,11 +97,27 @@ export function Picker({
     });
   }, [items, query]);
 
-  function show() {
-    if (disabled) return;
+  function measure() {
     const { above, below } = room(wrap.current!);
     const up = above >= 200 || above >= below;
-    setPlace({ up, max: Math.max(160, Math.min(352, up ? above : below)) });
+    // With the keyboard up the list may use every pixel above the field.
+    const cap = keyboardOpen() ? 640 : 352;
+    setPlace({ up, max: Math.max(160, Math.min(cap, up ? above : below)) });
+  }
+  // Phone search: once the keyboard is up, scroll the page so the field rests
+  // just above it, leaving the whole screen above for the list to scroll.
+  function dock() {
+    if (!searchable || !keyboardOpen() || !wrap.current) return;
+    for (let p = wrap.current.parentElement; p; p = p.parentElement) {
+      if (/(auto|scroll)/.test(getComputedStyle(p).overflowY)) return;
+    }
+    const gap =
+      wrap.current.getBoundingClientRect().bottom - (visible().bottom - 10);
+    if (Math.abs(gap) > 4) window.scrollBy(0, gap);
+  }
+  function show() {
+    if (disabled) return;
+    measure();
     setQuery("");
     setActive(
       Math.max(
@@ -108,6 +136,31 @@ export function Picker({
     close();
     field.current?.blur();
   }
+
+  // Follow the keyboard as it opens (and any scroll it causes) while searching.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!open || !searchable || !vv) return;
+    let frame = 0;
+    const settle = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        dock();
+        measure();
+      });
+    };
+    vv.addEventListener("resize", settle);
+    vv.addEventListener("scroll", settle);
+    const late = setTimeout(settle, 350);
+    settle();
+    return () => {
+      vv.removeEventListener("resize", settle);
+      vv.removeEventListener("scroll", settle);
+      cancelAnimationFrame(frame);
+      clearTimeout(late);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, searchable]);
 
   // Close when a tap lands anywhere outside the field and its list.
   useEffect(() => {
@@ -153,6 +206,23 @@ export function Picker({
     }
   }
 
+  function track() {
+    const el = list.current;
+    if (!el || el.scrollHeight <= el.clientHeight + 1) return setThumb(null);
+    const pad = 6,
+      span = el.clientHeight - pad * 2,
+      height = Math.max(24, (el.clientHeight / el.scrollHeight) * span),
+      top =
+        pad +
+        (el.scrollTop / (el.scrollHeight - el.clientHeight)) * (span - height);
+    setThumb({ top, height });
+  }
+  // Re-measure the indicator when the list opens, filters or resizes.
+  useLayoutEffect(() => {
+    if (open) track();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, shown, place.max]);
+
   const popover = open && (
     <div
       className={`cc-pick-pop${place.up ? " cc-pick-pop--up" : ""}`}
@@ -165,6 +235,7 @@ export function Picker({
           role="listbox"
           aria-label={label}
           className="cc-pick-list"
+          onScroll={track}
         >
           {shown.map((item, i) => {
             const heading =
@@ -205,6 +276,13 @@ export function Picker({
         </ul>
       ) : (
         <p className="cc-pick-empty">No matches for “{query}”</p>
+      )}
+      {thumb && (
+        <span
+          className="cc-pick-thumb"
+          style={{ top: thumb.top, height: thumb.height }}
+          aria-hidden="true"
+        />
       )}
     </div>
   );

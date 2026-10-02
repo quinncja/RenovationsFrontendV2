@@ -1184,3 +1184,20 @@ select.cc-input {
 .cc-pick .cc-pick-row--single {
   min-height: 2.75rem;
 }
+/* Scroll indicator: a thin copper thumb that stays visible (phones hide
+   native scrollbars until mid-scroll); the native bar is hidden. */
+.cc-pick-list {
+  scrollbar-width: none;
+}
+.cc-pick-list::-webkit-scrollbar {
+  display: none;
+}
+.cc-pick-thumb {
+  position: absolute;
+  right: 3px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--primary-color);
+  opacity: 0.85;
+  pointer-events: none;
+}
