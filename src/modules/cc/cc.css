@@ -755,6 +755,28 @@ select.cc-input {
   font-size: 0.75rem;
   color: var(--secondary-text);
 }
+/* Mapping sheet: the list is the sheet, so it grows with the modal. */
+.cc-map-list--full {
+  max-height: none;
+  overflow: visible;
+}
+.cc-map-card {
+  width: 5.5rem;
+  flex-shrink: 0;
+}
+.cc-map-row .cc-map-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cc-map-go {
+  flex-shrink: 0;
+  color: color-mix(in srgb, var(--secondary-text) 55%, transparent);
+  transition: color 0.15s ease;
+}
+.cc-map-row:hover .cc-map-go { color: var(--secondary-text); }
 .cc-card-num {
   font-size: 0.8125rem;
   font-weight: var(--font-weight-semibold);

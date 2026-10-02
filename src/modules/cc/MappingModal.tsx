@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { CCModal } from "./CCModal";
 import { Banner } from "./ReceiptForm";
 import { staffRequest } from "./staffApi";
@@ -8,18 +8,26 @@ interface Mapping {
   cardLast4: string;
   employeeName: string;
   employeeId: number;
-  ownerUid: string;
+  ownerUid?: string | null;
   phone?: string;
   revision: number;
   active: boolean;
-  consent?: { status: string };
 }
 interface Data {
   mappings: Mapping[];
   employees: { id: number; name: string }[];
   users: { id: string; name: string; email: string }[];
 }
-const blank = {
+type Draft = {
+  cardLast4: string;
+  employeeName: string;
+  employeeId: string;
+  ownerUid: string;
+  phone: string;
+  revision: number;
+  active: boolean;
+};
+const blank: Draft = {
   cardLast4: "",
   employeeName: "",
   employeeId: "",
@@ -28,22 +36,14 @@ const blank = {
   revision: 0,
   active: true,
 };
-const consentLabel = (m: Mapping) => {
-  const status = m.consent?.status;
-  if (!status) return "No SMS consent";
-  return `SMS ${status.replaceAll("_", " ")}`;
-};
 
-// Card list on top (rows in the change-order project picker's voice; copper
-// marks the one being edited), the add/edit form beneath, Save in the footer.
+// The card list is the whole sheet: each row reads card → person. Clicking a
+// row (or Add card) opens the editor as a second, smaller modal on top.
 export function MappingModal({ onClose }: { onClose: () => void }) {
   const [data, setData] = useState<Data | null>(null),
-    [draft, setDraft] = useState(blank);
-  const [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [consent, setConsent] = useState(false),
-    [script, setScript] = useState(""),
-    [editingCard, setEditingCard] = useState<string | null>(null);
+    [error, setError] = useState(""),
+    [editing, setEditing] = useState<Draft | null>(null),
+    [isNew, setIsNew] = useState(false);
   const load = () =>
     staffRequest<Data>("cc/mappings")
       .then(setData)
@@ -51,57 +51,23 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     void load();
   }, []);
-  function reset() {
-    setDraft(blank);
-    setEditingCard(null);
-    setConsent(false);
-    setScript("");
-  }
-  async function save() {
-    setBusy(true);
-    setError("");
-    try {
-      await staffRequest(
-        "cc/mappings",
-        json("PUT", {
-          ...draft,
-          employeeId: Number(draft.employeeId),
-          consentGranted: consent,
-          consentScript: script,
-        }),
-      );
-      await load();
-      reset();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  const editing = editingCard !== null;
   return (
     <CCModal
       eyebrow="Company card"
       title="Card mapping"
+      narrow
       onClose={onClose}
       footer={
-        <>
-          <span className="subheadline text-secondary">
-            Applies to future charges only.
-          </span>
-          <button
-            className="button primary-button"
-            disabled={
-              busy ||
-              !data ||
-              !/^\d{4}$/.test(draft.cardLast4) ||
-              !draft.employeeId
-            }
-            onClick={() => void save()}
-          >
-            {busy ? "Saving…" : editing ? "Save changes" : "Add card"}
-          </button>
-        </>
+        <button
+          className="button primary-button"
+          disabled={!data}
+          onClick={() => {
+            setIsNew(true);
+            setEditing(blank);
+          }}
+        >
+          <Plus size={15} /> Add card
+        </button>
       }
     >
       {!data ? (
@@ -112,180 +78,184 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
             Loading cards…
           </p>
         )
+      ) : data.mappings.length ? (
+        <div className="cc-map-list cc-map-list--full">
+          {data.mappings.map((m) => (
+            <button
+              key={m.cardLast4}
+              type="button"
+              className="cc-map-row"
+              onClick={() => {
+                setIsNew(false);
+                setEditing({
+                  ...blank,
+                  ...m,
+                  employeeId: String(m.employeeId || ""),
+                  ownerUid: m.ownerUid || "",
+                  phone: m.phone || "",
+                });
+              }}
+            >
+              <span className="cc-card-num cc-map-card">•••• {m.cardLast4}</span>
+              <span className="cc-map-name">{m.employeeName}</span>
+              {!m.active && (
+                <span className="cc-badge cc-badge--muted">Inactive</span>
+              )}
+              <ChevronRight size={15} className="cc-map-go" aria-hidden="true" />
+            </button>
+          ))}
+        </div>
       ) : (
-        <>
-          <section className="cc-band">
-            <div className="cc-band-head">
-              <h3 className="cc-band-title">Cards</h3>
-              {editing && (
-                <button
-                  type="button"
-                  className="cc-btn cc-btn--quiet"
-                  onClick={reset}
-                >
-                  <Plus size={15} aria-hidden="true" />
-                  Add another card
-                </button>
-              )}
-            </div>
-            {data.mappings.length ? (
-              <div className="cc-map-list">
-                {data.mappings.map((m) => (
-                  <button
-                    key={m.cardLast4}
-                    type="button"
-                    className={`cc-map-row${editingCard === m.cardLast4 ? " cc-map-row--active" : ""}`}
-                    onClick={() => {
-                      setDraft({
-                        ...m,
-                        employeeId: String(m.employeeId || ""),
-                        ownerUid: m.ownerUid || "",
-                        phone: m.phone || "",
-                      });
-                      setEditingCard(m.cardLast4);
-                      setConsent(false);
-                      setScript("");
-                    }}
-                  >
-                    <span className="cc-map-text">
-                      <span className="cc-map-name">{m.employeeName}</span>
-                      <span className="cc-map-meta">
-                        {m.phone || "No phone"} · {consentLabel(m)}
-                      </span>
-                    </span>
-                    {!m.active && (
-                      <span className="cc-badge cc-badge--muted">Inactive</span>
-                    )}
-                    <span className="cc-card-num">•••• {m.cardLast4}</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="cc-band-sub" style={{ marginTop: 0 }}>
-                No cards mapped yet.
-              </p>
-            )}
-          </section>
-
-          <fieldset className="cc-fieldset" disabled={busy}>
-            <section className="cc-band">
-              <div className="cc-band-head">
-                <h3 className="cc-band-title">
-                  {editing ? `Card •••• ${draft.cardLast4}` : "Add a card"}
-                </h3>
-              </div>
-              <div className="cc-grid">
-                <label className="cc-field">
-                  <span className="cc-field-label">Card last four</span>
-                  <input
-                    className="cc-input cc-input--money"
-                    value={draft.cardLast4}
-                    inputMode="numeric"
-                    maxLength={4}
-                    disabled={editing}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        cardLast4: e.target.value.replace(/\D/g, ""),
-                      })
-                    }
-                  />
-                </label>
-                <label className="cc-field">
-                  <span className="cc-field-label">Mobile number</span>
-                  <input
-                    className="cc-input"
-                    type="tel"
-                    placeholder="+1"
-                    value={draft.phone}
-                    onChange={(e) =>
-                      setDraft({ ...draft, phone: e.target.value })
-                    }
-                  />
-                </label>
-                <label className="cc-field">
-                  <span className="cc-field-label">Sage employee</span>
-                  <select
-                    className="cc-input"
-                    value={draft.employeeId}
-                    onChange={(e) =>
-                      setDraft({
-                        ...draft,
-                        employeeId: e.target.value,
-                        employeeName:
-                          data.employees.find(
-                            (x) => String(x.id) === e.target.value,
-                          )?.name || "",
-                      })
-                    }
-                  >
-                    <option value="">Choose an employee…</option>
-                    {data.employees.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.name} · {e.id}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="cc-field">
-                  <span className="cc-field-label">
-                    Dashboard login (optional)
-                  </span>
-                  <select
-                    className="cc-input"
-                    value={draft.ownerUid}
-                    onChange={(e) =>
-                      setDraft({ ...draft, ownerUid: e.target.value })
-                    }
-                  >
-                    <option value="">No login, texted links only</option>
-                    {data.users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <label className="cc-check">
-                <input
-                  type="checkbox"
-                  checked={draft.active}
-                  onChange={(e) =>
-                    setDraft({ ...draft, active: e.target.checked })
-                  }
-                />
-                Active
-              </label>
-              <label className="cc-check">
-                <input
-                  type="checkbox"
-                  checked={consent}
-                  onChange={(e) => setConsent(e.target.checked)}
-                />
-                I collected this employee’s explicit SMS consent today
-              </label>
-              {consent && (
-                <label className="cc-field">
-                  <span className="cc-field-label">
-                    Exact consent script read to the employee
-                  </span>
-                  <textarea
-                    className="cc-input"
-                    rows={4}
-                    value={script}
-                    onChange={(e) => setScript(e.target.value)}
-                  />
-                  <span className="cc-field-hint">
-                    Your name and today’s date are recorded with the script.
-                  </span>
-                </label>
-              )}
-              {error && <Banner tone="red">{error}</Banner>}
-            </section>
-          </fieldset>
-        </>
+        <p className="cc-band-sub" style={{ marginTop: 0 }}>
+          No cards mapped yet.
+        </p>
       )}
+      {editing && data && (
+        <CardEditor
+          initial={editing}
+          isNew={isNew}
+          data={data}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            void load();
+          }}
+        />
+      )}
+    </CCModal>
+  );
+}
+
+function CardEditor({
+  initial,
+  isNew,
+  data,
+  onClose,
+  onSaved,
+}: {
+  initial: Draft;
+  isNew: boolean;
+  data: Data;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [draft, setDraft] = useState(initial),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState("");
+  const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
+  const valid = /^\d{4}$/.test(draft.cardLast4) && !!draft.employeeId;
+  async function save() {
+    setBusy(true);
+    setError("");
+    try {
+      await staffRequest(
+        "cc/mappings",
+        json("PUT", { ...draft, employeeId: Number(draft.employeeId) }),
+      );
+      onSaved();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <CCModal
+      eyebrow={isNew ? "Card mapping" : `Card •••• ${initial.cardLast4}`}
+      title={isNew ? "Add card" : initial.employeeName || "Edit card"}
+      narrow
+      onClose={onClose}
+      footer={
+        <>
+          <button className="button secondary-button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="button primary-button"
+            disabled={busy || !valid}
+            onClick={() => void save()}
+          >
+            {busy ? "Saving…" : isNew ? "Add card" : "Save"}
+          </button>
+        </>
+      }
+    >
+      <fieldset className="cc-fieldset" disabled={busy}>
+        <div className="cc-grid">
+          <label className="cc-field">
+            <span className="cc-field-label">Card last four</span>
+            <input
+              className="cc-input cc-input--money"
+              value={draft.cardLast4}
+              inputMode="numeric"
+              maxLength={4}
+              autoFocus={isNew}
+              disabled={!isNew}
+              onChange={(e) =>
+                set({ cardLast4: e.target.value.replace(/\D/g, "") })
+              }
+            />
+          </label>
+          <label className="cc-field">
+            <span className="cc-field-label">Mobile number</span>
+            <input
+              className="cc-input"
+              type="tel"
+              placeholder="+1"
+              value={draft.phone}
+              onChange={(e) => set({ phone: e.target.value })}
+            />
+          </label>
+          <label className="cc-field cc-span-all">
+            <span className="cc-field-label">Sage employee</span>
+            <select
+              className="cc-input"
+              value={draft.employeeId}
+              onChange={(e) =>
+                set({
+                  employeeId: e.target.value,
+                  employeeName:
+                    data.employees.find((x) => String(x.id) === e.target.value)
+                      ?.name || "",
+                })
+              }
+            >
+              <option value="">Choose an employee…</option>
+              {data.employees.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name} · {e.id}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="cc-field cc-span-all">
+            <span className="cc-field-label">Dashboard login (optional)</span>
+            <select
+              className="cc-input"
+              value={draft.ownerUid}
+              onChange={(e) => set({ ownerUid: e.target.value })}
+            >
+              <option value="">No login, texted links only</option>
+              {data.users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        {!isNew && (
+          <label className="cc-check">
+            <input
+              type="checkbox"
+              checked={draft.active}
+              onChange={(e) => set({ active: e.target.checked })}
+            />
+            Active
+          </label>
+        )}
+        {error && <Banner tone="red">{error}</Banner>}
+      </fieldset>
     </CCModal>
   );
 }
