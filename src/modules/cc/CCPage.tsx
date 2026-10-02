@@ -41,7 +41,7 @@ import "./cc.css";
 const tabs = [
   { key: "pending", label: "Missing receipt" },
   { key: "awaiting", label: "Awaiting approval" },
-  { key: "past", label: "Past" },
+  { key: "past", label: "Complete" },
   { key: "all", label: "All" },
 ] as const;
 type Tab = (typeof tabs)[number]["key"];
