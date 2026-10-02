@@ -39,7 +39,7 @@ import "./cc.css";
 // head band (DetailModal voice) and adds the GM Review + Activity bands.
 
 const tabs = [
-  { key: "pending", label: "Pending entry" },
+  { key: "pending", label: "Missing receipt" },
   { key: "awaiting", label: "Awaiting approval" },
   { key: "past", label: "Past" },
   { key: "all", label: "All" },
