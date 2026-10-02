@@ -477,7 +477,7 @@ export default function CCPage() {
               </label>
               {error && <Banner tone="red">{error}</Banner>}
               <div className="cc-review-actions">
-                {!receipt.ownerUid && receipt.mode !== "test" && (
+                {receipt.employeeId == null && receipt.mode !== "test" && (
                   <button
                     className="cc-btn"
                     disabled={busy}
@@ -579,7 +579,7 @@ function ReceiptRow({
   onSelect: (on: boolean) => void;
   onOpen: () => void;
 }) {
-  const unassigned = !r.ownerUid && r.mode !== "test";
+  const unassigned = r.employeeId == null && r.mode !== "test";
   const syncNote = r.dropboxError
     ? "Dropbox retry pending"
     : r.firstSubmittedAt && r.dropboxRevision !== r.dropboxSyncedRevision

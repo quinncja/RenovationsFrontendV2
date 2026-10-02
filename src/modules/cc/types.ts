@@ -40,6 +40,8 @@ export interface Receipt {
   relatedReceiptIds?: string[];
   relatedReceipts?: { id: string; token: string }[];
   ownerUid?: string;
+  /** Sage employee the card maps to; set means the receipt is assigned. */
+  employeeId?: number | null;
   matchCandidates?: string[];
   dropboxRevision?: number;
   dropboxSyncedRevision?: number;

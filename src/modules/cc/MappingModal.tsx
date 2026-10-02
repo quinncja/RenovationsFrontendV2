@@ -91,7 +91,12 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
           </span>
           <button
             className="button primary-button"
-            disabled={busy || !data || !/^\d{4}$/.test(draft.cardLast4)}
+            disabled={
+              busy ||
+              !data ||
+              !/^\d{4}$/.test(draft.cardLast4) ||
+              !draft.employeeId
+            }
             onClick={() => void save()}
           >
             {busy ? "Saving…" : editing ? "Save changes" : "Add card"}
@@ -199,42 +204,44 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
                   />
                 </label>
                 <label className="cc-field">
-                  <span className="cc-field-label">Dashboard user</span>
-                  <select
-                    className="cc-input"
-                    value={draft.ownerUid}
-                    onChange={(e) => {
-                      const u = data.users.find(
-                        (u) => u.id === e.target.value,
-                      );
-                      setDraft({
-                        ...draft,
-                        ownerUid: e.target.value,
-                        employeeName: u?.name || "",
-                      });
-                    }}
-                  >
-                    <option value="">Choose a person…</option>
-                    {data.users.map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="cc-field">
                   <span className="cc-field-label">Sage employee</span>
                   <select
                     className="cc-input"
                     value={draft.employeeId}
                     onChange={(e) =>
-                      setDraft({ ...draft, employeeId: e.target.value })
+                      setDraft({
+                        ...draft,
+                        employeeId: e.target.value,
+                        employeeName:
+                          data.employees.find(
+                            (x) => String(x.id) === e.target.value,
+                          )?.name || "",
+                      })
                     }
                   >
                     <option value="">Choose an employee…</option>
                     {data.employees.map((e) => (
                       <option key={e.id} value={e.id}>
                         {e.name} · {e.id}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="cc-field">
+                  <span className="cc-field-label">
+                    Dashboard login (optional)
+                  </span>
+                  <select
+                    className="cc-input"
+                    value={draft.ownerUid}
+                    onChange={(e) =>
+                      setDraft({ ...draft, ownerUid: e.target.value })
+                    }
+                  >
+                    <option value="">No login, texted links only</option>
+                    {data.users.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
                       </option>
                     ))}
                   </select>
