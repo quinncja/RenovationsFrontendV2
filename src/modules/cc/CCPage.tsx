@@ -42,7 +42,7 @@ interface Listing {
   pageSize: number;
 }
 const emptyCopy: Record<Tab, string> = {
-  pending: "Nothing is waiting on a receipt.",
+  pending: "All card charges have receipts.",
   awaiting: "Nothing is waiting for approval.",
   past: "No approved or dismissed receipts yet.",
 };
@@ -201,8 +201,7 @@ export default function CCPage() {
 
   return (
     <Page
-      title="CC"
-      subtitle="Company card receipts"
+      title="Card Receipts"
       actions={
         <>
           {gm && (

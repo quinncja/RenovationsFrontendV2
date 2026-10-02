@@ -755,6 +755,26 @@ select.cc-input {
   font-size: 0.75rem;
   color: var(--secondary-text);
 }
+/* Inline "new Sage employee" panel in the card editor: a faint well so it reads
+   as a sub-form of the employee choice. */
+.cc-new-employee {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 1rem 1.125rem 1.125rem;
+  border-radius: 12px;
+  background: var(--hover-bg);
+}
+.cc-new-employee-title {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--secondary-text);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.cc-new-employee .cc-seg { align-self: stretch; }
+.cc-new-employee .cc-seg-btn { flex: 1; padding-top: 0.55rem; padding-bottom: 0.55rem; }
+
 /* Mapping sheet: the list is the sheet, so it grows with the modal. */
 .cc-map-list--full {
   max-height: none;

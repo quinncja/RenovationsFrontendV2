@@ -17,7 +17,9 @@ interface Data {
   mappings: Mapping[];
   employees: { id: number; name: string }[];
   users: { id: string; name: string; email: string }[];
+  positions: { id: number; name: string }[];
 }
+const NEW_EMPLOYEE = "new";
 type Draft = {
   cardLast4: string;
   employeeName: string;
@@ -141,16 +143,43 @@ function CardEditor({
 }) {
   const [draft, setDraft] = useState(initial),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [person, setPerson] = useState({
+      firstName: "",
+      lastName: "",
+      gender: "",
+      position: "",
+    });
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
-  const valid = /^\d{4}$/.test(draft.cardLast4) && !!draft.employeeId;
+  const adding = draft.employeeId === NEW_EMPLOYEE;
+  const valid =
+    /^\d{4}$/.test(draft.cardLast4) &&
+    !!draft.employeeId &&
+    (!adding ||
+      (!!person.firstName.trim() &&
+        !!person.lastName.trim() &&
+        !!person.gender &&
+        !!person.position));
   async function save() {
     setBusy(true);
     setError("");
     try {
+      // A new person is created in Sage first; the card then maps to them.
+      let employee = { id: Number(draft.employeeId), name: draft.employeeName };
+      if (adding) {
+        employee = await staffRequest<{ id: number; name: string }>(
+          "cc/employees",
+          json("POST", { ...person, gender: Number(person.gender), position: Number(person.position) }),
+        );
+        set({ employeeId: String(employee.id), employeeName: employee.name });
+      }
       await staffRequest(
         "cc/mappings",
-        json("PUT", { ...draft, employeeId: Number(draft.employeeId) }),
+        json("PUT", {
+          ...draft,
+          employeeId: employee.id,
+          employeeName: employee.name,
+        }),
       );
       onSaved();
     } catch (e) {
@@ -175,7 +204,13 @@ function CardEditor({
             disabled={busy || !valid}
             onClick={() => void save()}
           >
-            {busy ? "Saving…" : isNew ? "Add card" : "Save"}
+            {busy
+              ? "Saving…"
+              : adding
+                ? "Add employee and card"
+                : isNew
+                  ? "Add card"
+                  : "Save"}
           </button>
         </>
       }
@@ -221,6 +256,7 @@ function CardEditor({
               }
             >
               <option value="">Choose an employee…</option>
+              <option value={NEW_EMPLOYEE}>+ Add new employee…</option>
               {data.employees.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.name} · {e.id}
@@ -228,6 +264,78 @@ function CardEditor({
               ))}
             </select>
           </label>
+          {adding && (
+            <div className="cc-new-employee cc-span-all">
+              <span className="cc-new-employee-title">New Sage employee</span>
+              <div className="cc-grid">
+                <label className="cc-field">
+                  <span className="cc-field-label">First name</span>
+                  <input
+                    className="cc-input"
+                    autoFocus
+                    maxLength={50}
+                    value={person.firstName}
+                    onChange={(e) =>
+                      setPerson({ ...person, firstName: e.target.value })
+                    }
+                  />
+                </label>
+                <label className="cc-field">
+                  <span className="cc-field-label">Last name</span>
+                  <input
+                    className="cc-input"
+                    maxLength={50}
+                    value={person.lastName}
+                    onChange={(e) =>
+                      setPerson({ ...person, lastName: e.target.value })
+                    }
+                  />
+                </label>
+                <div className="cc-field">
+                  <span className="cc-field-label">Gender</span>
+                  <div className="cc-seg" role="radiogroup" aria-label="Gender">
+                    {(
+                      [
+                        ["1", "Male"],
+                        ["2", "Female"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        role="radio"
+                        aria-checked={person.gender === key}
+                        className={`cc-seg-btn${person.gender === key ? " cc-seg-btn--active" : ""}`}
+                        onClick={() => setPerson({ ...person, gender: key })}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label className="cc-field">
+                  <span className="cc-field-label">Position</span>
+                  <select
+                    className="cc-input"
+                    value={person.position}
+                    onChange={(e) =>
+                      setPerson({ ...person, position: e.target.value })
+                    }
+                  >
+                    <option value="">Choose a position…</option>
+                    {data.positions.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <span className="cc-field-hint">
+                Added to Sage as a current, regular full-time IL employee.
+              </span>
+            </div>
+          )}
           <label className="cc-field cc-span-all">
             <span className="cc-field-label">Dashboard login (optional)</span>
             <select
