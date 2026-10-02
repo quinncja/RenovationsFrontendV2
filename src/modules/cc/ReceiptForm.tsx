@@ -91,12 +91,16 @@ export function FilePreview({
   const isImage = file.mime.startsWith("image/") && file.mime !== "image/heic";
   const image = url && isImage;
   return (
-    <button
-      type="button"
+    // A link, not a button: the form's read-only <fieldset disabled> would
+    // otherwise disable it, and a receipt must stay viewable after submit.
+    <a
       className="cc-file"
-      disabled={!url}
+      href={url || undefined}
       title={error || `View ${file.name}`}
-      onClick={() => url && onOpen(file, url)}
+      onClick={(e) => {
+        e.preventDefault();
+        if (url) onOpen(file, url);
+      }}
     >
       <span className="cc-file-thumb">
         {image ? (
@@ -108,7 +112,7 @@ export function FilePreview({
       {(error || !isImage) && (
         <span className="cc-file-name">{error || file.name}</span>
       )}
-    </button>
+    </a>
   );
 }
 

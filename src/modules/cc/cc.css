@@ -524,16 +524,9 @@ select.cc-input {
   color: var(--primary-text);
   text-decoration: none;
 }
-/* Thumbnails are buttons (they open the in-app viewer). */
-button.cc-file {
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  text-align: left;
-  cursor: zoom-in;
-}
-button.cc-file:disabled { cursor: progress; }
+/* Thumbnails open the in-app viewer. */
+a.cc-file { cursor: zoom-in; }
+a.cc-file:not([href]) { cursor: default; }
 .cc-file-thumb {
   display: grid;
   place-items: center;
