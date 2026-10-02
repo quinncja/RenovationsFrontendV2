@@ -47,6 +47,7 @@ export const WIDGET_HOME_SECTION: Record<WidgetId, SectionId> = {
   openProjectsNoBudget: "reports",
   missingUnitCounts: "reports",
   missingOneOffNames: "reports",
+  costTypeMismatch: "reports",
   // Business Development
   currentYearRevenue: "businessDevelopment",
   allTimeRevenue: "businessDevelopment",
@@ -89,6 +90,7 @@ export const WIDGET_DEFAULT_ORDER: WidgetId[] = [
   "openProjectsNoBudget",
   "missingUnitCounts",
   "missingOneOffNames",
+  "costTypeMismatch",
   // Business Development
   "currentYearRevenue",
   "allTimeRevenue",

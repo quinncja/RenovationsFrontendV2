@@ -2,10 +2,10 @@ import { Fragment, useState, type ReactNode } from "react"
 import { SkelText } from "../../../shared/components/SkelText"
 import { formatMoneyFull } from "../../../shared/utils/format"
 
-// One column of the Period & Year Summary widget. The bands sit on their
-// own white sheet inside the widget's warm surface; the eyebrow and its
-// period/year selector stay outside it, so the header reads as a label on
-// the card and the sheet reads as the statement.
+// One column of the Period & Year Summary widget. The eyebrow (title +
+// period/year selector) and the bands all sit on one white sheet inset in
+// the widget's warm, copper-edged surface, so the card reads as a framed
+// statement with its heading on the same page as its figures.
 //
 // Every row shares one pitch and one size. What varies is the ROLE each
 // line plays in the arithmetic, shown the way the math is actually written:
@@ -90,12 +90,12 @@ export function SummaryColumn({ eyebrow, actions, groups, loading, pulseKey }: S
 
   return (
     <div className="pys-col">
-      <div className="pys-eyebrow">
-        <span className="pys-title widget-title headline">{eyebrow}</span>
-        {actions && <span className="pys-actions">{actions}</span>}
-      </div>
       <div className="pys-sheet" key={`sheet-${ripple}`}>
         {ripple > 0 && <span className="pys-ripple" aria-hidden="true" />}
+        <div className="pys-eyebrow">
+          <span className="pys-title widget-title headline">{eyebrow}</span>
+          {actions && <span className="pys-actions">{actions}</span>}
+        </div>
         {groups.map((g, gi) => (
           <Fragment key={gi}>
             {/* The seam is its own element, not a band border: both seams

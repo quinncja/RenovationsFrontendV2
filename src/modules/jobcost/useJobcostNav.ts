@@ -20,6 +20,7 @@ const DETAIL_LABELS: Array<[string, string]> = [
   ["/jobcost/property", "Property"],
   ["/jobcost/", "Job Costing"],
   ["/dashboard/forecast-billings", "Forecast Billings"],
+  ["/margin-report", "Margin Report"],
   ["/dashboard/breakdown", "Breakdown"],
   ["/dashboard", "Dashboard"],
 ]

@@ -34,6 +34,7 @@ const UpcomingBillingsPage = lazy(() => import("../../modules/dashboard/Upcoming
 const ProgressBillingsPage = lazy(() => import("../../modules/dashboard/ProgressBillingsPage.tsx"))
 const Invoices = lazy(() => import("../../modules/invoices/Invoices.tsx"))
 const OverheadReportPage = lazy(() => import("../../modules/dashboard/OverheadReportPage.tsx"))
+const MarginReportPage = lazy(() => import("../../modules/dashboard/MarginReportPage.tsx"))
 const Users = lazy(() => import("../../modules/users/Users.tsx"))
 const FeedbackPage = lazy(() => import("../../modules/feedback/FeedbackPage.tsx"))
 
@@ -122,6 +123,19 @@ export default function Router() {
                 <OverheadReportPage />
               </RequireRole>
             } />
+            {/* Still in testing: dev builds only (import.meta.env.DEV is false
+                in production, so the route doesn't exist there). The page
+                already supports managers (own jobs by default, All jobs
+                toggle); on release drop the DEV gate here, in the Reports nav
+                group and the Margin widget link, and add
+                "manager"/"generalManager" back to the roles and their navs. */}
+            {import.meta.env.DEV && (
+              <Route path="/margin-report" element={
+                <RequireRole allowed={["executive", "admin"]}>
+                  <MarginReportPage />
+                </RequireRole>
+              } />
+            )}
 
             {/* Directory — admin/executive */}
             <Route path="/clients" element={<RequireRole allowed={["executive", "admin"]}><ClientsPage /></RequireRole>} />

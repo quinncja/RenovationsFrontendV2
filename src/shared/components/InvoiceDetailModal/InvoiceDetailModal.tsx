@@ -163,9 +163,12 @@ function apLineToItem(l: APInvoiceLine, withJob: boolean): LedgerItem {
 // their cost type, the job being the modal's project link already.
 type JobLineGroup = DetailLineGroup & { jobNum: string | null }
 function apCostLinesToLedger(rows: APInvoiceCostLine[]): { lines: LedgerItem[]; groups: JobLineGroup[] | null } {
+  // Meta carries the jobcst record number so a line can be found in Sage.
   const toItem = (r: APInvoiceCostLine): LedgerItem => ({
     primary: r.description || costTypeLabel(r.costType) || "Job cost",
-    meta: r.description ? costTypeLabel(r.costType) : null,
+    meta: [r.description ? costTypeLabel(r.costType) : null, r.costRecnum ? `Job cost rec ${r.costRecnum}` : null]
+      .filter(Boolean)
+      .join(" · ") || null,
     amount: r.amount,
   })
   const jobs = new Set(rows.map((r) => r.jobNum ?? ""))

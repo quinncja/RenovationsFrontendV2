@@ -1372,10 +1372,9 @@ body{
 }
 .pys-widget { min-height: 0; }
 .pys-widget .widget-header { display: none; }
-/* No widget header on this card, so the eyebrow row IS the header: start it
-   at the card's padding edge and pull it up by half the selector's overhang,
-   so the eyebrow text lands on the same baseline as a normal widget title
-   (e.g. the Open Position card beside it). */
+/* No widget header on this card: the eyebrow lives inside each sheet, so
+   the body starts flush at the card's padding edge and the warm frame is
+   the same width on every side. */
 .pys-widget .widget-body { padding-top: 0; }
 .pys-grid {
   display: grid;
@@ -1413,13 +1412,17 @@ body{
 .pys-position-widget .overdue-line-title,
 .pys-position-widget .overdue-line-dir { font-size: var(--callout-size); }
 .pys-band-final .pys-label { white-space: nowrap; }
+/* The eyebrow is the sheet's first row: title on the left, selector on the
+   right, sitting on the white ground above the figures. Its 2rem height is
+   the selector's; the title centres in it. */
 .pys-eyebrow {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   min-height: 2rem;
-  margin-top: -0.5rem;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
+  position: relative;
+  z-index: 1;
 }
 .pys-actions {
   display: inline-flex;
@@ -1454,8 +1457,9 @@ body{
    vs semibold) and ink. Rules mark the two seams of the waterfall, so six
    rows read as three bands: inputs → result → conclusion. */
 .pys-title { margin-bottom: 0; }
-/* The statement itself: a white sheet inset in the widget's warm surface.
-   The eyebrow and its selector stay outside, on the warm ground. */
+/* The statement itself: a white sheet inset in the widget's warm surface,
+   carrying the eyebrow and its selector as well as the figures. The card's
+   own 1.25rem padding is the warm, copper-edged frame around it. */
 .pys-sheet {
   /* Fills its card, and the cards in a slot stretch to the tallest, so all
      three sheets come out the same height. The seams cap how far the bands
@@ -1465,11 +1469,7 @@ body{
   background: var(--card-color);
   border: 1px solid var(--border-color);
   border-radius: 12px;
-  padding: 1.125rem 1.25rem;
-  /* An even warm frame all the way round. The bottom and sides come from the
-     card's own 1.25rem padding; at the top, the eyebrow row is 2rem tall with
-     its text centred, so its 0.75rem margin plus that ~0.5rem of slack below
-     the text already makes the same 1.25rem — no margin of our own. */
+  padding: 0.875rem 1.25rem 1.125rem;
   box-shadow: var(--button-shadow);
   /* Bands stay tight; the seams between them absorb any extra height, so a
      taller row breathes evenly instead of stranding whitespace. */
@@ -14150,6 +14150,7 @@ svg.placeholder-illustration {
 .report-icon-navy { --icon-color: #19375a; }
 .report-icon-teal { --icon-color: #2f7d72; }
 .report-icon-plum { --icon-color: #6b4d78; }
+.report-icon-indigo { --icon-color: #4a5596; }
 
 .report-card-count {
   font-size: 2.5rem;
@@ -14229,6 +14230,87 @@ svg.placeholder-illustration {
   padding: 1.5rem 1.25rem 2rem;
   text-align: center;
 }
+
+/* Reference mapping beside a report modal. The anchor wraps only the modal,
+   so the modal stays centered and the card hangs off its left edge; below
+   1360px there is no room, so the inline copy inside the modal shows instead. */
+.reports-modal-anchor {
+  position: relative;
+  display: flex;
+  max-height: 80vh;
+}
+
+.reports-mapping-side {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 1rem);
+  width: max-content;
+  pointer-events: auto;
+}
+
+.reports-mapping {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.reports-mapping-side .reports-mapping { padding: 1rem 1.125rem; }
+
+.reports-mapping-title { color: var(--secondary-text); }
+
+/* Category · account → cost type. Rows are subgrids so the account and type
+   columns line up under their heads. */
+.reports-mapping-grid {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  column-gap: 0.625rem;
+  row-gap: 0.375rem;
+  align-items: center;
+  font-size: var(--callout-size);
+}
+
+.reports-mapping-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.reports-mapping-head {
+  font-size: 0.6875rem;
+  color: var(--secondary-text);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.reports-mapping-category { font-weight: 600; }
+.reports-mapping-row .num { text-align: right; color: var(--secondary-text); }
+.reports-mapping-arrow { color: var(--secondary-text); opacity: 0.7; }
+
+.reports-mapping--inline { display: none; }
+
+@media (max-width: 1360px) {
+  .reports-mapping-side { display: none; }
+  .reports-mapping--inline {
+    display: flex;
+    margin: 0 1.25rem 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    background: var(--hover-bg);
+  }
+  .reports-mapping--inline .reports-mapping-grid { max-width: 320px; }
+}
+
+/* Cost type mismatch table: two-line cells (value over its code). */
+.ctm-table td { vertical-align: top; }
+.ctm-primary { display: block; }
+.ctm-secondary {
+  display: block;
+  font-size: var(--callout-size);
+  color: var(--secondary-text);
+}
+.ctm-coded { font-weight: 600; }
+.ctm-table .ctm-num { text-align: right; white-space: nowrap; }
 
 /* Job / Job # cells in the reports modal navigate to the job page on click. */
 .reports-modal-job-cell {
@@ -22427,6 +22509,267 @@ body.pj-painting td.pj-computed {
   }
 }
 
+/* ── Margin Report (/margin-report) ── */
+/* Phase | One-off cards: the page's headline instruments, so they wear the
+   jobcost deck (warm porcelain / charcoal gradient, copper bloom, recessed
+   topline) instead of the plain white card. The margin is the one big figure; gross profit answers it
+   at the right in a half-size; a quiet uppercase strip closes the card.
+   The whole card is the click target (Widget expandable). */
+.mgr-kind-widget {
+  --jcb-text: light-dark(var(--primary-text), rgba(240, 232, 222, 0.93));
+  --jcb-muted: light-dark(var(--secondary-text), rgba(240, 232, 222, 0.55));
+  --jcb-line: light-dark(var(--border-color), rgba(240, 232, 222, 0.1));
+  --jcb-s1: light-dark(#fdfcfa, #2b241e);
+  --jcb-s2: light-dark(#f4f1ec, #1f1a15);
+  --jcb-bloom: light-dark(rgb(from var(--primary-color) r g b / 0.08), rgb(from var(--primary-color) r g b / 0.18));
+  --jcb-topline: light-dark(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.07));
+  --jc-shadow-ink: light-dark(var(--primary-text), #000);
+  min-height: 0;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem 1.375rem;
+  border: 1px solid var(--jcb-line);
+  background:
+    radial-gradient(120% 200% at 88% 0%, var(--jcb-bloom) 0%, transparent 55%),
+    linear-gradient(180deg, var(--jcb-s1) 0%, var(--jcb-s2) 100%);
+  box-shadow:
+    inset 0 1px 0 var(--jcb-topline),
+    0 1px 2px rgb(from var(--jc-shadow-ink) r g b / 0.06),
+    0 16px 32px -24px rgb(from var(--jc-shadow-ink) r g b / 0.3);
+}
+/* No lift on hover: the deck's resting shadow is the whole treatment. */
+.mgr-kind-widget.widget-expandable,
+.mgr-kind-widget.widget-expandable:hover { transition: none; }
+.mgr-kind-widget.widget-expandable:hover {
+  box-shadow:
+    inset 0 1px 0 var(--jcb-topline),
+    0 1px 2px rgb(from var(--jc-shadow-ink) r g b / 0.06),
+    0 16px 32px -24px rgb(from var(--jc-shadow-ink) r g b / 0.3);
+}
+/* The kind, in the recessed copper display type of the jobcost overview
+   strip: seated at the right of the hero row, level with the margin and
+   gross profit figures, overrunning the right edge so the card crops it, faded toward the left. It is
+   faint enough that the strip figures may sit on top of it. */
+.mgr-kind-widget .widget-title { color: var(--jcb-muted); }
+.mgr-kind-widget .widget-see-all { color: var(--jcb-muted); }
+.mgr-kind-widget.widget-expandable:hover .widget-see-all { color: var(--primary-color); }
+.mgr-kind-widget .widget-body { gap: 1.375rem; padding-top: 0.5rem; }
+.mgr-kind-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+.mgr-kind-main { display: flex; align-items: baseline; gap: 0.625rem; }
+/* One big register: 2.75rem tight display figure, the same tabular ink the
+   KPI tiles use, so the eye lands here first. */
+.mgr-kind-margin {
+  font-size: 2.75rem;
+  line-height: 1;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--jcb-text);
+}
+.mgr-kind-margin-label {
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--jcb-muted);
+}
+.mgr-kind-gp {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  padding-bottom: 0.125rem;
+}
+.mgr-kind-gp-value {
+  font-size: 1.375rem;
+  line-height: 1.1;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+  color: var(--jcb-text);
+}
+.mgr-kind-label {
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--jcb-muted);
+}
+/* Closing strip: hairline rule above, stats in the deck's muted/ink voice. */
+.mgr-kind-strip {
+  display: flex;
+  gap: 1.75rem;
+  flex-wrap: wrap;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--jcb-line);
+}
+.mgr-kind-strip .jc-head-stat { align-items: flex-start; min-width: 0; gap: 0.2rem; }
+.mgr-kind-strip .jc-head-stat-label { color: var(--jcb-muted); }
+.mgr-kind-strip .jc-head-stat-value { color: var(--jcb-text); }
+.mgr-kind-strip .mgr-kind-share { margin-left: auto; align-items: flex-end; }
+
+/* Header scope controls: the ohr seg dressed as the outline pill its
+   neighbours wear (.jc-export-btn / .year-selector) — same 1.5px border,
+   same radius, no recessed well — so the header reads as one row of pills.
+   The copper thumb stays: active state is meaning, not decoration. */
+.ohr-seg.mgr-hdr-seg {
+  padding: 3px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-color);
+  background: transparent;
+  box-shadow: none;
+}
+.mgr-hdr-seg .ohr-seg-btn {
+  padding: 0.22rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+.mgr-hdr-seg .ohr-seg-thumb { border-radius: 999px; }
+
+/* KPI captions under the summary tiles. */
+.mgr-kpi-caption { font-size: var(--callout-size); font-variant-numeric: tabular-nums; line-height: 1.4; }
+
+/* Client / property leaderboards (highest margin first): five rows the eye reads in one pass, no
+   inner scroll. Each row is rank · name + meta ‖ margin over gross profit,
+   the kind cards' two-register pairing at list scale. Hairlines between
+   rows, hover is the quiet fill only; the whole card opens the full list. */
+.mgr-lead-widget .widget-body { padding-top: 0.25rem; gap: 0; }
+.mgr-lead { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.mgr-lead-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.mgr-lead-row {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.875rem;
+  margin: 0 -0.75rem;
+  padding: 0.75rem 0.75rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.mgr-lead-row:hover,
+.mgr-lead-row:focus-visible { background: var(--hover-bg); outline: none; }
+.mgr-lead-row + .mgr-lead-row { position: relative; }
+.mgr-lead-row + .mgr-lead-row::before {
+  content: "";
+  position: absolute;
+  left: 0.75rem;
+  right: 0.75rem;
+  top: 0;
+  border-top: 1px solid var(--border-color);
+}
+.mgr-lead-row-skel { cursor: default; pointer-events: none; }
+.mgr-lead-row:hover::before,
+.mgr-lead-row:hover + .mgr-lead-row::before { border-color: transparent; }
+.mgr-lead-rank {
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--secondary-text);
+  text-align: center;
+}
+.mgr-lead-main { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.mgr-lead-name {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mgr-lead-meta {
+  font-size: var(--callout-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mgr-lead-figures { display: flex; flex-direction: column; align-items: flex-end; gap: 0.15rem; }
+.mgr-lead-margin {
+  font-size: 1.125rem;
+  line-height: 1.1;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--primary-text);
+}
+.mgr-lead-gp {
+  font-size: var(--callout-size);
+  font-variant-numeric: tabular-nums;
+  color: var(--secondary-text);
+  white-space: nowrap;
+}
+.mgr-lead-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--secondary-text);
+}
+
+/* Full ranked list modal: the leaderboard's long form. Rank column is a
+   quiet gutter; search pill lives beside the close button. */
+.mgr-groups-modal { width: min(820px, 94vw); max-width: 94vw; max-height: 86vh; }
+.mgr-group-table td { vertical-align: middle; }
+.mgr-group-table .mgr-rank-th { width: 2.25rem; }
+.mgr-group-table .mgr-rank-td {
+  width: 2.25rem;
+  font-size: var(--subheadline-size);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+  padding-right: 0;
+}
+.mgr-group-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+
+/* Distribution strip: a short chart, not a full-height one. */
+/* Sits beside the monthly gross margin chart; same plot height so the pair aligns. */
+.mgr-dist-widget .chart-container { min-height: 280px; }
+
+/* Monthly Margin rows reuse the overhead month cards; the head carries four
+   stats, so give them a touch less minimum width each. */
+.mgr-month-stats { gap: 1.25rem; }
+.mgr-month-stats .jc-head-stat { min-width: 5rem; }
+.mgr-month-items { overflow-x: auto; }
+.mgr-residual-row td { background: rgb(from var(--primary-text) r g b / 0.02); }
+
+/* Jobs modal: sized to its table (nowrap cells set the intrinsic width) so
+   the columns never scroll sideways; only the viewport caps it. */
+.mgr-jobs-modal {
+  width: fit-content;
+  min-width: min(720px, 94vw);
+  max-width: 94vw;
+}
+.mgr-jobs-modal .reports-modal-body { overflow-x: hidden; }
+.mgr-modal-actions { display: flex; align-items: center; gap: 0.5rem; }
+.mgr-jobs-table td { white-space: nowrap; }
+.mgr-job-name { display: block; }
+.mgr-job-recnum { display: block; font-size: 0.72rem; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 768px) {
+  .mgr-kind-widget { padding: 1.125rem 1.25rem; }
+  .mgr-kind-margin { font-size: 2.25rem; }
+  .mgr-kind-strip { gap: 1.25rem; }
+  .mgr-month-stats { gap: 0.75rem; }
+  .mgr-month-stats .jc-head-stat:nth-child(2) { display: none; }
+  .mgr-group-name { max-width: 160px; }
+  .mgr-lead-row { gap: 0.625rem; }
+  .mgr-lead-meta { white-space: normal; }
+}
+
 /* Job costing keeps every column; reuse the projections scroll-edge veils. */
 .jc-table-shell { min-width: 0; }
 .jc-scroll-frame {
@@ -22633,3 +22976,7 @@ body.pj-painting td.pj-computed {
 .jc-scroll-frame .jc-table-wrap > .spend-rank-table > tbody > .spend-rank-table-row.jc-row-open:hover > td {
   background: color-mix(in srgb, var(--primary-text) 5%, var(--card-color));
 }
+
+.mgr-basis-scroll { overflow-x: auto; max-width: 100%; }
+
+.mgr-jobs-modal .mgr-modal-actions { flex-wrap: wrap; justify-content: flex-end; }

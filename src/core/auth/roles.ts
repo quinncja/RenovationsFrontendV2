@@ -24,6 +24,7 @@ import {
   Clock,
   ChartPie,
   Table2,
+  Percent,
 } from "lucide-react"
 
 export interface NavItem {
@@ -69,6 +70,7 @@ const navItems = {
   invoices: { label: "Invoices", path: "/invoices", icon: FileText },
   upcomingBillings: { label: "Forecast Billings", path: "/forecast-billings", icon: CalendarClock },
   progressBillings: { label: "Progress Billings", path: "/progress-billings", icon: Receipt },
+  marginReport: { label: "Margin Report", path: "/margin-report", icon: Percent },
   overheadReport: { label: "Overhead Report", path: "/overhead-report", icon: ChartPie },
   users: { label: "Users", path: "/users", icon: Users },
   clients: { label: "Clients", path: "/clients", icon: Users2 },
@@ -91,7 +93,14 @@ export const PAGE_LABELS: ReadonlyArray<readonly [string, string]> = Object.valu
 const financesGroup: NavGroup = {
   label: "Reports",
   icon: Landmark,
-  items: [navItems.invoices, navItems.overheadReport, navItems.upcomingBillings, navItems.progressBillings],
+  items: [
+    navItems.invoices,
+    // Margin Report is still in testing: dev builds only.
+    ...(import.meta.env.DEV ? [navItems.marginReport] : []),
+    navItems.overheadReport,
+    navItems.upcomingBillings,
+    navItems.progressBillings,
+  ],
 }
 
 const directoryGroup: NavGroup = {

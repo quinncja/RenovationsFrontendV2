@@ -1,11 +1,12 @@
 import { useState } from "react"
 import { createPortal } from "react-dom"
 import { useJobcostNav } from "../../../jobcost/useJobcostNav"
-import { X, TriangleAlert, Calculator, Hash, Type } from "lucide-react"
+import { X, TriangleAlert, Calculator, Hash, Type, ArrowLeftRight, ArrowRight } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useWidgetData, usePageDisconnected } from "../../../../shared/context/PageContext"
 import { useModalLayer } from "../../../../shared/hooks/useModalLayer"
-import { formatNumber } from "../../../../shared/utils/format"
+import { formatNumber, formatMoneyFull } from "../../../../shared/utils/format"
+import { InvoiceDetailModal } from "../../../../shared/components/InvoiceDetailModal/InvoiceDetailModal"
 
 // Summary counts come from the `dataValidation` query (a single-row recordset),
 // the per-issue job rows from `dataValidationOpen` (tagged with `category`).
@@ -21,6 +22,7 @@ interface ValidationCounts {
   noBudget: number
   noUnitCount: number
   noOneOffName: number
+  costTypeMismatch: number
 }
 
 interface ValidationDetailRow {
@@ -29,9 +31,20 @@ interface ValidationDetailRow {
   jobnme: string
   status: number
   detail: string
+  // Cost type mismatch rows only (NULL for every other category).
+  invoiceRecnum?: string | null
+  invoiceNum?: string | null
+  vendorName?: string | null
+  accountNums?: string | null
+  accountTypes?: string | null
+  codedTypes?: string | null
+  codedTypeNums?: string | null
+  amount?: number | null
+  /** jobcst.recnum(s) behind the row, comma-separated. */
+  costRecnums?: string | null
 }
 
-type ReportVariant = "red" | "orange" | "gray" | "navy" | "teal" | "plum"
+type ReportVariant = "red" | "orange" | "gray" | "navy" | "teal" | "plum" | "indigo"
 
 type ReportWidgetId =
   | "reconciliation"
@@ -40,6 +53,7 @@ type ReportWidgetId =
   | "openProjectsNoBudget"
   | "missingUnitCounts"
   | "missingOneOffNames"
+  | "costTypeMismatch"
 
 interface ReportDefinition {
   /** Field on the counts row, also the `category` tag on detail rows. */
@@ -51,6 +65,44 @@ interface ReportDefinition {
   /** Short label for the compact pill rendering (GM home alert strip). */
   shortTitle: string
   subtitle: string
+  /** Reference table shown beside the modal (left of it on wide screens). */
+  mapping?: { title: string; rows: { category: string; account: string; costType: string }[] }
+  /** Columned table in place of the default Job / Job Number / Details. */
+  table?: "costTypeMismatch"
+}
+
+// Mirrors AcctCostTypeMap in the backend's dashboard.queries.js; change both
+// together.
+const ACCOUNT_COST_TYPE_MAPPING = {
+  title: "Expected Mapping",
+  rows: [
+    { category: "Material", account: "5500", costType: "1" },
+    { category: "Labor", account: "5400", costType: "2" },
+    { category: "Subcontractor", account: "5200", costType: "4" },
+    { category: "WTPM", account: "5005", costType: "5" },
+  ],
+}
+
+function MappingCard({ mapping, className }: { mapping: NonNullable<ReportDefinition["mapping"]>; className: string }) {
+  return (
+    <div className={`reports-mapping ${className}`}>
+      <span className="reports-mapping-title footnote emphasized">{mapping.title}</span>
+      <div className="reports-mapping-grid">
+        <span className="reports-mapping-head" />
+        <span className="reports-mapping-head">Account</span>
+        <span className="reports-mapping-head" />
+        <span className="reports-mapping-head">Cost Type</span>
+        {mapping.rows.map((r) => (
+          <div key={r.category} className="reports-mapping-row">
+            <span className="reports-mapping-category">{r.category}</span>
+            <span className="num">{r.account}</span>
+            <ArrowRight size={12} className="reports-mapping-arrow" aria-label="maps to" />
+            <span className="num">{r.costType}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // One definition per split widget. Was the `REPORTS` array in ReportsWidget.
@@ -102,6 +154,16 @@ const REPORT_DEFINITIONS: Record<ReportWidgetId, ReportDefinition> = {
     title: "Missing One-Off Names Report",
     shortTitle: "Missing One-Off Names",
     subtitle: "One-Off Jobs Without a One-Off Name",
+  },
+  costTypeMismatch: {
+    accessor: "costTypeMismatch",
+    variant: "indigo",
+    glyph: <ArrowLeftRight size={16} strokeWidth={2.5} />,
+    title: "Cost Type Mismatch Report",
+    shortTitle: "Cost Type Mismatch",
+    subtitle: "Invoice Accounts Not Matching Job Cost Types",
+    mapping: ACCOUNT_COST_TYPE_MAPPING,
+    table: "costTypeMismatch",
   },
 }
 
@@ -197,6 +259,18 @@ export function ReportWidget({ reportId, compact = false }: { reportId: ReportWi
                 onClick={() => setOpen(false)}
               />
               <div className="modal-positioner" style={{ zIndex: contentZ }}>
+                <div className="reports-modal-anchor">
+                {report.mapping && (
+                  <motion.div
+                    className="reports-mapping-side"
+                    initial={{ opacity: 0, scale: 0.96, y: 16 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.96, y: 16 }}
+                    transition={{ duration: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
+                  >
+                    <MappingCard mapping={report.mapping} className="card" />
+                  </motion.div>
+                )}
                 <motion.div
                   className="modal reports-modal"
                   initial={{ opacity: 0, scale: 0.96, y: 16 }}
@@ -217,9 +291,15 @@ export function ReportWidget({ reportId, compact = false }: { reportId: ReportWi
                     </button>
                   </div>
 
+                  {report.mapping && (
+                    <MappingCard mapping={report.mapping} className="reports-mapping--inline" />
+                  )}
+
                   <div className="reports-modal-body">
                     {activeRows.length === 0 ? (
                       <p className="reports-modal-empty body-text text-secondary">No issues found.</p>
+                    ) : report.table === "costTypeMismatch" ? (
+                      <CostTypeMismatchTable rows={activeRows} onJob={goToJob} />
                     ) : (
                       <table className="data-table">
                         <thead>
@@ -260,12 +340,94 @@ export function ReportWidget({ reportId, compact = false }: { reportId: ReportWi
                     )}
                   </div>
                 </motion.div>
+                </div>
               </div>
             </>
           )}
         </AnimatePresence>,
         document.body
       )}
+    </>
+  )
+}
+
+/**
+ * Cost type mismatch rows as columns: the invoice's account (and the cost type
+ * it implies) beside the cost type the job cost was actually coded to.
+ * Largest dollar mismatches first. A row opens its AP invoice in the shared
+ * invoice modal (stacked above this one); the job cell still opens the job.
+ */
+function CostTypeMismatchTable({ rows, onJob }: { rows: ValidationDetailRow[]; onJob: (n: string | number) => void }) {
+  const sorted = [...rows].sort((a, b) => Math.abs(Number(b.amount ?? 0)) - Math.abs(Number(a.amount ?? 0)))
+  const [invoice, setInvoice] = useState<ValidationDetailRow | null>(null)
+  const openInvoice = (row: ValidationDetailRow) => {
+    if (row.invoiceRecnum) setInvoice(row)
+  }
+  return (
+    <>
+    <table className="data-table ctm-table">
+      <thead>
+        <tr>
+          <th>Job</th>
+          <th>Invoice</th>
+          <th>Invoice Account</th>
+          <th>Coded in Job Cost</th>
+          <th className="ctm-num">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sorted.map((row, i) => (
+          <tr
+            key={`${row.invoiceNum}-${row.JobNumber}-${i}`}
+            className={`reports-modal-row${row.invoiceRecnum ? " clickable-row" : ""}`}
+            onClick={() => openInvoice(row)}
+            title={row.invoiceRecnum ? "Open invoice" : undefined}
+          >
+            <td
+              className="reports-modal-job-cell"
+              onClick={(e) => {
+                e.stopPropagation()
+                onJob(row.JobNumber)
+              }}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter") return
+                e.stopPropagation()
+                onJob(row.JobNumber)
+              }}
+              title="Open job"
+            >
+              <span className="ctm-primary">{row.jobnme}</span>
+              <span className="ctm-secondary num">{row.JobNumber}</span>
+            </td>
+            <td>
+              <span className="ctm-primary num">#{row.invoiceNum}</span>
+              {row.vendorName && <span className="ctm-secondary">{row.vendorName}</span>}
+            </td>
+            <td>
+              <span className="ctm-primary">{row.accountTypes}</span>
+              <span className="ctm-secondary num">Account {row.accountNums}</span>
+            </td>
+            <td>
+              <span className="ctm-primary ctm-coded">{row.codedTypes}</span>
+              <span className="ctm-secondary num">Cost type {row.codedTypeNums}</span>
+              {row.costRecnums && (
+                <span className="ctm-secondary num">
+                  {row.costRecnums.includes(",") ? "Job cost recs" : "Job cost rec"} {row.costRecnums}
+                </span>
+              )}
+            </td>
+            <td className="ctm-num num">{row.amount == null ? "—" : formatMoneyFull(Number(row.amount))}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+    <InvoiceDetailModal
+      invoiceId={invoice?.invoiceRecnum ?? null}
+      module={invoice?.accountTypes?.includes("Subcontractor") ? "subcontractors" : "suppliers"}
+      onClose={() => setInvoice(null)}
+    />
     </>
   )
 }
@@ -292,4 +454,8 @@ export function MissingUnitCountsWidget() {
 
 export function MissingOneOffNamesWidget() {
   return <ReportWidget reportId="missingOneOffNames" />
+}
+
+export function CostTypeMismatchWidget() {
+  return <ReportWidget reportId="costTypeMismatch" />
 }
