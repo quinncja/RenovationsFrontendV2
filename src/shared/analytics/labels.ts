@@ -61,7 +61,7 @@ const PAGE_LABELS: Array<[string, string]> = [
   ["/dashboard", "Dashboard"],
   ["/company", "Company Summary"],
   ["/jobcost", "Job Costing"],
-  ["/reports", "Activity"],
+  ["/reports", "Activity Report"],
   ["/change-orders", "Change Orders"],
   ["/invoices", "Invoices"],
   ["/forecast-billings", "Forecast Billings"],

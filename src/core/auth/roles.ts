@@ -20,6 +20,7 @@ import {
   Landmark,
   CalendarClock,
   Receipt,
+  CreditCard,
   Clock,
   ChartPie,
   Table2,
@@ -55,7 +56,7 @@ export function isNavDivider(item: NavEntry): item is NavDivider {
 }
 
 const navItems = {
-  cc: { label: "CC", path: "/cc", icon: Receipt },
+  cc: { label: "Card Receipts", path: "/cc", icon: CreditCard },
   home: { label: "Dashboard", path: "/dashboard", icon: Home },
   businessSummary: { label: "Company", path: "/company", icon: Building2 },
   jobcost: { label: "Job Costing", path: "/jobcost", icon: JobcostIcon as unknown as LucideIcon },
@@ -63,7 +64,7 @@ const navItems = {
   projections: { label: "Projections", path: "/projections", icon: Table2 },
   // "Reports" the page (daily/weekly/monthly activity reports) — distinct from
   // the dashboard's `reports` home section (reconciliation/data quality).
-  dailyReports: { label: "Activity", path: "/reports", icon: Clock },
+  dailyReports: { label: "Activity Report", path: "/reports", icon: Clock },
   changeOrders: { label: "Change Orders", path: "/change-orders", icon: ChangeOrderIcon as unknown as LucideIcon },
   invoices: { label: "Invoices", path: "/invoices", icon: FileText },
   upcomingBillings: { label: "Forecast Billings", path: "/forecast-billings", icon: CalendarClock },
@@ -110,11 +111,11 @@ const chartsGroup: NavGroup = {
 const executiveNav: NavEntry[] = [
   navItems.home,
   navItems.jobcost,
-  navItems.cc,
   navItems.projections,
   NAV_DIVIDER,
   navItems.employees,
   navItems.changeOrders,
+  navItems.cc,
   financesGroup,
   NAV_DIVIDER,
   directoryGroup,
@@ -123,37 +124,22 @@ const executiveNav: NavEntry[] = [
   navItems.users,
 ]
 
-// A project manager's non-admin layout: their own pages first (home + the
-// job costing table that now lives there), then the company-wide pages.
+// Project managers and General Managers share one layout: their own pages
+// first, then the job-scoped work they own, then reference pages. Data scope
+// still differs: a manager's lists are token-scoped to their own jobs (Change
+// Orders is view-only for them); a GM's span every job.
 const managerNav: NavEntry[] = [
   navItems.home,
   navItems.jobcost,
-  navItems.cc,
   NAV_DIVIDER,
-  navItems.businessSummary,
-  navItems.employees,
-  // View-only for managers: the backend scopes the list to their own jobs
-  // and rejects create/delete; the page hides those affordances.
   navItems.changeOrders,
-  navItems.dailyReports,
-  // Top-level for PMs (no Charts group in this nav): the process flowchart.
-  navItems.projectProcess,
-]
-
-// A General Manager oversees the PMs rather than a single job: same non-admin
-// tier, but Company drops out and Employees comes in (their home + Employees
-// page are how they review the PM roster). Change Orders is company-wide work
-// they own too. Data is company-wide, not job-scoped.
-const generalManagerNav: NavEntry[] = [
-  navItems.home,
-  navItems.jobcost,
   navItems.cc,
+  navItems.employees,
   NAV_DIVIDER,
   navItems.dailyReports,
-  navItems.employees,
-  navItems.changeOrders,
   navItems.projectProcess,
 ]
+const generalManagerNav = managerNav
 
 export const roles = {
   executive: {

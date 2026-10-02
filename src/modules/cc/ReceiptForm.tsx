@@ -115,6 +115,7 @@ export default function ReceiptForm({
   alert,
   verdict,
   onDismiss,
+  onDelete,
 }: {
   initial: Receipt;
   path: string;
@@ -127,6 +128,8 @@ export default function ReceiptForm({
   alert?: ReactNode;
   /** Replaces Submit in the sticky bar while the receipt awaits approval. */
   verdict?: ReactNode;
+  /** Dashboard only: soft-deletes the receipt (asks first). */
+  onDelete?: () => Promise<void>;
   /** Dismiss outright (GM) instead of asking a GM to dismiss. */
   onDismiss?: (reason: string) => Promise<void>;
 }) {
@@ -167,6 +170,18 @@ export default function ReceiptForm({
   // Description and total ride the head band; their fields open on request.
   // A receipt started by hand has no card alert behind it, so they lead.
   const [editing, setEditing] = useState(initial.manual);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  async function remove() {
+    setBusy(true);
+    setError("");
+    try {
+      await onDelete!();
+    } catch (e) {
+      setError((e as Error).message);
+      setConfirmDelete(false);
+      setBusy(false);
+    }
+  }
   const touch =
     typeof window !== "undefined" &&
     !!window.matchMedia?.("(pointer: coarse)").matches;
@@ -897,13 +912,46 @@ export default function ReceiptForm({
       ) : (
         !readonly && (
           <div className="cc-actionbar">
-            {
+            {confirmDelete ? (
+              <>
+                <span className="cc-actionbar-note cc-actionbar-note--strong">
+                  Delete this receipt? It will be removed from every list.
+                </span>
+                <button
+                  type="button"
+                  className="cc-btn"
+                  disabled={busy}
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="cc-btn cc-btn--destructive"
+                  disabled={busy}
+                  onClick={() => void remove()}
+                >
+                  {busy ? "Deleting…" : "Delete receipt"}
+                </button>
+              </>
+            ) : (
               <>
                 <span className="cc-actionbar-note">
                   {r.firstSubmittedAt
                     ? "Corrections are allowed until approval."
                     : "Save anytime and finish later."}
                 </span>
+                {onDelete && (
+                  <button
+                    type="button"
+                    className="cc-btn cc-btn--danger"
+                    disabled={busy}
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                    Delete
+                  </button>
+                )}
                 <button
                   type="button"
                   className="cc-btn"
@@ -925,7 +973,7 @@ export default function ReceiptForm({
                       : "Submit receipt"}
                 </button>
               </>
-            }
+            )}
           </div>
         )
       )}

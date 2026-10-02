@@ -57,7 +57,7 @@ export default function ReportsPage() {
 
   const { payload, isLoading, disconnected } = useRangeReport(source, range)
   const [metric, setMetric] = useState<ReportMetricKey | null>(null)
-  const { openItem, modals } = useItemDrilldown({ backLabel: "Activity", window: range })
+  const { openItem, modals } = useItemDrilldown({ backLabel: "Activity Report", window: range })
 
   // A window can outrun the feed's per-kind server cap; the summary tiles stay
   // exact either way, so we just note the timeline is showing the latest slice.
@@ -73,7 +73,7 @@ export default function ReportsPage() {
 
   return (
     <Page
-      title="Activity"
+      title="Activity Report"
       subtitle={range.from === range.to ? dayLabel(range.from) : rangeLabel(range)}
     >
       <MotionList>
@@ -145,7 +145,7 @@ export default function ReportsPage() {
         items={payload?.items ?? []}
         window={range}
         subtitle={rangeLabel(range)}
-        backLabel="Activity"
+        backLabel="Activity Report"
         onClose={() => setMetric(null)}
       />
       {modals}

@@ -57,6 +57,16 @@
   color: light-dark(#dc2626, #f87171);
   background: rgba(239, 68, 68, 0.08);
 }
+/* The confirmed, irreversible step (Delete receipt). */
+.cc-btn--destructive {
+  border-color: transparent;
+  background: light-dark(#dc2626, #ef4444);
+  color: #fff;
+}
+.cc-btn--destructive:hover:not(:disabled) {
+  background: light-dark(#b91c1c, #dc2626);
+  color: #fff;
+}
 .cc-icon-btn {
   display: inline-grid;
   place-items: center;
@@ -610,6 +620,11 @@ select.cc-input {
   margin-right: auto;
   font-size: 0.75rem;
   color: var(--secondary-text);
+}
+.cc-actionbar-note--strong {
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--primary-text);
 }
 
 .cc-disclosure > summary {

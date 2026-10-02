@@ -1,12 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, CreditCard, Paperclip, Plus } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  Paperclip,
+  Plus,
+} from "lucide-react";
 import Page from "../../shared/components/Page";
 import { Widget } from "../../shared/components/Widget/Widget";
 import { SearchField } from "../../shared/components/SearchField";
 import { SegmentedControl } from "../../shared/components/SegmentedControl";
 import { Badge } from "../../shared/components/Badge";
 import { SkelText } from "../../shared/components/SkelText";
-import { MotionList, MotionItem } from "../../shared/components/MotionList/MotionList";
+import {
+  MotionList,
+  MotionItem,
+} from "../../shared/components/MotionList/MotionList";
 import { useAuth } from "../../core/auth/AuthProvider";
 import { staffRequest, staffFile, watchReceipts } from "./staffApi";
 import { json } from "./api";
@@ -48,7 +57,7 @@ const emptyCopy: Record<Tab, string> = {
 };
 
 export default function CCPage() {
-  const { claims } = useAuth(),
+  const { claims, user } = useAuth(),
     gm = ["generalManager", "admin", "executive", "owner", "tech"].includes(
       String(claims.role),
     );
@@ -482,8 +491,8 @@ export default function CCPage() {
                 <Banner tone="amber">
                   <span className="cc-banner-row">
                     <span>
-                      <strong>Unassigned.</strong> Nobody is mapped to card
-                      •••• {receipt.cardLast4}.
+                      <strong>Unassigned.</strong> Nobody is mapped to card ••••{" "}
+                      {receipt.cardLast4}.
                     </span>
                     <button
                       className="cc-btn"
@@ -495,6 +504,25 @@ export default function CCPage() {
                   </span>
                 </Banner>
               )
+            }
+            onDelete={
+              gm ||
+              (receipt.manual &&
+                !receipt.charges.length &&
+                receipt.ownerUid === user?.uid)
+                ? async () => {
+                    await staffRequest(
+                      `cc/receipts/${receipt._id}/actions`,
+                      json("POST", {
+                        revision: receipt.revision,
+                        action: "delete",
+                      }),
+                    );
+                    setReceipt(null);
+                    setNotice("Receipt deleted.");
+                    refresh();
+                  }
+                : undefined
             }
             onDismiss={
               gm && receipt.canApprove
@@ -577,7 +605,10 @@ function ReceiptRow({
           </span>
         </div>
       </td>
-      <td className="subheadline text-secondary" style={{ whiteSpace: "nowrap" }}>
+      <td
+        className="subheadline text-secondary"
+        style={{ whiteSpace: "nowrap" }}
+      >
         {day(r.receiptDate)}
       </td>
       <td className="body-text">
@@ -675,7 +706,10 @@ function NewReceipt({
         </>
       }
     >
-      <p className="body-text text-secondary" style={{ margin: 0, lineHeight: 1.5 }}>
+      <p
+        className="body-text text-secondary"
+        style={{ margin: 0, lineHeight: 1.5 }}
+      >
         Start a receipt before the card notification arrives.
       </p>
       <label className="cc-field">
@@ -823,7 +857,11 @@ function Activity({ audit }: { audit: NonNullable<Receipt["audit"]> }) {
               <details className="cc-disclosure cc-trail-diff">
                 <summary>Show changes</summary>
                 <pre>
-                  {JSON.stringify({ before: a.before, after: a.after }, null, 2)}
+                  {JSON.stringify(
+                    { before: a.before, after: a.after },
+                    null,
+                    2,
+                  )}
                 </pre>
               </details>
             )}
