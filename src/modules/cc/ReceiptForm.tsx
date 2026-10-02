@@ -344,7 +344,7 @@ export default function ReceiptForm({
   const remaining = Math.round(Number(amount || 0) * 100) - allocated;
   const receiptProblem =
     !r.files.length && !missing.trim()
-      ? "Add a photo of the receipt, or explain why there isn't one."
+      ? "Add a photo, or explain why there isn't one."
       : "";
   const codingProblem = effective.some(
     (a) => !a.destination || (a.kind === "job" && !a.costType),
