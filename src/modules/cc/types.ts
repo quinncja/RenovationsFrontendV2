@@ -87,7 +87,7 @@ export const money = (cents: number) =>
 export const statusLabel = (state: Receipt["state"]) =>
   ({
     pending: "Pending submission",
-    awaiting: "Awaiting approval",
+    awaiting: "Needs approval",
     posting: "Posting",
     approved: "Approved",
     dismissed: "Dismissed",
