@@ -709,13 +709,24 @@ function ReceiptRow({
   const showStatus = tab === "past" || tab === "all";
   const unassigned = r.employeeId == null && r.mode !== "test";
   // Cost type per job line, "Overhead" for GL lines; each named once.
+  // Display only (what is saved and posted to Sage is unchanged): overhead
+  // lines read "Overhead" under Charged to and name their account under
+  // Category; job lines name the job and its cost type.
   const categories = [
     ...new Set(
       r.allocations
-        .map((a) => (a.kind === "overhead" ? "Overhead" : a.costTypeName))
+        .map((a) =>
+          a.kind === "overhead" ? a.name || a.destination : a.costTypeName,
+        )
         .filter(Boolean),
     ),
   ].join(", ");
+  const chargedTo = [
+    ...r.allocations.filter((a) => a.kind === "job"),
+    ...(r.allocations.some((a) => a.kind === "overhead")
+      ? [{ kind: "overhead" as const, destination: "overhead", name: "Overhead" }]
+      : []),
+  ];
   const syncNote = r.dropboxError
     ? "Dropbox retry pending"
     : r.firstSubmittedAt && r.dropboxRevision !== r.dropboxSyncedRevision
@@ -771,9 +782,9 @@ function ReceiptRow({
       )}
       <td className="body-text">
         {r.allocations.length ? (
-          // Each job opens its Job Costing page; overhead accounts have none.
+          // Each job opens its Job Costing page; overhead reads once, plain.
           <span className="cc-cell-alloc" style={{ display: "block" }}>
-            {r.allocations.map((a, i) => (
+            {chargedTo.map((a, i) => (
               <span key={`${a.destination}-${i}`}>
                 {i > 0 && ", "}
                 {a.kind === "job" ? (
