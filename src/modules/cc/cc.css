@@ -1558,3 +1558,9 @@ a.cc-file:not([href]) { cursor: default; }
 .cc-sb-dragging .cc-sb-thumb {
   background: rgb(from var(--secondary-text) r g b / 0.6);
 }
+/* The card clips its contents to its rounded corners so the edge veils (and
+   the slim thumb) never poke past the bottom corners. Nothing in this card
+   opens a popover, so clipping is safe. */
+.co-widget.cc-widget {
+  overflow: hidden;
+}
