@@ -1490,3 +1490,71 @@ a.cc-file:not([href]) { cursor: default; }
   font-size: 0.8125rem;
   color: var(--secondary-text);
 }
+
+/* ─── Receipts table: projection-grid scroll affordances ─────────────────────
+   Same treatment as .pj-veil-* / .pj-sb-* (useOverlayScroll): a gradient veil
+   on each side that still hides columns, the native bar hidden, and a slim
+   3px thumb over the table's bottom edge. Values match the grid's. */
+.cc-scroll-frame {
+  --cc-edge-shadow: light-dark(rgba(31, 26, 21, 0.1), rgba(0, 0, 0, 0.3));
+  position: relative;
+}
+.cc-table-scroll {
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+.cc-table-scroll::-webkit-scrollbar {
+  display: none;
+}
+.cc-veil {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 4;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.cc-veil-left {
+  left: 0;
+  width: 14px;
+  background: linear-gradient(to right, var(--cc-edge-shadow), transparent);
+}
+.cc-veil-right {
+  right: 0;
+  width: 26px;
+  background: linear-gradient(to left, var(--cc-edge-shadow), transparent);
+}
+.cc-can-left .cc-veil-left,
+.cc-can-right .cc-veil-right {
+  opacity: 1;
+}
+.cc-sb-h {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  z-index: 5;
+  opacity: 0.55;
+  transition: opacity 200ms ease;
+  touch-action: none;
+}
+.cc-scroll-frame:hover .cc-sb-h,
+.cc-scrolling .cc-sb-h,
+.cc-sb-dragging .cc-sb-h {
+  opacity: 1;
+}
+.cc-sb-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 0 0 1px 1px;
+  background: rgb(from var(--secondary-text) r g b / 0.3);
+  cursor: default;
+}
+.cc-sb-thumb:hover,
+.cc-sb-dragging .cc-sb-thumb {
+  background: rgb(from var(--secondary-text) r g b / 0.6);
+}

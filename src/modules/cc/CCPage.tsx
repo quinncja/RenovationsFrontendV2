@@ -18,6 +18,7 @@ import {
 } from "../../shared/components/MotionList/MotionList";
 import { useAuth } from "../../core/auth/AuthProvider";
 import { useJobcostNav } from "../jobcost/useJobcostNav";
+import { useEdgeScroll } from "./useEdgeScroll";
 import { staffRequest, staffFile, watchReceipts } from "./staffApi";
 import { json } from "./api";
 import { CCModal } from "./CCModal";
@@ -97,7 +98,7 @@ export default function CCPage() {
     gm = ["generalManager", "admin", "executive", "owner", "tech"].includes(
       String(claims.role),
     );
-  const [tab, setTab] = useState<Tab>("pending"),
+  const [tab, setTab] = useState<Tab>("all"),
     [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
     [page, setPage] = useState(0);
@@ -124,6 +125,7 @@ export default function CCPage() {
     { _id: string; mode: string; error: string; receivedAt?: string }[]
   >([]);
   const selecting = gm && tab === "awaiting";
+  const edge = useEdgeScroll(`${tab}|${page}|${query}|${list.items.length}`);
   // Live updates: a receipt written anywhere (email intake, phone form, another
   // reviewer) bumps this, and the list reloads quietly in place.
   const [live, setLive] = useState(0);
@@ -422,108 +424,115 @@ export default function CCPage() {
                     : emptyCopy[tab]}
               </div>
             ) : (
-              <div className="co-table-scroll">
-                <table className="spend-rank-table">
-                  <thead>
-                    <tr>
-                      {selecting && (
-                        <th className="cc-col-check">
-                          <input
-                            type="checkbox"
-                            aria-label="Select all on this page"
-                            checked={allSelected}
-                            disabled={loading}
-                            onChange={(e) =>
-                              setSelected(
-                                e.target.checked
-                                  ? new Set(list.items.map((r) => r._id))
-                                  : new Set(),
-                              )
-                            }
-                          />
-                        </th>
-                      )}
-                      <th style={{ width: "30%" }}>Charge</th>
-                      <th>Charged to</th>
-                      <th>Category</th>
-                      <th>Date</th>
-                      <th>Receipt</th>
-                      {showStatus && <th>Status</th>}
-                      <th className="spend-rank-table-value">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {loading
-                      ? Array.from({ length: 6 }, (_, i) => (
-                          <tr key={i} className="spend-rank-table-row-plain">
-                            {selecting && <td className="cc-col-check" />}
-                            <td>
-                              <div className="cc-cell-stack">
-                                <span className="body-text emphasized">
-                                  <SkelText ch={22 - (i % 3) * 4} />
-                                </span>
-                                <span className="cell-secondary">
-                                  <SkelText ch={16} />
-                                </span>
-                              </div>
-                            </td>
-                            <td className="body-text">
-                              <SkelText ch={14 - (i % 2) * 4} />
-                            </td>
-                            <td className="body-text">
-                              <SkelText ch={8} />
-                            </td>
-                            <td className="subheadline">
-                              <SkelText ch={10} />
-                            </td>
-                            <td className="body-text">
-                              <SkelText ch={6} />
-                            </td>
-                            {showStatus && (
+              <div ref={edge.frameRef} className={edge.frameClass}>
+                <div
+                  ref={edge.scrollRef}
+                  className="co-table-scroll cc-table-scroll"
+                  onScroll={edge.onScroll}
+                >
+                  <table className="spend-rank-table">
+                    <thead>
+                      <tr>
+                        {selecting && (
+                          <th className="cc-col-check">
+                            <input
+                              type="checkbox"
+                              aria-label="Select all on this page"
+                              checked={allSelected}
+                              disabled={loading}
+                              onChange={(e) =>
+                                setSelected(
+                                  e.target.checked
+                                    ? new Set(list.items.map((r) => r._id))
+                                    : new Set(),
+                                )
+                              }
+                            />
+                          </th>
+                        )}
+                        <th style={{ width: "30%" }}>Charge</th>
+                        <th>Charged to</th>
+                        <th>Category</th>
+                        <th>Date</th>
+                        <th>Receipt</th>
+                        {showStatus && <th>Status</th>}
+                        <th className="spend-rank-table-value">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {loading
+                        ? Array.from({ length: 6 }, (_, i) => (
+                            <tr key={i} className="spend-rank-table-row-plain">
+                              {selecting && <td className="cc-col-check" />}
+                              <td>
+                                <div className="cc-cell-stack">
+                                  <span className="body-text emphasized">
+                                    <SkelText ch={22 - (i % 3) * 4} />
+                                  </span>
+                                  <span className="cell-secondary">
+                                    <SkelText ch={16} />
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="body-text">
+                                <SkelText ch={14 - (i % 2) * 4} />
+                              </td>
                               <td className="body-text">
                                 <SkelText ch={8} />
                               </td>
-                            )}
-                            <td className="spend-rank-table-value body-text">
-                              <SkelText ch={8} />
-                            </td>
-                          </tr>
-                        ))
-                      : list.items.map((r, i) => {
-                          const wk = weekStart(r.receiptDate);
-                          const first =
-                            i === 0 ||
-                            weekStart(list.items[i - 1].receiptDate) !== wk;
-                          return (
-                            <Fragment key={r._id}>
-                              {first && (
-                                <WeekRow
-                                  start={wk}
-                                  week={weeks.get(wk)}
-                                  span={columns - 1}
-                                />
+                              <td className="subheadline">
+                                <SkelText ch={10} />
+                              </td>
+                              <td className="body-text">
+                                <SkelText ch={6} />
+                              </td>
+                              {showStatus && (
+                                <td className="body-text">
+                                  <SkelText ch={8} />
+                                </td>
                               )}
-                              <ReceiptRow
-                                r={r}
-                                tab={tab}
-                                selecting={selecting}
-                                selected={selected.has(r._id)}
-                                onSelect={(on) =>
-                                  setSelected((old) => {
-                                    const next = new Set(old);
-                                    if (on) next.add(r._id);
-                                    else next.delete(r._id);
-                                    return next;
-                                  })
-                                }
-                                onOpen={() => void open(r._id)}
-                                onOpenJob={(recnum) => goToJobcost(recnum)}
-                              />
-                            </Fragment>
-                          );
-                        })}
-                  </tbody>
-                </table>
+                              <td className="spend-rank-table-value body-text">
+                                <SkelText ch={8} />
+                              </td>
+                            </tr>
+                          ))
+                        : list.items.map((r, i) => {
+                            const wk = weekStart(r.receiptDate);
+                            const first =
+                              i === 0 ||
+                              weekStart(list.items[i - 1].receiptDate) !== wk;
+                            return (
+                              <Fragment key={r._id}>
+                                {first && (
+                                  <WeekRow
+                                    start={wk}
+                                    week={weeks.get(wk)}
+                                    span={columns - 1}
+                                  />
+                                )}
+                                <ReceiptRow
+                                  r={r}
+                                  tab={tab}
+                                  selecting={selecting}
+                                  selected={selected.has(r._id)}
+                                  onSelect={(on) =>
+                                    setSelected((old) => {
+                                      const next = new Set(old);
+                                      if (on) next.add(r._id);
+                                      else next.delete(r._id);
+                                      return next;
+                                    })
+                                  }
+                                  onOpen={() => void open(r._id)}
+                                  onOpenJob={(recnum) => goToJobcost(recnum)}
+                                />
+                              </Fragment>
+                            );
+                          })}
+                    </tbody>
+                  </table>
+                </div>
+                {edge.affordances}
               </div>
             )}
 
