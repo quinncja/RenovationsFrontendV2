@@ -451,11 +451,11 @@ export default function CCPage() {
                           </th>
                         )}
                         <th style={{ width: "30%" }}>Charge</th>
+                        {showStatus && <th>Status</th>}
                         <th>Charged to</th>
                         <th>Category</th>
                         <th>Date</th>
                         <th>Receipt</th>
-                        {showStatus && <th>Status</th>}
                         <th className="spend-rank-table-value">Amount</th>
                       </tr>
                     </thead>
@@ -474,6 +474,11 @@ export default function CCPage() {
                                   </span>
                                 </div>
                               </td>
+                              {showStatus && (
+                                <td className="body-text">
+                                  <SkelText ch={8} />
+                                </td>
+                              )}
                               <td className="body-text">
                                 <SkelText ch={14 - (i % 2) * 4} />
                               </td>
@@ -486,11 +491,6 @@ export default function CCPage() {
                               <td className="body-text">
                                 <SkelText ch={6} />
                               </td>
-                              {showStatus && (
-                                <td className="body-text">
-                                  <SkelText ch={8} />
-                                </td>
-                              )}
                               <td className="spend-rank-table-value body-text">
                                 <SkelText ch={8} />
                               </td>
@@ -757,6 +757,18 @@ function ReceiptRow({
           </span>
         </div>
       </td>
+      {showStatus && (
+        <td>
+          <div className="cc-cell-stack">
+            <span>
+              <Badge tone={statusTone(r.state)}>{statusLabel(r.state)}</Badge>
+            </span>
+            {r.invoiceNumber && (
+              <span className="cell-secondary">#{r.invoiceNumber}</span>
+            )}
+          </div>
+        </td>
+      )}
       <td className="body-text">
         {r.allocations.length ? (
           // Each job opens its Job Costing page; overhead accounts have none.
@@ -826,18 +838,6 @@ function ReceiptRow({
           {syncNote && <span className="cell-secondary">{syncNote}</span>}
         </div>
       </td>
-      {showStatus && (
-        <td>
-          <div className="cc-cell-stack">
-            <span>
-              <Badge tone={statusTone(r.state)}>{statusLabel(r.state)}</Badge>
-            </span>
-            {r.invoiceNumber && (
-              <span className="cell-secondary">#{r.invoiceNumber}</span>
-            )}
-          </div>
-        </td>
-      )}
       <td className="spend-rank-table-value body-text emphasized">
         {money(r.amountCents)}
       </td>
