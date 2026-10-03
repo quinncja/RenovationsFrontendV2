@@ -827,7 +827,11 @@ function ReceiptRow({
               </Badge>
             </span>
           ) : r.missingReceipt ? (
-            <span className="text-secondary">Explained</span>
+            <span>
+              <Badge tone="gray" size="compact">
+                Explained
+              </Badge>
+            </span>
           ) : (
             <span>
               <Badge tone="amber" size="compact">
