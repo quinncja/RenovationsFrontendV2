@@ -20,6 +20,7 @@ import {
   Plus,
   Trash2,
   Smartphone,
+  Tag,
   X,
   ZoomIn,
   ZoomOut,
@@ -1098,8 +1099,15 @@ export default function ReceiptForm({
             </div>
           )}
           {readonly ? (
-            r.missingReceipt && (
+            r.missingReceipt ? (
               <p className="cc-quote">No receipt: {r.missingReceipt}</p>
+            ) : (
+              !r.files.length && (
+                <p className="cc-empty-slot">
+                  <FileUp size={16} aria-hidden="true" />
+                  {theirs ? "No receipt uploaded yet" : "No receipt"}
+                </p>
+              )
             )
           ) : showMissing ? (
             <label className="cc-field">
@@ -1192,8 +1200,9 @@ export default function ReceiptForm({
                 ))}
               </div>
             ) : (
-              <p className="cc-band-sub" style={{ marginTop: 0 }}>
-                Not categorized
+              <p className="cc-empty-slot">
+                <Tag size={16} aria-hidden="true" />
+                {theirs ? "Not charged anywhere yet" : "Not categorized"}
               </p>
             )
           ) : !opts ? (

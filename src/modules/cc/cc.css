@@ -1645,3 +1645,18 @@ a.cc-file:not([href]) { cursor: default; }
     margin-top: 0;
   }
 }
+
+/* Read-only section with nothing in it yet (a pending receipt the cardholder
+   hasn't filled out): a dashed slot reads as "still to come", not as a blank. */
+.cc-empty-slot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.875rem 1rem;
+  border: 1px dashed var(--border-color, rgba(120, 130, 150, 0.35));
+  border-radius: 10px;
+  color: var(--secondary-text);
+  font-size: 0.8125rem;
+}
+.cc-empty-slot > svg { flex-shrink: 0; }
