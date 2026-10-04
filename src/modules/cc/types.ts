@@ -92,6 +92,14 @@ export const statusLabel = (state: Receipt["state"]) =>
     approved: "Approved",
     dismissed: "Dismissed",
   })[state];
+// Dashboard wording for a receipt's status: a pending receipt is the
+// cardholder's to fill out, so it says whose move it is.
+export function statusText(r: Receipt, viewerUid?: string | null) {
+  if (r.state !== "pending") return statusLabel(r.state);
+  if (viewerUid && r.ownerUid === viewerUid) return "Waiting on you";
+  const first = r.employeeId != null ? r.employeeName.split(" ")[0] : "";
+  return first ? `Waiting on ${first}` : "Waiting on cardholder";
+}
 export type Tone = "blue" | "green" | "amber" | "red" | "gray" | "muted";
 export const statusTone = (state: Receipt["state"]): Tone =>
   (

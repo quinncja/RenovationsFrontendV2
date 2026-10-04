@@ -499,7 +499,12 @@ export default function ReceiptForm({
   onDismiss,
   onDelete,
   onOpenJob,
+  cardholder,
 }: {
+  /** Set when a reviewer opens someone else's pending receipt: the form says
+   *  it is that cardholder's to fill out and opens view-only, with a "Fill out
+   *  on their behalf" override. Holds the cardholder's name. */
+  cardholder?: string;
   initial: Receipt;
   path: string;
   request: Request;
@@ -586,8 +591,13 @@ export default function ReceiptForm({
     cameraRef = useRef<HTMLInputElement>(null);
   // A GM reviewing a submitted receipt reads it; fixes go back via Return.
   const reviewing = !!verdict && r.state === "awaiting";
+  const [onBehalf, setOnBehalf] = useState(false);
+  const theirs = !!cardholder && r.state === "pending";
+  const cardholderFirst = cardholder?.split(" ")[0] || "the cardholder";
   const readonly =
-    reviewing || ["approved", "posting", "dismissed"].includes(r.state);
+    reviewing ||
+    (theirs && !onBehalf) ||
+    ["approved", "posting", "dismissed"].includes(r.state);
   useEffect(() => {
     let alive = true;
     request<Options>(`${path}/options`)
@@ -800,7 +810,7 @@ export default function ReceiptForm({
           <div className="cc-figure-block">
             <p className="cc-figure">{money(r.amountCents)}</p>
             <span className={`cc-badge cc-badge--${statusTone(r.state)}`}>
-              {statusLabel(r.state)}
+              {theirs ? `Waiting on ${cardholderFirst}` : statusLabel(r.state)}
             </span>
           </div>
         </div>
@@ -819,8 +829,38 @@ export default function ReceiptForm({
       {(r.correctionReason ||
         r.dismissalRequested ||
         alert ||
+        theirs ||
         !!r.matchCandidates?.length) && (
         <div className="cc-notes">
+          {theirs && (
+            <Banner>
+              <span className="cc-banner-row">
+                <span>
+                  {onBehalf ? (
+                    <>
+                      <strong>Filling out for {cardholderFirst}.</strong> This
+                      is normally {cardholderFirst}&apos;s to complete.
+                    </>
+                  ) : (
+                    <>
+                      <strong>Waiting on {cardholderFirst}.</strong>{" "}
+                      {cardholderFirst} fills this out from the link texted to
+                      their phone. It moves to Needs approval when they submit.
+                    </>
+                  )}
+                </span>
+                {!onBehalf && (
+                  <button
+                    type="button"
+                    className="cc-btn cc-btn--quiet"
+                    onClick={() => setOnBehalf(true)}
+                  >
+                    Fill out on their behalf
+                  </button>
+                )}
+              </span>
+            </Banner>
+          )}
           {r.correctionReason && !readonly && (
             <Banner tone="amber">
               <strong>Correction requested.</strong> {r.correctionReason}

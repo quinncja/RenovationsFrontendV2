@@ -27,7 +27,7 @@ import ReceiptForm, { Banner } from "./ReceiptForm";
 import {
   day,
   money,
-  statusLabel,
+  statusText,
   statusTone,
   type Receipt,
   type CCSettings,
@@ -41,7 +41,7 @@ import "./cc.css";
 
 const tabs = [
   { key: "all", label: "All" },
-  { key: "pending", label: "Missing receipt" },
+  { key: "pending", label: "Waiting on cardholder" },
   { key: "awaiting", label: "Needs approval" },
   { key: "past", label: "Complete" },
 ] as const;
@@ -527,6 +527,7 @@ export default function CCPage() {
                                   }
                                   onOpen={() => void open(r._id)}
                                   onOpenJob={(recnum) => goToJobcost(recnum)}
+                                  viewerUid={user?.uid}
                                 />
                               </Fragment>
                             );
@@ -616,6 +617,13 @@ export default function CCPage() {
               )
             }
             onOpenJob={(recnum) => goToJobcost(recnum)}
+            // Someone else's mapped card: theirs to fill out (unassigned
+            // cards have nobody to wait on; the Unassigned banner covers them).
+            cardholder={
+              receipt.ownerUid !== user?.uid && receipt.employeeId != null
+                ? receipt.employeeName
+                : undefined
+            }
             onDelete={
               gm ||
               (receipt.manual &&
@@ -699,7 +707,9 @@ function ReceiptRow({
   onSelect,
   onOpen,
   onOpenJob,
+  viewerUid,
 }: {
+  viewerUid?: string;
   r: Receipt;
   tab: Tab;
   selecting: boolean;
@@ -726,7 +736,13 @@ function ReceiptRow({
   const chargedTo = [
     ...r.allocations.filter((a) => a.kind === "job"),
     ...(r.allocations.some((a) => a.kind === "overhead")
-      ? [{ kind: "overhead" as const, destination: "overhead", name: "Overhead" }]
+      ? [
+          {
+            kind: "overhead" as const,
+            destination: "overhead",
+            name: "Overhead",
+          },
+        ]
       : []),
   ];
   const syncNote = r.dropboxError
@@ -774,7 +790,9 @@ function ReceiptRow({
         <td>
           <div className="cc-cell-stack">
             <span>
-              <Badge tone={statusTone(r.state)}>{statusLabel(r.state)}</Badge>
+              <Badge tone={statusTone(r.state)}>
+                {statusText(r, viewerUid)}
+              </Badge>
             </span>
             {r.invoiceNumber && (
               <span className="cell-secondary">#{r.invoiceNumber}</span>
