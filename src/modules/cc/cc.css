@@ -1660,3 +1660,123 @@ a.cc-file:not([href]) { cursor: default; }
   font-size: 0.8125rem;
 }
 .cc-empty-slot > svg { flex-shrink: 0; }
+
+/* ─── Filling out: two numbered step cards ─────────────────────────────────
+   Receipt (1) and Charged to (2) each sit in their own card while the form is
+   editable; the number turns into a green check as each is completed.
+   Read-only views keep the plain bands. */
+.cc-step {
+  padding: 1.125rem;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--card-color);
+  box-shadow: 0 1px 2px rgb(25 55 90 / 0.04), 0 4px 12px rgb(25 55 90 / 0.05);
+}
+.cc-step.cc-band--invalid {
+  margin: 0;
+  padding: 1.125rem;
+}
+.cc-step .cc-band-title {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.9375rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--primary-text);
+}
+.cc-step-mark {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  background: var(--hover-bg);
+  color: var(--secondary-text);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.cc-step--done .cc-step-mark {
+  background: #16a34a;
+  color: #fff;
+}
+
+/* Empty receipt: one wide drop target holding the camera / upload buttons. */
+.cc-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 1.5rem 1rem;
+  border: 1.5px dashed var(--border-color);
+  border-radius: 12px;
+  transition: background-color 0.15s ease;
+}
+.cc-drop--over { background: var(--active-bg); }
+.cc-drop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.625rem;
+}
+.cc-drop-btn {
+  gap: 0.5rem;
+}
+.cc-drop-hint {
+  font-size: 0.75rem;
+  color: var(--secondary-text);
+}
+@media (pointer: coarse) {
+  .cc-drop { padding: 1rem; }
+  .cc-drop-actions { width: 100%; }
+  .cc-drop-btn {
+    flex: 1 1 0;
+    justify-content: center;
+    min-height: 3rem;
+  }
+}
+
+.cc-link-btn {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--secondary-text);
+  font-family: var(--font-family);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-medium);
+  text-decoration: underline;
+  text-decoration-color: rgb(from var(--secondary-text) r g b / 0.4);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.cc-link-btn:hover { color: var(--primary-text); }
+
+/* Cost type as tap targets (only two or three choices). */
+.cc-chips {
+  display: flex;
+  gap: 0.5rem;
+}
+.cc-chip {
+  flex: 1 1 0;
+  box-sizing: border-box;
+  height: 2.5rem;
+  padding: 0 0.875rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--card-color);
+  color: var(--primary-text);
+  font-family: var(--font-family);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.cc-chip:hover:not(.cc-chip--on) { background: var(--hover-bg); }
+.cc-chip--on {
+  border-color: var(--primary-color);
+  background: var(--active-bg);
+  color: var(--primary-color);
+}

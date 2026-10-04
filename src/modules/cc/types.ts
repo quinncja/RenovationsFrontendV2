@@ -68,6 +68,8 @@ export interface Option {
 }
 export interface Options {
   jobs: Option[];
+  /** The cardholder's last submitted job line; a fresh form starts on it. */
+  last?: { destination: string; costType: string } | null;
   accounts: Option[];
   costTypes: Option[];
 }

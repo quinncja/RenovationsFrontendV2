@@ -9,6 +9,7 @@ import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   Camera,
+  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -43,7 +44,7 @@ import "./cc.css";
 // Shared by the dashboard review modal and the isolated /r/:token page, so it
 // draws only `cc-*` classes (cc.css), never App.css ones. Layout, top to
 // bottom: head band (merchant, who/when, amount + status), state banners,
-// then Details, Receipt, Categorization bands, and a sticky verdict bar.
+// then Details, Receipt, Charged to bands, and a sticky verdict bar.
 
 type Draft = Omit<Allocation, "amountCents"> & { amount: string };
 
@@ -578,6 +579,7 @@ export default function ReceiptForm({
   // Flips on the first Submit; from then on an incomplete section is marked
   // red until it's filled in (checked live, so the red clears as they fix it).
   const [attempted, setAttempted] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const receiptRef = useRef<HTMLElement>(null),
     codingRef = useRef<HTMLElement>(null);
   async function remove() {
@@ -612,7 +614,29 @@ export default function ReceiptForm({
     let alive = true;
     request<Options>(`${path}/options`)
       .then((value) => {
-        if (alive) setOpts(value);
+        if (!alive) return;
+        setOpts(value);
+        // A fresh form starts on the cardholder's last job and cost type.
+        const last = value.last;
+        if (last && !initial.allocations.length)
+          setDraft((d) =>
+            d.length === 1 && d[0].kind === "job" && !d[0].costType
+              ? [
+                  {
+                    ...d[0],
+                    destination:
+                      initial.mode === "test"
+                        ? d[0].destination
+                        : last.destination,
+                    costType: value.costTypes.some(
+                      (t) => t.id === last.costType,
+                    )
+                      ? last.costType
+                      : "",
+                  },
+                ]
+              : d,
+          );
       })
       .catch((e) => {
         if (alive) setError(e.message);
@@ -698,7 +722,7 @@ export default function ReceiptForm({
         });
         update(current);
       }
-      setNotice("Files added. Submit when the categorization is complete.");
+      setNotice("Files added. Submit once it's charged to a job or account.");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -787,6 +811,15 @@ export default function ReceiptForm({
       : "";
   const invalid = (problem: string) =>
     attempted && problem ? " cc-band--invalid" : "";
+  // Editing, the two jobs read as numbered cards that tick off when done.
+  const step = (done: boolean) =>
+    readonly ? "" : ` cc-step${done ? " cc-step--done" : ""}`;
+  const stepMark = (n: number, done: boolean) =>
+    !readonly && (
+      <span className="cc-step-mark" aria-hidden="true">
+        {done ? <Check size={13} strokeWidth={3} /> : n}
+      </span>
+    );
   const label = (
     list: { id: string; name: string }[] | undefined,
     id: string,
@@ -1035,7 +1068,7 @@ export default function ReceiptForm({
 
         <section
           ref={receiptRef}
-          className={`cc-band${readonly ? "" : invalid(receiptProblem)}`}
+          className={`cc-band${readonly ? "" : invalid(receiptProblem)}${step(!receiptProblem)}`}
         >
           {!readonly && attempted && receiptProblem && (
             <p className="cc-band-error" role="alert">
@@ -1044,9 +1077,75 @@ export default function ReceiptForm({
             </p>
           )}
           <div className="cc-band-head">
-            <h3 className="cc-band-title">Receipt</h3>
+            <h3 className="cc-band-title">
+              {stepMark(1, !receiptProblem)}
+              Receipt
+            </h3>
           </div>
-          {(r.files.length > 0 || !readonly) && (
+          {!readonly && (
+            <>
+              <input
+                hidden
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => void upload(e.target.files)}
+              />
+              <input
+                hidden
+                ref={uploadRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
+                multiple
+                onChange={(e) => void upload(e.target.files)}
+              />
+            </>
+          )}
+          {!readonly && !r.files.length && !showMissing && (
+            // Nothing yet: one wide target. Phones lead with the camera;
+            // desktops can drop a photo or PDF straight onto it.
+            <div
+              className={`cc-drop${dragging ? " cc-drop--over" : ""}`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                void upload(e.dataTransfer.files);
+              }}
+            >
+              <div className="cc-drop-actions">
+                {touch && (
+                  <button
+                    type="button"
+                    className="cc-btn cc-drop-btn"
+                    onClick={() => cameraRef.current?.click()}
+                  >
+                    <Camera size={17} aria-hidden="true" />
+                    Take photo
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="cc-btn cc-drop-btn"
+                  onClick={() => uploadRef.current?.click()}
+                >
+                  <FileUp size={17} aria-hidden="true" />
+                  {touch ? "Upload" : "Upload receipt"}
+                </button>
+              </div>
+              {!touch && (
+                <span className="cc-drop-hint">
+                  or drop a photo or PDF here
+                </span>
+              )}
+            </div>
+          )}
+          {r.files.length > 0 && (
             <div className="cc-files">
               {r.files.map((f) => (
                 <FilePreview
@@ -1075,25 +1174,9 @@ export default function ReceiptForm({
                     title="Photos or PDFs, up to 15 MB each"
                     onClick={() => uploadRef.current?.click()}
                   >
-                    <FileUp size={20} aria-hidden="true" />
-                    {touch ? "Upload file" : "Add receipt"}
+                    <Plus size={20} aria-hidden="true" />
+                    {touch ? "Upload" : "Add another"}
                   </button>
-                  <input
-                    hidden
-                    ref={cameraRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(e) => void upload(e.target.files)}
-                  />
-                  <input
-                    hidden
-                    ref={uploadRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/heic,application/pdf"
-                    multiple
-                    onChange={(e) => void upload(e.target.files)}
-                  />
                 </>
               )}
             </div>
@@ -1124,11 +1207,10 @@ export default function ReceiptForm({
             !r.files.length && (
               <button
                 type="button"
-                className="cc-btn cc-btn--quiet"
-                style={{ alignSelf: "flex-start" }}
+                className="cc-link-btn"
                 onClick={() => setShowMissing(true)}
               >
-                I can't provide a receipt
+                Can&apos;t provide a receipt?
               </button>
             )
           )}
@@ -1136,7 +1218,7 @@ export default function ReceiptForm({
 
         <section
           ref={codingRef}
-          className={`cc-band${readonly || !opts ? "" : invalid(codingProblem)}`}
+          className={`cc-band${readonly || !opts ? "" : invalid(codingProblem)}${step(!!opts && !codingProblem)}`}
         >
           {!readonly && opts && attempted && codingProblem && (
             <p className="cc-band-error" role="alert">
@@ -1146,7 +1228,8 @@ export default function ReceiptForm({
           )}
           <div className="cc-band-head">
             <h3 className="cc-band-title">
-              {readonly ? "Charged to" : "Categorization"}
+              {stepMark(2, !!opts && !codingProblem)}
+              Charged to
             </h3>
             {opts && !readonly && (split || remaining !== 0) && (
               <span
@@ -1297,12 +1380,34 @@ export default function ReceiptForm({
                   {a.kind === "job" && (
                     <div className="cc-field">
                       <span className="cc-field-label">Cost type</span>
-                      <Picker
-                        label="Cost type"
-                        items={costTypeItems}
-                        value={a.costType}
-                        onChange={(id) => edit(index, { costType: id })}
-                      />
+                      {costTypeItems.length <= 4 ? (
+                        // Two or three choices: tap targets, not a menu.
+                        <div
+                          className="cc-chips"
+                          role="radiogroup"
+                          aria-label="Cost type"
+                        >
+                          {costTypeItems.map((o) => (
+                            <button
+                              key={o.id}
+                              type="button"
+                              role="radio"
+                              aria-checked={a.costType === o.id}
+                              className={`cc-chip${a.costType === o.id ? " cc-chip--on" : ""}`}
+                              onClick={() => edit(index, { costType: o.id })}
+                            >
+                              {o.name}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <Picker
+                          label="Cost type"
+                          items={costTypeItems}
+                          value={a.costType}
+                          onChange={(id) => edit(index, { costType: id })}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
@@ -1428,7 +1533,7 @@ export default function ReceiptForm({
                 <span className="cc-actionbar-note">
                   {r.firstSubmittedAt
                     ? "Corrections are allowed until approval."
-                    : "Add the receipt and categorization, then submit."}
+                    : "Add the receipt and where it's charged, then submit."}
                 </span>
                 {onDelete && (
                   <button
