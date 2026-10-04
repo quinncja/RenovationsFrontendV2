@@ -289,11 +289,13 @@ export default function CCPage() {
       setBusy(false);
     }
   }
+  // Closing re-syncs the list quietly (no skeleton, rows stay put); edits
+  // made in the modal have usually already arrived over the live stream.
   const closeReceipt = useCallback(() => {
     setReceipt(null);
     setError("");
-    refresh();
-  }, [refresh]);
+    setLive((n) => n + 1);
+  }, []);
 
   // Past and All mix states, so their rows say which.
   const showStatus = tab === "past" || tab === "all";
