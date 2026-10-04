@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   Camera,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   ExternalLink,
   FileText,
@@ -137,10 +138,19 @@ export function FileViewer({
   file,
   url,
   onClose,
+  nav,
 }: {
   file: ReceiptFile;
   url: string;
   onClose: () => void;
+  /** Several files on the receipt: arrows, a counter and a thumbnail strip. */
+  nav?: {
+    index: number;
+    count: number;
+    onPrev: () => void;
+    onNext: () => void;
+    strip: ReactNode;
+  };
 }) {
   // view.x/y pan the image (px from centered); view.z = 1 is "fit".
   const [view, setView] = useState({ z: 1, x: 0, y: 0 });
@@ -149,6 +159,13 @@ export function FileViewer({
   const pinch = useRef<{ dist: number; z: number } | null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (nav && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (e.key === "ArrowLeft") nav.onPrev();
+        else nav.onNext();
+        return;
+      }
       if (e.key !== "Escape") return;
       e.stopPropagation();
       onClose();
@@ -156,7 +173,7 @@ export function FileViewer({
     // Capture phase: runs before the modal's own window-level Escape handler.
     document.addEventListener("keydown", onKey, true);
     return () => document.removeEventListener("keydown", onKey, true);
-  }, [onClose]);
+  }, [onClose, nav]);
   const kind =
     file.mime === "application/pdf"
       ? "pdf"
@@ -235,6 +252,11 @@ export function FileViewer({
     >
       <div className="cc-viewer-bar">
         <span className="cc-viewer-name">{file.name}</span>
+        {nav && (
+          <span className="cc-viewer-count">
+            {nav.index + 1} of {nav.count}
+          </span>
+        )}
         {kind === "image" && (
           <div className="cc-viewer-zoom">
             <button
@@ -320,9 +342,148 @@ export function FileViewer({
             </a>
           </p>
         )}
+        {nav && (
+          <>
+            <button
+              type="button"
+              className="cc-viewer-nav cc-viewer-nav--prev"
+              aria-label="Previous file"
+              onClick={nav.onPrev}
+            >
+              <ChevronLeft size={22} />
+            </button>
+            <button
+              type="button"
+              className="cc-viewer-nav cc-viewer-nav--next"
+              aria-label="Next file"
+              onClick={nav.onNext}
+            >
+              <ChevronRight size={22} />
+            </button>
+          </>
+        )}
       </div>
+      {nav?.strip}
     </div>,
     document.body,
+  );
+}
+
+// The viewer over every file on a receipt: opens on the file that was tapped,
+// steps with the arrows (or arrow keys, wrapping around) and the thumbnail
+// strip. Files load as they come into view (the neighbors are fetched ahead);
+// staff copies are blob URLs, revoked when the gallery closes.
+export function FileGallery({
+  files,
+  startId,
+  startUrl,
+  path,
+  loadFile,
+  onClose,
+}: {
+  files: ReceiptFile[];
+  startId: string;
+  /** The tapped thumbnail's already-loaded URL (owned by its preview). */
+  startUrl?: string;
+  path: string;
+  loadFile?: (path: string) => Promise<string>;
+  onClose: () => void;
+}) {
+  const [index, setIndex] = useState(() =>
+    Math.max(
+      0,
+      files.findIndex((f) => f.id === startId),
+    ),
+  );
+  const [urls, setUrls] = useState<Record<string, string>>(() =>
+    startUrl ? { [startId]: startUrl } : {},
+  );
+  const made = useRef<string[]>([]);
+  const asked = useRef(new Set<string>(startUrl ? [startId] : []));
+  useEffect(() => {
+    const want = [index, index + 1, index - 1 + files.length].map(
+      (i) => files[i % files.length],
+    );
+    for (const f of want) {
+      if (!f || asked.current.has(f.id)) continue;
+      asked.current.add(f.id);
+      if (!loadFile) {
+        setUrls((u) => ({ ...u, [f.id]: `${base}/${path}/files/${f.id}` }));
+        continue;
+      }
+      loadFile(`${path}/files/${f.id}`)
+        .then((value) => {
+          made.current.push(value);
+          setUrls((u) => ({ ...u, [f.id]: value }));
+        })
+        .catch(() => asked.current.delete(f.id));
+    }
+  }, [index, files, path, loadFile]);
+  useEffect(
+    () => () => made.current.forEach((u) => URL.revokeObjectURL(u)),
+    [],
+  );
+  const file = files[index];
+  const url = urls[file.id];
+  const many = files.length > 1;
+  const step = (d: number) =>
+    setIndex((i) => (i + d + files.length) % files.length);
+  const nav = many
+    ? {
+        index,
+        count: files.length,
+        onPrev: () => step(-1),
+        onNext: () => step(1),
+        strip: (
+          <div className="cc-viewer-strip" role="tablist" aria-label="Files">
+            {files.map((f, i) => {
+              const image =
+                f.mime.startsWith("image/") && f.mime !== "image/heic";
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === index}
+                  aria-label={f.name}
+                  className={`cc-viewer-thumb${i === index ? " cc-viewer-thumb--on" : ""}`}
+                  onClick={() => setIndex(i)}
+                >
+                  {image && urls[f.id] ? (
+                    <img src={urls[f.id]} alt="" draggable={false} />
+                  ) : (
+                    <FileText size={18} aria-hidden="true" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ),
+      }
+    : undefined;
+  if (!url)
+    return createPortal(
+      <div
+        className="cc-viewer"
+        role="dialog"
+        aria-modal="true"
+        aria-label={file.name}
+      >
+        <div className="cc-viewer-stage">
+          <p className="cc-viewer-note">Loading {file.name}…</p>
+        </div>
+      </div>,
+      document.body,
+    );
+  // key: a new file starts at "fit", not the last file's zoom.
+  return (
+    <FileViewer
+      key={file.id}
+      file={file}
+      url={url}
+      onClose={onClose}
+      nav={nav}
+    />
   );
 }
 
@@ -1248,9 +1409,12 @@ export default function ReceiptForm({
         )
       )}
       {viewing && (
-        <FileViewer
-          file={viewing.file}
-          url={viewing.url}
+        <FileGallery
+          files={r.files}
+          startId={viewing.file.id}
+          startUrl={viewing.url}
+          path={path}
+          loadFile={loadFile}
           onClose={() => setViewing(null)}
         />
       )}

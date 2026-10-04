@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FilePreview, FileViewer } from "./ReceiptForm";
+import { FilePreview, FileGallery } from "./ReceiptForm";
 import { staffRequest, staffFile } from "./staffApi";
 import { day, type ReceiptFile } from "./types";
 import "./cc.css";
@@ -20,7 +20,11 @@ interface InvoiceReceipt {
 
 export function InvoiceReceipts({ invoiceRecnum }: { invoiceRecnum: string }) {
   const [rows, setRows] = useState<InvoiceReceipt[] | null>(null),
-    [viewing, setViewing] = useState<{ file: ReceiptFile; url: string } | null>(null);
+    [viewing, setViewing] = useState<{
+      receipt: InvoiceReceipt;
+      file: ReceiptFile;
+      url: string;
+    } | null>(null);
   useEffect(() => {
     let alive = true;
     setRows(null);
@@ -53,7 +57,7 @@ export function InvoiceReceipts({ invoiceRecnum }: { invoiceRecnum: string }) {
                   file={{ ...f, bytes: f.bytes ?? 0 }}
                   path={`cc/receipts/${r.id}`}
                   loadFile={staffFile}
-                  onOpen={(file, url) => setViewing({ file, url })}
+                  onOpen={(file, url) => setViewing({ receipt: r, file, url })}
                 />
               ))}
             </div>
@@ -66,9 +70,15 @@ export function InvoiceReceipts({ invoiceRecnum }: { invoiceRecnum: string }) {
         </div>
       ))}
       {viewing && (
-        <FileViewer
-          file={viewing.file}
-          url={viewing.url}
+        <FileGallery
+          files={viewing.receipt.files.map((f) => ({
+            ...f,
+            bytes: f.bytes ?? 0,
+          }))}
+          startId={viewing.file.id}
+          startUrl={viewing.url}
+          path={`cc/receipts/${viewing.receipt.id}`}
+          loadFile={staffFile}
           onClose={() => setViewing(null)}
         />
       )}
