@@ -19,6 +19,7 @@ import {
   Pencil,
   Plus,
   Trash2,
+  Smartphone,
   X,
   ZoomIn,
   ZoomOut,
@@ -47,13 +48,21 @@ type Draft = Omit<Allocation, "amountCents"> & { amount: string };
 
 export function Banner({
   tone = "neutral",
+  icon,
   children,
 }: {
   tone?: "neutral" | "amber" | "red" | "green";
+  /** Overrides the tone's default icon. */
+  icon?: typeof Info;
   children: ReactNode;
 }) {
   const Icon =
-    tone === "green" ? CheckCircle2 : tone === "neutral" ? Info : AlertTriangle;
+    icon ??
+    (tone === "green"
+      ? CheckCircle2
+      : tone === "neutral"
+        ? Info
+        : AlertTriangle);
   return (
     <div
       className={`cc-banner${tone === "neutral" ? "" : ` cc-banner--${tone}`}`}
@@ -832,30 +841,22 @@ export default function ReceiptForm({
         theirs ||
         !!r.matchCandidates?.length) && (
         <div className="cc-notes">
+          {/* One quiet line: the badge above already says who it waits on. */}
           {theirs && (
-            <Banner>
+            <Banner icon={Smartphone}>
               <span className="cc-banner-row">
                 <span>
-                  {onBehalf ? (
-                    <>
-                      <strong>Filling out for {cardholderFirst}.</strong> This
-                      is normally {cardholderFirst}&apos;s to complete.
-                    </>
-                  ) : (
-                    <>
-                      <strong>Waiting on {cardholderFirst}.</strong>{" "}
-                      {cardholderFirst} fills this out from the link texted to
-                      their phone. It moves to Needs approval when they submit.
-                    </>
-                  )}
+                  {onBehalf
+                    ? `You're filling this out for ${cardholderFirst}.`
+                    : `${cardholderFirst} fills this out from their phone.`}
                 </span>
                 {!onBehalf && (
                   <button
                     type="button"
-                    className="cc-btn cc-btn--quiet"
+                    className="cc-btn"
                     onClick={() => setOnBehalf(true)}
                   >
-                    Fill out on their behalf
+                    Fill out instead
                   </button>
                 )}
               </span>

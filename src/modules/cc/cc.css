@@ -1633,3 +1633,15 @@ a.cc-file:not([href]) { cursor: default; }
   .cc-viewer-nav--prev { left: 0.5rem; }
   .cc-viewer-nav--next { right: 0.5rem; }
 }
+
+/* A banner with an action button on one line: the icon centers on the row
+   (the button makes it taller than the text). Narrow screens wrap the button
+   below, so the icon stays with the first line there. */
+@media (min-width: 601px) {
+  .cc-banner:has(> .cc-banner-body > .cc-banner-row) {
+    align-items: center;
+  }
+  .cc-banner:has(> .cc-banner-body > .cc-banner-row) > svg {
+    margin-top: 0;
+  }
+}
