@@ -29,13 +29,26 @@ export async function apiRequest<T = unknown>(
   })
 
   if (!response.ok) {
-    const error = new Error(`HTTP ${response.status}`) as Error & { status: number }
+    const error = new Error(await readErrorMessage(response)) as Error & { status: number }
     error.status = response.status
     throw error
   }
 
   const text = await response.text()
   return text ? JSON.parse(text) : ({} as T)
+}
+
+async function readErrorMessage(response: Response): Promise<string> {
+  const fallback = `HTTP ${response.status}`
+  try {
+    const body = (await response.json()) as { error?: unknown; message?: unknown }
+    const parts = [body.error, body.message].filter(
+      (part): part is string => typeof part === "string" && part.trim() !== ""
+    )
+    return parts.length > 0 ? `${parts.join(": ")} (${fallback})` : fallback
+  } catch {
+    return fallback
+  }
 }
 
 export async function apiGet<T = unknown>(path: string): Promise<T> {
