@@ -11,6 +11,7 @@ export interface JobOption {
 // Shape of the /project-list response (cleanProjectList): projects, each
 // with years, each with phases. We only need a few fields per phase.
 interface RawPhase {
+  recnum?: string
   num: string
   name?: string
   /** Full original job name (actrec.jobnme), already includes the phase. */
@@ -26,6 +27,14 @@ interface RawJob {
   name: string
   years?: RawYear[]
 }
+
+const isStandardPhase = (num: string): boolean => {
+  const n = Number(num)
+  return n >= 1 && n <= 12
+}
+
+const phaseRecnum = (phase: RawPhase): string =>
+  isStandardPhase(phase.num) ? `${phase.yearNum}${phase.jobNum}${phase.num}` : phase.jobNum
 
 /** Every OPEN phase (status 4 = "Current") as a flat, sorted option list,
  *  keyed by the recnum the backend expects (YY + 4-digit job + 2-digit phase). */
@@ -46,10 +55,7 @@ export function useOpenPhaseOptions(enabled: boolean): { options: JobOption[]; l
           for (const year of job.years ?? []) {
             for (const phase of year.phases ?? []) {
               if (phase.status !== 4) continue
-              const recnum =
-                phase.jobNum.length === 4
-                  ? `${phase.yearNum}${phase.jobNum}${phase.num}`
-                  : phase.jobNum
+              const recnum = phase.recnum ?? phaseRecnum(phase)
               if (seen.has(recnum)) continue
               seen.add(recnum)
               // Prefer the full job name (includes the phase); fall back to
