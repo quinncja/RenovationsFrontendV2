@@ -17,6 +17,7 @@ import {
   FileText,
   FileUp,
   Info,
+  Merge,
   Pencil,
   Plus,
   Trash2,
@@ -567,6 +568,9 @@ export default function ReceiptForm({
       state: string;
     }[]
   >([]);
+  // Other open charges on this card that can fold into this receipt.
+  const [combinable, setCombinable] = useState<typeof candidates>([]);
+  const [combining, setCombining] = useState(false);
   const [dismissReason, setDismissReason] = useState("");
   // Description and total ride the head band; their fields open on request.
   // A receipt started by hand has no card alert behind it, so they lead.
@@ -651,6 +655,18 @@ export default function ReceiptForm({
         .then(setCandidates)
         .catch((e) => setError(e.message));
   }, [path, request, initial.amountCents, initial.matchCandidates]);
+  useEffect(() => {
+    if (!initial.charges.length) return;
+    let alive = true;
+    request<typeof candidates>(`${path}/combinable`)
+      .then((list) => {
+        if (alive) setCombinable(list);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [path, request, initial.charges.length]);
   const update = (next: Receipt) => {
     setReceipt(next);
     onChange(next);
@@ -752,10 +768,16 @@ export default function ReceiptForm({
           amount: (a.amountCents / 100).toFixed(2),
         })),
       );
+      if (action === "combine") {
+        setCombining(false);
+        setCombinable((list) => list.filter((c) => c.id !== extra.receiptId));
+      }
       setNotice(
         action === "request-dismissal"
           ? "Dismissal requested. A GM will review this charge."
-          : "Receipt updated. Review the categorization before submitting.",
+          : action === "combine"
+            ? "Receipts combined. Check the split before submitting."
+            : "Receipt updated. Review the categorization before submitting.",
       );
     } catch (e) {
       setError((e as Error).message);
@@ -857,15 +879,29 @@ export default function ReceiptForm({
             </span>
           </div>
         </div>
-        {!readonly && !editing && (
-          <button
-            type="button"
-            className="cc-btn cc-btn--quiet cc-head-edit"
-            onClick={() => setEditing(true)}
-          >
-            <Pencil size={13} aria-hidden="true" />
-            Edit description or total
-          </button>
+        {!readonly && (!editing || (!!combinable.length && !combining)) && (
+          <div className="cc-head-actions">
+            {!editing && (
+              <button
+                type="button"
+                className="cc-btn cc-btn--quiet cc-head-edit"
+                onClick={() => setEditing(true)}
+              >
+                <Pencil size={13} aria-hidden="true" />
+                Edit description or total
+              </button>
+            )}
+            {!!combinable.length && !combining && (
+              <button
+                type="button"
+                className="cc-btn cc-btn--quiet cc-head-edit"
+                onClick={() => setCombining(true)}
+              >
+                <Merge size={13} aria-hidden="true" />
+                Combine with another receipt
+              </button>
+            )}
+          </div>
         )}
       </header>
 
@@ -953,6 +989,49 @@ export default function ReceiptForm({
               onClick={() => void relationship("match-reject")}
             >
               These are different purchases
+            </button>
+          </section>
+        )}
+
+        {combining && !readonly && (
+          <section className="cc-band">
+            <div className="cc-band-head">
+              <h3 className="cc-band-title">Combine with another receipt</h3>
+            </div>
+            <p className="cc-option-meta">
+              For charges from one purchase, like a fee or a split payment.
+              The other charge joins this receipt and its total adds to this
+              one.
+            </p>
+            <div className="cc-option-list">
+              {combinable.map((c) => (
+                <div className="cc-option" key={c.id}>
+                  <span className="cc-option-text">
+                    <strong>{c.description}</strong>
+                    <span className="cc-option-meta">
+                      {day(c.receiptDate)} · {money(c.amountCents)}
+                      {c.state === "awaiting" ? " · Submitted" : ""}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="cc-btn"
+                    onClick={() =>
+                      void relationship("combine", { receiptId: c.id })
+                    }
+                  >
+                    Combine
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="cc-btn cc-btn--quiet"
+              style={{ alignSelf: "flex-start" }}
+              onClick={() => setCombining(false)}
+            >
+              Cancel
             </button>
           </section>
         )}
