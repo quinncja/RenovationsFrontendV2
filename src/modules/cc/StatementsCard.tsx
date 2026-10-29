@@ -62,9 +62,11 @@ export function StatementsCard({
             <button
               type="button"
               key={w}
-              className={`cc-wk${tone === "due" ? " cc-wk--due" : ""}`}
+              className={`cc-wk${tone === "due" ? " cc-wk--due" : ""}${tone === "open" ? " cc-wk--open" : ""}`}
+              // The current week isn't over, so there's no statement to upload yet.
+              disabled={current}
               onClick={() => onUpload(w)}
-              aria-label={`Upload the ${weekRange(w)} statement`}
+              aria-label={current ? `${weekRange(w)}, this week` : `Upload the ${weekRange(w)} statement`}
             >
               <span className="cc-wk-label">{weekRange(w)}</span>
               {!list ? (

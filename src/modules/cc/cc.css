@@ -1999,7 +1999,15 @@ button.cc-wk {
   cursor: pointer;
   transition: background-color 0.15s;
 }
-button.cc-wk:hover { background-color: var(--hover-bg); }
+button.cc-wk:hover:not(:disabled) { background-color: var(--hover-bg); }
+button.cc-wk:disabled {
+  cursor: default;
+  background-color: var(--hover-bg);
+  border-color: transparent;
+}
+.cc-wk--open .cc-wk-label,
+.cc-wk--open .cc-wk-state,
+.cc-wk--open .cc-wk-meta { color: var(--secondary-text); opacity: 0.75; }
 button.cc-wk.cc-wk--due:hover { background-color: rgba(245, 158, 11, 0.12) !important; }
 .cc-wk--due {
   background-color: rgba(245, 158, 11, 0.06) !important;
