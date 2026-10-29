@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
-  FileUp,
   Plus,
   Users,
 } from "lucide-react";
@@ -26,6 +25,7 @@ import { staffRequest, staffFile, watchReceipts } from "./staffApi";
 import { json } from "./api";
 import { CCModal } from "./CCModal";
 import { StatementModal } from "./StatementModal";
+import { StatementsCard } from "./StatementsCard";
 import { MappingModal } from "./MappingModal";
 import ReceiptForm, { Banner } from "./ReceiptForm";
 import {
@@ -125,6 +125,7 @@ export default function CCPage() {
   const [receipt, setReceipt] = useState<Receipt | null>(null),
     [mappings, setMappings] = useState(false),
     [statement, setStatement] = useState(false),
+    [statementVersion, setStatementVersion] = useState(0),
     [create, setCreate] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set()),
     [busy, setBusy] = useState(false),
@@ -332,14 +333,6 @@ export default function CCPage() {
           {gm && (
             <button
               className="button secondary-button"
-              onClick={() => setStatement(true)}
-            >
-              <FileUp size={15} /> Upload statement
-            </button>
-          )}
-          {gm && (
-            <button
-              className="button secondary-button"
               onClick={() => setMappings(true)}
             >
               <CreditCard size={15} /> Card mapping
@@ -397,6 +390,14 @@ export default function CCPage() {
               {error && !receipt && <Banner tone="red">{error}</Banner>}
               {notice && <Banner tone="green">{notice}</Banner>}
             </div>
+          </MotionItem>
+        )}
+        {gm && (
+          <MotionItem>
+            <StatementsCard
+              version={statementVersion}
+              onUpload={() => setStatement(true)}
+            />
           </MotionItem>
         )}
         <MotionItem>
@@ -612,7 +613,10 @@ export default function CCPage() {
       {statement && (
         <StatementModal
           onClose={() => setStatement(false)}
-          onApplied={refresh}
+          onApplied={() => {
+            refresh();
+            setStatementVersion((v) => v + 1);
+          }}
         />
       )}
       {create && (

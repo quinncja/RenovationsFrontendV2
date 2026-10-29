@@ -1,0 +1,110 @@
+import { useEffect, useState } from "react";
+import { Check, FileUp } from "lucide-react";
+import { Widget } from "../../shared/components/Widget/Widget";
+import { SkelText } from "../../shared/components/SkelText";
+import { staffRequest } from "./staffApi";
+import { addDays, iso, mondayOf, short, weekRange } from "./statementWeeks";
+
+export interface StatementSummary {
+  id: string;
+  weekStart: string;
+  weekEnd: string;
+  by: string;
+  at: string;
+}
+
+// Card intake went live the week of Sep 28; no statements before it.
+const FIRST_WEEK = "2026-09-28";
+const WEEKS = 5;
+
+// The weekly statements card: what to do, and which recent weeks are done.
+export function StatementsCard({
+  version,
+  onUpload,
+}: {
+  /** Bumped after an upload so the card re-reads its weeks. */
+  version: number;
+  onUpload: () => void;
+}) {
+  const [list, setList] = useState<StatementSummary[] | null>(null);
+  useEffect(() => {
+    let alive = true;
+    staffRequest<StatementSummary[]>("cc/statements")
+      .then((x) => alive && setList(x))
+      .catch(() => alive && setList([]));
+    return () => {
+      alive = false;
+    };
+  }, [version]);
+
+  const thisWeek = mondayOf(iso(new Date()));
+  const lastWeek = addDays(thisWeek, -7);
+  const weeks = Array.from({ length: WEEKS }, (_, i) => addDays(thisWeek, (i - WEEKS + 1) * 7)).filter(
+    (w) => w >= FIRST_WEEK,
+  );
+  // Newest upload per week (the list arrives newest first).
+  const done = (w: string) => list?.find((s) => s.weekStart === w);
+  const due = !!list && !done(lastWeek) && lastWeek >= FIRST_WEEK;
+
+  return (
+    <Widget
+      className="cc-wks-card"
+      title="Weekly statements"
+      description="Every Monday, upload last week's Capital One transactions. Each charge is checked against its receipt, and anything different is fixed in one step."
+      actions={
+        <button className={`button ${due ? "primary-button" : "secondary-button"}`} onClick={onUpload}>
+          <FileUp size={15} /> {due ? "Upload last week's statement" : "Upload a statement"}
+        </button>
+      }
+    >
+      <div className="cc-wks" style={{ gridTemplateColumns: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
+        {weeks.map((w) => {
+          const s = done(w);
+          const current = w === thisWeek;
+          const tone = !list ? "" : s ? "done" : current ? "open" : "due";
+          return (
+            <div key={w} className={`cc-wk${tone === "due" ? " cc-wk--due" : ""}`}>
+              <span className="cc-wk-label">{weekRange(w)}</span>
+              {!list ? (
+                <>
+                  <span className="cc-wk-state">
+                    <SkelText ch={10} />
+                  </span>
+                  <span className="cc-wk-meta">
+                    <SkelText ch={14} />
+                  </span>
+                </>
+              ) : s ? (
+                <>
+                  <span className="cc-wk-state cc-wk-state--done">
+                    <Check size={14} strokeWidth={2.6} aria-hidden="true" /> Reconciled
+                  </span>
+                  <span className="cc-wk-meta">
+                    {short(iso(new Date(s.at)))}
+                    {s.by ? ` · ${s.by}` : ""}
+                  </span>
+                </>
+              ) : current ? (
+                <>
+                  <span className="cc-wk-state">
+                    <span className="cc-wk-dot" aria-hidden="true" /> This week
+                  </span>
+                  <span className="cc-wk-meta">Upload next Monday</span>
+                </>
+              ) : (
+                <>
+                  <span className="cc-wk-state cc-wk-state--due">
+                    <span className="cc-wk-dot" aria-hidden="true" /> Ready to upload
+                  </span>
+                  <span className="cc-wk-meta">
+                    {w === lastWeek ? "The week is over" : "Not uploaded yet"}
+                  </span>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Widget>
+  );
+}
