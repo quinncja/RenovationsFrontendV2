@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import App from "../../App.tsx"
 import RequireAuth, { RequireRole } from "./RequireAuth.tsx"
 import LoginPage from "../auth/pages/LoginPage.tsx"
+import PortalPage from "../auth/pages/PortalPage.tsx"
 import LogoutPage from "../auth/pages/LogoutPage.tsx"
 import SignoutPage from "../auth/pages/SignoutPage.tsx"
 
@@ -43,7 +44,7 @@ export default function Router() {
     <BrowserRouter>
       <Routes>
         {/* Auth pages — no navbar */}
-        <Route index element={<Navigate to="/login" replace />} />
+        <Route index element={<PortalPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/logout" element={<LogoutPage />} />
         <Route path="/signout" element={<SignoutPage />} />

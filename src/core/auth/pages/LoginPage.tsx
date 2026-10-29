@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react"
-import { ChartColumn, ChevronRight } from "lucide-react"
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth"
 import { auth } from "../firebase"
 import { useAuth } from "../AuthProvider"
@@ -9,18 +8,7 @@ import LoadingScreen from "../../components/LoadingScreen"
 import Logo from "../../components/Logo"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
 
-// On a phone, the signed-out landing first asks which app: RD Expenses (the
-// cardholder app, no dashboard account) or the dashboard. Choosing the
-// dashboard is remembered on that phone.
-const PORTAL_KEY = "rd:portal"
 const phoneLike = /iPhone|iPod|Android.+Mobile/.test(navigator.userAgent)
-function remembered() {
-  try {
-    return localStorage.getItem(PORTAL_KEY) === "dashboard"
-  } catch {
-    return false
-  }
-}
 
 /** Firebase's raw error strings leak SDK internals; map the common sign-in
  *  failures to something a person can act on. */
@@ -48,21 +36,6 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const isMobile = useIsMobile()
-  // The portal and the sign-in form are separate URLs (/login and
-  // /login?to=dashboard) so the phone's back button moves between them.
-  const location = useLocation()
-  const [params] = useSearchParams()
-  const portal = params.get("to") !== "dashboard"
-
-  // A phone that chose the dashboard before skips the portal on a fresh
-  // visit, but going back to /login within the visit still shows it.
-  // Decided once, on the page's first render, so returning to the portal
-  // with the back button never bounces forward again.
-  const [skipPortal] = useState(() => location.key === "default" && portal && remembered())
-  useEffect(() => {
-    if (skipPortal && (isMobile || phoneLike)) navigate("/login?to=dashboard", { replace: true })
-  }, [skipPortal, isMobile, navigate])
-
   useEffect(() => {
     if (!authLoading && user) {
       navigate("/dashboard", { replace: true })
@@ -75,59 +48,6 @@ export default function LoginPage() {
   // straight to the redirect above without ever seeing the form.
   if (authLoading || user) {
     return <LoadingScreen />
-  }
-
-  if ((isMobile || phoneLike) && portal) {
-    return (
-      <main className="portal">
-        <div className="login-background" />
-        <header className="portal-brand">
-          <Logo size={44} />
-          <span className="portal-brand-name">Renovations Delivered</span>
-        </header>
-        <div className="portal-body">
-          <h1 className="portal-title">Welcome</h1>
-          <p className="portal-sub">Choose where you'd like to go.</p>
-          <nav className="portal-list" aria-label="Open an app">
-            <a className="portal-row" href="/card/">
-              <span className="portal-tile portal-tile--expenses">
-                <img src="/r-logo.png" alt="" />
-              </span>
-              <span className="portal-text">
-                <b>RD Expenses</b>
-                <span>Receipts and returns for your company card</span>
-              </span>
-              <ChevronRight size={18} aria-hidden="true" />
-            </a>
-            <button
-              type="button"
-              className="portal-row"
-              onClick={() => {
-                try {
-                  localStorage.setItem(PORTAL_KEY, "dashboard")
-                } catch {
-                  // Not remembered; they'll be asked next visit.
-                }
-                navigate("/login?to=dashboard")
-              }}
-            >
-              <span className="portal-tile portal-tile--dashboard">
-                <img src="/r-logo.png" alt="" />
-                <span className="portal-tile-badge" aria-hidden="true">
-                  <ChartColumn size={13} strokeWidth={2.5} />
-                </span>
-              </span>
-              <span className="portal-text">
-                <b>RD Dashboard</b>
-                <span>Reports and job costing for staff</span>
-              </span>
-              <ChevronRight size={18} aria-hidden="true" />
-            </button>
-          </nav>
-        </div>
-        <footer className="portal-foot">Need help? qsieja@renovationsdelivered.com</footer>
-      </main>
-    )
   }
 
   async function handleGoogleLogin() {
