@@ -650,11 +650,11 @@ export default function ReceiptForm({
     };
   }, [path, request]);
   useEffect(() => {
-    if (initial.amountCents < 0 || initial.matchCandidates?.length)
+    if (initial.matchCandidates?.length)
       request<typeof candidates>(`${path}/candidates`)
         .then(setCandidates)
         .catch((e) => setError(e.message));
-  }, [path, request, initial.amountCents, initial.matchCandidates]);
+  }, [path, request, initial.matchCandidates]);
   useEffect(() => {
     if (!initial.charges.length) return;
     let alive = true;
@@ -820,6 +820,10 @@ export default function ReceiptForm({
     0,
   );
   const remaining = Math.round(Number(amount || 0) * 100) - allocated;
+  // Measured in the receipt's own direction: a return's split is negative,
+  // so money still to place is "left" whichever way the total points.
+  const direction = Number(amount || 0) < 0 ? -1 : 1;
+  const left = remaining * direction;
   const receiptProblem =
     !r.files.length && !missing.trim()
       ? "Add a photo, or explain why there isn't one."
@@ -1116,35 +1120,6 @@ export default function ReceiptForm({
           </section>
         )}
 
-        {r.amountCents < 0 && !r.originalReceiptId && !readonly && (
-          <section className="cc-band">
-            <div className="cc-band-head">
-              <h3 className="cc-band-title">Original purchase</h3>
-            </div>
-            <label className="cc-field">
-              <span className="cc-field-label">Link this return</span>
-              <select
-                className="cc-input"
-                defaultValue=""
-                onChange={(e) => {
-                  if (e.target.value)
-                    void relationship("link-return", {
-                      receiptId: e.target.value,
-                    });
-                }}
-              >
-                <option value="">Choose the original receipt</option>
-                {candidates.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {day(c.receiptDate)} · {c.description} ·{" "}
-                    {money(c.amountCents)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </section>
-        )}
-
         <section
           ref={receiptRef}
           className={`cc-band${readonly ? "" : invalid(receiptProblem)}${step(!receiptProblem)}`}
@@ -1312,13 +1287,13 @@ export default function ReceiptForm({
             </h3>
             {opts && !readonly && (split || remaining !== 0) && (
               <span
-                className={`cc-badge cc-badge--${remaining === 0 ? "green" : remaining > 0 ? "amber" : "red"}`}
+                className={`cc-badge cc-badge--${left === 0 ? "green" : left > 0 ? "amber" : "red"}`}
               >
-                {remaining === 0
+                {left === 0
                   ? "Fully allocated"
-                  : remaining > 0
-                    ? `${money(remaining)} unallocated`
-                    : `Over by ${money(-remaining)}`}
+                  : left > 0
+                    ? `${money(Math.abs(remaining))} unallocated`
+                    : `Over by ${money(Math.abs(remaining))}`}
               </span>
             )}
           </div>
@@ -1506,7 +1481,7 @@ export default function ReceiptForm({
                     destination: r.mode === "test" ? "24000100" : "",
                     costCode: "",
                     costType: "",
-                    amount: (Math.max(0, remaining) / 100).toFixed(2),
+                    amount: ((left > 0 ? remaining : 0) / 100).toFixed(2),
                   },
                 ])
               }

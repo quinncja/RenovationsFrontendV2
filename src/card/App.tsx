@@ -4,6 +4,7 @@ import ReceiptForm from "../modules/cc/ReceiptForm";
 import { publicRequest } from "../modules/cc/api";
 import { day, money, type Receipt } from "../modules/cc/types";
 import { appRequest, json, session, SignedOut, type Me, type Row } from "./api";
+import { Reminders } from "./Reminders";
 
 type View =
   | { name: "home" }
@@ -130,7 +131,15 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
 }
 
 function Signed({ onSignedOut }: { onSignedOut: () => void }) {
-  const [view, setView] = useState<View>({ name: "home" });
+  // A notification opens /card/?r=<receipt link token>: start on that receipt.
+  const [view, setView] = useState<View>(() => {
+    const token = new URLSearchParams(location.search).get("r");
+    if (token && /^[A-Za-z0-9_-]{22}$/.test(token)) {
+      history.replaceState(null, "", "/card/");
+      return { name: "receipt", token };
+    }
+    return { name: "home" };
+  });
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
@@ -197,6 +206,8 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
           <ChevronRight size={18} aria-hidden="true" />
         </button>
       </div>
+
+      {me && <Reminders testMode={me.testMode} />}
 
       <section className="rde-section">
         <h2 className="rde-section-title">
