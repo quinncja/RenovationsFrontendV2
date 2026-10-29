@@ -124,7 +124,8 @@ export default function CCPage() {
     [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null),
     [mappings, setMappings] = useState(false),
-    [statement, setStatement] = useState(false),
+    // The upload window: open with the week picked on the card, if any.
+    [statement, setStatement] = useState<{ week?: string } | null>(null),
     [statementVersion, setStatementVersion] = useState(0),
     [create, setCreate] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set()),
@@ -396,7 +397,7 @@ export default function CCPage() {
           <MotionItem>
             <StatementsCard
               version={statementVersion}
-              onUpload={() => setStatement(true)}
+              onUpload={(week) => setStatement({ week })}
             />
           </MotionItem>
         )}
@@ -612,7 +613,8 @@ export default function CCPage() {
       {mappings && <MappingModal onClose={() => setMappings(false)} />}
       {statement && (
         <StatementModal
-          onClose={() => setStatement(false)}
+          week={statement.week}
+          onClose={() => setStatement(null)}
           onApplied={() => {
             refresh();
             setStatementVersion((v) => v + 1);

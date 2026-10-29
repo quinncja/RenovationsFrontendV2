@@ -1991,8 +1991,18 @@ a.cc-file:not([href]) { cursor: default; }
   border: 1px solid var(--border-color);
   border-radius: 12px;
 }
+button.cc-wk {
+  appearance: none;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+button.cc-wk:hover { background-color: var(--hover-bg); }
+button.cc-wk.cc-wk--due:hover { background-color: rgba(245, 158, 11, 0.12) !important; }
 .cc-wk--due {
-  background: rgba(245, 158, 11, 0.06);
+  background-color: rgba(245, 158, 11, 0.06) !important;
   border-color: rgba(245, 158, 11, 0.35);
 }
 .cc-wk-label {

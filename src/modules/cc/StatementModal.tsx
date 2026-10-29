@@ -6,7 +6,7 @@ import { staffRequest } from "./staffApi";
 import { json } from "./api";
 import { money } from "./types";
 import { parseStatement, type StatementRow } from "./parseStatement";
-import { weekRange } from "./statementWeeks";
+import { addDays, weekRange } from "./statementWeeks";
 
 interface Line {
   key: string;
@@ -55,6 +55,8 @@ interface Result {
 }
 
 const signed = (cents: number) => `${cents > 0 ? "+" : "−"}${money(Math.abs(cents))}`;
+const longDay = (iso: string) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
 const shortDay = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 // Plain-words reason a final charge differs from its first alert.
@@ -69,9 +71,12 @@ function why(c: { cents: number; fromCents: number; category?: string }) {
 // changes, apply on confirmation. Matching runs on the server; the staging
 // table is its preview, and every change can be left out before applying.
 export function StatementModal({
+  week: picked,
   onClose,
   onApplied,
 }: {
+  /** Monday of the week picked on the card; the file is checked against it. */
+  week?: string;
   onClose: () => void;
   onApplied: () => void;
 }) {
@@ -170,7 +175,15 @@ export function StatementModal({
   return (
     <CCModal
       eyebrow={preview ? `Weekly statement · ${week}` : "Weekly statement"}
-      title={result ? `${week} is reconciled` : preview ? "Check the changes" : "Upload last week's statement"}
+      title={
+        result
+          ? `${week} is reconciled`
+          : preview
+            ? "Check the changes"
+            : picked
+              ? `Upload the ${weekRange(picked)} statement`
+              : "Upload last week's statement"
+      }
       wide
       onClose={onClose}
       footer={footer}
@@ -220,8 +233,15 @@ export function StatementModal({
           <li>
             <span className="cc-stmt-num">1</span>
             <span>
-              In Capital One, open <b>Transactions</b>, pick last week (Monday to Sunday) and
-              download it as a <b>CSV</b>.
+              In Capital One, open <b>Transactions</b>, pick{" "}
+              {picked ? (
+                <b>
+                  {longDay(picked)} to {longDay(addDays(picked, 6))}
+                </b>
+              ) : (
+                "last week (Monday to Sunday)"
+              )}{" "}
+              and download it as a <b>CSV</b>.
             </span>
           </li>
           <li>
@@ -254,6 +274,12 @@ export function StatementModal({
         </>
       ) : (
         <div className="cc-stmt">
+          {picked && preview.week.start !== picked && (
+            <Banner tone="amber">
+              This file covers <strong>{week}</strong>, not the {weekRange(picked)} week you picked.
+              Check it's the right download before confirming.
+            </Banner>
+          )}
           <div className="cc-stmt-result">
             <span className="cc-stmt-result-icon" aria-hidden="true">
               <CheckIcon size={18} strokeWidth={2.6} />

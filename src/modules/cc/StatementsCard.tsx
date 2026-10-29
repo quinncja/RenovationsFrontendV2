@@ -24,7 +24,8 @@ export function StatementsCard({
 }: {
   /** Bumped after an upload so the card re-reads its weeks. */
   version: number;
-  onUpload: () => void;
+  /** Opens the upload, for one week when a week was picked. */
+  onUpload: (week?: string) => void;
 }) {
   const [list, setList] = useState<StatementSummary[] | null>(null);
   useEffect(() => {
@@ -39,7 +40,8 @@ export function StatementsCard({
 
   const thisWeek = mondayOf(iso(new Date()));
   const lastWeek = addDays(thisWeek, -7);
-  const weeks = Array.from({ length: WEEKS }, (_, i) => addDays(thisWeek, (i - WEEKS + 1) * 7)).filter(
+  // Newest first: this week, then last week, then back.
+  const weeks = Array.from({ length: WEEKS }, (_, i) => addDays(thisWeek, -7 * i)).filter(
     (w) => w >= FIRST_WEEK,
   );
   // Newest upload per week (the list arrives newest first).
@@ -52,7 +54,7 @@ export function StatementsCard({
       title="Weekly statements"
       description="Every Monday, upload last week's Capital One transactions. Each charge is checked against its receipt, and anything different is fixed in one step."
       actions={
-        <button className={`button ${due ? "primary-button" : "secondary-button"}`} onClick={onUpload}>
+        <button className={`button ${due ? "primary-button" : "secondary-button"}`} onClick={() => onUpload(due ? lastWeek : undefined)}>
           <FileUp size={15} /> {due ? "Upload last week's statement" : "Upload a statement"}
         </button>
       }
@@ -63,7 +65,13 @@ export function StatementsCard({
           const current = w === thisWeek;
           const tone = !list ? "" : s ? "done" : current ? "open" : "due";
           return (
-            <div key={w} className={`cc-wk${tone === "due" ? " cc-wk--due" : ""}`}>
+            <button
+              type="button"
+              key={w}
+              className={`cc-wk${tone === "due" ? " cc-wk--due" : ""}`}
+              onClick={() => onUpload(w)}
+              aria-label={`Upload the ${weekRange(w)} statement`}
+            >
               <span className="cc-wk-label">{weekRange(w)}</span>
               {!list ? (
                 <>
@@ -101,7 +109,7 @@ export function StatementsCard({
                   </span>
                 </>
               )}
-            </div>
+            </button>
           );
         })}
       </div>
