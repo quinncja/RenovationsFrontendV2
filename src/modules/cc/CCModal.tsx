@@ -13,6 +13,7 @@ export function CCModal({
   eyebrow,
   title,
   narrow,
+  wide,
   footer,
   onClose,
   children,
@@ -20,6 +21,8 @@ export function CCModal({
   eyebrow?: string;
   title?: string;
   narrow?: boolean;
+  /** Room for a staging table (the statement upload). */
+  wide?: boolean;
   footer?: ReactNode;
   onClose: () => void;
   children: ReactNode;
@@ -46,7 +49,7 @@ export function CCModal({
       />
       <div className="modal-positioner" style={{ zIndex: contentZ }}>
         <motion.div
-          className={`modal co-modal cc-modal${narrow ? " cc-modal--narrow" : ""}`}
+          className={`modal co-modal cc-modal${narrow ? " cc-modal--narrow" : ""}${wide ? " cc-modal--wide" : ""}`}
           role="dialog"
           aria-modal="true"
           aria-label={title}

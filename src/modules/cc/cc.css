@@ -1833,3 +1833,90 @@ a.cc-file:not([href]) { cursor: default; }
   background: var(--active-bg);
   color: var(--primary-color);
 }
+
+/* ─── Statement upload (StatementModal) ──────────────────────────────────── */
+.modal.cc-modal--wide {
+  width: min(980px, 94vw);
+  max-width: min(980px, 94vw);
+}
+.cc-stmt-drop {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  width: 100%;
+  padding: 2.75rem 1.5rem;
+  border: 1.5px dashed var(--border-color);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--secondary-text);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.cc-stmt-drop .body-text { color: var(--primary-text); }
+.cc-stmt-drop:hover:not(:disabled),
+.cc-stmt-drop.is-dragging { background-color: var(--hover-bg); }
+.cc-stmt-drop:disabled { cursor: progress; }
+.cc-stmt {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+.cc-stmt-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 0.75rem;
+  row-gap: 0.375rem;
+}
+.cc-stmt-chips {
+  display: inline-flex;
+  gap: 0.375rem;
+  margin-left: auto;
+}
+.cc-stmt-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.cc-stmt-section .cc-band-sub { margin: -0.375rem 0 0; }
+.cc-stmt-table,
+.cc-stmt-aside .co-table-scroll {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+.cc-stmt .spend-rank-table td,
+.cc-stmt .spend-rank-table th {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.cc-stmt .spend-rank-table td:first-child,
+.cc-stmt .spend-rank-table th:first-child { padding-left: 1rem; }
+.cc-stmt .spend-rank-table td:last-child,
+.cc-stmt .spend-rank-table th:last-child { padding-right: 1rem; }
+.cc-stmt .cc-cell-stack .body-text {
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cc-stmt-aside summary {
+  cursor: pointer;
+  width: fit-content;
+}
+.cc-stmt-aside[open] summary { margin-bottom: 0.75rem; }
+.cc-stmt-aside .cc-band-sub { margin: 0 0 0.75rem; }
+.cc-stmt-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem 0 0.5rem;
+  text-align: center;
+}
+.cc-stmt-done h3,
+.cc-stmt-done p { margin: 0; }
+.cc-stmt-done-icon { color: var(--green, #16a34a); }
+.cc-stmt-done .cc-banner { align-self: stretch; text-align: left; }
+.cc-stmt-failures { margin: 0.375rem 0 0; padding-left: 1.125rem; }

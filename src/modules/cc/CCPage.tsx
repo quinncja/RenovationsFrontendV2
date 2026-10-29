@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
+  FileUp,
   Plus,
   Users,
 } from "lucide-react";
@@ -24,6 +25,7 @@ import { useEdgeScroll } from "./useEdgeScroll";
 import { staffRequest, staffFile, watchReceipts } from "./staffApi";
 import { json } from "./api";
 import { CCModal } from "./CCModal";
+import { StatementModal } from "./StatementModal";
 import { MappingModal } from "./MappingModal";
 import ReceiptForm, { Banner } from "./ReceiptForm";
 import {
@@ -122,6 +124,7 @@ export default function CCPage() {
     [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null),
     [mappings, setMappings] = useState(false),
+    [statement, setStatement] = useState(false),
     [create, setCreate] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set()),
     [busy, setBusy] = useState(false),
@@ -326,6 +329,14 @@ export default function CCPage() {
       title="Card Receipts"
       actions={
         <>
+          {gm && (
+            <button
+              className="button secondary-button"
+              onClick={() => setStatement(true)}
+            >
+              <FileUp size={15} /> Upload statement
+            </button>
+          )}
           {gm && (
             <button
               className="button secondary-button"
@@ -598,6 +609,12 @@ export default function CCPage() {
         </div>
       )}
       {mappings && <MappingModal onClose={() => setMappings(false)} />}
+      {statement && (
+        <StatementModal
+          onClose={() => setStatement(false)}
+          onApplied={refresh}
+        />
+      )}
       {create && (
         <NewReceipt
           onClose={() => setCreate(false)}
