@@ -78,19 +78,25 @@ export function Reminders({ testMode }: { testMode: boolean }) {
   if (status === "checking" || status === "unsupported") return null;
   if (status === "on")
     return (
-      <p className="rde-reminders-on">
+      <span className="rde-reminders-on" title={testMode ? "While testing, none are sent." : undefined}>
         <Bell size={14} aria-hidden="true" />
-        {testMode ? "Reminders are on. While testing, none are sent." : "Reminders are on."}
-      </p>
+        Reminders on{testMode ? " (paused while testing)" : ""}
+      </span>
     );
   if (status === "denied")
     return (
-      <p className="rde-reminders-on rde-reminders-on--off">
+      <span className="rde-reminders-on rde-reminders-on--off">
         <BellOff size={14} aria-hidden="true" />
-        Reminders are blocked. Turn on notifications for RD Expenses in your phone's Settings.
-      </p>
+        Reminders blocked in Settings
+      </span>
     );
-  if (later) return null;
+  if (later)
+    return (
+      <button type="button" className="rde-reminders-on rde-reminders-link" onClick={() => setLater(false)}>
+        <Bell size={14} aria-hidden="true" />
+        Turn on reminders
+      </button>
+    );
   return (
     <section className="rde-reminders">
       <span className="rde-action-icon">

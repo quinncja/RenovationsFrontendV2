@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Receipt as ReceiptIcon, RotateCcw } from "lucide-react";
+import { Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Undo2 } from "lucide-react";
 import ReceiptForm from "../modules/cc/ReceiptForm";
 import { publicRequest } from "../modules/cc/api";
-import { day, money, type Receipt } from "../modules/cc/types";
+import { money, tidyName, type Receipt } from "../modules/cc/types";
 import { appRequest, json, session, SignedOut, type Me, type Row } from "./api";
 import { Reminders } from "./Reminders";
 import { CodeInput } from "./CodeInput";
@@ -145,7 +145,13 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
   });
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState("");
-  const [flash, setFlash] = useState("");
+  // A short confirmation that slides up and fades (never shifts the page).
+  const [toast, setToast] = useState("");
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(""), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
   const load = useCallback(() => {
     appRequest<Me>("cc/app/me")
       .then((m) => {
@@ -166,7 +172,7 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
     return () => document.removeEventListener("visibilitychange", onShow);
   }, [load]);
   const home = (note = "") => {
-    setFlash(note);
+    setToast(note);
     setView({ name: "home" });
     load();
     window.scrollTo(0, 0);
@@ -181,17 +187,35 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
       />
     );
   if (view.name === "receipt")
-    return <ReceiptView token={view.token} onBack={() => home()} onSubmitted={() => home("Sent for approval. Thank you!")} />;
+    return (
+      <ReceiptView
+        token={view.token}
+        onBack={() => home()}
+        onSubmitted={(r) => home(`${tidyName(r.description || "Receipt")} sent for approval`)}
+      />
+    );
 
+  const signOut = () => {
+    void appRequest("cc/app/signout", { method: "POST" }).catch(() => {});
+    session.clear();
+    onSignedOut();
+  };
   return (
     <main className="rde-shell">
-      <Brand />
-      {me?.testMode && <p className="rde-test">Test mode: receipts go to Test Job and nothing is sent.</p>}
-      {me?.tester && me.cardholders && (
+      <header className="rde-top">
+        <Brand />
+        {me?.testMode && <span className="rde-pill">Test mode</span>}
+      </header>
+      <h1 className="rde-title">{me ? `Hi, ${me.name.split(" ")[0]}` : "\u00a0"}</h1>
+      {me?.tester && me.cardholders ? (
         <label className="rde-actas">
-          <span>Testing as</span>
+          Testing as{" "}
+          <b>
+            {me.actingAs} · •••• {me.cardLast4}
+          </b>
+          <ChevronDown size={14} aria-hidden="true" />
           <select
-            className="rde-input rde-actas-select"
+            aria-label="Testing as"
             value={me.cardLast4}
             onChange={(e) =>
               void appRequest("cc/app/act-as", json("POST", { cardLast4: e.target.value }))
@@ -206,99 +230,110 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
             ))}
           </select>
         </label>
+      ) : (
+        <p className="rde-greet-sub">{me ? `Company card •••• ${me.cardLast4}` : "\u00a0"}</p>
       )}
-      <h1 className="rde-title">{me ? `Hi, ${me.name.split(" ")[0]}` : " "}</h1>
-      {flash && <p className="rde-flash" role="status">{flash}</p>}
       {error && <p className="rde-error" role="alert">{error}</p>}
 
-      <div className="rde-actions">
-        <button type="button" className="rde-action" onClick={() => setView({ name: "start", kind: "purchase" })}>
-          <span className="rde-action-icon"><ReceiptIcon size={22} aria-hidden="true" /></span>
-          <span className="rde-action-text">
-            <b>Add a receipt</b>
-            <span>A purchase on your card</span>
+      <div className="rde-acts">
+        <button type="button" className="rde-act rde-act--primary" onClick={() => setView({ name: "start", kind: "purchase" })}>
+          <Camera size={26} aria-hidden="true" />
+          <span>
+            <b>Add receipt</b>
+            <small>Snap a purchase</small>
           </span>
-          <ChevronRight size={18} aria-hidden="true" />
         </button>
-        <button type="button" className="rde-action" onClick={() => setView({ name: "start", kind: "return" })}>
-          <span className="rde-action-icon"><RotateCcw size={22} aria-hidden="true" /></span>
-          <span className="rde-action-text">
-            <b>Log a return</b>
-            <span>Money back on your card</span>
+        <button type="button" className="rde-act" onClick={() => setView({ name: "start", kind: "return" })}>
+          <Undo2 size={26} aria-hidden="true" />
+          <span>
+            <b>Log return</b>
+            <small>Money back</small>
           </span>
-          <ChevronRight size={18} aria-hidden="true" />
         </button>
       </div>
 
-      {me && <Reminders testMode={me.testMode} />}
-
       <section className="rde-section">
-        <h2 className="rde-section-title">
-          To finish{me && me.todo.length ? ` · ${me.todo.length}` : ""}
-        </h2>
+        <div className="rde-section-head">
+          <h2 className="rde-section-title">To finish</h2>
+          {!!me?.todo.length && <span>{me.todo.length}</span>}
+        </div>
         {!me ? (
           <p className="rde-empty">Loading…</p>
         ) : me.todo.length ? (
           <List rows={me.todo} onOpen={(token) => setView({ name: "receipt", token })} />
         ) : (
-          <p className="rde-empty">You're all caught up.</p>
+          <p className="rde-empty rde-empty--done">
+            <Check size={16} aria-hidden="true" /> You're all caught up.
+          </p>
         )}
       </section>
 
       {!!me?.recent.length && (
         <section className="rde-section">
-          <h2 className="rde-section-title">Recently sent</h2>
+          <div className="rde-section-head">
+            <h2 className="rde-section-title">Recently sent</h2>
+          </div>
           <List rows={me.recent} onOpen={(token) => setView({ name: "receipt", token })} />
         </section>
       )}
 
       <footer className="rde-footer">
-        {me && <span>Card •••• {me.cardLast4}</span>}
-        <button
-          type="button"
-          className="rde-link"
-          onClick={() => {
-            void appRequest("cc/app/signout", { method: "POST" }).catch(() => {});
-            session.clear();
-            onSignedOut();
-          }}
-        >
+        {me && <Reminders testMode={me.testMode} />}
+        <button type="button" className="rde-link" onClick={signOut}>
           Sign out
         </button>
       </footer>
+
+      {toast && (
+        <div className="rde-toast" role="status" key={toast}>
+          <span className="rde-toast-mark">
+            <Check size={13} strokeWidth={3} aria-hidden="true" />
+          </span>
+          {toast}
+        </div>
+      )}
     </main>
   );
 }
 
-const stateLabel: Record<string, string> = {
-  awaiting: "Waiting for approval",
-  posting: "Approving",
-  approved: "Approved",
-};
+// Each row says what it's waiting on: a dot (amber needs you, red sent
+// back, blue with a GM, green done) and the same words beside the date.
+function status(r: Row): { tone: string; text: string } {
+  if (r.correction) return { tone: "red", text: r.correctionReason ? `Sent back: ${r.correctionReason}` : "Sent back" };
+  if (r.state === "pending") return { tone: "amber", text: r.amountCents < 0 ? "Return · needs slip" : "Needs receipt" };
+  if (r.state === "approved") return { tone: "green", text: "Approved" };
+  return { tone: "blue", text: "Waiting for approval" };
+}
 
 function List({ rows, onOpen }: { rows: Row[]; onOpen: (token: string) => void }) {
   return (
     <ul className="rde-list">
-      {rows.map((r) => (
-        <li key={r.token}>
-          <button type="button" className="rde-row" onClick={() => onOpen(r.token)}>
-            <span className="rde-row-text">
-              <b>{r.description}</b>
-              <span>
-                {day(r.receiptDate)}
-                {r.correction ? " · Needs a fix" : stateLabel[r.state] ? ` · ${stateLabel[r.state]}` : ""}
+      {rows.map((r) => {
+        const st = status(r);
+        return (
+          <li key={r.token}>
+            <button type="button" className="rde-row" onClick={() => onOpen(r.token)}>
+              <span className={`rde-dot rde-dot--${st.tone}`} aria-hidden="true" />
+              <span className="rde-row-text">
+                <b>{tidyName(r.description)}</b>
+                <span>
+                  {shortDay(r.receiptDate)} · {st.text}
+                </span>
               </span>
-            </span>
-            <span className={`rde-row-amt${r.amountCents < 0 ? " rde-row-amt--credit" : ""}`}>
-              {money(r.amountCents)}
-            </span>
-            <ChevronRight size={16} aria-hidden="true" />
-          </button>
-        </li>
-      ))}
+              <span className={`rde-row-amt${r.amountCents < 0 ? " rde-row-amt--credit" : ""}`}>
+                {money(r.amountCents)}
+              </span>
+              <ChevronRight size={16} aria-hidden="true" />
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
+
+const shortDay = (iso: string) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
 const today = () => {
   const d = new Date();
@@ -393,7 +428,7 @@ function ReceiptView({
 }: {
   token: string;
   onBack: () => void;
-  onSubmitted: () => void;
+  onSubmitted: (r: Receipt) => void;
 }) {
   const path = `cc/public/${encodeURIComponent(token)}`;
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -414,6 +449,7 @@ function ReceiptView({
             request={publicRequest}
             onChange={setReceipt}
             onSubmitted={onSubmitted}
+            phone
           />
         ) : (
           <p className="cc-shell-status" role={error ? "alert" : "status"}>

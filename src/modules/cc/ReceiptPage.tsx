@@ -118,6 +118,7 @@ function ReceiptPage() {
             request={publicRequest}
             onChange={setReceipt}
             onSubmitted={() => void submitted()}
+            phone
           />
         ) : (
           <p className="cc-shell-status" role={error ? "alert" : "status"}>

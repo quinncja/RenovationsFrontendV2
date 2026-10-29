@@ -125,3 +125,10 @@ export const day = (iso: string) => {
         timeZone: "UTC",
       });
 };
+
+// Card alerts arrive in capitals ("THE HOME DEPOT #1902"); phone screens show
+// them in title case. Names with any lowercase are left exactly as typed.
+export const tidyName = (name: string) =>
+  /[a-z]/.test(name)
+    ? name
+    : name.toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase());

@@ -62,9 +62,12 @@ export interface Row {
   amountCents: number;
   receiptDate: string;
   correction: boolean;
+  correctionReason?: string;
 }
 export interface Me {
   name: string;
+  /** The cardholder (the tester's chosen one when testing). */
+  actingAs?: string;
   cardLast4: string;
   testMode: boolean;
   /** The tech's test phone: testing as one of these cardholders. */

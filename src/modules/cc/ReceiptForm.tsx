@@ -18,6 +18,7 @@ import {
   FileUp,
   Info,
   Merge,
+  Ban,
   Pencil,
   Plus,
   Trash2,
@@ -33,6 +34,7 @@ import {
   money,
   statusLabel,
   statusTone,
+  tidyName,
   type Receipt,
   type Options,
   type Request,
@@ -512,7 +514,11 @@ export default function ReceiptForm({
   onDelete,
   onOpenJob,
   cardholder,
+  phone,
 }: {
+  /** Phone layout (RD Expenses and texted receipt links): a compact header,
+   *  extra actions under "More options" at the bottom, full-width submit. */
+  phone?: boolean;
   /** Set when a reviewer opens someone else's pending receipt: the form says
    *  it is that cardholder's to fill out and opens view-only, with a "Fill out
    *  on their behalf" override. Holds the cardholder's name. */
@@ -574,7 +580,10 @@ export default function ReceiptForm({
   const [dismissReason, setDismissReason] = useState("");
   // Description and total ride the head band; their fields open on request.
   // A receipt started by hand has no card alert behind it, so they lead.
-  const [editing, setEditing] = useState(initial.manual);
+  // On a phone the description and total sit under More options (the app
+  // asked for them before the receipt was created).
+  const [editing, setEditing] = useState(initial.manual && !phone);
+  const [dismissing, setDismissing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [viewing, setViewing] = useState<{
     file: ReceiptFile;
@@ -855,8 +864,114 @@ export default function ReceiptForm({
   const headline =
     r.charges.length === 1 ? r.charges[0].merchant : r.description;
 
+  const combineBand = combining && !readonly && (
+
+          <section className="cc-band">
+            <div className="cc-band-head">
+              <h3 className="cc-band-title">Combine with another receipt</h3>
+            </div>
+            <p className="cc-option-meta">
+              For charges from one purchase, like a fee or a split payment.
+              The other charge joins this receipt and its total adds to this
+              one.
+            </p>
+            <div className="cc-option-list">
+              {combinable.map((c) => (
+                <div className="cc-option" key={c.id}>
+                  <span className="cc-option-text">
+                    <strong>{c.description}</strong>
+                    <span className="cc-option-meta">
+                      {day(c.receiptDate)} · {money(c.amountCents)}
+                      {c.state === "awaiting" ? " · Submitted" : ""}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="cc-btn"
+                    onClick={() =>
+                      void relationship("combine", { receiptId: c.id })
+                    }
+                  >
+                    Combine
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="cc-btn cc-btn--quiet"
+              style={{ alignSelf: "flex-start" }}
+              onClick={() => setCombining(false)}
+            >
+              Cancel
+            </button>
+          </section>
+  );
+  const detailsBand = editing && !readonly && (
+
+          <section className="cc-band">
+            <div className="cc-band-head">
+              <h3 className="cc-band-title">Details</h3>
+            </div>
+            <div className={r.manual ? "cc-grid cc-grid--3" : "cc-grid"}>
+              <label className="cc-field">
+                <span className="cc-field-label">Description</span>
+                <input
+                  className="cc-input"
+                  value={description}
+                  maxLength={200}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </label>
+              <label className="cc-field">
+                <span className="cc-field-label">Total</span>
+                <input
+                  className="cc-input cc-input--money"
+                  inputMode="decimal"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                />
+              </label>
+              {r.manual && (
+                <label className="cc-field">
+                  <span className="cc-field-label">Receipt date</span>
+                  <input
+                    className="cc-input"
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                  />
+                </label>
+              )}
+            </div>
+          </section>
+  );
+
   return (
-    <div className="cc-form">
+    <div className={`cc-form${phone ? " cc-form--phone" : ""}`}>
+      {phone ? (
+        <header className="cc-phead">
+          <div className="cc-phead-row">
+            <h2 className="cc-phead-title">{tidyName(headline || "Card charge")}</h2>
+            <p className="cc-phead-amt">{money(r.amountCents)}</p>
+          </div>
+          <p className="cc-phead-meta">
+            {[
+              r.receiptDate && day(r.receiptDate),
+              `•••• ${r.cardLast4}`,
+              r.employeeName,
+              r.amountCents < 0 && "Return",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          {r.state !== "pending" && (
+            <span className={`cc-badge cc-badge--${statusTone(r.state)} cc-phead-badge`}>
+              {r.state === "awaiting" ? "Waiting for approval" : statusLabel(r.state)}
+            </span>
+          )}
+        </header>
+      ) : (
       <header className="cc-head">
         <div className="cc-eyebrow-row">
           <span className="cc-eyebrow">
@@ -908,6 +1023,7 @@ export default function ReceiptForm({
           </div>
         )}
       </header>
+      )}
 
       {(r.correctionReason ||
         r.dismissalRequested ||
@@ -997,87 +1113,8 @@ export default function ReceiptForm({
           </section>
         )}
 
-        {combining && !readonly && (
-          <section className="cc-band">
-            <div className="cc-band-head">
-              <h3 className="cc-band-title">Combine with another receipt</h3>
-            </div>
-            <p className="cc-option-meta">
-              For charges from one purchase, like a fee or a split payment.
-              The other charge joins this receipt and its total adds to this
-              one.
-            </p>
-            <div className="cc-option-list">
-              {combinable.map((c) => (
-                <div className="cc-option" key={c.id}>
-                  <span className="cc-option-text">
-                    <strong>{c.description}</strong>
-                    <span className="cc-option-meta">
-                      {day(c.receiptDate)} · {money(c.amountCents)}
-                      {c.state === "awaiting" ? " · Submitted" : ""}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    className="cc-btn"
-                    onClick={() =>
-                      void relationship("combine", { receiptId: c.id })
-                    }
-                  >
-                    Combine
-                  </button>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="cc-btn cc-btn--quiet"
-              style={{ alignSelf: "flex-start" }}
-              onClick={() => setCombining(false)}
-            >
-              Cancel
-            </button>
-          </section>
-        )}
-
-        {editing && !readonly && (
-          <section className="cc-band">
-            <div className="cc-band-head">
-              <h3 className="cc-band-title">Details</h3>
-            </div>
-            <div className={r.manual ? "cc-grid cc-grid--3" : "cc-grid"}>
-              <label className="cc-field">
-                <span className="cc-field-label">Description</span>
-                <input
-                  className="cc-input"
-                  value={description}
-                  maxLength={200}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </label>
-              <label className="cc-field">
-                <span className="cc-field-label">Total</span>
-                <input
-                  className="cc-input cc-input--money"
-                  inputMode="decimal"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                />
-              </label>
-              {r.manual && (
-                <label className="cc-field">
-                  <span className="cc-field-label">Receipt date</span>
-                  <input
-                    className="cc-input"
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
-                </label>
-              )}
-            </div>
-          </section>
-        )}
+        {!phone && combineBand}
+        {!phone && detailsBand}
 
         {r.charges.length > 1 && (
           <section className="cc-band">
@@ -1507,7 +1544,61 @@ export default function ReceiptForm({
             ))}
           </div>
         )}
-        {!readonly && (onDismiss || !r.dismissalRequested) && (
+        {phone && !readonly && (
+          <section className="cc-more">
+            <h3 className="cc-band-title">More options</h3>
+            {!!combinable.length && !combining && (
+              <button type="button" className="cc-more-btn" onClick={() => setCombining(true)}>
+                <Merge size={18} aria-hidden="true" />
+                Combine with another charge
+                <span className="cc-more-meta" title={`${combinable.length} other open charges on this card`}>
+                  {combinable.length}
+                </span>
+              </button>
+            )}
+            {combineBand}
+            {!editing && (
+              <button type="button" className="cc-more-btn" onClick={() => setEditing(true)}>
+                <Pencil size={18} aria-hidden="true" />
+                Edit description or total
+              </button>
+            )}
+            {detailsBand}
+            {!r.dismissalRequested && !dismissing && (
+              <button type="button" className="cc-more-btn" onClick={() => setDismissing(true)}>
+                <Ban size={18} aria-hidden="true" />
+                Charge was canceled or refunded
+              </button>
+            )}
+            {dismissing && (
+              <div className="cc-band">
+                <label className="cc-field">
+                  <span className="cc-field-label">What happened</span>
+                  <textarea
+                    className="cc-input"
+                    rows={2}
+                    value={dismissReason}
+                    onChange={(e) => setDismissReason(e.target.value)}
+                  />
+                </label>
+                <div className="cc-more-actions">
+                  <button type="button" className="cc-btn cc-btn--quiet" onClick={() => setDismissing(false)}>
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className="cc-btn cc-btn--danger"
+                    disabled={!dismissReason.trim()}
+                    onClick={() => void relationship("request-dismissal", { reason: dismissReason })}
+                  >
+                    Ask a GM to dismiss it
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+        {!phone && !readonly && (onDismiss || !r.dismissalRequested) && (
           <details className="cc-disclosure cc-disclosure--end">
             <summary>
               {onDismiss
@@ -1545,7 +1636,7 @@ export default function ReceiptForm({
         )}
       </fieldset>
 
-      {(error || notice) && (
+      {(error || (notice && !phone)) && (
         <div className="cc-feedback">
           {error ? (
             <Banner tone="red">{error}</Banner>
@@ -1585,9 +1676,11 @@ export default function ReceiptForm({
             ) : (
               <>
                 <span className="cc-actionbar-note">
-                  {r.firstSubmittedAt
-                    ? "Corrections are allowed until approval."
-                    : "Add the receipt and where it's charged, then submit."}
+                  {phone
+                    ? "A GM reviews it before it's posted."
+                    : r.firstSubmittedAt
+                      ? "Corrections are allowed until approval."
+                      : "Add the receipt and where it's charged, then submit."}
                 </span>
                 {onDelete && (
                   <button
@@ -1610,7 +1703,9 @@ export default function ReceiptForm({
                     ? "Submitting…"
                     : r.firstSubmittedAt
                       ? "Resubmit"
-                      : "Submit receipt"}
+                      : phone
+                        ? "Submit for approval"
+                        : "Submit receipt"}
                 </button>
               </>
             )}
