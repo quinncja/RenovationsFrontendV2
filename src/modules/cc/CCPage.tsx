@@ -112,8 +112,7 @@ export default function CCPage() {
     [weeks, setWeeks] = useState<Map<string, Week>>(new Map());
   const [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
-    [toast, setToast] = useState<{ id: number; text: string } | null>(null),
-    [version, setVersion] = useState(0);
+    [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null),
     [mappings, setMappings] = useState(false),
     [create, setCreate] = useState(false);
@@ -135,7 +134,7 @@ export default function CCPage() {
       staffRequest<typeof intake>("cc/intake-errors")
         .then(setIntake)
         .catch(() => {});
-  }, [gm, version, live]);
+  }, [gm, live]);
   async function retryIntake(id: string) {
     setBusy(true);
     try {
@@ -164,10 +163,9 @@ export default function CCPage() {
     },
     [],
   );
-  const refresh = useCallback(() => {
-    setSelected(new Set());
-    setVersion((v) => v + 1);
-  }, []);
+  // After an action the list re-syncs in place (no skeleton), so the table
+  // keeps its page and scroll position behind the modal.
+  const refresh = useCallback(() => setLive((n) => n + 1), []);
   useEffect(() => {
     const timer = setTimeout(() => {
       setQuery(search);
@@ -207,7 +205,7 @@ export default function CCPage() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [tab, page, query, version]);
+  }, [tab, page, query]);
   // Quiet reload on live updates: no skeleton, selection kept where possible.
   useEffect(() => {
     if (!live) return;
@@ -224,6 +222,11 @@ export default function CCPage() {
       ).catch(() => [] as Week[]),
     ])
       .then(([next, w]) => {
+        // The last row of a later page left this view: step back a page.
+        if (!next.items.length && page > 0) {
+          setPage(page - 1);
+          return;
+        }
         setList(next);
         setWeeks(new Map(w.map((x) => [x.start, x])));
         setSelected(
@@ -294,8 +297,8 @@ export default function CCPage() {
   const closeReceipt = useCallback(() => {
     setReceipt(null);
     setError("");
-    setLive((n) => n + 1);
-  }, []);
+    refresh();
+  }, [refresh]);
 
   // Past and All mix states, so their rows say which.
   const showStatus = tab === "past" || tab === "all";
