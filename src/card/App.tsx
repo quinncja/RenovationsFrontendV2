@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useState } from "react";
-import { Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Undo2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, Check, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, ScanLine, Undo2 } from "lucide-react";
 import ReceiptForm from "../modules/cc/ReceiptForm";
 import { publicRequest } from "../modules/cc/api";
 import { money, tidyName, type Receipt } from "../modules/cc/types";
-import { appRequest, json, session, SignedOut, type Me, type Row } from "./api";
+import { appRequest, appUpload, json, session, SignedOut, type Me, type Row, type ScanFields } from "./api";
+import { prepare } from "./photo";
 import { Reminders } from "./Reminders";
 import { CodeInput } from "./CodeInput";
 
 type View =
   | { name: "home" }
-  | { name: "start"; kind: "purchase" | "return" }
+  | { name: "start"; kind: "purchase" | "return"; photo?: File }
   | { name: "receipt"; token: string };
 
 export function App() {
@@ -171,6 +172,8 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
     document.addEventListener("visibilitychange", onShow);
     return () => document.removeEventListener("visibilitychange", onShow);
   }, [load]);
+  const camera = useRef<HTMLInputElement>(null);
+  const shooting = useRef<"purchase" | "return">("purchase");
   const home = (note = "") => {
     setToast(note);
     setView({ name: "home" });
@@ -182,6 +185,7 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
     return (
       <Start
         kind={view.kind}
+        photo={view.photo}
         onBack={() => home()}
         onStarted={(token) => setView({ name: "receipt", token })}
       />
@@ -195,6 +199,10 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
       />
     );
 
+  const snap = (kind: "purchase" | "return") => {
+    shooting.current = kind;
+    camera.current?.click();
+  };
   const signOut = () => {
     void appRequest("cc/app/signout", { method: "POST" }).catch(() => {});
     session.clear();
@@ -235,15 +243,28 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
       )}
       {error && <p className="rde-error" role="alert">{error}</p>}
 
+      {/* The tiles open the camera first; the photo leads the next screen. */}
+      <input
+        ref={camera}
+        type="file"
+        accept="image/*,application/pdf"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) setView({ name: "start", kind: shooting.current, photo: file });
+        }}
+      />
       <div className="rde-acts">
-        <button type="button" className="rde-act rde-act--primary" onClick={() => setView({ name: "start", kind: "purchase" })}>
+        <button type="button" className="rde-act rde-act--primary" onClick={() => snap("purchase")}>
           <Camera size={26} aria-hidden="true" />
           <span>
             <b>Add receipt</b>
             <small>Snap a purchase</small>
           </span>
         </button>
-        <button type="button" className="rde-act" onClick={() => setView({ name: "start", kind: "return" })}>
+        <button type="button" className="rde-act" onClick={() => snap("return")}>
           <Undo2 size={26} aria-hidden="true" />
           <span>
             <b>Log return</b>
@@ -251,6 +272,10 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
           </span>
         </button>
       </div>
+
+      <button type="button" className="rde-link rde-noshot" onClick={() => setView({ name: "start", kind: "purchase" })}>
+        No receipt to photograph? Enter it by hand
+      </button>
 
       <section className="rde-section">
         <div className="rde-section-head">
@@ -342,21 +367,63 @@ const today = () => {
 
 // The few facts asked up front (a return is negative from the start); the
 // receipt form then takes the photo and the job.
+// After the photo: the reader fills total, store and date for a quick check
+// (or the cardholder types them), then the receipt is created with the photo
+// already attached and opens on the job step.
 function Start({
   kind,
+  photo,
   onBack,
   onStarted,
 }: {
   kind: "purchase" | "return";
+  photo?: File;
   onBack: () => void;
   onStarted: (token: string) => void;
 }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState("");
+  const [reading, setReading] = useState(Boolean(photo));
+  const [read, setRead] = useState<"filled" | "partial" | "none" | "">("");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(today);
   const [store, setStore] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const retake = useRef<HTMLInputElement>(null);
   const ret = kind === "return";
+
+  async function take(raw: File) {
+    setReading(true);
+    setRead("");
+    setError("");
+    const ready = await prepare(raw);
+    setFile(ready);
+    setPreview((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return ready.type.startsWith("image/") ? URL.createObjectURL(ready) : "";
+    });
+    try {
+      const { fields } = await appUpload<{ fields: ScanFields | null }>("cc/app/scan", ready);
+      if (fields) {
+        if (fields.total) setAmount(fields.total);
+        if (fields.merchant) setStore(tidyName(fields.merchant));
+        if (fields.date) setDate(fields.date);
+        setRead(fields.total && fields.merchant && fields.date ? "filled" : fields.total || fields.merchant ? "partial" : "none");
+      } else setRead("none");
+    } catch {
+      setRead("none");
+    } finally {
+      setReading(false);
+    }
+  }
+  useEffect(() => {
+    if (photo) void take(photo);
+    // Runs once for the photo the camera handed over.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => () => void (preview && URL.revokeObjectURL(preview)), [preview]);
+
   async function go() {
     setBusy(true);
     setError("");
@@ -365,21 +432,74 @@ function Start({
         "cc/app/receipts",
         json("POST", { kind, amount, date, store }),
       );
+      if (file) {
+        const path = `cc/public/${encodeURIComponent(out.token)}`;
+        const r = await publicRequest<Receipt>(path);
+        await publicRequest<Receipt>(`${path}/files`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "X-File-Name": encodeURIComponent(file.name || "receipt.jpg"),
+            "X-Receipt-Revision": String(r.revision),
+          },
+          body: file,
+        }).catch(() => {
+          // The receipt exists; the photo can be added again on the next screen.
+        });
+      }
       onStarted(out.token);
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
     }
   }
+
+  const note = reading
+    ? "Reading your receipt…"
+    : read === "filled"
+      ? "Filled in from your photo. Check them before you continue."
+      : read === "partial"
+        ? "Some of it was readable. Fill in the rest."
+        : read === "none"
+          ? "Couldn't read this one. Fill it in below."
+          : "";
   return (
     <main className="rde-shell">
       <Back onBack={onBack} />
       <h1 className="rde-title">{ret ? "Log a return" : "Add a receipt"}</h1>
-      <p className="rde-sub">
-        {ret
-          ? "Money back on your card. Next you'll add a photo of the return slip and pick the job."
-          : "Next you'll add a photo of the receipt and pick the job."}
-      </p>
+      {photo || file ? (
+        <div className="rde-shot">
+          {preview ? (
+            <img src={preview} alt="Your receipt" />
+          ) : (
+            <span className="rde-shot-pdf">{file?.name || "Receipt"}</span>
+          )}
+          <button type="button" className="rde-shot-retake" onClick={() => retake.current?.click()} disabled={reading || busy}>
+            <RefreshCw size={14} aria-hidden="true" /> Retake
+          </button>
+          <input
+            ref={retake}
+            type="file"
+            accept="image/*,application/pdf"
+            capture="environment"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) void take(f);
+            }}
+          />
+        </div>
+      ) : (
+        <p className="rde-sub">
+          {ret ? "Money back on your card. Next you'll pick the job." : "Next you'll pick the job."}
+        </p>
+      )}
+      {note && (
+        <p className={`rde-read${reading ? " is-reading" : ""}`} role="status">
+          <ScanLine size={15} aria-hidden="true" /> {note}
+        </p>
+      )}
       <form
         className="rde-form"
         onSubmit={(e) => {
@@ -392,29 +512,37 @@ function Start({
           <input
             className="rde-input"
             inputMode="decimal"
-            placeholder="0.00"
+            placeholder={reading ? "…" : "0.00"}
             value={amount}
+            disabled={reading}
             onChange={(e) => setAmount(e.target.value.replace(/[^\d.,]/g, ""))}
-            autoFocus
           />
         </label>
         <label className="rde-field">
           <span>Store</span>
           <input
             className="rde-input"
-            placeholder="Home Depot"
+            placeholder={reading ? "…" : "Home Depot"}
             value={store}
             maxLength={200}
+            disabled={reading}
             onChange={(e) => setStore(e.target.value)}
           />
         </label>
         <label className="rde-field">
           <span>Date</span>
-          <input className="rde-input" type="date" max={today()} value={date} onChange={(e) => setDate(e.target.value)} />
+          <input
+            className="rde-input"
+            type="date"
+            max={today()}
+            value={date}
+            disabled={reading}
+            onChange={(e) => setDate(e.target.value)}
+          />
         </label>
         {error && <p className="rde-error" role="alert">{error}</p>}
-        <button className="rde-btn rde-btn--primary" disabled={busy || !Number(amount.replace(/,/g, ""))}>
-          {busy ? "Starting…" : "Next"}
+        <button className="rde-btn rde-btn--primary" disabled={busy || reading || !Number(amount.replace(/,/g, ""))}>
+          {busy ? "Saving…" : "Next: pick the job"}
         </button>
       </form>
     </main>

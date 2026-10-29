@@ -131,4 +131,4 @@ export const day = (iso: string) => {
 export const tidyName = (name: string) =>
   /[a-z]/.test(name)
     ? name
-    : name.toLowerCase().replace(/\b([a-z])/g, (c) => c.toUpperCase());
+    : name.toLowerCase().replace(/(^|[\s\-/&(#.])([a-z])/g, (_, lead, c) => lead + c.toUpperCase());

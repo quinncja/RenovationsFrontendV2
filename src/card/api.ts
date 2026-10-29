@@ -76,3 +76,19 @@ export interface Me {
   todo: Row[];
   recent: Row[];
 }
+
+// Raw upload with the session (the receipt reader takes the photo's bytes).
+export async function appUpload<T>(path: string, file: Blob): Promise<T> {
+  return appRequest<T>(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: file,
+  });
+}
+
+export interface ScanFields {
+  merchant: string;
+  total: string;
+  date: string;
+  isReturn: boolean;
+}
