@@ -98,7 +98,7 @@ export default function LoginPage() {
                 setPortal(false)
               }}
             >
-              <span className="portal-tile portal-tile--expenses">
+              <span className="portal-tile portal-tile--dashboard">
                 <img src="/r-logo.png" alt="" />
                 <span className="portal-tile-badge" aria-hidden="true">
                   <ChartColumn size={13} strokeWidth={2.5} />

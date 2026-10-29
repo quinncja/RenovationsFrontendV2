@@ -23073,7 +23073,13 @@ body.pj-painting td.pj-computed {
     radial-gradient(ellipse at 75% 75%, rgba(168, 106, 52, 0.22) 0%, transparent 60%),
     linear-gradient(160deg, #fdf8f2 0%, #f6e6d4 100%);
 }
-/* The dashboard is the R with a small chart badge on its corner. */
+/* The dashboard: the R on the dashboard's deep navy (its black outline
+   sinks into the tile, leaving the orange mark), with a chart badge. */
+.portal-tile--dashboard {
+  background:
+    radial-gradient(ellipse at 30% 25%, rgba(194, 124, 62, 0.28) 0%, transparent 60%),
+    linear-gradient(160deg, #23446c 0%, #12283f 100%);
+}
 .portal-tile { position: relative; }
 .portal-tile-badge {
   position: absolute;
@@ -23084,8 +23090,8 @@ body.pj-painting td.pj-computed {
   width: 1.5rem;
   height: 1.5rem;
   border-radius: 999px;
-  background: linear-gradient(160deg, #2a5282 0%, #19375a 100%);
-  color: #fff;
+  background: linear-gradient(160deg, #fdf8f2 0%, #f6e6d4 100%);
+  color: #19375a;
   border: 2px solid var(--card-color);
   box-shadow: 0 1px 3px rgba(25, 55, 90, 0.3);
 }
