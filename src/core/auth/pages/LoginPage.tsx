@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { ChevronRight } from "lucide-react"
+import { ChartColumn, ChevronRight } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth"
 import { auth } from "../firebase"
@@ -98,8 +98,11 @@ export default function LoginPage() {
                 setPortal(false)
               }}
             >
-              <span className="portal-tile portal-tile--dashboard">
-                <img src="/r-logo-white.png" alt="" />
+              <span className="portal-tile portal-tile--expenses">
+                <img src="/r-logo.png" alt="" />
+                <span className="portal-tile-badge" aria-hidden="true">
+                  <ChartColumn size={13} strokeWidth={2.5} />
+                </span>
               </span>
               <span className="portal-text">
                 <b>RD Dashboard</b>
