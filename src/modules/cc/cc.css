@@ -1315,6 +1315,10 @@ a.cc-file:not([href]) { cursor: default; }
 
 /* Week header rows in the receipt list: a quiet band (hover-bg fill, no
    borders) naming the week, its dates and count, with the total under Amount. */
+/* Same divider as the receipt rows, so the header sits on a line too. */
+.spend-rank-table tr.cc-week-row {
+  border-bottom: 1px solid var(--border-color);
+}
 .spend-rank-table tr.cc-week-row > td {
   padding-top: 0.875rem;
   padding-bottom: 0.625rem;
