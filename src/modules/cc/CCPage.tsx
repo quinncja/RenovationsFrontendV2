@@ -5,7 +5,9 @@ import {
   ChevronRight,
   CreditCard,
   Plus,
+  Users,
 } from "lucide-react";
+import { EmployeeAvatar } from "../../shared/components/EmployeeAvatar/EmployeeAvatar";
 import Page from "../../shared/components/Page";
 import { Widget } from "../../shared/components/Widget/Widget";
 import { SearchField } from "../../shared/components/SearchField";
@@ -401,22 +403,14 @@ export default function CCPage() {
                 ariaLabel="Receipt status"
               />
               {(people.length > 1 || person) && (
-                <select
-                  className="year-selector cc-person-filter"
+                <PersonFilter
+                  people={people}
                   value={person}
-                  onChange={(e) => {
-                    setPerson(e.target.value);
+                  onChange={(id) => {
+                    setPerson(id);
                     setPage(0);
                   }}
-                  aria-label="Filter by person"
-                >
-                  <option value="">Everyone</option>
-                  {people.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                />
               )}
               <SearchField
                 variant="co"
@@ -730,6 +724,44 @@ function WeekRow({
   );
 }
 
+// Person filter: the dashboard's pill dropdown, led by a people glyph, or by
+// the chosen person's initials badge once the list is narrowed to them.
+function PersonFilter({
+  people,
+  value,
+  onChange,
+}: {
+  people: { id: string; name: string }[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const chosen = people.find((p) => p.id === value);
+  const [first = "", ...rest] = (chosen?.name || "").split(" ");
+  return (
+    <label className={`cc-person${chosen ? " cc-person--set" : ""}`}>
+      <span className="cc-person-lead" aria-hidden="true">
+        {chosen ? (
+          <EmployeeAvatar firstName={first} lastName={rest.at(-1) || ""} />
+        ) : (
+          <Users size={13} />
+        )}
+      </span>
+      <select
+        className="year-selector cc-person-filter"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Filter by person"
+      >
+        <option value="">Everyone</option>
+        {people.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 function ReceiptRow({
   r,
   tab,

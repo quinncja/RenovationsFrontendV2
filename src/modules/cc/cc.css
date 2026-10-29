@@ -928,14 +928,48 @@ a.cc-file:not([href]) { cursor: default; }
   min-width: 14rem;
 }
 /* Person filter: the dashboard's pill dropdown (.year-selector), sized to the
-   toolbar's shared control height like the filter pills. */
+   toolbar's shared control height and set in the tab labels' quieter type.
+   A people glyph leads; once narrowed, the person's initials badge does. */
+.cc-person {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.cc-person-lead {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--secondary-text);
+  pointer-events: none;
+}
+.cc-person-lead .emp-avatar {
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 0.55rem;
+  letter-spacing: 0.02em;
+}
 .cc-widget .cc-person-filter {
   box-sizing: border-box;
   height: var(--co-control-h);
   padding-top: 0;
   padding-bottom: 0;
+  padding-left: 2.05rem;
   max-width: 14rem;
   text-overflow: ellipsis;
+  font-size: 0.78rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--secondary-text);
+  transition: color 160ms ease, background-color 0.15s, border-color 0.15s,
+    box-shadow 0.15s;
+}
+.cc-widget .cc-person-filter:hover,
+.cc-person--set .cc-person-filter {
+  color: var(--primary-text);
+}
+.cc-person--set .cc-person-filter {
+  padding-left: 2.35rem;
 }
 /* Even column rhythm. Overrides the Change Orders column-group padding that
    .co-widget applies by nth-child; the first and last cells line up with the
