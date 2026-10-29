@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { ChartLine, ChevronRight } from "lucide-react"
+import { ChevronRight } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth"
 import { auth } from "../firebase"
@@ -66,26 +66,29 @@ export default function LoginPage() {
 
   if ((isMobile || phoneLike) && portal) {
     return (
-      <div className="login-page">
+      <main className="portal">
         <div className="login-background" />
-        <div className="auth-card login-portal">
-          <div className="auth-card-header">
-            <Logo size={48} />
-            <h1 className="title1">Welcome</h1>
-            <p>What would you like to open?</p>
-          </div>
-          <div className="login-portal-choices">
-            <a className="login-portal-choice" href="/card/">
-              <img className="login-portal-appicon" src="/card/icons/apple-touch-icon.png" alt="" />
-              <span className="login-portal-text">
+        <header className="portal-brand">
+          <Logo size={44} />
+          <span className="portal-brand-name">Renovations Delivered</span>
+        </header>
+        <div className="portal-body">
+          <h1 className="portal-title">Welcome</h1>
+          <p className="portal-sub">Choose where you'd like to go.</p>
+          <nav className="portal-list" aria-label="Open an app">
+            <a className="portal-row" href="/card/">
+              <span className="portal-tile portal-tile--expenses">
+                <img src="/r-logo.png" alt="" />
+              </span>
+              <span className="portal-text">
                 <b>RD Expenses</b>
-                <span>Submit receipts and returns for your company card.</span>
+                <span>Receipts and returns for your company card</span>
               </span>
               <ChevronRight size={18} aria-hidden="true" />
             </a>
             <button
               type="button"
-              className="login-portal-choice"
+              className="portal-row"
               onClick={() => {
                 try {
                   localStorage.setItem(PORTAL_KEY, "dashboard")
@@ -95,16 +98,19 @@ export default function LoginPage() {
                 setPortal(false)
               }}
             >
-              <span className="login-portal-icon"><ChartLine size={22} aria-hidden="true" /></span>
-              <span className="login-portal-text">
-                <b>Dashboard</b>
-                <span>Reports and job costing. Sign in with your work account.</span>
+              <span className="portal-tile portal-tile--dashboard">
+                <img src="/r-logo-white.png" alt="" />
+              </span>
+              <span className="portal-text">
+                <b>RD Dashboard</b>
+                <span>Reports and job costing for staff</span>
               </span>
               <ChevronRight size={18} aria-hidden="true" />
             </button>
-          </div>
+          </nav>
         </div>
-      </div>
+        <footer className="portal-foot">Need help? qsieja@renovationsdelivered.com</footer>
+      </main>
     )
   }
 
