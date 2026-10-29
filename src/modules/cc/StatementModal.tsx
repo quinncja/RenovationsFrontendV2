@@ -6,7 +6,7 @@ import { staffRequest } from "./staffApi";
 import { json } from "./api";
 import { money } from "./types";
 import { parseStatement, type StatementRow } from "./parseStatement";
-import { addDays, weekRange } from "./statementWeeks";
+import { addDays, weekName, weekRange } from "./statementWeeks";
 
 interface Line {
   key: string;
@@ -172,18 +172,20 @@ export function StatementModal({
       </button>
     </>
   ) : undefined;
-  const week = preview ? weekRange(preview.week.start) : "";
+  // "Oct week 2 (Oct 12 – 18)".
+  const label = (start: string) => `${weekName(start)} (${weekRange(start)})`;
+  const week = preview ? label(preview.week.start) : "";
 
   return (
     <CCModal
-      eyebrow={preview ? `Weekly statement · ${week}` : "Weekly statement"}
+      eyebrow="Weekly statement"
       title={
         result
           ? `${week} is reconciled`
           : preview
             ? "Check the changes"
             : picked
-              ? `Upload the ${weekRange(picked)} statement`
+              ? `Upload the ${label(picked)} statement`
               : "Upload last week's statement"
       }
       wide
@@ -278,7 +280,7 @@ export function StatementModal({
         <div className="cc-stmt">
           {picked && preview.week.start !== picked && (
             <Banner tone="amber">
-              This file covers <strong>{week}</strong>, not the {weekRange(picked)} week you picked.
+              This file covers <strong>{week}</strong>, not {label(picked)}, the week you picked.
               Check it's the right download before confirming.
             </Banner>
           )}

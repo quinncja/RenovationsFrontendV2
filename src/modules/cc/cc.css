@@ -2018,6 +2018,13 @@ button.cc-wk.cc-wk--due:hover { background-color: rgba(245, 158, 11, 0.12) !impo
   font-weight: var(--font-weight-semibold);
   color: var(--primary-text);
   white-space: nowrap;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.5rem;
+}
+.cc-wk-range {
+  font-weight: var(--font-weight-regular);
+  color: var(--secondary-text);
 }
 .cc-wk-state {
   display: inline-flex;

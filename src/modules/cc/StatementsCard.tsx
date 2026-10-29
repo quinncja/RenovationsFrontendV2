@@ -3,7 +3,7 @@ import { Check } from "lucide-react";
 import { Widget } from "../../shared/components/Widget/Widget";
 import { SkelText } from "../../shared/components/SkelText";
 import { staffRequest } from "./staffApi";
-import { addDays, iso, mondayOf, short, weekRange } from "./statementWeeks";
+import { addDays, iso, mondayOf, short, weekName, weekRange } from "./statementWeeks";
 
 export interface StatementSummary {
   id: string;
@@ -66,9 +66,16 @@ export function StatementsCard({
               // The current week isn't over, so there's no statement to upload yet.
               disabled={current}
               onClick={() => onUpload(w)}
-              aria-label={current ? `${weekRange(w)}, this week` : `Upload the ${weekRange(w)} statement`}
+              aria-label={
+                current
+                  ? `${weekName(w)}, ${weekRange(w)}, this week`
+                  : `Upload the ${weekName(w)} statement, ${weekRange(w)}`
+              }
             >
-              <span className="cc-wk-label">{weekRange(w)}</span>
+              <span className="cc-wk-label">
+                {weekName(w)}
+                <span className="cc-wk-range">{weekRange(w)}</span>
+              </span>
               {!list ? (
                 <>
                   <span className="cc-wk-state">

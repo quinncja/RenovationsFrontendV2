@@ -20,3 +20,9 @@ export function weekRange(start: string) {
   const end = addDays(start, 6);
   return `${short(start)} – ${short(end, end.slice(5, 7) !== start.slice(5, 7))}`;
 }
+// "Oct week 2": the month and ordinal of the week's Monday, as the receipts
+// table names its week headers (and as the weekly spreadsheets are named).
+export function weekName(start: string) {
+  const d = new Date(`${start}T12:00:00`);
+  return `${d.toLocaleDateString("en-US", { month: "short" })} week ${Math.ceil(d.getDate() / 7)}`;
+}
