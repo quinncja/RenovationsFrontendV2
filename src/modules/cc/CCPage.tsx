@@ -101,7 +101,12 @@ export default function CCPage() {
   const [tab, setTab] = useState<Tab>("all"),
     [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
-    [page, setPage] = useState(0);
+    [page, setPage] = useState(0),
+    // Person filter: "" is everyone, else a Sage employee id or "unassigned".
+    [person, setPerson] = useState("");
+  const [people, setPeople] = useState<
+    { id: string; name: string; count: number }[]
+  >([]);
   const [list, setList] = useState<Listing>({
       items: [],
       total: 0,
@@ -129,6 +134,11 @@ export default function CCPage() {
   // reviewer) bumps this, and the list reloads quietly in place.
   const [live, setLive] = useState(0);
   useEffect(() => watchReceipts(() => setLive((n) => n + 1)), []);
+  useEffect(() => {
+    staffRequest<typeof people>("cc/receipts/people")
+      .then(setPeople)
+      .catch(() => {});
+  }, [live]);
   useEffect(() => {
     if (gm)
       staffRequest<typeof intake>("cc/intake-errors")
@@ -185,12 +195,12 @@ export default function CCPage() {
     setSelected(new Set());
     Promise.all([
       staffRequest<Listing>(
-        `cc/receipts?state=${tab}&page=${page}&search=${encodeURIComponent(query)}`,
+        `cc/receipts?state=${tab}&page=${page}&person=${person}&search=${encodeURIComponent(query)}`,
         { signal: controller.signal },
       ),
       // Totals are extra: if they fail, the list still loads without them.
       staffRequest<Week[]>(
-        `cc/receipts/weeks?state=${tab}&search=${encodeURIComponent(query)}`,
+        `cc/receipts/weeks?state=${tab}&person=${person}&search=${encodeURIComponent(query)}`,
         { signal: controller.signal },
       ).catch(() => [] as Week[]),
     ])
@@ -205,19 +215,19 @@ export default function CCPage() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [tab, page, query]);
+  }, [tab, page, query, person]);
   // Quiet reload on live updates: no skeleton, selection kept where possible.
   useEffect(() => {
     if (!live) return;
     const controller = new AbortController();
     Promise.all([
       staffRequest<Listing>(
-        `cc/receipts?state=${tab}&page=${page}&search=${encodeURIComponent(query)}`,
+        `cc/receipts?state=${tab}&page=${page}&person=${person}&search=${encodeURIComponent(query)}`,
         { signal: controller.signal },
       ),
       // Totals are extra: if they fail, the list still loads without them.
       staffRequest<Week[]>(
-        `cc/receipts/weeks?state=${tab}&search=${encodeURIComponent(query)}`,
+        `cc/receipts/weeks?state=${tab}&person=${person}&search=${encodeURIComponent(query)}`,
         { signal: controller.signal },
       ).catch(() => [] as Week[]),
     ])
@@ -390,6 +400,24 @@ export default function CCPage() {
                 layoutId="cc-tabs"
                 ariaLabel="Receipt status"
               />
+              {(people.length > 1 || person) && (
+                <select
+                  className="year-selector cc-person-filter"
+                  value={person}
+                  onChange={(e) => {
+                    setPerson(e.target.value);
+                    setPage(0);
+                  }}
+                  aria-label="Filter by person"
+                >
+                  <option value="">Everyone</option>
+                  {people.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              )}
               <SearchField
                 variant="co"
                 value={search}

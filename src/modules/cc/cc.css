@@ -927,6 +927,16 @@ a.cc-file:not([href]) { cursor: default; }
 .cc-widget .co-search-wrapper {
   min-width: 14rem;
 }
+/* Person filter: the dashboard's pill dropdown (.year-selector), sized to the
+   toolbar's shared control height like the filter pills. */
+.cc-widget .cc-person-filter {
+  box-sizing: border-box;
+  height: var(--co-control-h);
+  padding-top: 0;
+  padding-bottom: 0;
+  max-width: 14rem;
+  text-overflow: ellipsis;
+}
 /* Even column rhythm. Overrides the Change Orders column-group padding that
    .co-widget applies by nth-child; the first and last cells line up with the
    toolbar's 1.25rem inset. */
