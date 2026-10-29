@@ -21,6 +21,8 @@ interface Preview {
   from: string;
   to: string;
   week: { start: string; end: string };
+  /** Rows with no posted date yet; they reconcile the week they post. */
+  pending: number;
   lines: number;
   totalCents: number;
   already: number;
@@ -297,6 +299,8 @@ export function StatementModal({
                   : changes
                     ? ` · ${preview.changed.length + preview.combined.length + preview.created.length} below need a quick look before you confirm.`
                     : " · Nothing else to change."}
+                {!!preview.pending &&
+                  ` ${preview.pending} ${preview.pending === 1 ? "charge is" : "charges are"} still pending and will be checked on the week ${preview.pending === 1 ? "it posts" : "they post"}.`}
               </span>
             </div>
           </div>
