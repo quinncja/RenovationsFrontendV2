@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 import { ChartColumn, ChevronRight } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth"
 import { auth } from "../firebase"
 import { useAuth } from "../AuthProvider"
@@ -48,7 +48,20 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const isMobile = useIsMobile()
-  const [portal, setPortal] = useState(() => !remembered())
+  // The portal and the sign-in form are separate URLs (/login and
+  // /login?to=dashboard) so the phone's back button moves between them.
+  const location = useLocation()
+  const [params] = useSearchParams()
+  const portal = params.get("to") !== "dashboard"
+
+  // A phone that chose the dashboard before skips the portal on a fresh
+  // visit, but going back to /login within the visit still shows it.
+  // Decided once, on the page's first render, so returning to the portal
+  // with the back button never bounces forward again.
+  const [skipPortal] = useState(() => location.key === "default" && portal && remembered())
+  useEffect(() => {
+    if (skipPortal && (isMobile || phoneLike)) navigate("/login?to=dashboard", { replace: true })
+  }, [skipPortal, isMobile, navigate])
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -95,7 +108,7 @@ export default function LoginPage() {
                 } catch {
                   // Not remembered; they'll be asked next visit.
                 }
-                setPortal(false)
+                navigate("/login?to=dashboard")
               }}
             >
               <span className="portal-tile portal-tile--dashboard">

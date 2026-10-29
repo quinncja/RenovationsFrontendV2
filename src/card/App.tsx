@@ -5,6 +5,7 @@ import { publicRequest } from "../modules/cc/api";
 import { day, money, type Receipt } from "../modules/cc/types";
 import { appRequest, json, session, SignedOut, type Me, type Row } from "./api";
 import { Reminders } from "./Reminders";
+import { CodeInput } from "./CodeInput";
 
 type View =
   | { name: "home" }
@@ -19,6 +20,12 @@ export function App() {
     <SignIn onSignedIn={() => setSignedIn(true)} />
   );
 }
+
+// "7738967084" -> "(773) 896-7084" (anything else is shown as typed).
+const pretty = (raw: string) => {
+  const d = raw.replace(/\D/g, "").replace(/^1(?=\d{10}$)/, "");
+  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : raw;
+};
 
 // Phone number, then the texted code. The number must be the one on the
 // card mapping; any other number is told the same thing, so the app never
@@ -41,11 +48,11 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
       setBusy(false);
     }
   }
-  async function verify() {
+  async function verify(entered = code) {
     setBusy(true);
     setError("");
     try {
-      const out = await appRequest<{ token: string }>("cc/app/verify", json("POST", { phone, code }));
+      const out = await appRequest<{ token: string }>("cc/app/verify", json("POST", { phone, code: entered }));
       session.set(out.token);
       onSignedIn();
     } catch (e) {
@@ -94,21 +101,17 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
           }}
         >
           <p className="rde-sub">
-            If {phone} is on a company card, a 6-digit code is on its way. It works for 10 minutes.
+            If {pretty(phone)} is on a company card, a 6-digit code is on its way. It works for 10 minutes.
           </p>
-          <label className="rde-field">
-            <span>Code</span>
-            <input
-              className="rde-input rde-input--code"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              placeholder="123456"
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-              autoFocus
-            />
-          </label>
+          <CodeInput
+            value={code}
+            disabled={busy}
+            onChange={(c) => {
+              setCode(c);
+              if (error) setError("");
+            }}
+            onComplete={(c) => void verify(c)}
+          />
           {error && <p className="rde-error" role="alert">{error}</p>}
           <button className="rde-btn rde-btn--primary" disabled={busy || code.length !== 6}>
             {busy ? "Checking…" : "Sign in"}
@@ -184,6 +187,26 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
     <main className="rde-shell">
       <Brand />
       {me?.testMode && <p className="rde-test">Test mode: receipts go to Test Job and nothing is sent.</p>}
+      {me?.tester && me.cardholders && (
+        <label className="rde-actas">
+          <span>Testing as</span>
+          <select
+            className="rde-input rde-actas-select"
+            value={me.cardLast4}
+            onChange={(e) =>
+              void appRequest("cc/app/act-as", json("POST", { cardLast4: e.target.value }))
+                .then(load)
+                .catch((err) => setError((err as Error).message))
+            }
+          >
+            {me.cardholders.map((c) => (
+              <option key={c.cardLast4} value={c.cardLast4}>
+                {c.name} · •••• {c.cardLast4}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <h1 className="rde-title">{me ? `Hi, ${me.name.split(" ")[0]}` : " "}</h1>
       {flash && <p className="rde-flash" role="status">{flash}</p>}
       {error && <p className="rde-error" role="alert">{error}</p>}

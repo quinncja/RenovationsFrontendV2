@@ -67,6 +67,9 @@ export interface Me {
   name: string;
   cardLast4: string;
   testMode: boolean;
+  /** The tech's test phone: testing as one of these cardholders. */
+  tester?: boolean;
+  cardholders?: { cardLast4: string; name: string }[];
   todo: Row[];
   recent: Row[];
 }
