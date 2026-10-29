@@ -22980,3 +22980,53 @@ body.pj-painting td.pj-computed {
 .mgr-basis-scroll { overflow-x: auto; max-width: 100%; }
 
 .mgr-jobs-modal .mgr-modal-actions { flex-wrap: wrap; justify-content: flex-end; }
+
+/* ─── Mobile entry portal (LoginPage, phones only) ───────────────────────────
+   Signed-out phones choose RD Expenses (the cardholder app at /card) or the
+   dashboard before the sign-in form. */
+.login-portal-choices {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.login-portal-choice {
+  appearance: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  padding: 1rem;
+  text-align: left;
+  font: inherit;
+  color: var(--primary-text);
+  text-decoration: none;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  box-shadow: var(--button-shadow);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.login-portal-choice:active { background-color: var(--hover-bg); }
+.login-portal-appicon { width: 2.75rem; height: 2.75rem; border-radius: 0.75rem; flex-shrink: 0; }
+.login-portal-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  background: var(--hover-bg);
+}
+.login-portal-text { flex: 1; display: flex; flex-direction: column; gap: 0.125rem; }
+.login-portal-text b { font-size: 1rem; }
+.login-portal-text span { font-size: 0.8125rem; line-height: 1.4; color: var(--secondary-text); }
+.login-portal-choice > svg { color: var(--secondary-text); flex-shrink: 0; }
+.login-portal-switch {
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

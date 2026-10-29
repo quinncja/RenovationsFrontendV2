@@ -1,0 +1,17 @@
+{
+  "id": "/card/",
+  "name": "RD Expenses",
+  "short_name": "RD Expenses",
+  "description": "Submit company card receipts and returns.",
+  "start_url": "/card/",
+  "scope": "/card/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f8fd",
+  "theme_color": "#f7f8fd",
+  "icons": [
+    { "src": "/card/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/card/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/card/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

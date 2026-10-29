@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import { ChartLine, ChevronRight } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut } from "firebase/auth"
 import { auth } from "../firebase"
@@ -6,6 +7,20 @@ import { useAuth } from "../AuthProvider"
 import { ALLOWED_EMAIL_DOMAIN, DOMAIN_ERROR, isAllowedEmail } from "../domain"
 import LoadingScreen from "../../components/LoadingScreen"
 import Logo from "../../components/Logo"
+import useIsMobile from "../../../shared/hooks/useIsMobile"
+
+// On a phone, the signed-out landing first asks which app: RD Expenses (the
+// cardholder app, no dashboard account) or the dashboard. Choosing the
+// dashboard is remembered on that phone.
+const PORTAL_KEY = "rd:portal"
+const phoneLike = /iPhone|iPod|Android.+Mobile/.test(navigator.userAgent)
+function remembered() {
+  try {
+    return localStorage.getItem(PORTAL_KEY) === "dashboard"
+  } catch {
+    return false
+  }
+}
 
 /** Firebase's raw error strings leak SDK internals; map the common sign-in
  *  failures to something a person can act on. */
@@ -32,6 +47,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const isMobile = useIsMobile()
+  const [portal, setPortal] = useState(() => !remembered())
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -45,6 +62,50 @@ export default function LoginPage() {
   // straight to the redirect above without ever seeing the form.
   if (authLoading || user) {
     return <LoadingScreen />
+  }
+
+  if ((isMobile || phoneLike) && portal) {
+    return (
+      <div className="login-page">
+        <div className="login-background" />
+        <div className="auth-card login-portal">
+          <div className="auth-card-header">
+            <Logo size={48} />
+            <h1 className="title1">Welcome</h1>
+            <p>What would you like to open?</p>
+          </div>
+          <div className="login-portal-choices">
+            <a className="login-portal-choice" href="/card/">
+              <img className="login-portal-appicon" src="/card/icons/apple-touch-icon.png" alt="" />
+              <span className="login-portal-text">
+                <b>RD Expenses</b>
+                <span>Submit receipts and returns for your company card.</span>
+              </span>
+              <ChevronRight size={18} aria-hidden="true" />
+            </a>
+            <button
+              type="button"
+              className="login-portal-choice"
+              onClick={() => {
+                try {
+                  localStorage.setItem(PORTAL_KEY, "dashboard")
+                } catch {
+                  // Not remembered; they'll be asked next visit.
+                }
+                setPortal(false)
+              }}
+            >
+              <span className="login-portal-icon"><ChartLine size={22} aria-hidden="true" /></span>
+              <span className="login-portal-text">
+                <b>Dashboard</b>
+                <span>Reports and job costing. Sign in with your work account.</span>
+              </span>
+              <ChevronRight size={18} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   async function handleGoogleLogin() {
@@ -140,6 +201,11 @@ export default function LoginPage() {
             </form>
           </section>
         </div>
+        {(isMobile || phoneLike) && (
+          <a className="login-portal-switch" href="/card/">
+            Looking for RD Expenses? Open the card receipts app
+          </a>
+        )}
       </div>
     </div>
   )

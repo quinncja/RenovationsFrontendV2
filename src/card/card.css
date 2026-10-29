@@ -1,0 +1,287 @@
+/* RD Expenses (the cardholder app at /card). Tokens come from
+   receipt-page.css (the dashboard's light palette); this sheet lays out the
+   app's own screens. The receipt form itself is cc.css, shared with the
+   dashboard. */
+body {
+  background-color: var(--background-color);
+  background-image:
+    radial-gradient(ellipse at 30% 30%, rgba(194, 124, 62, 0.15) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 65%, rgba(168, 106, 52, 0.08) 0%, transparent 50%);
+  background-attachment: fixed;
+  min-height: 100dvh;
+}
+.rde-shell {
+  box-sizing: border-box;
+  max-width: 34rem;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top) + 1.5rem) 1.25rem calc(env(safe-area-inset-bottom) + 1.5rem);
+}
+.rde-shell--form { padding-left: 0.75rem; padding-right: 0.75rem; }
+.rde-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 1.75rem;
+}
+.rde-brand img { width: 2rem; height: 2rem; border-radius: 0.5rem; }
+.rde-brand b { font-size: 1.0625rem; color: var(--primary-text); }
+.rde-title {
+  margin: 0 0 0.375rem;
+  font-size: 1.625rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.01em;
+  color: var(--primary-text);
+}
+.rde-sub {
+  margin: 0 0 1.5rem;
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--secondary-text);
+}
+.rde-form { display: flex; flex-direction: column; gap: 1rem; }
+.rde-form .rde-sub { margin-bottom: 0.25rem; }
+.rde-field { display: flex; flex-direction: column; gap: 0.375rem; }
+.rde-field > span {
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-semibold);
+  color: var(--secondary-text);
+}
+/* 16px+ text stops iOS Safari zooming into a focused field. */
+.rde-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 3rem;
+  padding: 0 0.875rem;
+  font: inherit;
+  font-size: 1.0625rem;
+  color: var(--primary-text);
+  background: var(--card-color);
+  border: 1.5px solid var(--border-color);
+  border-radius: 0.875rem;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.rde-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgb(194 124 62 / 0.2);
+}
+.rde-input--code { font-size: 1.5rem; letter-spacing: 0.4em; text-align: center; }
+.rde-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 3.125rem;
+  padding: 0 1.25rem;
+  border: none;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+.rde-btn--primary {
+  color: #fff;
+  background: var(--copper-btn-bg);
+  box-shadow: var(--copper-btn-shadow);
+}
+.rde-btn:disabled { opacity: 0.5; cursor: default; }
+.rde-link {
+  appearance: none;
+  align-self: center;
+  margin-top: 0.25rem;
+  padding: 0.5rem;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--secondary-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.rde-error {
+  margin: 0;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.75rem;
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+.rde-flash {
+  margin: 0 0 1rem;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.75rem;
+  background: rgba(22, 163, 74, 0.1);
+  color: #15803d;
+  font-size: 0.9375rem;
+  font-weight: var(--font-weight-semibold);
+}
+.rde-test {
+  margin: -0.75rem 0 1rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.625rem;
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  font-size: 0.8125rem;
+}
+
+/* Home */
+.rde-actions { display: flex; flex-direction: column; gap: 0.75rem; margin: 0.75rem 0 2rem; }
+.rde-action {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  width: 100%;
+  padding: 1rem;
+  text-align: left;
+  font: inherit;
+  color: var(--primary-text);
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 1.125rem;
+  box-shadow: var(--button-shadow);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.rde-action:active { background-color: var(--hover-bg); }
+.rde-action-icon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  background: var(--active-bg);
+  color: var(--primary-color);
+}
+.rde-action-text { flex: 1; display: flex; flex-direction: column; gap: 0.125rem; }
+.rde-action-text b { font-size: 1.0625rem; }
+.rde-action-text span { font-size: 0.875rem; color: var(--secondary-text); }
+.rde-action > svg { color: var(--secondary-text); }
+.rde-section { margin-bottom: 1.75rem; }
+.rde-section-title {
+  margin: 0 0 0.625rem;
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--secondary-text);
+}
+.rde-empty { margin: 0; font-size: 0.9375rem; color: var(--secondary-text); }
+.rde-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  overflow: hidden;
+}
+.rde-list li + li { border-top: 1px solid var(--border-color); }
+.rde-row {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--primary-text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.rde-row:active { background-color: var(--hover-bg); }
+.rde-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.125rem; }
+.rde-row-text b { font-size: 0.9375rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rde-row-text span { font-size: 0.8125rem; color: var(--secondary-text); }
+.rde-row-amt { font-size: 0.9375rem; font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
+.rde-row-amt--credit { color: #15803d; }
+.rde-row > svg { color: var(--secondary-text); flex-shrink: 0; }
+.rde-footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  color: var(--secondary-text);
+}
+.rde-footer .rde-link { margin: 0; }
+.rde-back {
+  appearance: none;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  margin: 0 0 1rem -0.375rem;
+  padding: 0.375rem;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 1rem;
+  color: var(--primary-color);
+  cursor: pointer;
+}
+.rde-shell--form .rde-back { margin-left: 0.125rem; }
+
+/* Install */
+.rde-appicon {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 1.0625rem;
+  margin: 0.25rem 0 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.rde-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.rde-steps li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-radius: 1rem;
+  background: var(--card-color);
+  border: 1px solid var(--border-color);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+  color: var(--primary-text);
+}
+.rde-num {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 1.625rem;
+  height: 1.625rem;
+  border-radius: 999px;
+  background: var(--hover-bg);
+  font-size: 0.8125rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--secondary-text);
+}
+.rde-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.5rem;
+  background: var(--hover-bg);
+  font-weight: var(--font-weight-semibold);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.rde-chip svg { color: #2f7cf6; }
+.rde-note { margin: 1rem 0 0; font-size: 0.9375rem; line-height: 1.45; color: var(--secondary-text); }
+.rde-note--done { color: #15803d; font-weight: var(--font-weight-semibold); }
+.rde-install .rde-btn { margin-top: 0.25rem; }
+.rde-install-skip { margin-top: auto; padding-top: 2rem; }
