@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, FileUp } from "lucide-react";
+import { Check } from "lucide-react";
 import { Widget } from "../../shared/components/Widget/Widget";
 import { SkelText } from "../../shared/components/SkelText";
 import { staffRequest } from "./staffApi";
@@ -46,18 +46,12 @@ export function StatementsCard({
   );
   // Newest upload per week (the list arrives newest first).
   const done = (w: string) => list?.find((s) => s.weekStart === w);
-  const due = !!list && !done(lastWeek) && lastWeek >= FIRST_WEEK;
 
   return (
     <Widget
       className="cc-wks-card"
       title="Weekly statements"
-      description="Every Monday, upload last week's Capital One transactions. Each charge is checked against its receipt, and anything different is fixed in one step."
-      actions={
-        <button className={`button ${due ? "primary-button" : "secondary-button"}`} onClick={() => onUpload(due ? lastWeek : undefined)}>
-          <FileUp size={15} /> {due ? "Upload last week's statement" : "Upload a statement"}
-        </button>
-      }
+      description="Every Monday, click last week below and upload its Capital One transactions. Each charge is checked against its receipt, and anything different is fixed in one step."
     >
       <div className="cc-wks" style={{ gridTemplateColumns: `repeat(${weeks.length}, minmax(0, 1fr))` }}>
         {weeks.map((w) => {
