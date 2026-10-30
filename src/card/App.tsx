@@ -278,25 +278,17 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
         onSnap={(token) => snap(token)}
       />
 
-      <button type="button" className="rde-return" onClick={() => snap("return")}>
-        <span className="rde-return-icon">
-          <Undo2 size={22} aria-hidden="true" />
-        </span>
-        <span className="rde-return-text">
-          <b>Log a return</b>
-          <small>Returns don't send a text. Log it as soon as you get money back.</small>
-        </span>
-        <ChevronRight size={18} aria-hidden="true" />
+      <button type="button" className="rde-btn rde-btn--outline rde-return" onClick={() => snap("return")}>
+        <Undo2 size={18} aria-hidden="true" /> Log a return
       </button>
 
       <p className="rde-early">
-        Receipt in hand before the text?{" "}
         <button type="button" className="rde-inline" onClick={() => snap("purchase")}>
-          Add it early
-        </button>{" "}
-        or{" "}
+          Add a receipt early
+        </button>
+        <span aria-hidden="true">·</span>
         <button type="button" className="rde-inline" onClick={() => setView({ name: "start", kind: "purchase" })}>
-          enter it by hand
+          Enter by hand
         </button>
       </p>
 
@@ -352,8 +344,8 @@ async function attachPhoto(token: string, file: File) {
 }
 
 function action(r: Row) {
-  if (r.correction) return { label: "Fix and resend", camera: false };
-  return { label: r.amountCents < 0 ? "Snap the return slip" : "Snap the receipt", camera: true };
+  if (r.correction) return { label: "Fix it", camera: false };
+  return { label: r.amountCents < 0 ? "Add return slip" : "Add receipt", camera: true };
 }
 
 function Queue({
@@ -376,11 +368,8 @@ function Queue({
   if (!rows.length)
     return (
       <section className="rde-queue rde-queue--clear">
-        <span className="rde-clear-mark">
-          <Check size={22} strokeWidth={2.5} aria-hidden="true" />
-        </span>
-        <b>You're all caught up</b>
-        <span>When your card is charged, we'll text you a link to snap the receipt.</span>
+        <b>Nothing to submit</b>
+        <span>You'll get a text when your card is charged.</span>
       </section>
     );
   const [next, ...rest] = [...rows].sort((a, b) => Number(b.correction) - Number(a.correction));
@@ -390,15 +379,16 @@ function Queue({
   const ret = next.amountCents < 0;
   return (
     <section className="rde-queue" aria-labelledby="rde-queue-title">
-      <div className="rde-queue-head">
-        <h2 id="rde-queue-title">Waiting on you</h2>
-        <span className="rde-count">{rows.length}</span>
+      <div className="rde-section-head">
+        <h2 id="rde-queue-title" className="rde-section-title">Needs receipt</h2>
+        <span>{rows.length}</span>
       </div>
       <article className={`rde-next${next.correction ? " rde-next--back" : ""}`}>
         <button type="button" className="rde-next-body" onClick={() => onOpen(next.token)}>
           <span className="rde-next-meta">
             <span className={`rde-dot rde-dot--${st.tone}`} aria-hidden="true" />
-            {next.correction ? "Sent back" : ret ? "Return" : "Card charge"} · {shortDay(next.receiptDate)}
+            {shortDay(next.receiptDate)}
+            {next.correction ? " · Sent back" : ret ? " · Return" : ""}
           </span>
           <span className="rde-next-main">
             <b>{tidyName(next.description)}</b>
