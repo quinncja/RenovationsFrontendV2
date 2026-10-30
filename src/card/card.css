@@ -3,8 +3,10 @@
    app's own screens. The receipt form itself is cc.css, shared with the
    dashboard. */
 /* RD Expenses wears the navy of its icon where the dashboard uses copper:
-   the shared accent tokens are redefined here, so the receipt form follows. */
-:root {
+   the shared accent tokens are redefined here, so the receipt form follows.
+   html:root / html body outrank receipt-page.css, which the production build
+   loads after this sheet. */
+html:root {
   --primary-color: #23446c;
   --primary-color-hover: #2f5784;
   --copper-btn-bg: linear-gradient(180deg, #2f5784 0%, #1d3a5e 100%);
@@ -13,7 +15,7 @@
   --active-bg: rgb(35 68 108 / 0.1);
   --rde-focus-ring: rgb(35 68 108 / 0.2);
 }
-body {
+html body {
   background-color: var(--background-color);
   background-image:
     radial-gradient(ellipse at 30% 30%, rgba(35, 68, 108, 0.08) 0%, transparent 60%),
