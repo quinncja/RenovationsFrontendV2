@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   ChevronLeft,
@@ -50,21 +50,12 @@ const tabs = [
   { key: "past", label: "Complete" },
 ] as const;
 type Tab = (typeof tabs)[number]["key"];
-const PAGE_SIZE = 50;
 interface Week {
   start: string;
   count: number;
   totalCents: number;
   dismissedCount: number;
   dismissedCents: number;
-}
-// Monday (YYYY-MM-DD) of a receipt date's Monday-to-Sunday week; mirrors the
-// server's weekStart so rows land under the header that carries their total.
-function weekStart(date: string) {
-  const d = new Date(`${date}T00:00:00Z`);
-  if (!date || isNaN(d.getTime())) return "";
-  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
-  return d.toISOString().slice(0, 10);
 }
 const utc = (iso: string, opts: Intl.DateTimeFormatOptions) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", {
@@ -105,7 +96,10 @@ export default function CCPage() {
   const [tab, setTab] = useState<Tab>("all"),
     [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
-    [page, setPage] = useState(0),
+    // The week asked for (null = newest) and the one on screen; the list
+    // shows one Monday-to-Sunday week at a time, every receipt in it.
+    [week, setWeek] = useState<string | null>(null),
+    [shownWeek, setShownWeek] = useState<string | null>(null),
     // Person filter: "" is everyone, else a Sage employee id or "unassigned".
     [person, setPerson] = useState("");
   const [people, setPeople] = useState<
@@ -115,10 +109,10 @@ export default function CCPage() {
       items: [],
       total: 0,
       page: 0,
-      pageSize: PAGE_SIZE,
+      pageSize: 0,
     }),
     [loading, setLoading] = useState(true),
-    [weeks, setWeeks] = useState<Map<string, Week>>(new Map());
+    [weeks, setWeeks] = useState<Week[]>([]);
   const [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [toast, setToast] = useState<{ id: number; text: string } | null>(null);
@@ -136,7 +130,9 @@ export default function CCPage() {
     { _id: string; mode: string; error: string; receivedAt?: string }[]
   >([]);
   const selecting = gm && tab === "awaiting";
-  const edge = useEdgeScroll(`${tab}|${page}|${query}|${list.items.length}`);
+  const edge = useEdgeScroll(
+    `${tab}|${shownWeek}|${query}|${list.items.length}`,
+  );
   // Live updates: a receipt written anywhere (email intake, phone form, another
   // reviewer) bumps this, and the list reloads quietly in place.
   const [live, setLive] = useState(0);
@@ -181,12 +177,12 @@ export default function CCPage() {
     [],
   );
   // After an action the list re-syncs in place (no skeleton), so the table
-  // keeps its page and scroll position behind the modal.
+  // keeps its week and scroll position behind the modal.
   const refresh = useCallback(() => setLive((n) => n + 1), []);
   useEffect(() => {
     const timer = setTimeout(() => {
       setQuery(search);
-      setPage(0);
+      setWeek(null);
     }, 250);
     return () => clearTimeout(timer);
   }, [search]);
@@ -195,25 +191,38 @@ export default function CCPage() {
       .then(setSettings)
       .catch(() => {});
   }, []);
+  // Weeks for the tab (newest first, server totals), then every receipt in
+  // the wanted week: that one if still listed, else the next older one (its
+  // last row left this view), else the oldest; null asks for the newest.
+  async function loadWeek(wanted: string | null, signal: AbortSignal) {
+    const qs = `state=${tab}&person=${person}&search=${encodeURIComponent(query)}`;
+    const w = await staffRequest<Week[]>(`cc/receipts/weeks?${qs}`, {
+      signal,
+    });
+    const target =
+      wanted === null
+        ? w[0]
+        : w.find((x) => x.start === wanted) ||
+          w.find((x) => x.start < wanted) ||
+          w[w.length - 1];
+    const next = target
+      ? await staffRequest<Listing>(
+          `cc/receipts?${qs}&week=${target.start || "none"}`,
+          { signal },
+        )
+      : { items: [], total: 0, page: 0, pageSize: 0 };
+    return { w, shown: target ? target.start : null, next };
+  }
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError("");
     setSelected(new Set());
-    Promise.all([
-      staffRequest<Listing>(
-        `cc/receipts?state=${tab}&page=${page}&person=${person}&search=${encodeURIComponent(query)}`,
-        { signal: controller.signal },
-      ),
-      // Totals are extra: if they fail, the list still loads without them.
-      staffRequest<Week[]>(
-        `cc/receipts/weeks?state=${tab}&person=${person}&search=${encodeURIComponent(query)}`,
-        { signal: controller.signal },
-      ).catch(() => [] as Week[]),
-    ])
-      .then(([next, w]) => {
+    loadWeek(week, controller.signal)
+      .then(({ w, shown, next }) => {
+        setWeeks(w);
+        setShownWeek(shown);
         setList(next);
-        setWeeks(new Map(w.map((x) => [x.start, x])));
       })
       .catch((e) => {
         if (!controller.signal.aborted) setError(e.message);
@@ -222,30 +231,17 @@ export default function CCPage() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [tab, page, query, person]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, week, query, person]);
   // Quiet reload on live updates: no skeleton, selection kept where possible.
   useEffect(() => {
     if (!live) return;
     const controller = new AbortController();
-    Promise.all([
-      staffRequest<Listing>(
-        `cc/receipts?state=${tab}&page=${page}&person=${person}&search=${encodeURIComponent(query)}`,
-        { signal: controller.signal },
-      ),
-      // Totals are extra: if they fail, the list still loads without them.
-      staffRequest<Week[]>(
-        `cc/receipts/weeks?state=${tab}&person=${person}&search=${encodeURIComponent(query)}`,
-        { signal: controller.signal },
-      ).catch(() => [] as Week[]),
-    ])
-      .then(([next, w]) => {
-        // The last row of a later page left this view: step back a page.
-        if (!next.items.length && page > 0) {
-          setPage(page - 1);
-          return;
-        }
+    loadWeek(shownWeek, controller.signal)
+      .then(({ w, shown, next }) => {
+        setWeeks(w);
+        setShownWeek(shown);
         setList(next);
-        setWeeks(new Map(w.map((x) => [x.start, x])));
         setSelected(
           (old) =>
             new Set(next.items.filter((r) => old.has(r._id)).map((r) => r._id)),
@@ -319,12 +315,13 @@ export default function CCPage() {
 
   // Past and All mix states, so their rows say which.
   const showStatus = tab === "past" || tab === "all";
-  // Week headers span every column but Amount, which carries the total.
-  const columns = (selecting ? 1 : 0) + 6 + (showStatus ? 1 : 0);
   const allSelected =
     list.items.length > 0 && selected.size === list.items.length;
-  const firstRow = page * PAGE_SIZE + 1,
-    lastRow = Math.min((page + 1) * PAGE_SIZE, list.total);
+  // Weeks run newest first: left steps back in time, right steps forward.
+  const at = weeks.findIndex((x) => x.start === shownWeek),
+    older = at >= 0 ? weeks[at + 1] : undefined,
+    newer = at > 0 ? weeks[at - 1] : undefined,
+    allCount = weeks.reduce((n, x) => n + x.count + x.dismissedCount, 0);
 
   return (
     <Page
@@ -410,7 +407,7 @@ export default function CCPage() {
                 options={tabs}
                 onChange={(t) => {
                   setTab(t);
-                  setPage(0);
+                  setWeek(null);
                 }}
                 layoutId="cc-tabs"
                 ariaLabel="Receipt status"
@@ -421,7 +418,7 @@ export default function CCPage() {
                   value={person}
                   onChange={(id) => {
                     setPerson(id);
-                    setPage(0);
+                    setWeek(null);
                   }}
                 />
               )}
@@ -435,7 +432,7 @@ export default function CCPage() {
                 {loading ? (
                   <SkelText ch={9} />
                 ) : (
-                  `${list.total} ${list.total === 1 ? "receipt" : "receipts"}`
+                  `${allCount} ${allCount === 1 ? "receipt" : "receipts"}`
                 )}
               </span>
               {selecting && (
@@ -455,6 +452,15 @@ export default function CCPage() {
               )}
             </div>
 
+            {(loading || weeks.length > 0) && (
+              <WeekBar
+                start={loading ? null : shownWeek}
+                week={weeks[at]}
+                older={older}
+                newer={newer}
+                onStep={(w) => setWeek(w.start)}
+              />
+            )}
             {!loading && !list.items.length ? (
               <div className="cc-empty body-text text-secondary">
                 {error
@@ -477,7 +483,7 @@ export default function CCPage() {
                           <th className="cc-col-check">
                             <input
                               type="checkbox"
-                              aria-label="Select all on this page"
+                              aria-label="Select all in this week"
                               checked={allSelected}
                               disabled={loading}
                               onChange={(e) =>
@@ -536,68 +542,30 @@ export default function CCPage() {
                               </td>
                             </tr>
                           ))
-                        : list.items.map((r, i) => {
-                            const wk = weekStart(r.receiptDate);
-                            const first =
-                              i === 0 ||
-                              weekStart(list.items[i - 1].receiptDate) !== wk;
-                            return (
-                              <Fragment key={r._id}>
-                                {first && (
-                                  <WeekRow
-                                    start={wk}
-                                    week={weeks.get(wk)}
-                                    span={columns - 1}
-                                  />
-                                )}
-                                <ReceiptRow
-                                  r={r}
-                                  tab={tab}
-                                  selecting={selecting}
-                                  selected={selected.has(r._id)}
-                                  onSelect={(on) =>
-                                    setSelected((old) => {
-                                      const next = new Set(old);
-                                      if (on) next.add(r._id);
-                                      else next.delete(r._id);
-                                      return next;
-                                    })
-                                  }
-                                  onOpen={() => void open(r._id)}
-                                  onOpenJob={(recnum) => goToJobcost(recnum)}
-                                  viewerUid={user?.uid}
-                                />
-                              </Fragment>
-                            );
-                          })}
+                        : list.items.map((r) => (
+                            <ReceiptRow
+                              key={r._id}
+                              r={r}
+                              tab={tab}
+                              selecting={selecting}
+                              selected={selected.has(r._id)}
+                              onSelect={(on) =>
+                                setSelected((old) => {
+                                  const next = new Set(old);
+                                  if (on) next.add(r._id);
+                                  else next.delete(r._id);
+                                  return next;
+                                })
+                              }
+                              onOpen={() => void open(r._id)}
+                              onOpenJob={(recnum) => goToJobcost(recnum)}
+                              viewerUid={user?.uid}
+                            />
+                          ))}
                     </tbody>
                   </table>
                 </div>
                 {edge.affordances}
-              </div>
-            )}
-
-            {list.total > PAGE_SIZE && (
-              <div className="cc-pager">
-                <span className="subheadline text-secondary">
-                  {firstRow}–{lastRow} of {list.total}
-                </span>
-                <div className="cc-pager-buttons">
-                  <button
-                    className="button secondary-button"
-                    disabled={page === 0 || loading}
-                    onClick={() => setPage(page - 1)}
-                  >
-                    <ChevronLeft size={14} /> Previous
-                  </button>
-                  <button
-                    className="button secondary-button"
-                    disabled={lastRow >= list.total || loading}
-                    onClick={() => setPage(page + 1)}
-                  >
-                    Next <ChevronRight size={14} />
-                  </button>
-                </div>
               </div>
             )}
           </Widget>
@@ -715,35 +683,68 @@ export default function CCPage() {
   );
 }
 
-// A week's header row: name and dates on the left, its total under Amount.
-// Totals come from the server, so they cover the whole week across pages.
-function WeekRow({
+// The week pager above the table: step older/newer around the week's name
+// and dates; its count and total (server totals, so dismissed charges are
+// told apart) sit on the right.
+function WeekBar({
   start,
   week,
-  span,
+  older,
+  newer,
+  onStep,
 }: {
-  start: string;
+  start: string | null;
   week: Week | undefined;
-  span: number;
+  older: Week | undefined;
+  newer: Week | undefined;
+  onStep: (w: Week) => void;
 }) {
-  const { name, range } = weekLabel(start);
+  const label = start === null ? null : weekLabel(start);
   return (
-    <tr className="cc-week-row">
-      <td colSpan={span}>
-        <span className="cc-week-name">{name}</span>
-        {range && <span className="cc-week-range">{range}</span>}
-        {week && (
-          <span className="cc-week-meta">
-            {week.count} {week.count === 1 ? "receipt" : "receipts"}
-            {week.dismissedCount > 0 &&
-              ` · ${week.dismissedCount} dismissed (${money(week.dismissedCents)}, not in total)`}
+    <div className="cc-weekbar">
+      <div className="cc-weekbar-nav">
+        <button
+          type="button"
+          className="btn-icon"
+          aria-label="Previous week"
+          disabled={!older}
+          onClick={() => older && onStep(older)}
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="cc-weekbar-label">
+          <span className="cc-week-name">
+            {label ? label.name : <SkelText ch={10} />}
           </span>
-        )}
-      </td>
-      <td className="spend-rank-table-value cc-week-total">
-        {week ? money(week.totalCents) : ""}
-      </td>
-    </tr>
+          {label?.range && <span className="cc-week-range">{label.range}</span>}
+        </span>
+        <button
+          type="button"
+          className="btn-icon"
+          aria-label="Next week"
+          disabled={!newer}
+          onClick={() => newer && onStep(newer)}
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+      <span className="cc-weekbar-sum">
+        <span className="cc-week-meta">
+          {week ? (
+            <>
+              {week.count} {week.count === 1 ? "receipt" : "receipts"}
+              {week.dismissedCount > 0 &&
+                ` · ${week.dismissedCount} dismissed (${money(week.dismissedCents)}, not in total)`}
+            </>
+          ) : (
+            <SkelText ch={10} />
+          )}
+        </span>
+        <span className="cc-week-total">
+          {week ? money(week.totalCents) : <SkelText ch={8} />}
+        </span>
+      </span>
+    </div>
   );
 }
 
