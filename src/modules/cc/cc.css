@@ -1039,19 +1039,6 @@ a.cc-file:not([href]) { cursor: default; }
   padding: 3rem 1.25rem;
   text-align: center;
 }
-.cc-pager {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 1.25rem;
-  border-top: 1px solid var(--border-color);
-}
-.cc-pager-buttons {
-  display: flex;
-  gap: 0.5rem;
-}
-
 /* Intake errors (GM): banner with its retry rows beneath. */
 .cc-intake-list {
   list-style: none;
@@ -1350,14 +1337,44 @@ a.cc-file:not([href]) { cursor: default; }
 /* Week header rows in the receipt list: a quiet band (hover-bg fill, no
    borders) naming the week, its dates and count, with the total under Amount. */
 /* Same divider as the receipt rows, so the header sits on a line too. */
-.spend-rank-table tr.cc-week-row {
+/* Week pager above the table: older/newer steppers around the week's name
+   and dates, its count and total on the right, in the Amount column's weight. */
+.cc-weekbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 1.25rem 0.5rem 0.75rem;
   border-bottom: 1px solid var(--border-color);
-}
-.spend-rank-table tr.cc-week-row > td {
-  padding-top: 0.875rem;
-  padding-bottom: 0.625rem;
   background: var(--hover-bg);
   white-space: nowrap;
+}
+.cc-weekbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+.cc-weekbar-nav .btn-icon {
+  width: 2rem;
+  height: 2rem;
+}
+.cc-weekbar-nav .btn-icon:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: none;
+}
+.cc-weekbar-label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  min-width: 11.5rem;
+  justify-content: center;
+}
+.cc-weekbar-sum {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
 }
 .cc-week-name {
   font-size: 0.875rem;
@@ -1366,15 +1383,25 @@ a.cc-file:not([href]) { cursor: default; }
 }
 .cc-week-range,
 .cc-week-meta {
-  margin-left: 0.625rem;
   font-size: 0.8125rem;
   color: var(--secondary-text);
   font-variant-numeric: tabular-nums;
 }
-.cc-week-meta::before { content: "· "; }
 .cc-week-total {
+  font-size: 0.875rem;
   font-weight: var(--font-weight-bold);
+  color: var(--primary-text);
   font-variant-numeric: tabular-nums;
+}
+@media (max-width: 768px) {
+  .cc-weekbar { padding-right: 1rem; }
+  .cc-weekbar-label {
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    min-width: 8.5rem;
+  }
+  .cc-weekbar-sum .cc-week-meta { display: none; }
 }
 
 /* Confirmation toast (same surface as the Projections undo toast): bottom
@@ -2121,7 +2148,12 @@ button.cc-wk.cc-wk--due:hover { background-color: rgba(245, 158, 11, 0.12) !impo
 .cc-form--phone .cc-actionbar-note { order: 3; display: block !important; margin: 0; text-align: center; }
 
 /* Active | Inactive switch over the card list (only when a card is inactive). */
-.cc-map-seg { width: fit-content; margin-bottom: 0.875rem; }
+.cc-map-seg { width: fit-content; margin-bottom: 0.75rem; }
+.cc-map-stack { display: grid; }
+/* Hidden panes keep their space (visibility, not display) so the taller list
+   sets the height for both. */
+.cc-map-pane { grid-area: 1 / 1; min-width: 0; }
+.cc-map-pane[hidden] { display: block; visibility: hidden; }
 .cc-map-seg-count {
   margin-left: 0.25rem;
   font-variant-numeric: tabular-nums;

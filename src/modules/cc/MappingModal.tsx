@@ -58,8 +58,7 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
   // Inactive cards stay out of the way: the list shows active cards, and an
   // Active | Inactive switch appears only once a card has been deactivated.
   const active = data?.mappings.filter((m) => m.active) ?? [],
-    inactive = data?.mappings.filter((m) => !m.active) ?? [],
-    shown = view === "inactive" && inactive.length ? inactive : active;
+    inactive = data?.mappings.filter((m) => !m.active) ?? [];
   const row = (m: Mapping) => (
     <button
       key={m.cardLast4}
@@ -113,7 +112,7 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
           </p>
         )
       ) : data.mappings.length ? (
-        <>
+        <div className="cc-map-sheet">
           {inactive.length > 0 && (
             <SegmentedControl
               variant="ohr"
@@ -128,18 +127,29 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
               ariaLabel="Card status"
             />
           )}
-          {shown.length > 0 ? (
-            <div
-              className={`cc-map-list cc-map-list--full${view === "inactive" ? " cc-map-list--inactive" : ""}`}
-            >
-              {shown.map(row)}
+          {/* Both lists share one grid cell, so the sheet is always as tall as
+              the longer one and switching never resizes the modal. */}
+          <div className="cc-map-stack">
+            <div className="cc-map-pane" hidden={view !== "active"}>
+              {active.length ? (
+                <div className="cc-map-list cc-map-list--full">
+                  {active.map(row)}
+                </div>
+              ) : (
+                <p className="cc-band-sub" style={{ margin: 0 }}>
+                  No active cards.
+                </p>
+              )}
             </div>
-          ) : (
-            <p className="cc-band-sub" style={{ marginTop: 0 }}>
-              No active cards.
-            </p>
-          )}
-        </>
+            {inactive.length > 0 && (
+              <div className="cc-map-pane" hidden={view !== "inactive"}>
+                <div className="cc-map-list cc-map-list--full cc-map-list--inactive">
+                  {inactive.map(row)}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       ) : (
         <p className="cc-band-sub" style={{ marginTop: 0 }}>
           No cards mapped yet.
