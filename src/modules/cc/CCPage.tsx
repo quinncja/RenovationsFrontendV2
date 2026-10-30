@@ -4,7 +4,6 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
-  FlaskConical,
   Plus,
   Users,
 } from "lucide-react";
@@ -28,9 +27,6 @@ import { CCModal } from "./CCModal";
 import { StatementModal } from "./StatementModal";
 import { StatementsCard } from "./StatementsCard";
 import { MappingModal } from "./MappingModal";
-import { DemoChargeModal } from "./DemoChargeModal";
-import { ConfirmModal } from "../../shared/components/ConfirmModal/ConfirmModal";
-import { demoMode, useDemoMode } from "./demo";
 import ReceiptForm, { Banner } from "./ReceiptForm";
 import {
   day,
@@ -101,11 +97,6 @@ const emptyCopy: Record<Tab, string> = {
 };
 
 export default function CCPage() {
-  const demo = useDemoMode();
-  return <ReceiptsPage key={demo ? "demo" : "live"} demo={demo} />;
-}
-
-function ReceiptsPage({ demo }: { demo: boolean }) {
   const { goToJobcost } = useJobcostNav();
   const { claims, user } = useAuth(),
     gm = ["generalManager", "admin", "executive", "owner", "tech"].includes(
@@ -144,9 +135,6 @@ function ReceiptsPage({ demo }: { demo: boolean }) {
   const [intake, setIntake] = useState<
     { _id: string; mode: string; error: string; receivedAt?: string }[]
   >([]);
-  const [demoCharge, setDemoCharge] = useState(false),
-    [demoReset, setDemoReset] = useState<"closed" | "open" | "busy">("closed"),
-    [demoResetError, setDemoResetError] = useState("");
   const selecting = gm && tab === "awaiting";
   const edge = useEdgeScroll(`${tab}|${page}|${query}|${list.items.length}`);
   // Live updates: a receipt written anywhere (email intake, phone form, another
@@ -177,21 +165,6 @@ function ReceiptsPage({ demo }: { demo: boolean }) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
-    }
-  }
-  async function resetDemo() {
-    setDemoReset("busy");
-    setDemoResetError("");
-    try {
-      await staffRequest("cc/demo/reset", json("POST", {}));
-      setDemoReset("closed");
-      setReceipt(null);
-      setPage(0);
-      showToast("Demo data cleared");
-      refresh();
-    } catch (e) {
-      setDemoReset("open");
-      setDemoResetError((e as Error).message);
     }
   }
   // Brief confirmation pill, bottom center; re-keyed so a repeat restarts it.
@@ -376,51 +349,12 @@ function ReceiptsPage({ demo }: { demo: boolean }) {
       }
     >
       <MotionList className="cc-page-stack">
-        {(demo ||
-          settings?.testMode ||
+        {(settings?.testMode ||
           (gm && intake.length > 0) ||
           (error && !receipt) ||
           notice) && (
           <MotionItem>
             <div className="cc-notes">
-              {demo && (
-                <Banner icon={FlaskConical}>
-                  <span className="cc-banner-row">
-                    <span>
-                      <strong>Demo mode.</strong> A separate, empty set of
-                      receipts. Approvals post to a simulated Sage; nothing
-                      reaches Dropbox or anyone's phone.
-                    </span>
-                    <span className="cc-demo-actions">
-                      {gm && (
-                        <>
-                          <button
-                            className="cc-btn"
-                            onClick={() => setDemoCharge(true)}
-                          >
-                            Simulate card charge
-                          </button>
-                          <button
-                            className="cc-btn"
-                            onClick={() => {
-                              setDemoResetError("");
-                              setDemoReset("open");
-                            }}
-                          >
-                            Reset demo data
-                          </button>
-                        </>
-                      )}
-                      <button
-                        className="cc-btn"
-                        onClick={() => demoMode.set(false)}
-                      >
-                        Exit demo
-                      </button>
-                    </span>
-                  </span>
-                </Banner>
-              )}
               {settings?.testMode && (
                 <Banner>
                   <strong>Test mode.</strong> New charges go to Test Job and
@@ -677,28 +611,6 @@ function ReceiptsPage({ demo }: { demo: boolean }) {
         </div>
       )}
       {mappings && <MappingModal onClose={() => setMappings(false)} />}
-      {demoCharge && (
-        <DemoChargeModal
-          onClose={() => setDemoCharge(false)}
-          onCharged={(id) => {
-            setDemoCharge(false);
-            showToast("Card alert received");
-            refresh();
-            if (id) void open(id);
-          }}
-        />
-      )}
-      <ConfirmModal
-        open={demoReset !== "closed"}
-        title="Reset demo data?"
-        message="Every demo receipt, card mapping, statement and uploaded file is deleted. Live receipts are not touched."
-        confirmLabel="Reset"
-        danger
-        loading={demoReset === "busy"}
-        error={demoResetError || undefined}
-        onConfirm={() => void resetDemo()}
-        onCancel={() => setDemoReset("closed")}
-      />
       {statement && (
         <StatementModal
           week={statement.week}

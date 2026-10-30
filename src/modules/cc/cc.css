@@ -406,11 +406,6 @@ select.cc-input {
   flex-direction: column;
   gap: 0.5rem;
 }
-.cc-demo-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
 
 /* A band of the form: eyebrow title (twin of .settings-group-title), an
    optional right-side status, then its content. */
@@ -724,7 +719,6 @@ a.cc-file:not([href]) { cursor: default; }
 /* The receipt form's sticky bar must sit at the very bottom of the scroll
    body, so the GM bands that follow it render above it instead. */
 .cc-modal-body > .cc-form { display: contents; }
-.cc-modal-body > .cc-demo-form { display: contents; }
 .cc-modal-body > .cc-form > .cc-feedback { order: 98; }
 .cc-modal-body > .cc-form > .cc-actionbar { order: 99; margin-bottom: 0; }
 /* WebKit pins a sticky bar inside the scroller's padding, letting content

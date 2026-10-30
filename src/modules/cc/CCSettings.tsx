@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { SegmentedControl } from "../../shared/components/SegmentedControl";
 import { staffRequest } from "./staffApi";
 import { json } from "./api";
-import { demoMode, useDemoMode } from "./demo";
 import type { CCSettings as Settings } from "./types";
 import "./cc.css";
 
@@ -14,14 +13,11 @@ export function CCSettings() {
     [busy, setBusy] = useState(false),
     [consentOpen, setConsentOpen] = useState(false),
     [script, setScript] = useState("");
-  const demo = useDemoMode();
   useEffect(() => {
-    setSettings(null);
-    setError("");
     staffRequest<Settings>("cc/settings")
       .then(setSettings)
       .catch((e) => setError(e.message));
-  }, [demo]);
+  }, []);
   async function saveConsent() {
     if (!settings) return;
     setBusy(true);
@@ -64,28 +60,6 @@ export function CCSettings() {
   const granted = settings?.testConsent === "granted";
   return (
     <>
-      <div className="settings-row">
-        <div className="settings-row-info">
-          <span className="settings-row-label">Demo mode</span>
-          <span className="settings-row-description">
-            {demo
-              ? "Card Receipts is using a separate demo dataset. Nothing reaches Sage, Dropbox or anyone's phone."
-              : "Try every receipt feature on an empty, separate dataset. Only this browser switches."}
-          </span>
-        </div>
-        <SegmentedControl
-          variant="settings"
-          role="radiogroup"
-          ariaLabel="Demo mode"
-          layoutId="ccDemoModeThumb"
-          value={demo ? "on" : "off"}
-          options={[
-            { key: "off", label: "Off" },
-            { key: "on", label: "On" },
-          ]}
-          onChange={(k) => demoMode.set(k === "on")}
-        />
-      </div>
       <div className="settings-row">
         <div className="settings-row-info">
           <span className="settings-row-label">Receipt test mode</span>
