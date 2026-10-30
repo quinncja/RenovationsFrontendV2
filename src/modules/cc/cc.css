@@ -1355,12 +1355,19 @@ a.cc-file:not([href]) { cursor: default; }
   gap: 0.5rem;
   min-width: 0;
 }
-.cc-weekbar-step {
+/* Beats .secondary-button's side padding, which otherwise leaves the chevron
+   a few pixels wide (WebKit shrinks the svg to fit). */
+.button.secondary-button.cc-weekbar-step {
+  flex-shrink: 0;
   justify-content: center;
   width: 2.25rem;
   height: 2.25rem;
   padding: 0;
   color: var(--primary-text);
+}
+.cc-weekbar-step > svg,
+.cc-weekfoot svg {
+  flex-shrink: 0;
 }
 /* Bottom of the table: step to the neighboring weeks by name. */
 .cc-weekfoot {
