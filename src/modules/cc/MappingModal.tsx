@@ -93,7 +93,11 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
                   ...blank,
                   ...m,
                   employeeId: String(m.employeeId || ""),
-                  ownerUid: m.ownerUid || "",
+                  // A login no longer in the user list reads as none, so the
+                  // select and the saved value agree.
+                  ownerUid: data.users.some((u) => u.id === m.ownerUid)
+                    ? m.ownerUid!
+                    : "",
                   phone: m.phone || "",
                 });
               }}
@@ -177,6 +181,7 @@ function CardEditor({
         "cc/mappings",
         json("PUT", {
           ...draft,
+          previousCardLast4: isNew ? undefined : initial.cardLast4,
           employeeId: employee.id,
           employeeName: employee.name,
         }),
@@ -225,11 +230,16 @@ function CardEditor({
               inputMode="numeric"
               maxLength={4}
               autoFocus={isNew}
-              disabled={!isNew}
               onChange={(e) =>
                 set({ cardLast4: e.target.value.replace(/\D/g, "") })
               }
             />
+            {!isNew && draft.cardLast4 !== initial.cardLast4 && (
+              <span className="cc-field-hint">
+                New charges map to this number. Past receipts keep ••••{" "}
+                {initial.cardLast4}.
+              </span>
+            )}
           </label>
           <label className="cc-field">
             <span className="cc-field-label">Mobile number</span>
