@@ -30,6 +30,8 @@ import {
 } from "lucide-react";
 import { json, base } from "./api";
 import {
+  chargedAt,
+  clock,
   day,
   money,
   statusLabel,
@@ -958,6 +960,7 @@ export default function ReceiptForm({
           <p className="cc-phead-meta">
             {[
               r.receiptDate && day(r.receiptDate),
+              clock(chargedAt(r)),
               `•••• ${r.cardLast4}`,
               r.employeeName,
               r.amountCents < 0 && "Return",
@@ -988,6 +991,7 @@ export default function ReceiptForm({
             <p className="cc-party">
               {r.employeeName}
               {r.receiptDate ? ` · ${day(r.receiptDate)}` : ""}
+              {clock(chargedAt(r)) ? ` · ${clock(chargedAt(r))}` : ""}
               {r.invoiceNumber ? ` · #${r.invoiceNumber}` : ""}
             </p>
           </div>

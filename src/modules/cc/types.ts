@@ -26,7 +26,7 @@ export interface Receipt {
   receiptDate: string;
   description: string;
   amountCents: number;
-  charges: { merchant: string; amountCents: number; messageId: string }[];
+  charges: { merchant: string; amountCents: number; messageId: string; sentAt?: string }[];
   allocations: Allocation[];
   files: ReceiptFile[];
   missingReceipt: string;
@@ -124,6 +124,20 @@ export const day = (iso: string) => {
         year: "numeric",
         timeZone: "UTC",
       });
+};
+
+// The time of a charge, in Chicago time ("2:14 PM"); "" when unknown.
+export const clock = (iso?: string | null) => {
+  const d = iso ? new Date(iso) : null;
+  return d && !isNaN(d.getTime())
+    ? d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Chicago" })
+    : "";
+};
+// When the card was charged: the earliest of a receipt's card alerts (a
+// receipt started by hand has none).
+export const chargedAt = (r: Pick<Receipt, "charges">) => {
+  const times = (r.charges || []).map((c) => new Date(c.sentAt || "").getTime()).filter((t) => !isNaN(t));
+  return times.length ? new Date(Math.min(...times)).toISOString() : null;
 };
 
 // Card alerts arrive in capitals ("THE HOME DEPOT #1902"); phone screens show

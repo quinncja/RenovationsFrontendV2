@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Camera, Check, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, ScanLine, Undo2 } from "lucide-react";
 import ReceiptForm from "../modules/cc/ReceiptForm";
 import { publicRequest } from "../modules/cc/api";
-import { money, tidyName, type Receipt } from "../modules/cc/types";
+import { clock, money, tidyName, type Receipt } from "../modules/cc/types";
 import { appRequest, appUpload, json, session, SignedOut, type Me, type Row, type ScanFields } from "./api";
 import { prepare } from "./photo";
 import { Reminders } from "./Reminders";
@@ -385,7 +385,9 @@ function Queue({
   onOpen: (token: string) => void;
   onSnap: (token: string) => void;
 }) {
-  const sorted = [...rows].sort((a, b) => b.receiptDate.localeCompare(a.receiptDate));
+  const sorted = [...rows].sort(
+    (a, b) => b.receiptDate.localeCompare(a.receiptDate) || (b.chargedAt || "").localeCompare(a.chargedAt || ""),
+  );
   return (
     <ul className="rde-list rde-list--flush" aria-label="To finish">
       {sorted.map((r) => {
@@ -412,7 +414,7 @@ function Queue({
                   <span className="rde-row-why">Sent back{r.correctionReason ? ` · ${r.correctionReason}` : ""}</span>
                 ) : (
                   <span>
-                    {shortDay(r.receiptDate)}
+                    {when(r)}
                     {ret ? " · Return" : ""}
                   </span>
                 )}
@@ -439,7 +441,7 @@ function List({ rows, onOpen }: { rows: Row[]; onOpen: (token: string) => void }
             <button type="button" className="rde-row" onClick={() => onOpen(r.token)}>
               <span className="rde-row-text">
                 <Marquee text={tidyName(r.description)} />
-                <span>{shortDay(r.receiptDate)}</span>
+                <span>{when(r)}</span>
               </span>
               <span className="rde-row-amt">
                 <b className={r.amountCents < 0 ? "rde-credit" : undefined}>{money(r.amountCents)}</b>
@@ -452,6 +454,9 @@ function List({ rows, onOpen }: { rows: Row[]; onOpen: (token: string) => void }
     </ul>
   );
 }
+
+// "Oct 27 · 2:14 PM" (the time only when a card alert gave one).
+const when = (r: Row) => [shortDay(r.receiptDate), clock(r.chargedAt)].filter(Boolean).join(" · ");
 
 const shortDay = (iso: string) =>
   new Date(`${iso}T12:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });

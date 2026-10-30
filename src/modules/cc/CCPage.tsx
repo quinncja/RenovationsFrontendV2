@@ -29,6 +29,8 @@ import { StatementsCard } from "./StatementsCard";
 import { MappingModal } from "./MappingModal";
 import ReceiptForm, { Banner } from "./ReceiptForm";
 import {
+  chargedAt,
+  clock,
   day,
   money,
   statusText,
@@ -501,6 +503,7 @@ export default function CCPage() {
                         <th>Charged to</th>
                         <th>Category</th>
                         <th>Date</th>
+                        <th>Time</th>
                         <th>Receipt</th>
                         <th className="spend-rank-table-value">Amount</th>
                       </tr>
@@ -533,6 +536,9 @@ export default function CCPage() {
                               </td>
                               <td className="subheadline">
                                 <SkelText ch={10} />
+                              </td>
+                              <td className="subheadline">
+                                <SkelText ch={7} />
                               </td>
                               <td className="body-text">
                                 <SkelText ch={6} />
@@ -957,6 +963,12 @@ function ReceiptRow({
         style={{ whiteSpace: "nowrap" }}
       >
         {day(r.receiptDate)}
+      </td>
+      <td
+        className="subheadline text-secondary"
+        style={{ whiteSpace: "nowrap" }}
+      >
+        {clock(chargedAt(r))}
       </td>
       <td className="body-text">
         <div className="cc-cell-stack">

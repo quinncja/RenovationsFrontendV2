@@ -65,6 +65,8 @@ export interface Row {
   correctionReason?: string;
   /** A photo is already attached (tapping opens it rather than the camera). */
   hasPhoto?: boolean;
+  /** When the card was charged (the earliest alert); null for one started by hand. */
+  chargedAt?: string | null;
 }
 export interface Me {
   name: string;
