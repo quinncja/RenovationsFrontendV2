@@ -63,6 +63,8 @@ export interface Row {
   receiptDate: string;
   correction: boolean;
   correctionReason?: string;
+  /** A photo is already attached (tapping opens it rather than the camera). */
+  hasPhoto?: boolean;
 }
 export interface Me {
   name: string;
