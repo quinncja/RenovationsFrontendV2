@@ -1288,16 +1288,30 @@ export default function ReceiptForm({
               )
             )
           ) : showMissing ? (
-            <label className="cc-field">
-              <span className="cc-field-label">Why is there no receipt?</span>
-              <textarea
-                className="cc-input"
-                value={missing}
-                rows={2}
-                maxLength={2000}
-                onChange={(e) => setMissing(e.target.value)}
-              />
-            </label>
+            <>
+              <label className="cc-field">
+                <span className="cc-field-label">Why is there no receipt?</span>
+                <textarea
+                  className="cc-input"
+                  value={missing}
+                  rows={2}
+                  maxLength={2000}
+                  onChange={(e) => setMissing(e.target.value)}
+                />
+              </label>
+              {/* Changed their mind: the explanation clears and the photo
+                  and upload buttons come back. */}
+              <button
+                type="button"
+                className="cc-link-btn"
+                onClick={() => {
+                  setShowMissing(false);
+                  setMissing("");
+                }}
+              >
+                I have the receipt after all
+              </button>
+            </>
           ) : (
             !r.files.length && (
               <button
