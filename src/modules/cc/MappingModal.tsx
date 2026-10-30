@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { CCModal } from "./CCModal";
 import { Banner } from "./ReceiptForm";
 import { staffRequest } from "./staffApi";
@@ -45,7 +45,8 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
   const [data, setData] = useState<Data | null>(null),
     [error, setError] = useState(""),
     [editing, setEditing] = useState<Draft | null>(null),
-    [isNew, setIsNew] = useState(false);
+    [isNew, setIsNew] = useState(false),
+    [showInactive, setShowInactive] = useState(false);
   const load = () =>
     staffRequest<Data>("cc/mappings")
       .then(setData)
@@ -53,6 +54,35 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     void load();
   }, []);
+  // Inactive cards stay out of the way: folded under a quiet toggle below the
+  // working list.
+  const active = data?.mappings.filter((m) => m.active) ?? [],
+    inactive = data?.mappings.filter((m) => !m.active) ?? [];
+  const row = (m: Mapping) => (
+    <button
+      key={m.cardLast4}
+      type="button"
+      className="cc-map-row"
+      onClick={() => {
+        setIsNew(false);
+        setEditing({
+          ...blank,
+          ...m,
+          employeeId: String(m.employeeId || ""),
+          // A login no longer in the user list reads as none, so the
+          // select and the saved value agree.
+          ownerUid: data?.users.some((u) => u.id === m.ownerUid)
+            ? m.ownerUid!
+            : "",
+          phone: m.phone || "",
+        });
+      }}
+    >
+      <span className="cc-card-num cc-map-card">•••• {m.cardLast4}</span>
+      <span className="cc-map-name">{m.employeeName}</span>
+      <ChevronRight size={15} className="cc-map-go" aria-hidden="true" />
+    </button>
+  );
   return (
     <CCModal
       eyebrow="Company card"
@@ -81,36 +111,35 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
           </p>
         )
       ) : data.mappings.length ? (
-        <div className="cc-map-list cc-map-list--full">
-          {data.mappings.map((m) => (
-            <button
-              key={m.cardLast4}
-              type="button"
-              className="cc-map-row"
-              onClick={() => {
-                setIsNew(false);
-                setEditing({
-                  ...blank,
-                  ...m,
-                  employeeId: String(m.employeeId || ""),
-                  // A login no longer in the user list reads as none, so the
-                  // select and the saved value agree.
-                  ownerUid: data.users.some((u) => u.id === m.ownerUid)
-                    ? m.ownerUid!
-                    : "",
-                  phone: m.phone || "",
-                });
-              }}
-            >
-              <span className="cc-card-num cc-map-card">•••• {m.cardLast4}</span>
-              <span className="cc-map-name">{m.employeeName}</span>
-              {!m.active && (
-                <span className="cc-badge cc-badge--muted">Inactive</span>
+        <>
+          {active.length > 0 && (
+            <div className="cc-map-list cc-map-list--full">
+              {active.map(row)}
+            </div>
+          )}
+          {inactive.length > 0 && (
+            <>
+              <button
+                type="button"
+                className="cc-btn cc-btn--quiet cc-map-inactive-toggle"
+                aria-expanded={showInactive}
+                onClick={() => setShowInactive((v) => !v)}
+              >
+                <ChevronDown
+                  size={14}
+                  aria-hidden="true"
+                  className={`cc-map-inactive-chev${showInactive ? " cc-map-inactive-chev--open" : ""}`}
+                />
+                {showInactive ? "Hide" : "Show"} {inactive.length} inactive
+              </button>
+              {showInactive && (
+                <div className="cc-map-list cc-map-list--full cc-map-list--inactive">
+                  {inactive.map(row)}
+                </div>
               )}
-              <ChevronRight size={15} className="cc-map-go" aria-hidden="true" />
-            </button>
-          ))}
-        </div>
+            </>
+          )}
+        </>
       ) : (
         <p className="cc-band-sub" style={{ marginTop: 0 }}>
           No cards mapped yet.

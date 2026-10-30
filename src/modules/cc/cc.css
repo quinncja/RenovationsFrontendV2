@@ -2119,3 +2119,14 @@ button.cc-wk.cc-wk--due:hover { background-color: rgba(245, 158, 11, 0.12) !impo
 .cc-form--phone .cc-actionbar .cc-btn--primary { order: 1; width: 100%; min-height: 3rem; font-size: 1rem; border-radius: 999px; }
 .cc-form--phone .cc-actionbar .cc-btn:not(.cc-btn--primary) { order: 2; }
 .cc-form--phone .cc-actionbar-note { order: 3; display: block !important; margin: 0; text-align: center; }
+
+/* Inactive cards fold under a quiet toggle below the working list. */
+.cc-map-inactive-toggle {
+  margin-top: 0.75rem;
+  color: var(--secondary-text);
+}
+.cc-map-inactive-chev { transition: transform 0.15s ease; }
+.cc-map-inactive-chev--open { transform: rotate(180deg); }
+.cc-map-list--inactive { margin-top: 0.5rem; }
+.cc-map-list--inactive .cc-map-name,
+.cc-map-list--inactive .cc-card-num { color: var(--secondary-text); }
