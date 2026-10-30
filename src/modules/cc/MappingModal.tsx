@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
+import { SegmentedControl } from "../../shared/components/SegmentedControl";
 import { CCModal } from "./CCModal";
 import { Banner } from "./ReceiptForm";
 import { staffRequest } from "./staffApi";
@@ -46,7 +47,7 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
     [error, setError] = useState(""),
     [editing, setEditing] = useState<Draft | null>(null),
     [isNew, setIsNew] = useState(false),
-    [showInactive, setShowInactive] = useState(false);
+    [view, setView] = useState<"active" | "inactive">("active");
   const load = () =>
     staffRequest<Data>("cc/mappings")
       .then(setData)
@@ -54,10 +55,11 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     void load();
   }, []);
-  // Inactive cards stay out of the way: folded under a quiet toggle below the
-  // working list.
+  // Inactive cards stay out of the way: the list shows active cards, and an
+  // Active | Inactive switch appears only once a card has been deactivated.
   const active = data?.mappings.filter((m) => m.active) ?? [],
-    inactive = data?.mappings.filter((m) => !m.active) ?? [];
+    inactive = data?.mappings.filter((m) => !m.active) ?? [],
+    shown = view === "inactive" && inactive.length ? inactive : active;
   const row = (m: Mapping) => (
     <button
       key={m.cardLast4}
@@ -112,32 +114,30 @@ export function MappingModal({ onClose }: { onClose: () => void }) {
         )
       ) : data.mappings.length ? (
         <>
-          {active.length > 0 && (
-            <div className="cc-map-list cc-map-list--full">
-              {active.map(row)}
-            </div>
-          )}
           {inactive.length > 0 && (
-            <>
-              <button
-                type="button"
-                className="cc-btn cc-btn--quiet cc-map-inactive-toggle"
-                aria-expanded={showInactive}
-                onClick={() => setShowInactive((v) => !v)}
-              >
-                <ChevronDown
-                  size={14}
-                  aria-hidden="true"
-                  className={`cc-map-inactive-chev${showInactive ? " cc-map-inactive-chev--open" : ""}`}
-                />
-                {showInactive ? "Hide" : "Show"} {inactive.length} inactive
-              </button>
-              {showInactive && (
-                <div className="cc-map-list cc-map-list--full cc-map-list--inactive">
-                  {inactive.map(row)}
-                </div>
-              )}
-            </>
+            <SegmentedControl
+              variant="ohr"
+              className="cc-map-seg"
+              value={view}
+              options={[
+                { key: "active", label: <>Active <span className="cc-map-seg-count">{active.length}</span></> },
+                { key: "inactive", label: <>Inactive <span className="cc-map-seg-count">{inactive.length}</span></> },
+              ]}
+              onChange={setView}
+              layoutId="cc-map-view"
+              ariaLabel="Card status"
+            />
+          )}
+          {shown.length > 0 ? (
+            <div
+              className={`cc-map-list cc-map-list--full${view === "inactive" ? " cc-map-list--inactive" : ""}`}
+            >
+              {shown.map(row)}
+            </div>
+          ) : (
+            <p className="cc-band-sub" style={{ marginTop: 0 }}>
+              No active cards.
+            </p>
           )}
         </>
       ) : (
