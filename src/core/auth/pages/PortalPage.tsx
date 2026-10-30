@@ -3,6 +3,7 @@ import { ChartColumn, ChevronRight } from "lucide-react"
 import { useAuth } from "../AuthProvider"
 import LoadingScreen from "../../components/LoadingScreen"
 import Logo from "../../components/Logo"
+import LogoText from "../../components/LogoText"
 import useIsMobile from "../../../shared/hooks/useIsMobile"
 
 const phoneLike = /iPhone|iPod|Android.+Mobile/.test(navigator.userAgent)
@@ -22,8 +23,8 @@ export default function PortalPage() {
       <main className="portal">
         <div className="login-background" />
         <header className="portal-brand">
-          <Logo size={44} />
-          <span className="portal-brand-name">Renovations Delivered</span>
+          <Logo size={36} />
+          <LogoText />
         </header>
         <div className="portal-body">
           <h1 className="portal-title">Welcome</h1>
