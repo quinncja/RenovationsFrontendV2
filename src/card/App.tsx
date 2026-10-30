@@ -290,9 +290,7 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
                 <span>{todo.length === 1 ? "receipt" : "receipts"} to finish</span>
               </p>
               <p className="rde-hero-meta">
-                {todo.some((r) => !r.correction && !r.hasPhoto)
-                  ? `Tap ${todo.length === 1 ? "it" : "one"} to photograph its receipt`
-                  : `Tap ${todo.length === 1 ? "it" : "one"} to finish it`}
+                Tap a charge to finish it
               </p>
             </>
           ) : (
@@ -373,9 +371,9 @@ async function attachPhoto(token: string, file: File) {
   });
 }
 
-// Charges waiting on a receipt, newest first. Tapping a row opens the
-// camera, and the photo lands on that receipt before its form opens; one that
-// already has a photo (or was sent back) opens straight to its form.
+// Charges waiting on a receipt, newest first. Tapping a row opens its form
+// (some have no receipt, just details to enter); the camera on the left
+// takes a photo straight onto it, then opens the form.
 function Queue({
   rows,
   attaching,
@@ -387,22 +385,27 @@ function Queue({
   onOpen: (token: string) => void;
   onSnap: (token: string) => void;
 }) {
-  // Newest charge first.
   const sorted = [...rows].sort((a, b) => b.receiptDate.localeCompare(a.receiptDate));
   return (
     <ul className="rde-list rde-list--flush" aria-label="To finish">
       {sorted.map((r) => {
         const ret = r.amountCents < 0;
-        const opens = r.correction || r.hasPhoto;
         return (
-          <li key={r.token}>
+          <li key={r.token} className="rde-queue-item">
             <button
               type="button"
-              className="rde-row"
+              className="rde-snap"
+              aria-label={`Photograph the ${ret ? "return slip" : "receipt"}: ${tidyName(r.description)}`}
               disabled={!!attaching}
-              aria-label={opens ? undefined : `${tidyName(r.description)}: take a photo of the ${ret ? "return slip" : "receipt"}`}
-              onClick={() => (opens ? onOpen(r.token) : onSnap(r.token))}
+              onClick={() => onSnap(r.token)}
             >
+              {attaching === r.token ? (
+                <RefreshCw size={17} className="rde-spin" aria-hidden="true" />
+              ) : (
+                <Camera size={18} aria-hidden="true" />
+              )}
+            </button>
+            <button type="button" className="rde-row" disabled={!!attaching} onClick={() => onOpen(r.token)}>
               <span className="rde-row-text">
                 <Marquee text={tidyName(r.description)} />
                 {r.correction ? (
@@ -417,11 +420,7 @@ function Queue({
               <span className="rde-row-amt">
                 <b className={ret ? "rde-credit" : undefined}>{money(r.amountCents)}</b>
               </span>
-              {attaching === r.token ? (
-                <RefreshCw size={16} className="rde-spin rde-row-chev" aria-hidden="true" />
-              ) : (
-                <ChevronRight size={18} className="rde-row-chev" aria-hidden="true" />
-              )}
+              <ChevronRight size={18} className="rde-row-chev" aria-hidden="true" />
             </button>
           </li>
         );

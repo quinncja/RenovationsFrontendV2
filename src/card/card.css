@@ -429,9 +429,30 @@ body {
 .rde-list--flush { border-radius: 0; box-shadow: none; }
 .rde-row:disabled { cursor: default; }
 .rde-row-chev { flex-shrink: 0; margin: 0 -0.375rem 0 -0.25rem; color: rgb(25 55 90 / 0.3); }
-/* The hero and the rows share the same 1.25rem inset; the first row gets a
-   touch more room under the navy edge. */
+/* The hero and the rows share the same 1.25rem inset: the camera sits on it
+   and the row's text follows. The first row gets a touch more room under
+   the navy edge. */
+.rde-queue-item { display: flex; align-items: center; padding-left: 1.25rem; }
+.rde-queue-item .rde-row { flex: 1; min-width: 0; padding-left: 0.75rem; }
 .rde-list--flush li:first-child .rde-row { padding-top: 1rem; }
+.rde-list--flush li:first-child .rde-snap { margin-top: 0.125rem; }
+.rde-snap {
+  appearance: none;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 2.375rem;
+  height: 2.375rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--active-bg);
+  color: var(--primary-color);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.rde-snap:active { background: rgb(194 124 62 / 0.2); }
+.rde-snap:disabled { opacity: 0.5; cursor: default; }
 
 /* A name too long for its row glides to its end and back (Marquee). */
 .rde-row-text .rde-marquee { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
