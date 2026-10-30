@@ -1,5 +1,5 @@
 import { Navigate, useNavigate } from "react-router-dom"
-import { ChartColumn, ChevronRight } from "lucide-react"
+import { ChartNoAxesColumn, ChevronRight } from "lucide-react"
 import { useAuth } from "../AuthProvider"
 import LoadingScreen from "../../components/LoadingScreen"
 import Logo from "../../components/Logo"
@@ -48,7 +48,7 @@ export default function PortalPage() {
               <span className="portal-tile portal-tile--dashboard">
                 <img src="/r-logo.png" alt="" />
                 <span className="portal-tile-badge" aria-hidden="true">
-                  <ChartColumn size={13} strokeWidth={2.5} />
+                  <ChartNoAxesColumn size={15} strokeWidth={2.75} />
                 </span>
               </span>
               <span className="portal-text">
