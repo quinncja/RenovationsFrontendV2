@@ -173,7 +173,8 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
     return () => document.removeEventListener("visibilitychange", onShow);
   }, [load]);
   const camera = useRef<HTMLInputElement>(null);
-  const shooting = useRef<"purchase" | "return">("purchase");
+  const shooting = useRef<string>("purchase");
+  const [attaching, setAttaching] = useState("");
   const home = (note = "") => {
     setToast(note);
     setView({ name: "home" });
@@ -199,9 +200,20 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
       />
     );
 
-  const snap = (kind: "purchase" | "return") => {
-    shooting.current = kind;
+  const snap = (target: string) => {
+    shooting.current = target;
     camera.current?.click();
+  };
+  const snapInto = async (token: string, raw: File) => {
+    setAttaching(token);
+    try {
+      await attachPhoto(token, await prepare(raw));
+    } catch {
+      setToast("Photo didn't upload. Add it on the next screen.");
+    } finally {
+      setAttaching("");
+      setView({ name: "receipt", token });
+    }
   };
   const signOut = () => {
     void appRequest("cc/app/signout", { method: "POST" }).catch(() => {});
@@ -243,7 +255,6 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
       )}
       {error && <p className="rde-error" role="alert">{error}</p>}
 
-      {/* The tiles open the camera first; the photo leads the next screen. */}
       <input
         ref={camera}
         type="file"
@@ -253,45 +264,41 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
         onChange={(e) => {
           const file = e.target.files?.[0];
           e.target.value = "";
-          if (file) setView({ name: "start", kind: shooting.current, photo: file });
+          if (!file) return;
+          const target = shooting.current;
+          if (target === "purchase" || target === "return") setView({ name: "start", kind: target, photo: file });
+          else void snapInto(target, file);
         }}
       />
-      <div className="rde-acts">
-        <button type="button" className="rde-act rde-act--primary" onClick={() => snap("purchase")}>
-          <Camera size={26} aria-hidden="true" />
-          <span>
-            <b>Add receipt</b>
-            <small>Snap a purchase</small>
-          </span>
-        </button>
-        <button type="button" className="rde-act" onClick={() => snap("return")}>
-          <Undo2 size={26} aria-hidden="true" />
-          <span>
-            <b>Log return</b>
-            <small>Money back</small>
-          </span>
-        </button>
-      </div>
 
-      <button type="button" className="rde-link rde-noshot" onClick={() => setView({ name: "start", kind: "purchase" })}>
-        No receipt to photograph? Enter it by hand
+      <Queue
+        rows={me?.todo}
+        attaching={attaching}
+        onOpen={(token) => setView({ name: "receipt", token })}
+        onSnap={(token) => snap(token)}
+      />
+
+      <button type="button" className="rde-return" onClick={() => snap("return")}>
+        <span className="rde-return-icon">
+          <Undo2 size={22} aria-hidden="true" />
+        </span>
+        <span className="rde-return-text">
+          <b>Log a return</b>
+          <small>Returns don't send a text. Log it as soon as you get money back.</small>
+        </span>
+        <ChevronRight size={18} aria-hidden="true" />
       </button>
 
-      <section className="rde-section">
-        <div className="rde-section-head">
-          <h2 className="rde-section-title">To finish</h2>
-          {!!me?.todo.length && <span>{me.todo.length}</span>}
-        </div>
-        {!me ? (
-          <p className="rde-empty">Loading…</p>
-        ) : me.todo.length ? (
-          <List rows={me.todo} onOpen={(token) => setView({ name: "receipt", token })} />
-        ) : (
-          <p className="rde-empty rde-empty--done">
-            <Check size={16} aria-hidden="true" /> You're all caught up.
-          </p>
-        )}
-      </section>
+      <p className="rde-early">
+        Receipt in hand before the text?{" "}
+        <button type="button" className="rde-inline" onClick={() => snap("purchase")}>
+          Add it early
+        </button>{" "}
+        or{" "}
+        <button type="button" className="rde-inline" onClick={() => setView({ name: "start", kind: "purchase" })}>
+          enter it by hand
+        </button>
+      </p>
 
       {!!me?.recent.length && (
         <section className="rde-section">
@@ -328,6 +335,126 @@ function status(r: Row): { tone: string; text: string } {
   if (r.state === "pending") return { tone: "amber", text: r.amountCents < 0 ? "Return · needs slip" : "Needs receipt" };
   if (r.state === "approved") return { tone: "green", text: "Approved" };
   return { tone: "blue", text: "Waiting for approval" };
+}
+
+async function attachPhoto(token: string, file: File) {
+  const path = `cc/public/${encodeURIComponent(token)}`;
+  const r = await publicRequest<Receipt>(path);
+  await publicRequest<Receipt>(`${path}/files`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/octet-stream",
+      "X-File-Name": encodeURIComponent(file.name || "receipt.jpg"),
+      "X-Receipt-Revision": String(r.revision),
+    },
+    body: file,
+  });
+}
+
+function action(r: Row) {
+  if (r.correction) return { label: "Fix and resend", camera: false };
+  return { label: r.amountCents < 0 ? "Snap the return slip" : "Snap the receipt", camera: true };
+}
+
+function Queue({
+  rows,
+  attaching,
+  onOpen,
+  onSnap,
+}: {
+  rows?: Row[];
+  attaching: string;
+  onOpen: (token: string) => void;
+  onSnap: (token: string) => void;
+}) {
+  if (!rows)
+    return (
+      <section className="rde-queue" aria-busy="true">
+        <p className="rde-empty">Loading…</p>
+      </section>
+    );
+  if (!rows.length)
+    return (
+      <section className="rde-queue rde-queue--clear">
+        <span className="rde-clear-mark">
+          <Check size={22} strokeWidth={2.5} aria-hidden="true" />
+        </span>
+        <b>You're all caught up</b>
+        <span>When your card is charged, we'll text you a link to snap the receipt.</span>
+      </section>
+    );
+  const [next, ...rest] = [...rows].sort((a, b) => Number(b.correction) - Number(a.correction));
+  const act = action(next);
+  const st = status(next);
+  const busy = attaching === next.token;
+  const ret = next.amountCents < 0;
+  return (
+    <section className="rde-queue" aria-labelledby="rde-queue-title">
+      <div className="rde-queue-head">
+        <h2 id="rde-queue-title">Waiting on you</h2>
+        <span className="rde-count">{rows.length}</span>
+      </div>
+      <article className={`rde-next${next.correction ? " rde-next--back" : ""}`}>
+        <button type="button" className="rde-next-body" onClick={() => onOpen(next.token)}>
+          <span className="rde-next-meta">
+            <span className={`rde-dot rde-dot--${st.tone}`} aria-hidden="true" />
+            {next.correction ? "Sent back" : ret ? "Return" : "Card charge"} · {shortDay(next.receiptDate)}
+          </span>
+          <span className="rde-next-main">
+            <b>{tidyName(next.description)}</b>
+            <span className={ret ? "rde-row-amt--credit" : undefined}>{money(next.amountCents)}</span>
+          </span>
+          {next.correction && next.correctionReason && <span className="rde-next-why">{next.correctionReason}</span>}
+        </button>
+        <button
+          type="button"
+          className="rde-btn rde-btn--primary"
+          disabled={!!attaching}
+          onClick={() => (act.camera ? onSnap(next.token) : onOpen(next.token))}
+        >
+          {act.camera && <Camera size={18} aria-hidden="true" />}
+          {busy ? "Uploading…" : act.label}
+        </button>
+      </article>
+      {!!rest.length && (
+        <ul className="rde-list rde-queue-rest" aria-label="Also waiting">
+          {rest.map((r) => {
+            const s = status(r);
+            const a = action(r);
+            return (
+              <li key={r.token} className="rde-queue-item">
+                <button type="button" className="rde-row" onClick={() => onOpen(r.token)}>
+                  <span className={`rde-dot rde-dot--${s.tone}`} aria-hidden="true" />
+                  <span className="rde-row-text">
+                    <b>{tidyName(r.description)}</b>
+                    <span>
+                      {shortDay(r.receiptDate)} · {s.text}
+                    </span>
+                  </span>
+                  <span className={`rde-row-amt${r.amountCents < 0 ? " rde-row-amt--credit" : ""}`}>
+                    {money(r.amountCents)}
+                  </span>
+                </button>
+                {a.camera ? (
+                  <button
+                    type="button"
+                    className="rde-snap"
+                    aria-label={`${a.label}: ${tidyName(r.description)}`}
+                    disabled={!!attaching}
+                    onClick={() => onSnap(r.token)}
+                  >
+                    {attaching === r.token ? <RefreshCw size={18} className="rde-spin" aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />}
+                  </button>
+                ) : (
+                  <ChevronRight size={16} className="rde-queue-chev" aria-hidden="true" />
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
 }
 
 function List({ rows, onOpen }: { rows: Row[]; onOpen: (token: string) => void }) {
@@ -433,17 +560,7 @@ function Start({
         json("POST", { kind, amount, date, store }),
       );
       if (file) {
-        const path = `cc/public/${encodeURIComponent(out.token)}`;
-        const r = await publicRequest<Receipt>(path);
-        await publicRequest<Receipt>(`${path}/files`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/octet-stream",
-            "X-File-Name": encodeURIComponent(file.name || "receipt.jpg"),
-            "X-Receipt-Revision": String(r.revision),
-          },
-          body: file,
-        }).catch(() => {
+        await attachPhoto(out.token, file).catch(() => {
           // The receipt exists; the photo can be added again on the next screen.
         });
       }
