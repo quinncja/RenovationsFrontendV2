@@ -7,6 +7,7 @@ import { appRequest, appUpload, json, session, SignedOut, type Me, type Row, typ
 import { prepare } from "./photo";
 import { Reminders } from "./Reminders";
 import { CodeInput } from "./CodeInput";
+import { Marquee } from "./Marquee";
 
 type View =
   | { name: "home" }
@@ -357,8 +358,6 @@ function status(r: Row): { tone: string; text: string } {
   return { tone: "", text: "In review" };
 }
 
-// The store's first letter, as a quiet tile at the start of each row.
-const initial = (description: string) => (tidyName(description).match(/[A-Za-z0-9]/)?.[0] || "•").toUpperCase();
 
 async function attachPhoto(token: string, file: File) {
   const path = `cc/public/${encodeURIComponent(token)}`;
@@ -374,7 +373,7 @@ async function attachPhoto(token: string, file: File) {
   });
 }
 
-// Charges waiting on a receipt. Sent-back ones lead. Tapping a row opens the
+// Charges waiting on a receipt, newest first. Tapping a row opens the
 // camera, and the photo lands on that receipt before its form opens; one that
 // already has a photo (or was sent back) opens straight to its form.
 function Queue({
@@ -388,7 +387,8 @@ function Queue({
   onOpen: (token: string) => void;
   onSnap: (token: string) => void;
 }) {
-  const sorted = [...rows].sort((a, b) => Number(b.correction) - Number(a.correction));
+  // Newest charge first.
+  const sorted = [...rows].sort((a, b) => b.receiptDate.localeCompare(a.receiptDate));
   return (
     <ul className="rde-list rde-list--flush" aria-label="To finish">
       {sorted.map((r) => {
@@ -403,11 +403,8 @@ function Queue({
               aria-label={opens ? undefined : `${tidyName(r.description)}: take a photo of the ${ret ? "return slip" : "receipt"}`}
               onClick={() => (opens ? onOpen(r.token) : onSnap(r.token))}
             >
-              <span className={`rde-mono${r.correction ? " rde-mono--back" : ""}`} aria-hidden="true">
-                {initial(r.description)}
-              </span>
               <span className="rde-row-text">
-                <b>{tidyName(r.description)}</b>
+                <Marquee text={tidyName(r.description)} />
                 {r.correction ? (
                   <span className="rde-row-why">Sent back{r.correctionReason ? ` · ${r.correctionReason}` : ""}</span>
                 ) : (
@@ -441,11 +438,8 @@ function List({ rows, onOpen }: { rows: Row[]; onOpen: (token: string) => void }
         return (
           <li key={r.token}>
             <button type="button" className="rde-row" onClick={() => onOpen(r.token)}>
-              <span className="rde-mono" aria-hidden="true">
-                {initial(r.description)}
-              </span>
               <span className="rde-row-text">
-                <b>{tidyName(r.description)}</b>
+                <Marquee text={tidyName(r.description)} />
                 <span>{shortDay(r.receiptDate)}</span>
               </span>
               <span className="rde-row-amt">

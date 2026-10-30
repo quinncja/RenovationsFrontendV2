@@ -399,7 +399,7 @@ body {
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  padding: 0.8125rem 0.875rem;
+  padding: 0.875rem 1.25rem;
   border: none;
   background: none;
   font: inherit;
@@ -409,19 +409,6 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .rde-row:active { background-color: var(--hover-bg); }
-.rde-mono {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 2.375rem;
-  height: 2.375rem;
-  border-radius: 0.6875rem;
-  background: var(--hover-bg);
-  font-size: 0.9375rem;
-  font-weight: var(--font-weight-bold);
-  color: var(--secondary-text);
-}
-.rde-mono--back { background: rgb(220 38 38 / 0.09); color: #b91c1c; }
 .rde-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.125rem; }
 .rde-row-text b {
   font-size: 0.96875rem;
@@ -441,7 +428,29 @@ body {
 /* The To finish list is the card's lower half. */
 .rde-list--flush { border-radius: 0; box-shadow: none; }
 .rde-row:disabled { cursor: default; }
-.rde-row-chev { flex-shrink: 0; margin-left: -0.125rem; color: rgb(25 55 90 / 0.3); }
+.rde-row-chev { flex-shrink: 0; margin: 0 -0.375rem 0 -0.25rem; color: rgb(25 55 90 / 0.3); }
+/* The hero and the rows share the same 1.25rem inset; the first row gets a
+   touch more room under the navy edge. */
+.rde-list--flush li:first-child .rde-row { padding-top: 1rem; }
+
+/* A name too long for its row glides to its end and back (Marquee). */
+.rde-row-text .rde-marquee { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.rde-row-text .rde-marquee > span { display: inline-block; font-size: inherit; color: inherit; }
+.rde-row-text .rde-marquee.is-moving {
+  text-overflow: clip;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 1rem), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 1rem), transparent);
+}
+.rde-marquee.is-moving > span { animation: rdeMarquee var(--rde-time, 8s) ease-in-out infinite; }
+@keyframes rdeMarquee {
+  0%, 18% { transform: translateX(0); }
+  50%, 68% { transform: translateX(var(--rde-shift, 0)); }
+  100% { transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rde-marquee.is-moving > span { animation: none; }
+  .rde-row-text .rde-marquee.is-moving { text-overflow: ellipsis; -webkit-mask-image: none; mask-image: none; }
+}
 
 /* Starting one from scratch: quiet, under the card. */
 .rde-start { display: grid; grid-template-columns: 1fr 1fr; gap: 0.625rem; margin-bottom: 1.75rem; }
