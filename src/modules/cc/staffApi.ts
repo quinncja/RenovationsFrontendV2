@@ -1,9 +1,13 @@
 import { auth } from "../../core/auth/firebase";
 import { publicRequest, base } from "./api";
+import { demoMode } from "./demo";
 import type { Request } from "./types";
 export async function staffHeaders(): Promise<Record<string, string>> {
   const token = await auth.currentUser?.getIdToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...demoMode.headers(),
+  };
 }
 export const staffRequest: Request = async (path, init) => {
   const headers = new Headers(init?.headers);

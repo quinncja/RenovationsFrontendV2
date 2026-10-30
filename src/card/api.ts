@@ -2,6 +2,7 @@
 // Receipt screens reuse the public receipt endpoints (by link token), so this
 // only covers sign-in and the home screen.
 import { base, json } from "../modules/cc/api";
+import { demoMode } from "../modules/cc/demo";
 
 const KEY = "rd-expenses:session";
 
@@ -35,6 +36,7 @@ export async function appRequest<T>(path: string, init?: RequestInit): Promise<T
   const token = session.get();
   const headers = new Headers(init?.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  for (const [key, value] of Object.entries(demoMode.headers())) headers.set(key, value);
   const res = await fetch(`${base}/${path}`, {
     ...init,
     headers,
@@ -70,6 +72,7 @@ export interface Me {
   actingAs?: string;
   cardLast4: string;
   testMode: boolean;
+  demo?: boolean;
   /** The tech's test phone: testing as one of these cardholders. */
   tester?: boolean;
   cardholders?: { cardLast4: string; name: string }[];

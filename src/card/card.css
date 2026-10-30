@@ -327,6 +327,7 @@ body {
   letter-spacing: 0.05em;
   text-transform: uppercase;
 }
+.rde-pills { display: flex; gap: 0.375rem; }
 .rde-greet-sub { margin: 0.25rem 0 1.25rem; font-size: 0.875rem; color: var(--secondary-text); }
 /* Testing as: reads as text, opens the native picker. */
 .rde-actas {

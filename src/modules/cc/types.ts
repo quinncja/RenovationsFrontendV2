@@ -80,6 +80,7 @@ export interface CCSettings {
   sageReady: boolean;
   smsReady: boolean;
   testConsent: string;
+  demo?: boolean;
 }
 export type Request = <T>(path: string, init?: RequestInit) => Promise<T>;
 export const money = (cents: number) =>

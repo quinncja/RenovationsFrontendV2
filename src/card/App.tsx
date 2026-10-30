@@ -7,6 +7,7 @@ import { appRequest, appUpload, json, session, SignedOut, type Me, type Row, typ
 import { prepare } from "./photo";
 import { Reminders } from "./Reminders";
 import { CodeInput } from "./CodeInput";
+import { demoMode, useDemoMode } from "../modules/cc/demo";
 
 type View =
   | { name: "home" }
@@ -37,11 +38,15 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [demoCode, setDemoCode] = useState("");
+  const demo = useDemoMode();
   async function send() {
     setBusy(true);
     setError("");
     try {
-      await appRequest("cc/app/code", json("POST", { phone }));
+      const out = await appRequest<{ sent: boolean; demoCode?: string }>("cc/app/code", json("POST", { phone }));
+      setDemoCode(out.demoCode || "");
+      setCode(out.demoCode || "");
       setSent(true);
     } catch (e) {
       setError((e as Error).message);
@@ -64,7 +69,14 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
   }
   return (
     <main className="rde-shell">
-      <Brand />
+      {demo ? (
+        <header className="rde-top">
+          <Brand />
+          <span className="rde-pill">Demo</span>
+        </header>
+      ) : (
+        <Brand />
+      )}
       <h1 className="rde-title">Sign in</h1>
       {!sent ? (
         <form
@@ -90,7 +102,17 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
           </label>
           {error && <p className="rde-error" role="alert">{error}</p>}
           <button className="rde-btn rde-btn--primary" disabled={busy || phone.replace(/\D/g, "").length < 10}>
-            {busy ? "Sending…" : "Text me a code"}
+            {busy ? "Sending…" : demo ? "Get a demo code" : "Text me a code"}
+          </button>
+          <button
+            type="button"
+            className="rde-link"
+            onClick={() => {
+              demoMode.set(!demo);
+              setError("");
+            }}
+          >
+            {demo ? "Leave the demo" : "Try the demo instead"}
           </button>
         </form>
       ) : (
@@ -102,7 +124,11 @@ function SignIn({ onSignedIn }: { onSignedIn: () => void }) {
           }}
         >
           <p className="rde-sub">
-            If {pretty(phone)} is on a company card, a 6-digit code is on its way. It works for 10 minutes.
+            {demoCode
+              ? `Demo: no text is sent. Your code is ${demoCode}.`
+              : demo
+                ? `${pretty(phone)} isn't on a demo card. Ask a GM to map it under Card mapping in demo mode.`
+                : `If ${pretty(phone)} is on a company card, a 6-digit code is on its way. It works for 10 minutes.`}
           </p>
           <CodeInput
             value={code}
@@ -212,7 +238,12 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
     <main className="rde-shell">
       <header className="rde-top">
         <Brand />
-        {me?.testMode && <span className="rde-pill">Test mode</span>}
+        {(me?.demo || me?.testMode) && (
+          <span className="rde-pills">
+            {me.demo && <span className="rde-pill">Demo</span>}
+            {me.testMode && <span className="rde-pill">Test mode</span>}
+          </span>
+        )}
       </header>
       <h1 className="rde-title">{me ? `Hi, ${me.name.split(" ")[0]}` : "\u00a0"}</h1>
       {me?.tester && me.cardholders ? (
