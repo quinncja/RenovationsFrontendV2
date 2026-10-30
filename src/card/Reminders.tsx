@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Bell, BellOff } from "lucide-react";
+import { Bell, BellOff, X } from "lucide-react";
 import { appRequest, json } from "./api";
 
 type Status = "checking" | "unsupported" | "off" | "on" | "denied";
@@ -25,7 +25,7 @@ export function Reminders({ testMode }: { testMode: boolean }) {
   const [status, setStatus] = useState<Status>("checking");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [later, setLater] = useState(() => {
+  const [hidden, setHidden] = useState(() => {
     try {
       return localStorage.getItem(LATER) === "1";
     } catch {
@@ -90,42 +90,36 @@ export function Reminders({ testMode }: { testMode: boolean }) {
         Reminders blocked in Settings
       </span>
     );
-  if (later)
+  if (hidden)
     return (
-      <button type="button" className="rde-reminders-on rde-reminders-link" onClick={() => setLater(false)}>
+      <button type="button" className="rde-reminders-on rde-reminders-link" onClick={() => setHidden(false)}>
         <Bell size={14} aria-hidden="true" />
         Turn on reminders
       </button>
     );
+  const later = () => {
+    try {
+      localStorage.setItem(LATER, "1");
+    } catch {
+      // Hidden for this visit only.
+    }
+    setHidden(true);
+  };
   return (
     <section className="rde-reminders">
-      <span className="rde-action-icon">
-        <Bell size={22} aria-hidden="true" />
+      <span className="rde-reminders-icon">
+        <Bell size={17} aria-hidden="true" />
       </span>
-      <div className="rde-reminders-text">
-        <b>Turn on reminders</b>
-        <span>Get a notification when a receipt or return needs you.</span>
+      <span className="rde-reminders-text">
+        Get a reminder when a receipt needs you
         {error && <span className="rde-reminders-error">{error}</span>}
-        <div className="rde-reminders-buttons">
-          <button type="button" className="rde-btn rde-btn--primary rde-btn--small" disabled={busy} onClick={() => void turnOn()}>
-            {busy ? "Turning on…" : "Turn on"}
-          </button>
-          <button
-            type="button"
-            className="rde-link"
-            onClick={() => {
-              try {
-                localStorage.setItem(LATER, "1");
-              } catch {
-                // Hidden for this visit only.
-              }
-              setLater(true);
-            }}
-          >
-            Not now
-          </button>
-        </div>
-      </div>
+      </span>
+      <button type="button" className="rde-reminders-on-btn" disabled={busy} onClick={() => void turnOn()}>
+        {busy ? "Turning on…" : "Turn on"}
+      </button>
+      <button type="button" className="rde-reminders-x" aria-label="Not now" onClick={later}>
+        <X size={17} aria-hidden="true" />
+      </button>
     </section>
   );
 }

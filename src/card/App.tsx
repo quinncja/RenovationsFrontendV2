@@ -220,14 +220,16 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
     session.clear();
     onSignedOut();
   };
+  const todo = me?.todo;
+  const sentBack = todo?.filter((r) => r.correction).length ?? 0;
+  const oldest = todo?.reduce((o, r) => (!o || r.receiptDate < o ? r.receiptDate : o), "") ?? "";
   return (
     <main className="rde-shell">
       <header className="rde-top">
-        <Brand />
+        <h1 className="rde-title">{me ? `Hi, ${me.name.split(" ")[0]}` : " "}</h1>
         {me?.testMode && <span className="rde-pill">Test mode</span>}
       </header>
-      <h1 className="rde-title">{me ? `Hi, ${me.name.split(" ")[0]}` : "\u00a0"}</h1>
-      {me?.tester && me.cardholders ? (
+      {me?.tester && me.cardholders && (
         <label className="rde-actas">
           Testing as{" "}
           <b>
@@ -250,8 +252,6 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
             ))}
           </select>
         </label>
-      ) : (
-        <p className="rde-greet-sub">{me ? `Company card •••• ${me.cardLast4}` : "\u00a0"}</p>
       )}
       {error && <p className="rde-error" role="alert">{error}</p>}
 
@@ -271,26 +271,53 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
         }}
       />
 
-      <Queue
-        rows={me?.todo}
-        attaching={attaching}
-        onOpen={(token) => setView({ name: "receipt", token })}
-        onSnap={(token) => snap(token)}
-      />
+      {/* The card: what's left to finish, and the two things you can start. */}
+      <section className="rde-hero" aria-busy={!todo}>
+        <div className="rde-hero-row">
+          <span>Company card</span>
+          <span className="rde-hero-last4">{me ? `•••• ${me.cardLast4}` : ""}</span>
+        </div>
+        {!todo ? (
+          <>
+            <p className="rde-hero-big">{" "}</p>
+            <p className="rde-hero-meta">{" "}</p>
+          </>
+        ) : todo.length ? (
+          <>
+            <p className="rde-hero-big">
+              {todo.length}
+              <span>{todo.length === 1 ? "receipt" : "receipts"} to finish</span>
+            </p>
+            <p className="rde-hero-meta">
+              {[sentBack ? `${sentBack} sent back` : "", `${todo.length === 1 ? "from" : "oldest from"} ${shortDay(oldest)}`]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="rde-hero-big rde-hero-big--done">All caught up</p>
+            <p className="rde-hero-meta">You'll get a text when your card is charged.</p>
+          </>
+        )}
+        <div className="rde-hero-actions">
+          <button type="button" className="rde-hb rde-hb--solid" onClick={() => snap("purchase")}>
+            <Camera size={18} aria-hidden="true" /> Add receipt
+          </button>
+          <button type="button" className="rde-hb rde-hb--glass" onClick={() => snap("return")}>
+            <Undo2 size={18} aria-hidden="true" /> Log return
+          </button>
+        </div>
+      </section>
 
-      <button type="button" className="rde-btn rde-btn--outline rde-return" onClick={() => snap("return")}>
-        <Undo2 size={18} aria-hidden="true" /> Log a return
-      </button>
-
-      <p className="rde-early">
-        <button type="button" className="rde-inline" onClick={() => snap("purchase")}>
-          Add a receipt early
-        </button>
-        <span aria-hidden="true">·</span>
-        <button type="button" className="rde-inline" onClick={() => setView({ name: "start", kind: "purchase" })}>
-          Enter by hand
-        </button>
-      </p>
+      {!!todo?.length && (
+        <Queue
+          rows={todo}
+          attaching={attaching}
+          onOpen={(token) => setView({ name: "receipt", token })}
+          onSnap={(token) => snap(token)}
+        />
+      )}
 
       {!!me?.recent.length && (
         <section className="rde-section">
@@ -320,14 +347,16 @@ function Signed({ onSignedOut }: { onSignedOut: () => void }) {
   );
 }
 
-// Each row says what it's waiting on: a dot (amber needs you, red sent
-// back, blue with a GM, green done) and the same words beside the date.
+// After it's sent, the amount carries where it stands.
 function status(r: Row): { tone: string; text: string } {
-  if (r.correction) return { tone: "red", text: r.correctionReason ? `Sent back: ${r.correctionReason}` : "Sent back" };
-  if (r.state === "pending") return { tone: "amber", text: r.amountCents < 0 ? "Return · needs slip" : "Needs receipt" };
+  if (r.correction) return { tone: "red", text: "Sent back" };
   if (r.state === "approved") return { tone: "green", text: "Approved" };
-  return { tone: "blue", text: "Waiting for approval" };
+  if (r.state === "pending") return { tone: "", text: "Not sent" };
+  return { tone: "", text: "In review" };
 }
+
+// The store's first letter, as a quiet tile at the start of each row.
+const initial = (description: string) => (tidyName(description).match(/[A-Za-z0-9]/)?.[0] || "•").toUpperCase();
 
 async function attachPhoto(token: string, file: File) {
   const path = `cc/public/${encodeURIComponent(token)}`;
@@ -343,106 +372,75 @@ async function attachPhoto(token: string, file: File) {
   });
 }
 
-function action(r: Row) {
-  if (r.correction) return { label: "Fix it", camera: false };
-  return { label: r.amountCents < 0 ? "Add return slip" : "Add receipt", camera: true };
-}
-
+// Charges waiting on a receipt. Sent-back ones lead and open the form (the
+// reason says what to fix); the rest take a photo straight from the row.
 function Queue({
   rows,
   attaching,
   onOpen,
   onSnap,
 }: {
-  rows?: Row[];
+  rows: Row[];
   attaching: string;
   onOpen: (token: string) => void;
   onSnap: (token: string) => void;
 }) {
-  if (!rows)
-    return (
-      <section className="rde-queue" aria-busy="true">
-        <p className="rde-empty">Loading…</p>
-      </section>
-    );
-  if (!rows.length)
-    return (
-      <section className="rde-queue rde-queue--clear">
-        <b>Nothing to submit</b>
-        <span>You'll get a text when your card is charged.</span>
-      </section>
-    );
-  const [next, ...rest] = [...rows].sort((a, b) => Number(b.correction) - Number(a.correction));
-  const act = action(next);
-  const st = status(next);
-  const busy = attaching === next.token;
-  const ret = next.amountCents < 0;
+  const sorted = [...rows].sort((a, b) => Number(b.correction) - Number(a.correction));
+  const total = rows.reduce((sum, r) => sum + r.amountCents, 0);
   return (
-    <section className="rde-queue" aria-labelledby="rde-queue-title">
+    <section className="rde-section" aria-labelledby="rde-queue-title">
       <div className="rde-section-head">
-        <h2 id="rde-queue-title" className="rde-section-title">Needs receipt</h2>
-        <span>{rows.length}</span>
+        <h2 id="rde-queue-title" className="rde-section-title">To finish</h2>
+        <span>{money(total)}</span>
       </div>
-      <article className={`rde-next${next.correction ? " rde-next--back" : ""}`}>
-        <button type="button" className="rde-next-body" onClick={() => onOpen(next.token)}>
-          <span className="rde-next-meta">
-            <span className={`rde-dot rde-dot--${st.tone}`} aria-hidden="true" />
-            {shortDay(next.receiptDate)}
-            {next.correction ? " · Sent back" : ret ? " · Return" : ""}
-          </span>
-          <span className="rde-next-main">
-            <b>{tidyName(next.description)}</b>
-            <span className={ret ? "rde-row-amt--credit" : undefined}>{money(next.amountCents)}</span>
-          </span>
-          {next.correction && next.correctionReason && <span className="rde-next-why">{next.correctionReason}</span>}
-        </button>
-        <button
-          type="button"
-          className="rde-btn rde-btn--primary"
-          disabled={!!attaching}
-          onClick={() => (act.camera ? onSnap(next.token) : onOpen(next.token))}
-        >
-          {act.camera && <Camera size={18} aria-hidden="true" />}
-          {busy ? "Uploading…" : act.label}
-        </button>
-      </article>
-      {!!rest.length && (
-        <ul className="rde-list rde-queue-rest" aria-label="Also waiting">
-          {rest.map((r) => {
-            const s = status(r);
-            const a = action(r);
-            return (
-              <li key={r.token} className="rde-queue-item">
-                <button type="button" className="rde-row" onClick={() => onOpen(r.token)}>
-                  <span className={`rde-dot rde-dot--${s.tone}`} aria-hidden="true" />
-                  <span className="rde-row-text">
-                    <b>{tidyName(r.description)}</b>
-                    <span>
-                      {shortDay(r.receiptDate)} · {s.text}
+      <ul className="rde-list">
+        {sorted.map((r) => {
+          const ret = r.amountCents < 0;
+          const label = ret ? "Add return slip" : "Add receipt";
+          return (
+            <li key={r.token} className="rde-queue-item">
+              <button type="button" className="rde-row" onClick={() => onOpen(r.token)}>
+                <span className={`rde-mono${r.correction ? " rde-mono--back" : ""}`} aria-hidden="true">
+                  {initial(r.description)}
+                </span>
+                <span className="rde-row-text">
+                  <b>{tidyName(r.description)}</b>
+                  {r.correction ? (
+                    <span className="rde-row-why">
+                      Sent back{r.correctionReason ? ` · ${r.correctionReason}` : ""}
                     </span>
-                  </span>
-                  <span className={`rde-row-amt${r.amountCents < 0 ? " rde-row-amt--credit" : ""}`}>
-                    {money(r.amountCents)}
-                  </span>
+                  ) : (
+                    <span>
+                      {shortDay(r.receiptDate)}
+                      {ret ? " · Return" : ""}
+                    </span>
+                  )}
+                </span>
+                <span className="rde-row-amt">
+                  <b className={ret ? "rde-credit" : undefined}>{money(r.amountCents)}</b>
+                </span>
+              </button>
+              {r.correction ? (
+                <ChevronRight size={18} className="rde-queue-chev" aria-hidden="true" />
+              ) : (
+                <button
+                  type="button"
+                  className="rde-snap"
+                  aria-label={`${label}: ${tidyName(r.description)}`}
+                  disabled={!!attaching}
+                  onClick={() => onSnap(r.token)}
+                >
+                  {attaching === r.token ? (
+                    <RefreshCw size={17} className="rde-spin" aria-hidden="true" />
+                  ) : (
+                    <Camera size={17} aria-hidden="true" />
+                  )}
                 </button>
-                {a.camera ? (
-                  <button
-                    type="button"
-                    className="rde-snap"
-                    aria-label={`${a.label}: ${tidyName(r.description)}`}
-                    disabled={!!attaching}
-                    onClick={() => onSnap(r.token)}
-                  >
-                    {attaching === r.token ? <RefreshCw size={18} className="rde-spin" aria-hidden="true" /> : <Camera size={18} aria-hidden="true" />}
-                  </button>
-                ) : (
-                  <ChevronRight size={16} className="rde-queue-chev" aria-hidden="true" />
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
 }
@@ -455,17 +453,17 @@ function List({ rows, onOpen }: { rows: Row[]; onOpen: (token: string) => void }
         return (
           <li key={r.token}>
             <button type="button" className="rde-row" onClick={() => onOpen(r.token)}>
-              <span className={`rde-dot rde-dot--${st.tone}`} aria-hidden="true" />
+              <span className="rde-mono" aria-hidden="true">
+                {initial(r.description)}
+              </span>
               <span className="rde-row-text">
                 <b>{tidyName(r.description)}</b>
-                <span>
-                  {shortDay(r.receiptDate)} · {st.text}
-                </span>
+                <span>{shortDay(r.receiptDate)}</span>
               </span>
-              <span className={`rde-row-amt${r.amountCents < 0 ? " rde-row-amt--credit" : ""}`}>
-                {money(r.amountCents)}
+              <span className="rde-row-amt">
+                <b className={r.amountCents < 0 ? "rde-credit" : undefined}>{money(r.amountCents)}</b>
+                <span className={st.tone ? `rde-tone--${st.tone}` : undefined}>{st.text}</span>
               </span>
-              <ChevronRight size={16} aria-hidden="true" />
             </button>
           </li>
         );
