@@ -570,7 +570,7 @@ export default function CCPage() {
             )}
             {!loading && list.items.length > 0 && (older || newer) && (
               <div className="cc-weekfoot">
-                {older ? (
+                {older && (
                   <button
                     type="button"
                     className="button secondary-button"
@@ -578,8 +578,6 @@ export default function CCPage() {
                   >
                     <ChevronLeft size={16} /> {weekLabel(older.start).name}
                   </button>
-                ) : (
-                  <span />
                 )}
                 {newer && (
                   <button
