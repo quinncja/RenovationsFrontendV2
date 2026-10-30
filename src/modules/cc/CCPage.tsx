@@ -568,6 +568,30 @@ export default function CCPage() {
                 {edge.affordances}
               </div>
             )}
+            {!loading && list.items.length > 0 && (older || newer) && (
+              <div className="cc-weekfoot">
+                {older ? (
+                  <button
+                    type="button"
+                    className="button secondary-button"
+                    onClick={() => setWeek(older.start)}
+                  >
+                    <ChevronLeft size={16} /> {weekLabel(older.start).name}
+                  </button>
+                ) : (
+                  <span />
+                )}
+                {newer && (
+                  <button
+                    type="button"
+                    className="button secondary-button"
+                    onClick={() => setWeek(newer.start)}
+                  >
+                    {weekLabel(newer.start).name} <ChevronRight size={16} />
+                  </button>
+                )}
+              </div>
+            )}
           </Widget>
         </MotionItem>
       </MotionList>
@@ -705,12 +729,12 @@ function WeekBar({
       <div className="cc-weekbar-nav">
         <button
           type="button"
-          className="btn-icon"
+          className="button secondary-button cc-weekbar-step"
           aria-label="Previous week"
           disabled={!older}
           onClick={() => older && onStep(older)}
         >
-          <ChevronLeft size={16} />
+          <ChevronLeft size={18} />
         </button>
         <span className="cc-weekbar-label">
           <span className="cc-week-name">
@@ -720,12 +744,12 @@ function WeekBar({
         </span>
         <button
           type="button"
-          className="btn-icon"
+          className="button secondary-button cc-weekbar-step"
           aria-label="Next week"
           disabled={!newer}
           onClick={() => newer && onStep(newer)}
         >
-          <ChevronRight size={16} />
+          <ChevronRight size={18} />
         </button>
       </div>
       <span className="cc-weekbar-sum">
